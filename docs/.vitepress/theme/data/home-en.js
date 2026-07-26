@@ -1,25 +1,25 @@
 export const getHomeEnContent = () => ({
   heroData: {
-    badge: 'Email · WhatsApp · WeChat — One Unified Inbox',
+    badge: 'WhatsApp + Email → Structured Enterprise Knowledge',
     githubUrl: 'https://github.com/cloud2ai/devify',
-    title: 'Never Lose an Important<br>Conversation Again',
-    subtitle: 'Connect your Gmail or Outlook directly via IMAP, or forward any chat to your AI inbox. Every message analyzed, permanently archived, and searchable in seconds.',
+    title: 'Your Team\'s Best Knowledge Is Trapped in Chat.<br>Devify Gets It Out.',
+    subtitle: 'Customer feedback, engineering decisions, negotiated terms — the conversations where real work happens don\'t live in your docs. Devify turns WhatsApp and email threads into structured records that flow straight into the tools your team already uses.',
     points: [
       {
         icon: 'unified',
-        text: 'Email, WhatsApp, WeChat — all in one place'
+        text: 'One inbox for WhatsApp, Slack, Teams, and email'
       },
       {
         icon: 'ai',
-        text: 'AI reads text, images, screenshots, and documents'
+        text: 'Reads screenshots and logs, not just text'
       },
       {
         icon: 'search',
-        text: 'Find any message from years ago instantly'
+        text: 'Every conversation becomes the same structured format'
       },
       {
         icon: 'process',
-        text: 'Forward → AI processes → Permanently saved'
+        text: 'Structured results sync straight into Jira or Feishu Bitable'
       }
     ],
     primaryButtonText: 'Start for Free',
@@ -57,26 +57,32 @@ export const getHomeEnContent = () => ({
     features: []
   },
   howItWorksData: {
-    title: 'Three Ways to Get Started',
-    subtitle: 'Connect your inbox directly, or forward anything manually — your choice',
+    title: 'From Scattered Chat to Structured Knowledge',
+    subtitle: 'The same four steps behind every conversation Devify processes',
     steps: [
       {
         icon: 'email',
-        title: 'Connect Your Email via IMAP',
+        title: 'Collect — one inbox for every channel',
         description:
-          'Link your Gmail, Outlook, or any IMAP inbox directly. New emails are pulled in and processed automatically — no forwarding needed. Or simply forward any conversation to your dedicated AI inbox.'
+          'WhatsApp, Slack, Teams, Gmail, Outlook — forward or connect any of them to a single address. No per-platform integration to build or maintain.'
       },
       {
         icon: 'ai',
-        title: 'AI Reads and Analyzes Everything',
+        title: 'Understand — text and screenshots alike',
         description:
-          'The AI reads every message, understands images and screenshots, extracts key decisions, flags action items, and generates a clean summary — automatically, for every conversation.'
+          'A large share of what matters in a conversation isn\'t text — it\'s a screenshot of an error, a log, a quote. Devify\'s AI reads both and builds the full context.'
       },
       {
         icon: 'dashboard',
-        title: 'Search Everything, Forever',
+        title: 'Standardize — the same shape, regardless of who wrote it',
         description:
-          'Every conversation is permanently stored in the cloud. Full-text search across all platforms and all time. Switch devices, clear cache — nothing is ever lost.'
+          'Some people write a full paragraph; some send five screenshots and no context. Devify turns every conversation into the same structured shape — summary, key points, action items.'
+      },
+      {
+        icon: 'integration',
+        title: 'Integrate — into the workflow you already have',
+        description:
+          'Structured results sync into Jira, Feishu Bitable, or wherever your team already tracks work — so captured knowledge keeps compounding instead of sitting in an archive.'
       }
     ]
   },
@@ -111,85 +117,46 @@ export const getHomeEnContent = () => ({
     ]
   },
   useCasesData: {
-    title: 'Who Uses AImyChats?',
-    subtitle: 'Anyone who needs to find, prove, or remember something from a past conversation',
+    title: 'Built for Teams, Not Just Inboxes',
+    subtitle: 'Wherever your team\'s real work happens in chat, Devify turns it into something the whole organization can use',
     useCases: [
       {
-        icon: 'sales',
-        role: 'Account Managers',
-        subtitle: 'Every client promise, on record',
+        icon: 'team',
+        role: 'Engineering Teams',
+        subtitle: 'Every bug investigation, captured — not re-solved twice',
         description:
-          'Client discussions span WhatsApp, email, and calls. AI automatically archives and summarizes every interaction so you can reference exactly what was agreed.',
+          'The incident chatter in Slack or WhatsApp holds the real root-cause discussion. Devify turns it into a structured record the next on-call engineer can actually find.',
         benefits: [
-          'Multi-platform client communications archived',
-          'Commitments and requirements clearly recorded',
-          'Screenshot content (quotes, specs) auto-extracted',
-          'Instant search across all client history'
+          'Screenshots, logs, and error messages auto-extracted',
+          'Structured issue synced straight to Jira',
+          'Search past incidents instead of re-investigating them',
+          'Context survives even after the original chat is gone'
+        ]
+      },
+      {
+        icon: 'support',
+        role: 'Customer Success Teams',
+        subtitle: 'Every customer commitment, on record',
+        description:
+          'Feature requests, complaints, and promises live in WhatsApp threads and forwarded emails. Devify keeps them structured and attributable, instead of buried in one person\'s inbox.',
+        benefits: [
+          'Customer feedback auto-summarized and tagged',
+          'Commitments and deadlines extracted automatically',
+          'Synced to your CRM or ticketing system',
+          'Full history searchable across every customer'
         ]
       },
       {
         icon: 'lawyer',
-        role: 'Lawyers',
-        subtitle: 'Communications that hold up as evidence',
+        role: 'Compliance & Legal Teams',
+        subtitle: 'A defensible record, without changing how anyone communicates',
         description:
-          'Client consultations, contract negotiations, case evidence — scattered across platforms. AI structures it all into a searchable, permanent record.',
+          'Regulated communication scattered across chat apps is a liability, not an asset. Devify captures it as structured, timestamped records without asking teams to adopt a new tool.',
         benefits: [
-          'Multi-platform conversation archiving',
-          'Image and document content AI-analyzed',
-          'Key clauses and commitments auto-extracted',
-          'Permanent, searchable case history'
-        ]
-      },
-      {
-        icon: 'team',
-        role: 'Project Managers',
-        subtitle: 'Decisions buried in group chats, surfaced',
-        description:
-          'Requirement changes, approval threads, action items — lost in long group chats. AI extracts decisions and to-dos automatically.',
-        benefits: [
-          'Group chat discussions structured automatically',
-          'Requirement change history traceable',
-          'Action items and owners auto-identified',
-          'Multiple project channels in one view'
-        ]
-      },
-      {
-        icon: 'team',
-        role: 'Executives',
-        subtitle: 'Cross-channel clarity, at scale',
-        description:
-          'Strategic decisions happen across email, messaging, and calls. AI consolidates it all so you can trace any decision back to its source.',
-        benefits: [
-          'All communication channels unified',
-          'Key decisions permanently preserved',
-          'Multi-scenario AI analysis (projects, clients, internal)',
-          'Decision context retrievable on demand'
-        ]
-      },
-      {
-        icon: 'doctor',
-        role: 'Healthcare Professionals',
-        subtitle: 'Complete patient communication history',
-        description:
-          'Lab reports shared as images, symptoms described over chat, follow-up notes via email — AI archives and organizes it all for accurate patient tracking.',
-        benefits: [
-          'Lab results and prescriptions auto-recognized',
-          'Patient communication permanently preserved',
-          'Key symptoms and instructions extracted',
-          'Instant access to full patient history'
-        ]
-      },
-      {
-        icon: 'finance',
-        role: 'Financial Advisors',
-        subtitle: 'Every recommendation, documented',
-        description:
-          'Client conversations about investments, risks, and decisions need to be on record. AI turns scattered messages into a traceable, compliant archive.',
-        benefits: [
-          'Investment conversations fully documented',
-          'Client confirmations clearly recorded',
-          'Screenshot-based intent auto-captured',
-          'Traceable history for compliance needs'
+          'Communication captured with full context and timestamps',
+          'No new app to adopt — forwarding an email is enough',
+          'Structured records exportable for audit',
+          'Self-hosted option for full data residency control'
         ]
       }
     ]

@@ -13,9 +13,12 @@
       </div>
 
       <!-- Steps -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 relative">
+      <div :class="['grid grid-cols-1 gap-8 md:gap-12 relative', steps.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3']">
         <!-- Connection lines for desktop -->
-        <div class="hidden md:block absolute top-10 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-200 via-primary-400 to-primary-200" style="width: 66%; margin-left: 17%;"></div>
+        <div
+          class="hidden md:block absolute top-10 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-200 via-primary-400 to-primary-200"
+          :style="steps.length === 4 ? 'width: 75%; margin-left: 12.5%;' : 'width: 66%; margin-left: 17%;'"
+        ></div>
 
         <div
           v-for="(step, index) in steps"
@@ -34,6 +37,9 @@
               </svg>
               <svg v-else-if="step.icon === 'dashboard'" class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <svg v-else-if="step.icon === 'integration'" class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
               </svg>
               <svg v-else class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />

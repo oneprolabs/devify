@@ -18,8 +18,8 @@ LOCAL_MODE="${LOCAL_MODE:-0}"
 log() { echo -e "\033[1;36m[devify-deploy]\033[0m $*"; }
 die() { echo -e "\033[1;31m[devify-deploy] ERROR:\033[0m $*" >&2; exit 1; }
 
-DEVIFY_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/cloud2ai/devify"
-DEVIFY_UI_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/cloud2ai/devify-ui"
+DEVIFY_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify"
+DEVIFY_UI_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify-ui"
 
 # Single-flight lock so two mutating runs (a CI retry overlapping a manual run,
 # two operators) can't race on .active_color, the colored containers, or the
@@ -113,7 +113,7 @@ sync_devify() {
         git -C "${CORE_DIR}" remote set-url origin "${DEVIFY_REPO}"
     fi
 
-    git -C "${CORE_DIR}" fetch --tags origin
+    git -C "${CORE_DIR}" fetch --tags --force origin
     if git -C "${CORE_DIR}" rev-parse --verify --quiet "origin/${DEVIFY_REF}" >/dev/null; then
         git -C "${CORE_DIR}" checkout --force -B "${DEVIFY_REF}" "origin/${DEVIFY_REF}"
     else

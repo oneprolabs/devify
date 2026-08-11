@@ -38,7 +38,7 @@ DEFAULT_ADMIN_PORT=19443
 DEFAULT_SMTP_PORT=25
 REGISTRY_GITHUB="registry.cn-beijing.aliyuncs.com/oneprolabs"
 REGISTRY_CN="registry.cn-beijing.aliyuncs.com/oneprolabs"
-INSTALLER_VERSION="0.2.0"
+INSTALLER_VERSION="0.2.1"
 HEALTH_TIMEOUT=120
 
 # Files fetched directly from the source repository tag (GitHub or Gitee).
@@ -1130,6 +1130,35 @@ docker_pull_progress() {
   return 0
 }
 
+verify_app_image_platform() {
+  local img="$1" manifest="" target_arch="${ARCH}"
+  case "${img}" in
+    */"${APP_NAME}":*|*/"${APP_NAME}-ui":*) ;;
+    *) return 0 ;;
+  esac
+
+  case "${DOCKER_DEFAULT_PLATFORM:-}" in
+    linux/amd64|linux/amd64/*) target_arch="amd64" ;;
+    linux/arm64|linux/arm64/*) target_arch="arm64" ;;
+  esac
+
+  if ! manifest="$(docker manifest inspect "${img}" 2>>"${LOG_FILE:-/dev/null}")"; then
+    log_warn "could not inspect the platform manifest for ${img}; continuing with normal pull retries"
+    return 0
+  fi
+  if ! printf '%s\n' "${manifest}" | awk -v arch="${target_arch}" '
+    /"architecture"[[:space:]]*:/ {
+      matches_arch = ($0 ~ "\\\"" arch "\\\"")
+    }
+    matches_arch && /"os"[[:space:]]*:[[:space:]]*"linux"/ {
+      found = 1
+    }
+    END { exit found ? 0 : 1 }
+  '; then
+    abort "${img} does not provide a linux/${target_arch} image; choose a multi-architecture release or run Devify on a supported host architecture"
+  fi
+}
+
 pull_images() {
   log_step "Pulling container images (registry: ${REGISTRY})"
   run_compose config --quiet || abort "invalid docker-compose configuration; see ${LOG_FILE}"
@@ -1145,6 +1174,7 @@ pull_images() {
     return 0
   fi
   for img in "${images[@]}"; do
+    verify_app_image_platform "${img}"
     attempt=1
     while :; do
       if pull_one "${img}"; then
@@ -1237,6 +1267,21 @@ health_check() {
     sleep 5
   done
   log_ok "Health check passed: ${url}"
+
+  local admin_deadline=$((SECONDS + HEALTH_TIMEOUT))
+  local admin_status=""
+  local admin_url="https://127.0.0.1:${ADMIN_PORT}/admin/"
+  until [[ "${admin_status}" == "200" || "${admin_status}" == "302" ]]; do
+    admin_status="$(curl --insecure --silent --show-error --output /dev/null \
+      --write-out '%{http_code}' --max-time 5 "${admin_url}" 2>/dev/null || true)"
+    if ((SECONDS >= admin_deadline)); then
+      abort "admin health check failed for ${admin_url} (last HTTP status: ${admin_status:-unavailable})"
+    fi
+    if [[ "${admin_status}" != "200" && "${admin_status}" != "302" ]]; then
+      sleep 5
+    fi
+  done
+  log_ok "Admin health check passed: ${admin_url} (HTTP ${admin_status})"
 }
 
 # ---------------------------------------------------------------------------
@@ -1286,7 +1331,7 @@ final_summary() {
   log_step "Installation complete"
   log_ok "Devify v${VERSION} installed at ${INSTALL_DIR}"
   log_info "URL:              ${SCHEME}://${DOMAIN}${PORT_SUFFIX}"
-  log_info "Admin panel:      https://${DOMAIN}:${ADMIN_PORT}/devify-admin (self-signed certificate)"
+  log_info "Admin panel:      https://${DOMAIN}:${ADMIN_PORT}/admin/ (self-signed certificate)"
   log_info "Username:         ${ADMIN_USERNAME}"
   log_info "Initial password: ${ADMIN_PASSWORD}"
   log_info "Install dir:      ${INSTALL_DIR}"

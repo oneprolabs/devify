@@ -63,7 +63,7 @@ jobs:
             USE_MIRROR=false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
 
       - name: Extract metadata for UI image
         id: ui-meta
@@ -93,7 +93,27 @@ jobs:
             VITE_SENTRY_RELEASE=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
+
+      - name: Verify published image platforms
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_VERSION#v}"
+          for image_name in "${IMAGE_NAME}" "${UI_IMAGE_NAME}"; do
+            image="${ALIYUN_REGISTRY}/${image_name}:${version}"
+            manifest="$(docker buildx imagetools inspect --raw "${image}")"
+            for arch in amd64 arm64; do
+              if ! printf '%s' "${manifest}" | jq -e --arg arch "${arch}" \
+                'any(.manifests[]?; .platform.os == "linux" and .platform.architecture == $arch)' \
+                >/dev/null; then
+                echo "Missing linux/${arch} manifest in ${image}" >&2
+                exit 1
+              fi
+            done
+            echo "Verified linux/amd64 and linux/arm64 manifests in ${image}"
+          done
 
       # Auto-deploy gate: the image build/push above always runs on a tag, but
       # deploying to the host runs ONLY when the repo/environment variable

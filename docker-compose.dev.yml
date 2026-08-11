@@ -110,7 +110,7 @@ services:
     networks:
       - devify_network
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "mariadb --defaults-extra-file=/var/lib/mysql/.my-healthcheck.cnf --skip-ssl --protocol=tcp --host=127.0.0.1 --batch --skip-column-names --execute=\"SELECT 1 FROM information_schema.ENGINES WHERE engine='innodb' AND support IN ('YES', 'DEFAULT', 'ENABLED')\" | grep -qx 1"]
       interval: 5s
       timeout: 5s
       retries: 10

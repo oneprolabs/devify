@@ -224,10 +224,14 @@ else
 fi
 
 for compose_file in docker-compose.yml docker-compose.dev.yml; do
-  if grep -Fq 'test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]' "${compose_file}"; then
-    ok "${compose_file} uses MariaDB's authenticated health check"
+  healthcheck_line="$(grep -F 'test: ["CMD-SHELL"' "${compose_file}" | grep -F 'mariadb' || true)"
+  if [[ "${healthcheck_line}" == *"/var/lib/mysql/.my-healthcheck.cnf"* \
+    && "${healthcheck_line}" == *"--protocol=tcp"* \
+    && "${healthcheck_line}" == *"--host=127.0.0.1"* \
+    && "${healthcheck_line}" == *"information_schema.ENGINES"* ]]; then
+    ok "${compose_file} uses an authenticated TCP MariaDB health check"
   else
-    fail "${compose_file} does not use MariaDB's authenticated health check"
+    fail "${compose_file} does not use the production-safe MariaDB health check"
   fi
 done
 

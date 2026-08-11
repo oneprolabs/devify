@@ -110,7 +110,7 @@ services:
     networks:
       - devify_network
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "--silent"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 5s
       retries: 10

@@ -7,11 +7,21 @@ on:
     paths:
       - 'install.sh'
       - 'scripts/test-install.sh'
+      - 'docker-compose.yml'
+      - 'docker-compose.dev.yml'
+      - 'docker/nginx/default.conf'
+      - 'docker/nginx/bluegreen/default.conf'
+      - '.github/workflows/build_and_deploy.yml'
       - '.github/workflows/installer-platform-tests.yml'
   pull_request:
     paths:
       - 'install.sh'
       - 'scripts/test-install.sh'
+      - 'docker-compose.yml'
+      - 'docker-compose.dev.yml'
+      - 'docker/nginx/default.conf'
+      - 'docker/nginx/bluegreen/default.conf'
+      - '.github/workflows/build_and_deploy.yml'
       - '.github/workflows/installer-platform-tests.yml'
   workflow_dispatch:
 

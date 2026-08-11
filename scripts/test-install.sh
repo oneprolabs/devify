@@ -178,6 +178,123 @@ else
   ok "require_root skipped (root/sudo re-exec is host-specific, not run in CI)"
 fi
 
+section "final_summary"
+summary_out="$(
+  VERSION="test"
+  INSTALL_DIR="${TMPDIR:-/tmp}/devify-test-$$"
+  DATA_DIR="${INSTALL_DIR}/data"
+  SCHEME="https"
+  DOMAIN="192.0.2.1"
+  PORT_SUFFIX=":10443"
+  ADMIN_PORT="19443"
+  ADMIN_USERNAME="admin"
+  ADMIN_PASSWORD="test-password"
+  LOG_FILE=""
+  HTTPS="true"
+  final_summary
+)"
+expected_admin_url="https://192.0.2.1:19443/admin/"
+if printf '%s\n' "${summary_out}" | grep -Fq "Admin panel:      ${expected_admin_url}"; then
+  ok "final summary exposes the working admin panel URL"
+else
+  fail "final summary does not expose ${expected_admin_url}"
+fi
+if printf '%s\n' "${summary_out}" | grep -Fq "/devify-admin"; then
+  fail "final summary still exposes the obsolete /devify-admin path"
+else
+  ok "final summary omits the obsolete /devify-admin path"
+fi
+
+section "installer contracts"
+if [[ "${INSTALLER_VERSION}" == "0.2.1" ]]; then
+  ok "installer patch version is 0.2.1"
+else
+  fail "installer patch version is ${INSTALLER_VERSION}, expected 0.2.1"
+fi
+multiarch_builds="$(grep -Fc "platforms: linux/amd64,linux/arm64" .github/workflows/build_and_deploy.yml)"
+if [[ "${multiarch_builds}" == "2" ]]; then
+  ok "release workflow builds backend and UI for amd64 and arm64"
+else
+  fail "release workflow has ${multiarch_builds} multi-architecture build(s), expected 2"
+fi
+if grep -Fq "Verify published image platforms" .github/workflows/build_and_deploy.yml; then
+  ok "release workflow verifies published image platforms"
+else
+  fail "release workflow does not verify published image platforms"
+fi
+
+for compose_file in docker-compose.yml docker-compose.dev.yml; do
+  if grep -Fq 'test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]' "${compose_file}"; then
+    ok "${compose_file} uses MariaDB's authenticated health check"
+  else
+    fail "${compose_file} does not use MariaDB's authenticated health check"
+  fi
+done
+
+for nginx_file in docker/nginx/default.conf docker/nginx/bluegreen/default.conf; do
+  if grep -Fq "# Entry URL: /admin/" "${nginx_file}"; then
+    ok "${nginx_file} documents the working admin entry URL"
+  else
+    fail "${nginx_file} does not document the working admin entry URL"
+  fi
+done
+
+section "health_check"
+health_out_file="${TMPDIR:-/tmp}/devify-test-health-$$.log"
+curl() {
+  local last_arg="${!#}"
+  if [[ "${last_arg}" == "http://127.0.0.1:18001/health" ]]; then
+    return 0
+  fi
+  if [[ "${last_arg}" == "https://127.0.0.1:19443/admin/" ]]; then
+    printf '302'
+    return 0
+  fi
+  return 1
+}
+HTTP_PORT="18001"
+ADMIN_PORT="19443"
+HEALTH_TIMEOUT="1"
+health_check >"${health_out_file}" 2>&1
+unset -f curl
+if grep -Fq "Admin health check passed: https://127.0.0.1:19443/admin/ (HTTP 302)" "${health_out_file}"; then
+  ok "health check verifies the dedicated admin URL"
+else
+  fail "health check did not verify the dedicated admin URL: $(tr '\n' ' ' <"${health_out_file}")"
+fi
+rm -f "${health_out_file}"
+
+section "verify_app_image_platform"
+docker() {
+  printf '%s\n' '{"manifests":[{"platform":{"architecture":"amd64","os":"linux"}}]}'
+}
+APP_NAME="devify"
+ARCH="arm64"
+DOCKER_DEFAULT_PLATFORM=""
+LOG_FILE=""
+platform_out="$(verify_app_image_platform "registry.example/devify:1.3.0" 2>&1)"
+platform_rc=$?
+if [[ "${platform_rc}" == "1" ]] && printf '%s\n' "${platform_out}" | grep -Fq "does not provide a linux/arm64 image"; then
+  ok "unsupported application image architecture fails before pull retries"
+else
+  fail "unsupported application image architecture was not rejected: ${platform_out}"
+fi
+ARCH="amd64"
+if verify_app_image_platform "registry.example/devify-ui:1.3.0" >/dev/null 2>&1; then
+  ok "supported application image architecture passes manifest preflight"
+else
+  fail "supported application image architecture was rejected"
+fi
+ARCH="arm64"
+DOCKER_DEFAULT_PLATFORM="linux/amd64"
+if verify_app_image_platform "registry.example/devify:1.3.0" >/dev/null 2>&1; then
+  ok "explicit Docker target platform overrides the host architecture"
+else
+  fail "explicit Docker target platform was ignored"
+fi
+unset DOCKER_DEFAULT_PLATFORM
+unset -f docker
+
 section "run_compose (Windows path conversion)"
 if [[ "${PLATFORM}" == "windows" ]]; then
   COMPOSE_CMD=(echo)

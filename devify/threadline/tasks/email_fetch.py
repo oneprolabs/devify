@@ -10,13 +10,11 @@ import logging
 from typing import Dict
 
 from celery import shared_task
-from django.contrib.auth.models import User
 from django.utils import timezone
 from django.conf import settings
-from django.db.models import Prefetch
 
 from agentcore_task.adapters.django import prevent_duplicate_task
-from threadline.models import EmailMessage, Settings
+from threadline.models import EmailMailbox, EmailMessage, Settings
 from threadline.utils.email import (
     EmailProcessor,
     EmailSaveService,
@@ -38,6 +36,58 @@ def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
         return
 
     process_email_merge.delay(str(email_msg.id))
+
+
+
+def _user_filter_config(user_id: int) -> dict:
+    """
+    Read the user's shared filter settings.
+
+    Filters stay on the account rather than on each mailbox: a user who
+    wants only invoices wants that from every mailbox they connect.
+    """
+    setting = Settings.objects.filter(
+        user_id=user_id, key="email_config", is_active=True
+    ).first()
+    if not setting:
+        return {}
+    return (setting.value or {}).get("filter_config") or {}
+
+
+def _record_mailbox_success(mailbox) -> None:
+    mailbox.last_fetched_at = timezone.now()
+    mailbox.last_success_at = mailbox.last_fetched_at
+    mailbox.last_error = ""
+    mailbox.consecutive_failures = 0
+    mailbox.save(
+        update_fields=[
+            "last_fetched_at",
+            "last_success_at",
+            "last_error",
+            "consecutive_failures",
+            "updated_at",
+        ]
+    )
+
+
+def _record_mailbox_failure(mailbox, exc) -> None:
+    """
+    Keep the failure on the mailbox that caused it.
+
+    With several mailboxes connected, an account-level error message would
+    leave the user guessing which one needs attention.
+    """
+    mailbox.last_fetched_at = timezone.now()
+    mailbox.last_error = str(exc)[:2000]
+    mailbox.consecutive_failures = (mailbox.consecutive_failures or 0) + 1
+    mailbox.save(
+        update_fields=[
+            "last_fetched_at",
+            "last_error",
+            "consecutive_failures",
+            "updated_at",
+        ]
+    )
 
 
 @shared_task
@@ -72,67 +122,48 @@ def imap_email_fetch():
         logger.info(f"{context} Starting IMAP email fetch task")
         tracer.append_task("INIT", "IMAP email fetch task started")
 
-        # Query users with IMAP configuration.
-        # Use __contains for MySQL JSONField compatibility.
-        # The filter matches settings with mode=custom_imap and imap_config.
-        users_with_imap_config = (
-            User.objects.filter(
-                is_active=True,
-                settings__key="email_config",
-                settings__is_active=True,
-                settings__value__contains={"mode": "custom_imap"},
-            )
-            .prefetch_related(
-                Prefetch(
-                    "settings",
-                    queryset=Settings.objects.filter(
-                        key="email_config", is_active=True
-                    ),
-                )
-            )
-            .distinct()
+        # Every enabled mailbox is polled, whatever else the user has
+        # configured. Mailboxes and the virtual address are parallel
+        # channels now, not alternatives.
+        mailboxes = (
+            EmailMailbox.objects.filter(enabled=True, user__is_active=True)
+            .select_related("user")
+            .order_by("user_id", "id")
         )
 
-        for user in users_with_imap_config:
-            user_display = f"{user.username} (ID: {user.id})"
+        for mailbox in mailboxes:
+            user = mailbox.user
+            user_display = (
+                f"{user.username} (ID: {user.id}) "
+                f"[{mailbox.display_name}]"
+            )
             try:
-                logger.info(f"{context} Processing user {user_display}")
+                logger.info(f"{context} Processing mailbox {user_display}")
                 tracer.append_task(
-                    "USER_PROCESS", f"Starting to process user {user_display}"
+                    "USER_PROCESS", f"Starting to process {user_display}"
                 )
 
-                email_config_setting = user.settings.first()
-                if not email_config_setting:
-                    logger.warning(
-                        f"{context} User {user_display} has no email_config, "
-                        "skipping"
-                    )
-                    continue
-
-                email_config = email_config_setting.value
-
-                if "imap_config" not in email_config:
-                    logger.warning(
-                        f"{context} User {user_display} email_config missing "
-                        "imap_config, skipping"
-                    )
-                    continue
-
-                # Fetch emails for each user with pre-fetched config
                 result = fetch_user_imap_emails(
-                    user.id, email_config, user_display=user_display
+                    user.id,
+                    mailbox.to_email_config(
+                        filter_config=_user_filter_config(user.id)
+                    ),
+                    user_display=user_display,
                 )
                 processed_count += 1
                 emails_processed += result.get("emails_processed", 0)
                 email_ids.extend(result.get("email_ids", []))
 
+                _record_mailbox_success(mailbox)
+
                 tracer.append_task(
                     "USER_SUCCESS",
-                    f"User {user_display} processing completed: {result}",
+                    f"{user_display} processing completed: {result}",
                 )
 
             except Exception as exc:
                 error_count += 1
+                _record_mailbox_failure(mailbox, exc)
                 tracer.append_task(
                     "USER_ERROR",
                     f"User {user_display} processing failed: {str(exc)}",

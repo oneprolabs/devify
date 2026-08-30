@@ -169,3 +169,15 @@ SHARE_LINK_CLEANUP_CONFIG = {
         os.getenv('SHARE_LINK_CLEANUP_BATCH_SIZE', '500')
     )
 }
+
+
+# ============================
+# User Mailboxes
+# ============================
+
+# MAX_USER_MAILBOXES: How many IMAP mailboxes one user may connect.
+# - The virtual address is always available and is not counted here.
+# - Every mailbox is polled on each fetch cycle, so this bounds the work
+#   a single account can create for the scheduler.
+MAX_USER_MAILBOXES = int(os.getenv('MAX_USER_MAILBOXES', '5'))
+

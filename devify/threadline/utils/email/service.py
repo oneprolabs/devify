@@ -313,33 +313,27 @@ class EmailSaveService:
 
     def load_user_mappings(self):
         """
-        Load auto_assign users and their aliases into memory for batch
-        processing optimization.
-        Only loads users who have auto_assign mode enabled.
-        This method should be called once at the start of batch
-        email processing.
+        Load alias-to-user mappings into memory for batch processing.
+
+        Called once at the start of a batch so inbound mail can be routed
+        without a query per message.
         """
         if self._mappings_loaded:
             return
 
-        logger.info(
-            "Loading auto_assign user mappings for batch processing..."
+        logger.info("Loading alias mappings for batch processing...")
+
+        # The virtual address is always live: it is a channel that runs
+        # alongside any mailboxes a user connects, not an alternative to
+        # them. Anyone holding an active alias can receive on it.
+        auto_assign_user_ids = set(
+            EmailAlias.objects.filter(is_active=True).values_list(
+                "user_id", flat=True
+            )
         )
 
-        # Get all email configs and filter in Python due to JSONField
-        # query limitations
-        all_email_settings = Settings.objects.filter(
-            key="email_config", is_active=True
-        ).values("user_id", "value")
-
-        auto_assign_user_ids = {
-            setting["user_id"]
-            for setting in all_email_settings
-            if setting["value"].get("mode") == "auto_assign"
-        }
-
         if not auto_assign_user_ids:
-            logger.info("No auto_assign users found")
+            logger.info("No users with an active alias found")
             self._mappings_loaded = True
             return
 

@@ -9,6 +9,8 @@ from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
+from billing.fields import EncryptedTextField
+
 from threadline.state_machine import (
     EmailStatus,
     get_initial_email_status,
@@ -985,6 +987,111 @@ class ThreadlineShareLink(models.Model):
         self.view_count += 1
         self.last_viewed_at = timestamp
 
+
+
+class EmailMailbox(models.Model):
+    """
+    One IMAP mailbox a user has connected.
+
+    Mailboxes are separate rows rather than entries inside the user's
+    email settings because each one needs its own state: which fetch
+    succeeded last, what failed and why. With several mailboxes attached,
+    a single shared error field would leave the user unable to tell which
+    one is broken.
+
+    This channel runs alongside the virtual address rather than instead of
+    it; a user can receive on both.
+    """
+
+    uuid = models.UUIDField(
+        default=uuid_lib.uuid4,
+        unique=True,
+        editable=False,
+        verbose_name=_("UUID"),
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mailboxes",
+        verbose_name=_("User"),
+    )
+    name = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Name"),
+        help_text=_("Label shown in the UI; defaults to the address"),
+    )
+    imap_host = models.CharField(max_length=255, verbose_name=_("IMAP Host"))
+    imap_port = models.PositiveIntegerField(
+        default=993, verbose_name=_("IMAP Port")
+    )
+    use_ssl = models.BooleanField(default=True, verbose_name=_("Use SSL"))
+    username = models.CharField(max_length=255, verbose_name=_("Username"))
+    # Stored encrypted at rest. The previous single-mailbox configuration
+    # kept this in plain text inside a JSON settings blob.
+    password = EncryptedTextField(blank=True, default="")
+    folder = models.CharField(
+        max_length=100, default="INBOX", verbose_name=_("Folder")
+    )
+    delete_after_fetch = models.BooleanField(
+        default=False, verbose_name=_("Delete After Fetch")
+    )
+
+    enabled = models.BooleanField(default=True, verbose_name=_("Enabled"))
+    last_fetched_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("Last Fetched At")
+    )
+    last_success_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("Last Success At")
+    )
+    last_error = models.TextField(blank=True, verbose_name=_("Last Error"))
+    consecutive_failures = models.PositiveIntegerField(
+        default=0, verbose_name=_("Consecutive Failures")
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Email Mailbox")
+        verbose_name_plural = _("Email Mailboxes")
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "imap_host", "username"],
+                name="threadline_mailbox_user_host_username_uniq",
+            )
+        ]
+        indexes = [models.Index(fields=["enabled"])]
+
+    def __str__(self) -> str:
+        return f"{self.display_name} -> {self.user_id}"
+
+    @property
+    def display_name(self) -> str:
+        return self.name or self.username
+
+    def to_email_config(self, filter_config=None) -> dict:
+        """
+        Render this mailbox in the shape the fetch pipeline expects.
+
+        Keeping the existing dict contract means the processor, parser and
+        save path stay untouched by the move to multiple mailboxes.
+        """
+        return {
+            "mode": "custom_imap",
+            "imap_config": {
+                "imap_host": self.imap_host,
+                "imap_port": self.imap_port,
+                "imap_ssl_port": self.imap_port,
+                "use_ssl": self.use_ssl,
+                "username": self.username,
+                "password": self.password,
+                "folder": self.folder,
+                "delete_after_fetch": self.delete_after_fetch,
+            },
+            "filter_config": filter_config or {},
+        }
 
 class EmailAlias(models.Model):
     """

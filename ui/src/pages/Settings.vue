@@ -530,114 +530,7 @@
           </template>
 
           <form class="space-y-5" @submit.prevent="saveEmailConfig">
-            <div
-              class="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-4 md:items-start"
-            >
-              <div class="md:col-span-1">
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  {{ t('settings.emailMode') }}
-                </label>
-                <p class="text-xs text-gray-500">
-                  {{ t('settings.emailModeDesc') }}
-                </p>
-              </div>
-              <div class="md:col-span-2">
-                <select
-                  v-model="emailForm.mode"
-                  class="block w-full pl-3 pr-10 py-2 text-sm border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 rounded-md shadow-sm appearance-none cursor-pointer hover:border-gray-400 transition-colors"
-                >
-                  <option value="auto_assign">
-                    {{ t('settings.emailModeAutoAssign') }}
-                  </option>
-                  <option value="custom_imap">
-                    {{ t('settings.emailModeCustomImap') }}
-                  </option>
-                </select>
-                <div
-                  v-if="emailForm.mode === 'auto_assign'"
-                  class="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3"
-                >
-                  <div class="text-xs font-medium text-blue-700">
-                    {{ t('settings.currentAutoAssignedEmail') }}
-                  </div>
-                  <div
-                    class="mt-1 text-sm font-mono text-blue-900 truncate"
-                    :title="autoAssignedEmail || t('settings.noVirtualEmail')"
-                  >
-                    {{ autoAssignedEmail || t('settings.noVirtualEmail') }}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div
-              v-if="emailForm.mode === 'custom_imap'"
-              class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4"
-            >
-              <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <BaseInput
-                  v-model="emailForm.imapHost"
-                  :label="t('settings.imapHost')"
-                  :placeholder="t('settings.imapHostPlaceholder')"
-                />
-                <BaseInput
-                  v-model="emailForm.username"
-                  :label="t('settings.imapUsername')"
-                  :placeholder="t('settings.imapUsernamePlaceholder')"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <BaseInput
-                  v-model="emailForm.password"
-                  :label="t('settings.imapPassword')"
-                  type="password"
-                  name="imap_password"
-                  autocomplete="current-password"
-                  :placeholder="t('settings.imapPasswordPlaceholder')"
-                />
-                <BaseInput
-                  v-model="emailForm.imapSslPort"
-                  :label="t('settings.imapSslPort')"
-                  type="number"
-                  :placeholder="t('settings.imapSslPortPlaceholder')"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <BaseInput
-                  v-model="emailForm.folder"
-                  :label="t('settings.imapFolder')"
-                  :placeholder="t('settings.imapFolderPlaceholder')"
-                />
-                <BaseInput
-                  v-model="emailForm.maxAgeDays"
-                  :label="t('settings.maxAgeDays')"
-                  type="number"
-                  :placeholder="t('settings.maxAgeDaysPlaceholder')"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <label class="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    v-model="emailForm.useSsl"
-                    type="checkbox"
-                    class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  {{ t('settings.useSsl') }}
-                </label>
-
-                <label class="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    v-model="emailForm.deleteAfterFetch"
-                    type="checkbox"
-                    class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  {{ t('settings.deleteAfterFetch') }}
-                </label>
-              </div>
-            </div>
+            <MailboxSection :virtual-email="autoAssignedEmail" />
 
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
@@ -688,26 +581,11 @@
             <div class="flex justify-end">
               <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <BaseButton
-                  v-if="emailForm.mode === 'custom_imap'"
-                  type="button"
-                  variant="secondary"
-                  class="w-full sm:w-auto"
-                  :loading="validatingEmailConfig"
-                  :disabled="validatingEmailConfig || savingEmailConfig"
-                  @click="validateEmailConfigOnly"
-                >
-                  {{
-                    validatingEmailConfig
-                      ? t('settings.validatingConnection')
-                      : t('settings.validateConnection')
-                  }}
-                </BaseButton>
-                <BaseButton
                   type="submit"
                   variant="primary"
                   class="w-full sm:w-auto"
                   :loading="savingEmailConfig"
-                  :disabled="savingEmailConfig || validatingEmailConfig"
+                  :disabled="savingEmailConfig"
                 >
                   {{ saveEmailButtonLabel }}
                 </BaseButton>
@@ -820,7 +698,7 @@ import { settingsApi } from '@/api/settings'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
+import MailboxSection from '@/components/settings/MailboxSection.vue'
 import SceneSelector from '@/components/ui/SceneSelector.vue'
 import { getTimezoneLabel } from '@/utils/timezones'
 
@@ -832,7 +710,6 @@ const activeSettingsTab = ref('account')
 const loadingSettings = ref(true)
 const savingPreferences = ref(false)
 const savingEmailConfig = ref(false)
-const validatingEmailConfig = ref(false)
 const errorMessage = ref('')
 const preferenceError = ref('')
 const preferenceSuccess = ref('')
@@ -850,19 +727,17 @@ const preferenceForm = reactive({
   scene: ''
 })
 
+// Filters live on the account rather than on each mailbox: someone who
+// only wants invoices wants that from every mailbox they connect.
 const emailForm = reactive({
-  mode: 'auto_assign',
-  imapHost: '',
-  username: '',
-  password: '',
-  imapSslPort: 993,
-  useSsl: true,
-  deleteAfterFetch: false,
   folder: 'INBOX',
   filtersText: '',
   excludePatternsText: '',
   maxAgeDays: 7
 })
+
+// Kept so saving the filters cannot drop settings this form does not show.
+const rawEmailConfig = ref({})
 
 const settingsTabs = computed(() => [
   {
@@ -881,15 +756,9 @@ const settingsTabs = computed(() => [
 
 const authInfo = computed(() => userStore.userInfo?.auth_info || null)
 
-const displayedAiEmail = computed(() => {
-  const customImapEmail =
-    emailForm.mode === 'custom_imap' ? emailForm.username.trim() : ''
-  if (customImapEmail) {
-    return customImapEmail
-  }
-
-  return userStore.userInfo?.virtual_email?.trim() || ''
-})
+const displayedAiEmail = computed(
+  () => userStore.userInfo?.virtual_email?.trim() || ''
+)
 
 const hasDisplayedAiEmail = computed(() => Boolean(displayedAiEmail.value))
 
@@ -980,23 +849,12 @@ function normalizeUiLanguageCode(language) {
 
 function normalizeEmailConfig(value) {
   const raw = value && typeof value === 'object' ? value : {}
-  const imapConfig =
-    raw.imap_config && typeof raw.imap_config === 'object'
-      ? raw.imap_config
-      : {}
+  rawEmailConfig.value = raw
   const filterConfig =
     raw.filter_config && typeof raw.filter_config === 'object'
       ? raw.filter_config
       : {}
 
-  emailForm.mode = raw.mode || 'auto_assign'
-  emailForm.imapHost = imapConfig.imap_host || ''
-  emailForm.username = imapConfig.username || ''
-  emailForm.password = imapConfig.password || ''
-  emailForm.imapSslPort = imapConfig.imap_ssl_port || 993
-  emailForm.useSsl =
-    imapConfig.use_ssl !== undefined ? Boolean(imapConfig.use_ssl) : true
-  emailForm.deleteAfterFetch = Boolean(imapConfig.delete_after_fetch)
   emailForm.folder = filterConfig.folder || 'INBOX'
   emailForm.filtersText = formatListValue(filterConfig.filters)
   emailForm.excludePatternsText = Array.isArray(filterConfig.exclude_patterns)
@@ -1005,16 +863,10 @@ function normalizeEmailConfig(value) {
   emailForm.maxAgeDays = filterConfig.max_age_days || 7
 }
 function buildEmailConfig() {
+  // Only the filter half belongs to this form now; whatever else is
+  // already stored is carried through untouched.
   return {
-    mode: emailForm.mode,
-    imap_config: {
-      imap_host: emailForm.imapHost.trim(),
-      username: emailForm.username.trim(),
-      password: emailForm.password,
-      imap_ssl_port: Number(emailForm.imapSslPort) || 993,
-      use_ssl: Boolean(emailForm.useSsl),
-      delete_after_fetch: Boolean(emailForm.deleteAfterFetch)
-    },
+    ...(rawEmailConfig.value || {}),
     filter_config: {
       folder: emailForm.folder.trim() || 'INBOX',
       filters: parseListValue(emailForm.filtersText),
@@ -1106,28 +958,6 @@ function setSectionError(section, message) {
   }
 }
 
-function validateEmailConfig() {
-  if (emailForm.mode !== 'custom_imap') {
-    return null
-  }
-
-  const missingFields = []
-  if (!emailForm.imapHost.trim()) missingFields.push(t('settings.imapHost'))
-  if (!emailForm.username.trim()) missingFields.push(t('settings.imapUsername'))
-  if (!emailForm.password) missingFields.push(t('settings.imapPassword'))
-
-  const port = Number(emailForm.imapSslPort)
-  if (!Number.isInteger(port) || port <= 0) {
-    missingFields.push(t('settings.imapSslPort'))
-  }
-
-  if (missingFields.length) {
-    return `${t('settings.settingsError')}: ${missingFields.join(', ')}`
-  }
-
-  return null
-}
-
 async function savePreferences() {
   savingPreferences.value = true
   clearSectionFeedback('preference')
@@ -1171,14 +1001,6 @@ async function saveEmailConfig() {
 
   try {
     const nextEmailConfig = buildEmailConfig()
-    const validationError = validateEmailConfig()
-    if (validationError) {
-      throw new Error(validationError)
-    }
-
-    if (emailForm.mode === 'custom_imap') {
-      await settingsApi.validateImapConfig(nextEmailConfig)
-    }
 
     await settingsApi.saveSettingByKey({
       key: 'email_config',
@@ -1195,36 +1017,6 @@ async function saveEmailConfig() {
     )
   } finally {
     savingEmailConfig.value = false
-  }
-}
-
-async function validateEmailConfigOnly() {
-  clearSectionFeedback('email')
-
-  const validationError = validateEmailConfig()
-  if (validationError) {
-    setSectionError('email', validationError)
-    return
-  }
-
-  if (emailForm.mode !== 'custom_imap') {
-    setSectionSuccess('email', t('settings.emailValidationNotRequired'))
-    return
-  }
-
-  validatingEmailConfig.value = true
-
-  try {
-    await settingsApi.validateImapConfig(buildEmailConfig())
-    setSectionSuccess('email', t('settings.imapValidationPassed'))
-  } catch (error) {
-    console.error('Failed to validate IMAP config:', error)
-    setSectionError(
-      'email',
-      extractErrorMessage(error, t('settings.imapValidationFailed'))
-    )
-  } finally {
-    validatingEmailConfig.value = false
   }
 }
 

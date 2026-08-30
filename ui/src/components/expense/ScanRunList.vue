@@ -40,6 +40,9 @@
               <th class="py-2 pr-4 text-right font-medium">
                 {{ t('expense.scan.candidates') }}
               </th>
+              <th class="py-2 pr-4 text-right font-medium">
+                {{ t('expense.scan.invoices') }}
+              </th>
               <th class="py-2 text-right font-medium">
                 {{ t('expense.scan.credits') }}
               </th>
@@ -70,6 +73,16 @@
               </td>
               <td class="py-2 pr-4 text-right tabular-nums text-gray-900">
                 {{ run.candidate_emails }}
+              </td>
+              <td class="py-2 pr-4 text-right tabular-nums text-gray-900">
+                {{ run.invoices_created }}
+                <span
+                  v-if="run.duplicates"
+                  class="ml-1 text-xs text-gray-400"
+                  :title="t('expense.scan.duplicates')"
+                >
+                  +{{ run.duplicates }}
+                </span>
               </td>
               <td class="py-2 text-right tabular-nums text-gray-900">
                 {{ run.credits_consumed }}

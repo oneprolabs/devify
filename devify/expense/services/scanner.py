@@ -18,6 +18,7 @@ from billing.services.config_service import get_credit_policy
 from expense.models import InvoiceScanRun
 from expense.services.candidate_filter import evaluate_email, resolve_keywords
 from expense.services.config_service import get_app_config, get_user_config
+from expense.services.recognition import Outcome, recognize_email
 from threadline.models import EmailMessage
 
 logger = logging.getLogger(__name__)
@@ -153,14 +154,68 @@ def preview_scan(user, lookback_days=None, email_uuids=None) -> dict:
     return summary
 
 
-def execute_scan(run: InvoiceScanRun, lookback_days=None, email_uuids=None):
-    """Fill in a scan run with the verdicts for its scope."""
+def recognize_candidates(run: InvoiceScanRun, candidates, force=False) -> dict:
+    """
+    Recognize each candidate email, one at a time.
+
+    Sequential on purpose: the run record is the user's receipt for what
+    they were charged, so the counts have to reflect work that actually
+    finished rather than work that was queued.
+    """
+    totals = {
+        "invoices_created": 0,
+        "duplicates": 0,
+        "not_invoice": 0,
+        "failed": 0,
+        "credits_consumed": 0,
+        "insufficient_credits": 0,
+    }
+
+    for candidate in candidates:
+        email = EmailMessage.objects.filter(id=candidate.email_id).first()
+        if email is None:
+            continue
+
+        try:
+            stats = recognize_email(email, force=force)
+        except Exception:
+            logger.exception(
+                "Recognition crashed for email %s in run %s",
+                candidate.email_id,
+                run.uuid,
+            )
+            totals["failed"] += 1
+            continue
+
+        if stats.get("outcome") == Outcome.INSUFFICIENT_CREDITS:
+            totals["insufficient_credits"] += 1
+            # Nothing further can succeed this run; stop before the rest
+            # burn model calls that cannot be paid for either.
+            break
+
+        totals["invoices_created"] += stats.get("extracted", 0)
+        totals["duplicates"] += stats.get("duplicates", 0)
+        totals["not_invoice"] += stats.get("not_invoice", 0)
+        totals["failed"] += stats.get("failed", 0)
+        totals["credits_consumed"] += stats.get("credits_consumed", 0)
+
+    return totals
+
+
+def execute_scan(
+    run: InvoiceScanRun, lookback_days=None, email_uuids=None, force=False
+):
+    """Evaluate the scope, recognize what qualifies and record the outcome."""
     user_config = get_user_config(run.user)
     since = resolve_since(user_config, lookback_days)
+    started_at = timezone.now()
 
     try:
         evaluation = evaluate_scope(
             run.user, since=since, email_uuids=email_uuids
+        )
+        totals = recognize_candidates(
+            run, evaluation["candidates"], force=force
         )
     except Exception as exc:
         logger.exception("Expense scan run %s failed", run.uuid)
@@ -173,8 +228,15 @@ def execute_scan(run: InvoiceScanRun, lookback_days=None, email_uuids=None):
         raise
 
     summary = summarize(evaluation)
+    summary.update(totals)
+
     run.emails_scanned = summary["emails_scanned"]
     run.candidate_emails = summary["candidate_emails"]
+    run.invoices_created = totals["invoices_created"]
+    run.duplicates = totals["duplicates"]
+    run.not_invoice = totals["not_invoice"]
+    run.failed = totals["failed"]
+    run.credits_consumed = totals["credits_consumed"]
     run.status = InvoiceScanRun.Status.COMPLETED
     run.finished_at = timezone.now()
     run.details = {
@@ -189,16 +251,37 @@ def execute_scan(run: InvoiceScanRun, lookback_days=None, email_uuids=None):
         update_fields=[
             "emails_scanned",
             "candidate_emails",
+            "invoices_created",
+            "duplicates",
+            "not_invoice",
+            "failed",
+            "credits_consumed",
             "status",
             "finished_at",
             "details",
         ]
     )
 
-    # The watermark deliberately stays put. Recognition lands in M3, so
-    # advancing it now would mark these emails as handled and permanently
-    # skip the invoices inside them.
+    advance_watermark(user_config, started_at, targeted=bool(email_uuids))
     return run
+
+
+def advance_watermark(user_config, started_at, targeted: bool = False):
+    """
+    Move the incremental floor forward, but never backwards.
+
+    A scan aimed at specific emails says nothing about everything else, so
+    it must not claim the mailbox up to now has been handled.
+    """
+    if targeted:
+        return
+
+    current = user_config.last_scanned_at
+    if current and current >= started_at:
+        return
+
+    user_config.last_scanned_at = started_at
+    user_config.save(update_fields=["last_scanned_at", "updated_at"])
 
 
 def start_scan(
@@ -206,6 +289,7 @@ def start_scan(
     trigger=InvoiceScanRun.Trigger.MANUAL,
     lookback_days=None,
     email_uuids=None,
+    force=False,
 ) -> InvoiceScanRun:
     """Create the run row and queue the work, returning immediately."""
     run = InvoiceScanRun.objects.create(user=user, trigger=trigger)
@@ -218,6 +302,7 @@ def start_scan(
                 str(run.uuid),
                 lookback_days=lookback_days,
                 email_uuids=email_uuids,
+                force=force,
             )
         except Exception:
             logger.exception(

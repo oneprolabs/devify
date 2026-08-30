@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
     timeout=getattr(settings, "TASK_TIMEOUT_MINUTES", 60) * 60,
 )
 def scan_user_invoices(
-    run_uuid: str, lookback_days=None, email_uuids=None
+    run_uuid: str, lookback_days=None, email_uuids=None, force=False
 ) -> dict:
     run = InvoiceScanRun.objects.select_related("user").get(uuid=run_uuid)
     tracer = TaskTracer("INVOICE_SCAN", module="expense")
@@ -37,21 +37,28 @@ def scan_user_invoices(
         }
     )
     try:
-        execute_scan(run, lookback_days=lookback_days, email_uuids=email_uuids)
-        summary = (run.details or {}).get("summary", {})
+        execute_scan(
+            run,
+            lookback_days=lookback_days,
+            email_uuids=email_uuids,
+            force=force,
+        )
         tracer.complete_task(
             {
                 "run_uuid": str(run.uuid),
                 "status": "completed",
                 "emails_scanned": run.emails_scanned,
                 "candidate_emails": run.candidate_emails,
-                "estimated_credits": summary.get("estimated_credits", 0),
+                "invoices_created": run.invoices_created,
+                "credits_consumed": run.credits_consumed,
             }
         )
         return {
             "run_uuid": str(run.uuid),
             "emails_scanned": run.emails_scanned,
             "candidate_emails": run.candidate_emails,
+            "invoices_created": run.invoices_created,
+            "credits_consumed": run.credits_consumed,
         }
     except Exception as exc:
         logger.exception("Expense scan %s failed", run_uuid)

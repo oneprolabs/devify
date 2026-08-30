@@ -1147,7 +1147,9 @@
         "running": "Running",
         "completed": "Completed",
         "failed": "Failed"
-      }
+      },
+      "invoices": "Invoices",
+      "duplicates": "duplicates"
     }
   }
 }

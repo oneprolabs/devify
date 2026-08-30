@@ -173,7 +173,9 @@ class TestExecuteScan:
         assert run.candidate_emails == 1
         assert run.details["summary"]["estimated_credits"] == 1
 
-    def test_run_consumes_no_credits_in_this_milestone(self, user):
+    def test_undecodable_attachment_costs_nothing(self, user):
+        # The fixture points at a path that does not exist, so decoding
+        # fails before any model is called. The user must not be billed.
         set_user_enabled(get_user_config(user), True)
         email = make_email(user)
         attach(user, email)
@@ -184,10 +186,9 @@ class TestExecuteScan:
 
         assert run.credits_consumed == 0
         assert run.invoices_created == 0
+        assert run.failed == 1
 
-    def test_watermark_does_not_advance_before_recognition_exists(self, user):
-        # Moving it here would mark these emails handled and permanently
-        # skip the invoices inside them once M3 lands.
+    def test_watermark_advances_after_a_full_scan(self, user):
         config = set_user_enabled(get_user_config(user), True)
         email = make_email(user)
         attach(user, email)
@@ -196,7 +197,32 @@ class TestExecuteScan:
         execute_scan(run, lookback_days=30)
         config.refresh_from_db()
 
+        assert config.last_scanned_at is not None
+
+    def test_targeted_scan_leaves_the_watermark_alone(self, user):
+        # Recognizing two named emails says nothing about the rest of the
+        # mailbox, so it must not claim everything up to now was handled.
+        config = set_user_enabled(get_user_config(user), True)
+        email = make_email(user)
+        attach(user, email)
+        run = InvoiceScanRun.objects.create(user=user)
+
+        execute_scan(run, email_uuids=[str(email.uuid)])
+        config.refresh_from_db()
+
         assert config.last_scanned_at is None
+
+    def test_watermark_never_moves_backwards(self, user):
+        config = set_user_enabled(get_user_config(user), True)
+        future = timezone.now() + timedelta(days=1)
+        config.last_scanned_at = future
+        config.save(update_fields=["last_scanned_at"])
+        run = InvoiceScanRun.objects.create(user=user)
+
+        execute_scan(run, lookback_days=30)
+        config.refresh_from_db()
+
+        assert config.last_scanned_at == future
 
     def test_candidate_details_name_the_source(self, user):
         set_user_enabled(get_user_config(user), True)

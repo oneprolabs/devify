@@ -1176,6 +1176,62 @@
         "ok": "已下载"
       },
       "releaseFailed": "放行失败，请稍后重试。"
+    },
+    "categories": {
+      "transport_long": "长途交通",
+      "transport_local": "市内交通",
+      "accommodation": "住宿",
+      "meals": "餐饮",
+      "entertainment": "业务招待",
+      "office": "办公用品",
+      "communication": "通讯",
+      "training": "会议培训",
+      "other": "其他"
+    },
+    "invoices": {
+      "title": "发票",
+      "subtitle": "识别出的发票在这里筛选、核对和修正。",
+      "search": "搜索",
+      "searchPlaceholder": "销售方 / 发票号码 / 抬头",
+      "category": "分类",
+      "allCategories": "全部分类",
+      "from": "开票起",
+      "to": "开票止",
+      "needsReviewOnly": "只看待复核",
+      "empty": "还没有识别出发票。",
+      "issueDate": "开票日期",
+      "seller": "销售方",
+      "amount": "价税合计",
+      "state": "状态",
+      "duplicate": "重复",
+      "needsReview": "待复核",
+      "ok": "正常",
+      "untitled": "未识别销售方",
+      "reviewHint": "金额不自洽或识别置信度偏低，请核对后保存。",
+      "learnHint": "改过分类后，同一销售方的下一张发票会自动归到这里，不再重新判断。",
+      "ticketDetails": "票据信息",
+      "viewOriginal": "查看原件",
+      "reextract": "重新识别",
+      "saveFailed": "保存失败，请稍后重试。",
+      "reextractStarted": "已开始重新识别，会再消耗 1 点。",
+      "fields": {
+        "invoice_no": "发票号码",
+        "issue_date": "开票日期",
+        "seller_name": "销售方",
+        "seller_tax_id": "销售方税号",
+        "buyer_name": "购买方抬头",
+        "buyer_tax_id": "购买方税号",
+        "total_amount": "价税合计",
+        "tax_amount": "税额",
+        "amount_excl_tax": "不含税金额",
+        "city": "消费城市"
+      },
+      "sources": {
+        "rule": "按票种自动判定",
+        "user_rule": "按你此前的修正判定",
+        "model": "由模型判定",
+        "user": "你手动设置"
+      }
     }
   }
 }

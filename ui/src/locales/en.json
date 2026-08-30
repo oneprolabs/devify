@@ -1167,6 +1167,62 @@
         "ok": "Downloaded"
       },
       "releaseFailed": "Could not release the link. Please try again."
+    },
+    "categories": {
+      "transport_long": "Long-distance transport",
+      "transport_local": "Local transport",
+      "accommodation": "Accommodation",
+      "meals": "Meals",
+      "entertainment": "Entertainment",
+      "office": "Office supplies",
+      "communication": "Communication",
+      "training": "Training",
+      "other": "Other"
+    },
+    "invoices": {
+      "title": "Invoices",
+      "subtitle": "Filter, check and correct the invoices that were recognized.",
+      "search": "Search",
+      "searchPlaceholder": "Seller / invoice number / billing title",
+      "category": "Category",
+      "allCategories": "All categories",
+      "from": "Issued from",
+      "to": "Issued to",
+      "needsReviewOnly": "Needs review only",
+      "empty": "No invoices recognized yet.",
+      "issueDate": "Issue date",
+      "seller": "Seller",
+      "amount": "Total",
+      "state": "State",
+      "duplicate": "Duplicate",
+      "needsReview": "Review",
+      "ok": "OK",
+      "untitled": "Seller not recognized",
+      "reviewHint": "The amounts do not add up, or the read was low-confidence. Check the fields before saving.",
+      "learnHint": "Once you correct a category, the next invoice from this seller goes there automatically.",
+      "ticketDetails": "Ticket details",
+      "viewOriginal": "View original",
+      "reextract": "Read again",
+      "saveFailed": "Could not save. Please try again.",
+      "reextractStarted": "Reading again; this costs another credit.",
+      "fields": {
+        "invoice_no": "Invoice number",
+        "issue_date": "Issue date",
+        "seller_name": "Seller",
+        "seller_tax_id": "Seller tax ID",
+        "buyer_name": "Billing title",
+        "buyer_tax_id": "Buyer tax ID",
+        "total_amount": "Total",
+        "tax_amount": "Tax",
+        "amount_excl_tax": "Excluding tax",
+        "city": "City"
+      },
+      "sources": {
+        "rule": "From the ticket type",
+        "user_rule": "From your earlier correction",
+        "model": "Proposed by the model",
+        "user": "Set by you"
+      }
     }
   }
 }

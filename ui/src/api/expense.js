@@ -43,6 +43,28 @@ export const expenseApi = {
     return apiClient
       .post(`/v1/apps/expense/links/${uuid}/allow`)
       .then(extractData)
+  },
+
+  getInvoices(params = {}) {
+    return apiClient
+      .get('/v1/apps/expense/invoices', { params })
+      .then(extractData)
+  },
+
+  getInvoice(uuid) {
+    return apiClient.get(`/v1/apps/expense/invoices/${uuid}`).then(extractData)
+  },
+
+  updateInvoice(uuid, payload) {
+    return apiClient
+      .patch(`/v1/apps/expense/invoices/${uuid}`, payload)
+      .then(extractData)
+  },
+
+  reextractInvoice(uuid) {
+    return apiClient
+      .post(`/v1/apps/expense/invoices/${uuid}/reextract`)
+      .then(extractData)
   }
 }
 

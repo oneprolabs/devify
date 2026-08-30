@@ -32,6 +32,12 @@
           @toggle="handleToggle"
         />
 
+        <InvoiceSection
+          v-if="config?.enabled"
+          ref="invoiceSection"
+          @rescanned="loadRuns"
+        />
+
         <PendingLinkList
           v-if="config?.enabled"
           :links="links"
@@ -65,6 +71,7 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import ExpenseEnableCard from '@/components/expense/ExpenseEnableCard.vue'
+import InvoiceSection from '@/components/expense/InvoiceSection.vue'
 import PendingLinkList from '@/components/expense/PendingLinkList.vue'
 import ScanPreviewDialog from '@/components/expense/ScanPreviewDialog.vue'
 import ScanRunList from '@/components/expense/ScanRunList.vue'
@@ -76,6 +83,7 @@ const config = ref(null)
 const runs = ref([])
 const links = ref([])
 const releasing = ref('')
+const invoiceSection = ref(null)
 const loading = ref(true)
 const saving = ref(false)
 const scanning = ref(false)
@@ -169,6 +177,8 @@ async function confirmScan() {
   try {
     await expenseApi.startScan({})
     await loadRuns()
+    // A scan can produce new invoices, so the list refreshes with it.
+    await invoiceSection.value?.load()
   } catch (err) {
     error.value = readError(err, 'expense.scan.startFailed')
   } finally {

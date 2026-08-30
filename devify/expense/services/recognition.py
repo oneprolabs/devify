@@ -30,6 +30,7 @@ from expense.services.candidate_filter import (
     evaluate_email,
     resolve_allowed_domains,
 )
+from expense.services.classification import classify
 from expense.services.config_service import get_app_config, get_user_config
 from expense.services.decoder import DecodeError, decode_source
 from expense.services.extractor import ExtractionError, extract
@@ -118,6 +119,8 @@ def _extract_file(email, file_path, content_type, filename, app_config):
         NODE_NAME,
     )
     fields["decoder"] = decoded.decoder
+    if fields.get("is_invoice"):
+        classify(email.user, fields)
     return fields
 
 

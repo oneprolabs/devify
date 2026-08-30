@@ -10,6 +10,7 @@ from rest_framework import serializers
 from expense.models import (
     ExpenseAppConfig,
     ExpenseUserConfig,
+    Invoice,
     InvoiceScanRun,
     InvoiceSourceFile,
 )
@@ -193,4 +194,102 @@ class InvoiceSourceFileSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+
+class InvoiceListSerializer(serializers.ModelSerializer):
+    """Row shape for the invoice table."""
+
+    email_subject = serializers.CharField(
+        source="email_message.subject", read_only=True, default=""
+    )
+
+    class Meta:
+        model = Invoice
+        fields = [
+            "uuid",
+            "status",
+            "invoice_type",
+            "invoice_no",
+            "issue_date",
+            "seller_name",
+            "total_amount",
+            "tax_amount",
+            "currency",
+            "category",
+            "category_source",
+            "city",
+            "needs_review",
+            "confidence",
+            "email_subject",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class InvoiceDetailSerializer(InvoiceListSerializer):
+    """Everything the detail drawer shows, including provenance."""
+
+    source_url = serializers.CharField(
+        source="source_file.source_url", read_only=True, default=""
+    )
+    filename = serializers.CharField(
+        source="email_attachment.filename", read_only=True, default=""
+    )
+    duplicate_of_uuid = serializers.CharField(
+        source="duplicate_of.uuid", read_only=True, default=""
+    )
+
+    class Meta(InvoiceListSerializer.Meta):
+        fields = InvoiceListSerializer.Meta.fields + [
+            "invoice_code",
+            "seller_tax_id",
+            "buyer_name",
+            "buyer_tax_id",
+            "amount_excl_tax",
+            "items",
+            "ticket_details",
+            "source_type",
+            "source_url",
+            "filename",
+            "duplicate_of_uuid",
+            "error_message",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class InvoiceUpdateSerializer(serializers.ModelSerializer):
+    """
+    The fields a person may correct.
+
+    Deliberately narrow: status, provenance and billing links are the
+    system's to set, not the user's.
+    """
+
+    class Meta:
+        model = Invoice
+        fields = [
+            "invoice_type",
+            "invoice_no",
+            "invoice_code",
+            "issue_date",
+            "seller_name",
+            "seller_tax_id",
+            "buyer_name",
+            "buyer_tax_id",
+            "total_amount",
+            "tax_amount",
+            "amount_excl_tax",
+            "currency",
+            "category",
+            "city",
+            "needs_review",
+        ]
+
+    def validate_total_amount(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError(
+                _("Amount cannot be negative.")
+            )
+        return value
 

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 
+from django.db.models import Q
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
@@ -13,13 +16,16 @@ from rest_framework.views import APIView
 
 from billing.services.config_service import get_credit_policy
 from billing.services.credits_service import CreditsService
-from expense.models import InvoiceScanRun, InvoiceSourceFile
+from expense.models import Invoice, InvoiceScanRun, InvoiceSourceFile
 from expense.serializers import (
     ExpenseAppConfigSerializer,
     ExpenseUserConfigSerializer,
+    InvoiceDetailSerializer,
+    InvoiceListSerializer,
     InvoiceScanRunDetailSerializer,
     InvoiceScanRunSerializer,
     InvoiceSourceFileSerializer,
+    InvoiceUpdateSerializer,
     ScanRequestSerializer,
 )
 from expense.services.config_service import (
@@ -28,6 +34,7 @@ from expense.services.config_service import (
     set_user_enabled,
 )
 from expense.services.scan_scheduler import sync_scan_periodic_task
+from expense.services.classification import remember_correction
 from expense.services.scanner import preview_scan, start_scan
 
 logger = logging.getLogger(__name__)
@@ -236,5 +243,137 @@ class ExpenseLinkAllowAPIView(APIView):
             message=_("link released"),
             code=202,
             status_code=status.HTTP_202_ACCEPTED,
+        )
+
+
+class ExpenseInvoiceListAPIView(APIView):
+    """The invoice table, with the filters the list view offers."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset = Invoice.objects.filter(user=request.user)
+        params = request.query_params
+
+        if params.get("status"):
+            queryset = queryset.filter(status=params["status"])
+        else:
+            # Failed reads and non-invoices are noise in the default view;
+            # they stay reachable through an explicit status filter.
+            queryset = queryset.filter(
+                status__in=[
+                    Invoice.Status.EXTRACTED,
+                    Invoice.Status.DUPLICATE,
+                ]
+            )
+
+        if params.get("category"):
+            queryset = queryset.filter(category=params["category"])
+        if params.get("city"):
+            queryset = queryset.filter(city__icontains=params["city"])
+        if params.get("start"):
+            queryset = queryset.filter(issue_date__gte=params["start"])
+        if params.get("end"):
+            queryset = queryset.filter(issue_date__lte=params["end"])
+        if params.get("needs_review") == "true":
+            queryset = queryset.filter(needs_review=True)
+        if params.get("q"):
+            term = params["q"]
+            queryset = queryset.filter(
+                Q(seller_name__icontains=term)
+                | Q(invoice_no__icontains=term)
+                | Q(buyer_name__icontains=term)
+            )
+
+        queryset = queryset.select_related("email_message")[:200]
+        return _response(InvoiceListSerializer(queryset, many=True).data)
+
+
+class ExpenseInvoiceDetailAPIView(APIView):
+    """Read, correct or discard one invoice."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_object(self, request, uuid):
+        return get_object_or_404(Invoice, uuid=uuid, user=request.user)
+
+    def get(self, request, uuid):
+        invoice = self._get_object(request, uuid)
+        return _response(InvoiceDetailSerializer(invoice).data)
+
+    def patch(self, request, uuid):
+        invoice = self._get_object(request, uuid)
+        previous_category = invoice.category
+
+        serializer = InvoiceUpdateSerializer(
+            invoice, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        invoice = serializer.save()
+
+        if "category" in serializer.validated_data:
+            new_category = serializer.validated_data["category"]
+            if new_category and new_category != previous_category:
+                # A correction is worth remembering, so the next invoice
+                # from this supplier lands in the right place unaided.
+                remember_correction(request.user, invoice, new_category)
+                invoice.category_source = Invoice.CategorySource.USER
+                invoice.save(update_fields=["category_source", "updated_at"])
+
+        return _response(InvoiceDetailSerializer(invoice).data)
+
+    def delete(self, request, uuid):
+        invoice = self._get_object(request, uuid)
+        invoice.delete()
+        return _response(None, message=_("deleted"))
+
+
+class ExpenseInvoiceReextractAPIView(APIView):
+    """Read one email's invoices again, charging for the rerun."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uuid):
+        invoice = get_object_or_404(Invoice, uuid=uuid, user=request.user)
+        run = start_scan(
+            request.user,
+            trigger=InvoiceScanRun.Trigger.MANUAL,
+            email_uuids=[str(invoice.email_message.uuid)],
+            force=True,
+        )
+        return _response(
+            {"run_uuid": str(run.uuid)},
+            message=_("re-extraction started"),
+            code=202,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+
+
+class ExpenseInvoiceFileAPIView(APIView):
+    """
+    Serve the original document behind an invoice.
+
+    Always authenticated and always scoped to the owner: these files carry
+    tax numbers and billing titles, so there is no anonymous path to them.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uuid):
+        invoice = get_object_or_404(Invoice, uuid=uuid, user=request.user)
+
+        source = invoice.email_attachment or invoice.source_file
+        path = getattr(source, "file_path", "") if source else ""
+        if not path or not os.path.exists(path):
+            raise Http404("Original file is no longer available")
+
+        filename = (
+            getattr(source, "filename", None)
+            or os.path.basename(path)
+        )
+        return FileResponse(
+            open(path, "rb"),
+            as_attachment=False,
+            filename=filename,
         )
 

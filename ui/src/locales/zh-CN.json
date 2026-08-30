@@ -1279,6 +1279,28 @@
       "dismiss": "忽略",
       "freeNote": "行程归集完全按规则计算，不调用模型、不消耗点数。",
       "acceptFailed": "操作失败，请稍后重试。"
+    },
+    "tabsData": "数据",
+    "tabsSettings": "设置",
+    "disabledHint": "发票管家尚未开启。到「设置」里打开后，系统会按周期扫描邮件并在这里展示识别出的发票。",
+    "prefs": {
+      "title": "扫描与导出设置",
+      "subtitle": "这些设置影响扫描哪些邮件、以及导出时的文件命名。",
+      "saved": "已保存。",
+      "homeCity": "常驻城市",
+      "homeCityPlaceholder": "例如：北京",
+      "homeCityHelp": "用于判断哪些消费属于出差。留空则按最近的消费记录自动推断。",
+      "filenameTemplate": "导出命名模板",
+      "filenameTemplateHelp": "可用字段：issue_date、category、seller、amount、invoice_no、city、buyer。留空使用默认模板。",
+      "keywords": "发票关键词",
+      "keywordsPlaceholder": "每行一个，例如：\n发票\n行程单",
+      "keywordsHelp": "只有命中关键词的邮件才会进入识别。留空则使用内置词表。",
+      "senders": "只扫描这些发件人",
+      "sendersPlaceholder": "每行一个邮箱或域名",
+      "sendersHelp": "留空表示不限制发件人。",
+      "linkDomains": "额外放行的下载域名",
+      "linkDomainsPlaceholder": "每行一个域名",
+      "linkDomainsHelp": "正文里的下载链接只有域名在平台白名单或此列表中才会自动下载。"
     }
   }
 }

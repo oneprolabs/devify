@@ -10,6 +10,27 @@
         </p>
       </div>
 
+      <div class="border-b border-gray-200">
+        <div class="flex gap-6" role="tablist">
+          <button
+            v-for="tab in tabs"
+            :key="tab.value"
+            type="button"
+            role="tab"
+            class="flex-shrink-0 border-b-2 px-1 py-3 text-sm font-medium transition-colors"
+            :aria-selected="activeTab === tab.value"
+            :class="
+              activeTab === tab.value
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            "
+            @click="activeTab = tab.value"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+      </div>
+
       <BaseCard v-if="loading">
         <div class="space-y-4 animate-pulse">
           <div class="h-5 w-40 rounded bg-gray-200"></div>
@@ -25,42 +46,55 @@
           {{ error }}
         </p>
 
-        <ExpenseEnableCard
-          v-if="config"
-          :model-value="config"
-          :saving="saving"
-          @toggle="handleToggle"
-        />
+        <!-- Data: what the app has found and what to do with it -->
+        <template v-if="activeTab === 'data'">
+          <BaseCard v-if="!config?.enabled">
+            <p class="py-8 text-center text-sm text-gray-500">
+              {{ t('expense.disabledHint') }}
+            </p>
+          </BaseCard>
 
-        <TripSuggestionCard
-          v-if="config?.enabled"
-          :trips="trips"
-          :accepting="acceptingTrip"
-          @accept="acceptTrip"
-          @dismiss="dismissTrip"
-        />
+          <template v-else>
+            <TripSuggestionCard
+              :trips="trips"
+              :accepting="acceptingTrip"
+              @accept="acceptTrip"
+              @dismiss="dismissTrip"
+            />
 
-        <InvoiceSection
-          v-if="config?.enabled"
-          ref="invoiceSection"
-          @rescanned="loadRuns"
-        />
+            <InvoiceSection ref="invoiceSection" @rescanned="refreshData" />
 
-        <GroupSection v-if="config?.enabled" ref="groupSection" />
+            <GroupSection ref="groupSection" />
 
-        <PendingLinkList
-          v-if="config?.enabled"
-          :links="links"
-          :releasing="releasing"
-          @release="releaseLink"
-        />
+            <PendingLinkList
+              :links="links"
+              :releasing="releasing"
+              @release="releaseLink"
+            />
 
-        <ScanRunList
-          v-if="config?.enabled"
-          :runs="runs"
-          :scanning="scanning"
-          @scan="openPreview"
-        />
+            <ScanRunList
+              :runs="runs"
+              :scanning="scanning"
+              @scan="openPreview"
+            />
+          </template>
+        </template>
+
+        <!-- Settings: the switch and how scanning behaves -->
+        <template v-else>
+          <ExpenseEnableCard
+            v-if="config"
+            :model-value="config"
+            :saving="saving"
+            @toggle="handleToggle"
+          />
+
+          <ExpensePreferences
+            v-if="config?.enabled"
+            :config="config"
+            @updated="onConfigUpdated"
+          />
+        </template>
       </template>
 
       <ScanPreviewDialog
@@ -76,33 +110,41 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import ExpenseEnableCard from '@/components/expense/ExpenseEnableCard.vue'
+import ExpensePreferences from '@/components/expense/ExpensePreferences.vue'
 import GroupSection from '@/components/expense/GroupSection.vue'
 import InvoiceSection from '@/components/expense/InvoiceSection.vue'
 import PendingLinkList from '@/components/expense/PendingLinkList.vue'
-import TripSuggestionCard from '@/components/expense/TripSuggestionCard.vue'
 import ScanPreviewDialog from '@/components/expense/ScanPreviewDialog.vue'
 import ScanRunList from '@/components/expense/ScanRunList.vue'
+import TripSuggestionCard from '@/components/expense/TripSuggestionCard.vue'
 import { expenseApi } from '@/api/expense'
 
 const { t } = useI18n()
 
+const activeTab = ref('data')
+const tabs = computed(() => [
+  { value: 'data', label: t('expense.tabsData') },
+  { value: 'settings', label: t('expense.tabsSettings') }
+])
+
 const config = ref(null)
 const runs = ref([])
 const links = ref([])
-const releasing = ref('')
-const invoiceSection = ref(null)
-const groupSection = ref(null)
 const trips = ref([])
-const acceptingTrip = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const scanning = ref(false)
+const releasing = ref('')
+const acceptingTrip = ref('')
 const error = ref('')
+
+const invoiceSection = ref(null)
+const groupSection = ref(null)
 
 const previewOpen = ref(false)
 const previewLoading = ref(false)
@@ -146,40 +188,10 @@ async function loadTrips() {
   }
 }
 
-async function acceptTrip(trip) {
-  acceptingTrip.value = trip.uuid
-  error.value = ''
-  try {
-    await expenseApi.acceptTrip(trip.uuid)
-    await Promise.all([loadTrips(), groupSection.value?.load()])
-    await invoiceSection.value?.load()
-  } catch (err) {
-    error.value = readError(err, 'expense.trips.acceptFailed')
-  } finally {
-    acceptingTrip.value = ''
-  }
-}
-
-async function dismissTrip(trip) {
-  try {
-    await expenseApi.dismissTrip(trip.uuid)
-    await loadTrips()
-  } catch (err) {
-    error.value = readError(err, 'expense.trips.acceptFailed')
-  }
-}
-
-async function releaseLink(link) {
-  releasing.value = link.uuid
-  error.value = ''
-  try {
-    await expenseApi.releaseLink(link.uuid)
-    await loadRuns()
-  } catch (err) {
-    error.value = readError(err, 'expense.links.releaseFailed')
-  } finally {
-    releasing.value = ''
-  }
+async function refreshData() {
+  await Promise.all([loadRuns(), loadTrips()])
+  await invoiceSection.value?.load()
+  await groupSection.value?.load()
 }
 
 async function loadConfig() {
@@ -195,12 +207,16 @@ async function loadConfig() {
   }
 }
 
+function onConfigUpdated(updated) {
+  config.value = updated
+}
+
 async function handleToggle(enabled) {
   saving.value = true
   error.value = ''
   try {
     config.value = await expenseApi.updateConfig({ enabled })
-    await loadRuns()
+    await Promise.all([loadRuns(), loadTrips()])
   } catch (err) {
     error.value = readError(err, 'expense.saveFailed')
   } finally {
@@ -229,13 +245,46 @@ async function confirmScan() {
   error.value = ''
   try {
     await expenseApi.startScan({})
-    await loadRuns()
-    // A scan can produce new invoices, so the list refreshes with it.
-    await invoiceSection.value?.load()
+    await refreshData()
   } catch (err) {
     error.value = readError(err, 'expense.scan.startFailed')
   } finally {
     scanning.value = false
+  }
+}
+
+async function acceptTrip(trip) {
+  acceptingTrip.value = trip.uuid
+  error.value = ''
+  try {
+    await expenseApi.acceptTrip(trip.uuid)
+    await refreshData()
+  } catch (err) {
+    error.value = readError(err, 'expense.trips.acceptFailed')
+  } finally {
+    acceptingTrip.value = ''
+  }
+}
+
+async function dismissTrip(trip) {
+  try {
+    await expenseApi.dismissTrip(trip.uuid)
+    await loadTrips()
+  } catch (err) {
+    error.value = readError(err, 'expense.trips.acceptFailed')
+  }
+}
+
+async function releaseLink(link) {
+  releasing.value = link.uuid
+  error.value = ''
+  try {
+    await expenseApi.releaseLink(link.uuid)
+    await loadRuns()
+  } catch (err) {
+    error.value = readError(err, 'expense.links.releaseFailed')
+  } finally {
+    releasing.value = ''
   }
 }
 

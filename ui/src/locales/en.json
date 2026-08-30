@@ -1270,6 +1270,28 @@
       "dismiss": "Dismiss",
       "freeNote": "Trip grouping is pure rule work: no model call, no credits.",
       "acceptFailed": "That did not work. Please try again."
+    },
+    "tabsData": "Data",
+    "tabsSettings": "Settings",
+    "disabledHint": "The expense app is off. Turn it on under Settings and recognized invoices will appear here after the next scan.",
+    "prefs": {
+      "title": "Scanning and export",
+      "subtitle": "These settings decide which mail is scanned and how exported files are named.",
+      "saved": "Saved.",
+      "homeCity": "Home city",
+      "homeCityPlaceholder": "e.g. Beijing",
+      "homeCityHelp": "Used to tell business travel from everyday spending. Leave blank to infer it from recent invoices.",
+      "filenameTemplate": "Export filename template",
+      "filenameTemplateHelp": "Available fields: issue_date, category, seller, amount, invoice_no, city, buyer. Leave blank for the default.",
+      "keywords": "Invoice keywords",
+      "keywordsPlaceholder": "One per line, e.g.\ninvoice\nreceipt",
+      "keywordsHelp": "Only mail matching a keyword is recognized. Leave blank to use the built-in list.",
+      "senders": "Only scan these senders",
+      "sendersPlaceholder": "One address or domain per line",
+      "sendersHelp": "Leave blank to accept every sender.",
+      "linkDomains": "Extra allowed download domains",
+      "linkDomainsPlaceholder": "One domain per line",
+      "linkDomainsHelp": "A link in the body is only fetched when its domain is on the platform allowlist or in this list."
     }
   }
 }

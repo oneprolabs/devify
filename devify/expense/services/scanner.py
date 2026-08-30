@@ -169,6 +169,8 @@ def recognize_candidates(run: InvoiceScanRun, candidates, force=False) -> dict:
         "failed": 0,
         "credits_consumed": 0,
         "insufficient_credits": 0,
+        "links_fetched": 0,
+        "link_failures": 0,
     }
 
     for candidate in candidates:
@@ -198,6 +200,8 @@ def recognize_candidates(run: InvoiceScanRun, candidates, force=False) -> dict:
         totals["not_invoice"] += stats.get("not_invoice", 0)
         totals["failed"] += stats.get("failed", 0)
         totals["credits_consumed"] += stats.get("credits_consumed", 0)
+        totals["links_fetched"] += stats.get("links_fetched", 0)
+        totals["link_failures"] += stats.get("link_failures", 0)
 
     return totals
 
@@ -237,6 +241,7 @@ def execute_scan(
     run.not_invoice = totals["not_invoice"]
     run.failed = totals["failed"]
     run.credits_consumed = totals["credits_consumed"]
+    run.links_fetched = totals["links_fetched"]
     run.status = InvoiceScanRun.Status.COMPLETED
     run.finished_at = timezone.now()
     run.details = {
@@ -256,6 +261,7 @@ def execute_scan(
             "not_invoice",
             "failed",
             "credits_consumed",
+            "links_fetched",
             "status",
             "finished_at",
             "details",

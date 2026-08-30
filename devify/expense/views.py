@@ -13,12 +13,13 @@ from rest_framework.views import APIView
 
 from billing.services.config_service import get_credit_policy
 from billing.services.credits_service import CreditsService
-from expense.models import InvoiceScanRun
+from expense.models import InvoiceScanRun, InvoiceSourceFile
 from expense.serializers import (
     ExpenseAppConfigSerializer,
     ExpenseUserConfigSerializer,
     InvoiceScanRunDetailSerializer,
     InvoiceScanRunSerializer,
+    InvoiceSourceFileSerializer,
     ScanRequestSerializer,
 )
 from expense.services.config_service import (
@@ -187,4 +188,53 @@ class ExpenseScanRunDetailAPIView(APIView):
     def get(self, request, uuid):
         run = get_object_or_404(InvoiceScanRun, uuid=uuid, user=request.user)
         return _response(InvoiceScanRunDetailSerializer(run).data)
+
+
+class ExpenseLinkListAPIView(APIView):
+    """Links found in email bodies, and what became of each."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset = InvoiceSourceFile.objects.filter(user=request.user)
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            queryset = queryset.filter(fetch_status=status_filter)
+        return _response(
+            InvoiceSourceFileSerializer(queryset[:100], many=True).data
+        )
+
+
+class ExpenseLinkAllowAPIView(APIView):
+    """
+    Release one blocked link.
+
+    The override is deliberately scoped to this single URL rather than
+    adding its domain to the allowlist, so trusting one invoice email does
+    not quietly widen what the server will fetch in future.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uuid):
+        record = get_object_or_404(
+            InvoiceSourceFile, uuid=uuid, user=request.user
+        )
+        record.user_allowed = True
+        record.save(update_fields=["user_allowed"])
+
+        run = start_scan(
+            request.user,
+            trigger=InvoiceScanRun.Trigger.MANUAL,
+            email_uuids=[str(record.email_message.uuid)],
+        )
+        return _response(
+            {
+                "link": InvoiceSourceFileSerializer(record).data,
+                "run_uuid": str(run.uuid),
+            },
+            message=_("link released"),
+            code=202,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
 

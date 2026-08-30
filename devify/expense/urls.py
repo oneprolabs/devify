@@ -4,6 +4,8 @@ from django.urls import path
 
 from expense.views import (
     ExpenseConfigAPIView,
+    ExpenseLinkAllowAPIView,
+    ExpenseLinkListAPIView,
     ExpenseScanAPIView,
     ExpenseScanPreviewAPIView,
     ExpenseScanRunDetailAPIView,
@@ -36,5 +38,15 @@ urlpatterns = [
         "apps/expense/scan-runs/<uuid:uuid>",
         ExpenseScanRunDetailAPIView.as_view(),
         name="expense-scan-run-detail",
+    ),
+    path(
+        "apps/expense/links",
+        ExpenseLinkListAPIView.as_view(),
+        name="expense-links",
+    ),
+    path(
+        "apps/expense/links/<uuid:uuid>/allow",
+        ExpenseLinkAllowAPIView.as_view(),
+        name="expense-link-allow",
     ),
 ]

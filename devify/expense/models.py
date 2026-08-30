@@ -178,6 +178,14 @@ class InvoiceSourceFile(models.Model):
         db_index=True,
         verbose_name=_("Fetch Status"),
     )
+    user_allowed = models.BooleanField(
+        default=False,
+        verbose_name=_("User Allowed"),
+        help_text=_(
+            "Set when the user releases a single link whose domain is not "
+            "on the allowlist"
+        ),
+    )
     error_message = models.TextField(blank=True, verbose_name=_("Error"))
     fetched_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -32,6 +32,13 @@
           @toggle="handleToggle"
         />
 
+        <PendingLinkList
+          v-if="config?.enabled"
+          :links="links"
+          :releasing="releasing"
+          @release="releaseLink"
+        />
+
         <ScanRunList
           v-if="config?.enabled"
           :runs="runs"
@@ -58,6 +65,7 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import ExpenseEnableCard from '@/components/expense/ExpenseEnableCard.vue'
+import PendingLinkList from '@/components/expense/PendingLinkList.vue'
 import ScanPreviewDialog from '@/components/expense/ScanPreviewDialog.vue'
 import ScanRunList from '@/components/expense/ScanRunList.vue'
 import { expenseApi } from '@/api/expense'
@@ -66,6 +74,8 @@ const { t } = useI18n()
 
 const config = ref(null)
 const runs = ref([])
+const links = ref([])
+const releasing = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const scanning = ref(false)
@@ -83,12 +93,31 @@ function readError(err, fallbackKey) {
 async function loadRuns() {
   if (!config.value?.enabled) {
     runs.value = []
+    links.value = []
     return
   }
   try {
-    runs.value = await expenseApi.getScanRuns()
+    const [runList, linkList] = await Promise.all([
+      expenseApi.getScanRuns(),
+      expenseApi.getLinks()
+    ])
+    runs.value = runList
+    links.value = linkList.filter((link) => link.fetch_status !== 'ok')
   } catch (err) {
     error.value = readError(err, 'expense.loadFailed')
+  }
+}
+
+async function releaseLink(link) {
+  releasing.value = link.uuid
+  error.value = ''
+  try {
+    await expenseApi.releaseLink(link.uuid)
+    await loadRuns()
+  } catch (err) {
+    error.value = readError(err, 'expense.links.releaseFailed')
+  } finally {
+    releasing.value = ''
   }
 }
 

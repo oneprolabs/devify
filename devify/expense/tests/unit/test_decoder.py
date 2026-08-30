@@ -173,7 +173,7 @@ class TestDecodeSource:
     def test_content_type_selects_the_decoder(self, tmp_path):
         target = tmp_path / "a.bin"
         target.write_bytes(build_pdf(
-                "INVOICE NO 25117000000012345678 TOTAL 100.00 CNY SELLER TEST CO"
+                "INVOICE NO 25117000000012345678 TOTAL 100.00 CNY SELLER"
             ))
 
         decoded = decode_source(
@@ -185,7 +185,7 @@ class TestDecodeSource:
     def test_extension_is_used_when_the_type_is_generic(self, tmp_path):
         target = tmp_path / "invoice.pdf"
         target.write_bytes(build_pdf(
-                "INVOICE NO 25117000000012345678 TOTAL 100.00 CNY SELLER TEST CO"
+                "INVOICE NO 25117000000012345678 TOTAL 100.00 CNY SELLER"
             ))
 
         decoded = decode_source(

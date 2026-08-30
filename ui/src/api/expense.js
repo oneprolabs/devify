@@ -33,6 +33,16 @@ export const expenseApi = {
 
   getScanRun(uuid) {
     return apiClient.get(`/v1/apps/expense/scan-runs/${uuid}`).then(extractData)
+  },
+
+  getLinks(params = {}) {
+    return apiClient.get('/v1/apps/expense/links', { params }).then(extractData)
+  },
+
+  releaseLink(uuid) {
+    return apiClient
+      .post(`/v1/apps/expense/links/${uuid}/allow`)
+      .then(extractData)
   }
 }
 

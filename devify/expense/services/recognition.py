@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -22,11 +23,20 @@ from django.utils import timezone
 from billing.models import EmailCreditsTransaction
 from billing.services.config_service import get_credit_policy
 from billing.services.credits_service import CreditsService
-from expense.models import Invoice
-from expense.services.candidate_filter import SourceKind, evaluate_email
+from expense.models import Invoice, InvoiceSourceFile
+from expense.services.candidate_filter import (
+    SkipReason,
+    SourceKind,
+    evaluate_email,
+    resolve_allowed_domains,
+)
 from expense.services.config_service import get_app_config, get_user_config
 from expense.services.decoder import DecodeError, decode_source
 from expense.services.extractor import ExtractionError, extract
+from expense.services.link_fetcher import (
+    MAX_LINKS_PER_EMAIL,
+    fetch_link,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +66,7 @@ def already_charged(email) -> EmailCreditsTransaction | None:
     ).first()
 
 
-def build_dedup_key(fields: dict, attachment) -> str:
+def build_dedup_key(fields: dict, attachment, source_file=None) -> str:
     """
     Prefer the invoice number; fall back to the file's own fingerprint.
 
@@ -69,6 +79,9 @@ def build_dedup_key(fields: dict, attachment) -> str:
 
     if attachment is not None and attachment.content_md5:
         return attachment.content_md5
+
+    if source_file is not None and source_file.content_md5:
+        return source_file.content_md5
 
     seed = "|".join(
         str(fields.get(key) or "")
@@ -86,12 +99,12 @@ def _model_for(decoded, app_config) -> str:
     return str(app_config.llm_config_uuid or "")
 
 
-def _extract_one(email, attachment, app_config) -> dict:
-    """Decode and read one attachment. Raises on unusable input."""
+def _extract_file(email, file_path, content_type, filename, app_config):
+    """Decode and read one file. Raises on unusable input."""
     decoded = decode_source(
-        attachment.file_path,
-        content_type=attachment.content_type,
-        filename=attachment.filename,
+        file_path,
+        content_type=content_type,
+        filename=filename,
         max_pages=app_config.max_pdf_pages,
     )
     if decoded.is_empty:
@@ -100,7 +113,7 @@ def _extract_one(email, attachment, app_config) -> dict:
     fields = extract(
         decoded,
         email,
-        attachment.filename or "",
+        filename or "",
         _model_for(decoded, app_config),
         NODE_NAME,
     )
@@ -108,7 +121,44 @@ def _extract_one(email, attachment, app_config) -> dict:
     return fields
 
 
-def _persist(email, attachment, fields, source_type) -> tuple[Invoice, str]:
+def _extract_one(email, attachment, app_config) -> dict:
+    return _extract_file(
+        email,
+        attachment.file_path,
+        attachment.content_type,
+        attachment.filename,
+        app_config,
+    )
+
+
+def record_blocked_links(email, verdict) -> None:
+    """
+    Keep refused links visible.
+
+    A user whose invoice never arrived needs to see that a link was found
+    and why it was not followed, otherwise the app looks simply broken.
+    """
+    reason_map = {
+        SkipReason.BLOCKED_DOMAIN: (
+            InvoiceSourceFile.FetchStatus.BLOCKED_DOMAIN
+        ),
+        SkipReason.NOT_HTTPS: InvoiceSourceFile.FetchStatus.BLOCKED_DOMAIN,
+    }
+    for item in verdict.skipped:
+        status = reason_map.get(item.reason)
+        if not status or not item.url:
+            continue
+        InvoiceSourceFile.objects.get_or_create(
+            user=email.user,
+            email_message=email,
+            source_url=item.url[:1000],
+            defaults={"fetch_status": status, "error_message": item.reason},
+        )
+
+
+def _persist(
+    email, fields, source_type, attachment=None, source_file=None
+) -> tuple[Invoice, str]:
     """
     Store one result, resolving duplicates against what is already on file.
 
@@ -120,12 +170,20 @@ def _persist(email, attachment, fields, source_type) -> tuple[Invoice, str]:
         "email_message": email,
         "source_type": source_type,
         "email_attachment": attachment,
+        "source_file": source_file,
         "raw_extraction": fields.get("raw_extraction") or {},
     }
+    # An attachment is unique per invoice row; a fetched file is keyed by
+    # the row it produced instead.
+    lookup = (
+        {"email_attachment": attachment}
+        if attachment is not None
+        else {"source_file": source_file}
+    )
 
     if not fields.get("is_invoice"):
         invoice, _ = Invoice.objects.update_or_create(
-            email_attachment=attachment,
+            **lookup,
             defaults={
                 **defaults,
                 "status": Invoice.Status.NOT_INVOICE,
@@ -134,10 +192,10 @@ def _persist(email, attachment, fields, source_type) -> tuple[Invoice, str]:
         )
         return invoice, "not_invoice"
 
-    dedup_key = build_dedup_key(fields, attachment)
+    dedup_key = build_dedup_key(fields, attachment, source_file)
     existing = (
         Invoice.objects.filter(user=email.user, dedup_key=dedup_key)
-        .exclude(email_attachment=attachment)
+        .exclude(**lookup)
         .first()
     )
 
@@ -176,7 +234,7 @@ def _persist(email, attachment, fields, source_type) -> tuple[Invoice, str]:
     try:
         with transaction.atomic():
             invoice, _ = Invoice.objects.update_or_create(
-                email_attachment=attachment, defaults=payload
+                **lookup, defaults=payload
             )
     except IntegrityError:
         # Another worker claimed the same dedup key between the lookup and
@@ -184,7 +242,7 @@ def _persist(email, attachment, fields, source_type) -> tuple[Invoice, str]:
         payload["status"] = Invoice.Status.DUPLICATE
         payload["dedup_key"] = None
         invoice, _ = Invoice.objects.update_or_create(
-            email_attachment=attachment, defaults=payload
+            **lookup, defaults=payload
         )
 
     return invoice, (
@@ -194,19 +252,111 @@ def _persist(email, attachment, fields, source_type) -> tuple[Invoice, str]:
     )
 
 
-def _mark_failed(email, attachment, message, source_type) -> Invoice:
+def _mark_failed(
+    email, message, source_type, attachment=None, source_file=None
+) -> Invoice:
+    lookup = (
+        {"email_attachment": attachment}
+        if attachment is not None
+        else {"source_file": source_file}
+    )
     invoice, _ = Invoice.objects.update_or_create(
-        email_attachment=attachment,
+        **lookup,
         defaults={
             "user": email.user,
             "email_message": email,
             "source_type": source_type,
+            "email_attachment": attachment,
+            "source_file": source_file,
             "status": Invoice.Status.FAILED,
             "error_message": str(message)[:2000],
             "dedup_key": None,
         },
     )
     return invoice
+
+
+def _tally(stats: dict, result: str) -> None:
+    if result == "extracted":
+        stats["extracted"] += 1
+    elif result == "duplicate":
+        stats["duplicates"] += 1
+    elif result == "not_invoice":
+        stats["not_invoice"] += 1
+    elif result == "failed":
+        stats["failed"] += 1
+
+
+def _handle_link(
+    email, url, app_config, allowed_domains, force, stats
+) -> str | None:
+    """Fetch one linked file and read it, recording why if either fails."""
+    record, _ = InvoiceSourceFile.objects.get_or_create(
+        user=email.user,
+        email_message=email,
+        source_url=url[:1000],
+    )
+
+    already_read = Invoice.objects.filter(
+        source_file=record,
+        status__in=[
+            Invoice.Status.EXTRACTED,
+            Invoice.Status.DUPLICATE,
+            Invoice.Status.NOT_INVOICE,
+        ],
+    ).exists()
+    if already_read and not force:
+        stats["skipped"] += 1
+        return None
+
+    outcome = fetch_link(
+        url,
+        email,
+        allowed_domains,
+        app_config.max_download_bytes,
+        skip_allowlist=record.user_allowed,
+    )
+
+    record.fetch_status = outcome.status
+    record.error_message = outcome.error
+    record.final_url = outcome.final_url[:1000]
+    record.content_type = outcome.content_type
+    record.file_size = outcome.file_size
+    record.file_path = outcome.file_path
+    record.content_md5 = outcome.content_md5
+    record.fetched_at = timezone.now()
+    record.save()
+
+    if not outcome.ok:
+        stats["link_failures"] = stats.get("link_failures", 0) + 1
+        return None
+
+    stats["links_fetched"] = stats.get("links_fetched", 0) + 1
+
+    try:
+        fields = _extract_file(
+            email,
+            outcome.file_path,
+            outcome.content_type,
+            os.path.basename(outcome.file_path),
+            app_config,
+        )
+    except (DecodeError, ExtractionError) as exc:
+        _mark_failed(
+            email, exc, SourceKind.BODY_LINK, source_file=record
+        )
+        return "failed"
+    except Exception as exc:
+        logger.exception("Unexpected error reading linked file %s", url)
+        _mark_failed(
+            email, exc, SourceKind.BODY_LINK, source_file=record
+        )
+        return "failed"
+
+    _, result = _persist(
+        email, fields, SourceKind.BODY_LINK, source_file=record
+    )
+    return result
 
 
 def recognize_email(email, force: bool = False) -> dict:
@@ -254,11 +404,23 @@ def recognize_email(email, force: bool = False) -> dict:
         "credits_consumed": 0,
     }
 
+    record_blocked_links(email, verdict)
+
     by_id = {a.id: a for a in attachments}
+    allowed_domains = resolve_allowed_domains(app_config, user_config)
+    links_done = 0
+
     for source in verdict.sources:
-        if source.kind != SourceKind.ATTACHMENT:
-            # Body-link downloads arrive in M4.
-            stats["skipped"] += 1
+        if source.kind == SourceKind.BODY_LINK:
+            if links_done >= MAX_LINKS_PER_EMAIL:
+                stats["skipped"] += 1
+                continue
+            links_done += 1
+            outcome = _handle_link(
+                email, source.url, app_config, allowed_domains, force, stats
+            )
+            if outcome is not None:
+                _tally(stats, outcome)
             continue
 
         attachment = by_id.get(source.attachment_id)
@@ -285,7 +447,7 @@ def recognize_email(email, force: bool = False) -> dict:
                 attachment.id,
                 exc,
             )
-            _mark_failed(email, attachment, exc, source.kind)
+            _mark_failed(email, exc, source.kind, attachment=attachment)
             stats["failed"] += 1
             continue
         except Exception as exc:
@@ -293,17 +455,14 @@ def recognize_email(email, force: bool = False) -> dict:
                 "Unexpected invoice extraction error for attachment %s",
                 attachment.id,
             )
-            _mark_failed(email, attachment, exc, source.kind)
+            _mark_failed(email, exc, source.kind, attachment=attachment)
             stats["failed"] += 1
             continue
 
-        _, result = _persist(email, attachment, fields, source.kind)
-        if result == "extracted":
-            stats["extracted"] += 1
-        elif result == "duplicate":
-            stats["duplicates"] += 1
-        else:
-            stats["not_invoice"] += 1
+        _, result = _persist(
+            email, fields, source.kind, attachment=attachment
+        )
+        _tally(stats, result)
 
     # One charge for the email, and only when it actually produced something
     # new. Duplicates and non-invoices stay free.

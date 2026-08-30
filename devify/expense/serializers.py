@@ -11,6 +11,7 @@ from expense.models import (
     ExpenseAppConfig,
     ExpenseUserConfig,
     InvoiceScanRun,
+    InvoiceSourceFile,
 )
 
 
@@ -172,4 +173,24 @@ class ScanRequestSerializer(serializers.Serializer):
                 _("Provide either lookback_days or email_uuids, not both.")
             )
         return attrs
+
+
+class InvoiceSourceFileSerializer(serializers.ModelSerializer):
+    """A link found in an email body and what became of it."""
+
+    class Meta:
+        model = InvoiceSourceFile
+        fields = [
+            "uuid",
+            "source_url",
+            "final_url",
+            "content_type",
+            "file_size",
+            "fetch_status",
+            "user_allowed",
+            "error_message",
+            "fetched_at",
+            "created_at",
+        ]
+        read_only_fields = fields
 

@@ -1150,6 +1150,23 @@
       },
       "invoices": "Invoices",
       "duplicates": "duplicates"
+    },
+    "links": {
+      "title": "Links waiting on you",
+      "subtitle": "Download links were found in email bodies but not fetched automatically.",
+      "release": "Release once",
+      "safetyNote": "Releasing applies to this one link only and does not add its domain to the allowlist. Pages that require a login or a verification code cannot be fetched; download those by hand and forward them to this mailbox.",
+      "reasons": {
+        "blocked_domain": "Domain is not on the allowlist",
+        "blocked_ip": "The address resolves inside a private network",
+        "too_large": "File exceeds the size limit",
+        "timeout": "The download timed out",
+        "requires_auth": "A sign-in is required; download it by hand and forward it",
+        "bad_type": "The file is not an invoice document",
+        "failed": "The download failed",
+        "ok": "Downloaded"
+      },
+      "releaseFailed": "Could not release the link. Please try again."
     }
   }
 }

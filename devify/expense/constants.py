@@ -81,3 +81,39 @@ DEFAULT_INVOICE_KEYWORDS = (
     "fapiao",
     "itinerary",
 )
+
+
+# Labels for exported filenames, zip folders and the pasteable summary.
+#
+# Deliberately plain strings rather than the translated choice labels. An
+# archived file must keep the same name forever, so its name cannot depend
+# on the viewer's language or on a translation catalog appearing later;
+# and the summary block is Chinese throughout, so English category names
+# inside it read as a defect.
+CATEGORY_LABELS_CN = {
+    ExpenseCategory.TRANSPORT_LONG: "长途交通",
+    ExpenseCategory.TRANSPORT_LOCAL: "市内交通",
+    ExpenseCategory.ACCOMMODATION: "住宿",
+    ExpenseCategory.MEALS: "餐饮",
+    ExpenseCategory.ENTERTAINMENT: "业务招待",
+    ExpenseCategory.OFFICE: "办公用品",
+    ExpenseCategory.COMMUNICATION: "通讯",
+    ExpenseCategory.TRAINING: "会议培训",
+    ExpenseCategory.OTHER: "其他",
+}
+
+
+# Invoice type names for the export manifest, fixed for the same reason.
+INVOICE_TYPE_LABELS_CN = {
+    "vat_special": "增值税专用发票",
+    "vat_normal": "增值税普通发票",
+    "vat_electronic": "增值税电子普通发票",
+    "train": "铁路车票",
+    "flight_itinerary": "航空行程单",
+    "coach": "公路客票",
+    "taxi": "出租车票",
+    "hotel": "住宿发票",
+    "quota": "定额发票",
+    "other": "其他",
+}
+

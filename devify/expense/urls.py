@@ -4,6 +4,11 @@ from django.urls import path
 
 from expense.views import (
     ExpenseConfigAPIView,
+    ExpenseGroupDetailAPIView,
+    ExpenseGroupExportAPIView,
+    ExpenseGroupItemsAPIView,
+    ExpenseGroupListAPIView,
+    ExpenseGroupSummaryAPIView,
     ExpenseInvoiceDetailAPIView,
     ExpenseInvoiceFileAPIView,
     ExpenseInvoiceListAPIView,
@@ -14,6 +19,9 @@ from expense.views import (
     ExpenseScanPreviewAPIView,
     ExpenseScanRunDetailAPIView,
     ExpenseScanRunListAPIView,
+    ExpenseTripAcceptAPIView,
+    ExpenseTripDismissAPIView,
+    ExpenseTripListAPIView,
 )
 
 
@@ -62,6 +70,46 @@ urlpatterns = [
         "apps/expense/invoices/<uuid:uuid>/file",
         ExpenseInvoiceFileAPIView.as_view(),
         name="expense-invoice-file",
+    ),
+    path(
+        "apps/expense/groups",
+        ExpenseGroupListAPIView.as_view(),
+        name="expense-groups",
+    ),
+    path(
+        "apps/expense/groups/<uuid:uuid>",
+        ExpenseGroupDetailAPIView.as_view(),
+        name="expense-group-detail",
+    ),
+    path(
+        "apps/expense/groups/<uuid:uuid>/items",
+        ExpenseGroupItemsAPIView.as_view(),
+        name="expense-group-items",
+    ),
+    path(
+        "apps/expense/groups/<uuid:uuid>/summary",
+        ExpenseGroupSummaryAPIView.as_view(),
+        name="expense-group-summary",
+    ),
+    path(
+        "apps/expense/groups/<uuid:uuid>/export",
+        ExpenseGroupExportAPIView.as_view(),
+        name="expense-group-export",
+    ),
+    path(
+        "apps/expense/trips",
+        ExpenseTripListAPIView.as_view(),
+        name="expense-trips",
+    ),
+    path(
+        "apps/expense/trips/<uuid:uuid>/accept",
+        ExpenseTripAcceptAPIView.as_view(),
+        name="expense-trip-accept",
+    ),
+    path(
+        "apps/expense/trips/<uuid:uuid>/dismiss",
+        ExpenseTripDismissAPIView.as_view(),
+        name="expense-trip-dismiss",
     ),
     path(
         "apps/expense/links",

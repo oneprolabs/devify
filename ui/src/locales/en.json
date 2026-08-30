@@ -1223,6 +1223,35 @@
         "model": "Proposed by the model",
         "user": "Set by you"
       }
+    },
+    "groups": {
+      "title": "Reimbursement groups",
+      "subtitle": "Collect invoices into one claim, with the figures and files ready to file.",
+      "create": "New",
+      "namePlaceholder": "Group name",
+      "empty": "No groups yet.",
+      "line": "{count} invoices · {amount} total",
+      "businessTrip": "Business trip",
+      "viewSummary": "Summary",
+      "export": "Export files",
+      "createFailed": "Could not create the group; the name may already exist.",
+      "formFields": "Claim form fields",
+      "copyAll": "Copy all",
+      "copied": "Copied",
+      "invoiceCount": "Invoices",
+      "totalAmount": "Total",
+      "taxAmount": "Tax",
+      "amountInWords": "In words"
+    },
+    "trips": {
+      "title": "Business trip detected",
+      "subtitle": "Grouped from long-distance tickets and spending away from home. Accepting creates a group.",
+      "headline": "{start} → {end} {city}",
+      "detail": "{count} invoices · {amount} total",
+      "accept": "Accept",
+      "dismiss": "Dismiss",
+      "freeNote": "Trip grouping is pure rule work: no model call, no credits.",
+      "acceptFailed": "That did not work. Please try again."
     }
   }
 }

@@ -9,10 +9,12 @@ from rest_framework import serializers
 
 from expense.models import (
     ExpenseAppConfig,
+    ExpenseGroup,
     ExpenseUserConfig,
     Invoice,
     InvoiceScanRun,
     InvoiceSourceFile,
+    TripSuggestion,
 )
 
 
@@ -292,4 +294,72 @@ class InvoiceUpdateSerializer(serializers.ModelSerializer):
                 _("Amount cannot be negative.")
             )
         return value
+
+
+class ExpenseGroupSerializer(serializers.ModelSerializer):
+    """A reimbursement batch with its cached totals."""
+
+    class Meta:
+        model = ExpenseGroup
+        fields = [
+            "uuid",
+            "name",
+            "purpose",
+            "status",
+            "trip_type",
+            "period_start",
+            "period_end",
+            "external_ref",
+            "note",
+            "invoice_count",
+            "total_amount",
+            "tax_amount",
+            "exported_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "uuid",
+            "period_start",
+            "period_end",
+            "invoice_count",
+            "total_amount",
+            "tax_amount",
+            "exported_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_name(self, value):
+        name = str(value or "").strip()
+        if not name:
+            raise serializers.ValidationError(_("A name is required."))
+        return name
+
+
+class TripSuggestionSerializer(serializers.ModelSerializer):
+    """An inferred business trip, offered rather than applied."""
+
+    class Meta:
+        model = TripSuggestion
+        fields = [
+            "uuid",
+            "destination_city",
+            "start_date",
+            "end_date",
+            "invoice_ids",
+            "total_amount",
+            "confidence",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class GroupItemsSerializer(serializers.Serializer):
+    """Invoices to add to or remove from a group."""
+
+    invoice_uuids = serializers.ListField(
+        child=serializers.UUIDField(), allow_empty=False
+    )
 

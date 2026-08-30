@@ -1232,6 +1232,35 @@
         "model": "由模型判定",
         "user": "你手动设置"
       }
+    },
+    "groups": {
+      "title": "报销组",
+      "subtitle": "把发票归到一次报销里，汇总好填报字段和附件。",
+      "create": "新建",
+      "namePlaceholder": "报销组名称",
+      "empty": "还没有报销组。",
+      "line": "{count} 张票据 · 合计 {amount} 元",
+      "businessTrip": "出差",
+      "viewSummary": "查看汇总",
+      "export": "导出附件",
+      "createFailed": "创建失败，请检查名称是否重复。",
+      "formFields": "报销单填报字段",
+      "copyAll": "一键复制",
+      "copied": "已复制",
+      "invoiceCount": "票据张数",
+      "totalAmount": "价税合计",
+      "taxAmount": "税额合计",
+      "amountInWords": "金额大写"
+    },
+    "trips": {
+      "title": "检测到出差",
+      "subtitle": "根据长途交通票和异地消费自动归集，采纳后会生成报销组。",
+      "headline": "{start} → {end} {city}",
+      "detail": "{count} 张票据 · 合计 {amount} 元",
+      "accept": "采纳",
+      "dismiss": "忽略",
+      "freeNote": "行程归集完全按规则计算，不调用模型、不消耗点数。",
+      "acceptFailed": "操作失败，请稍后重试。"
     }
   }
 }

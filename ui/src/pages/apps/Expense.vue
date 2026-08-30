@@ -32,11 +32,21 @@
           @toggle="handleToggle"
         />
 
+        <TripSuggestionCard
+          v-if="config?.enabled"
+          :trips="trips"
+          :accepting="acceptingTrip"
+          @accept="acceptTrip"
+          @dismiss="dismissTrip"
+        />
+
         <InvoiceSection
           v-if="config?.enabled"
           ref="invoiceSection"
           @rescanned="loadRuns"
         />
+
+        <GroupSection v-if="config?.enabled" ref="groupSection" />
 
         <PendingLinkList
           v-if="config?.enabled"
@@ -71,8 +81,10 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import ExpenseEnableCard from '@/components/expense/ExpenseEnableCard.vue'
+import GroupSection from '@/components/expense/GroupSection.vue'
 import InvoiceSection from '@/components/expense/InvoiceSection.vue'
 import PendingLinkList from '@/components/expense/PendingLinkList.vue'
+import TripSuggestionCard from '@/components/expense/TripSuggestionCard.vue'
 import ScanPreviewDialog from '@/components/expense/ScanPreviewDialog.vue'
 import ScanRunList from '@/components/expense/ScanRunList.vue'
 import { expenseApi } from '@/api/expense'
@@ -84,6 +96,9 @@ const runs = ref([])
 const links = ref([])
 const releasing = ref('')
 const invoiceSection = ref(null)
+const groupSection = ref(null)
+const trips = ref([])
+const acceptingTrip = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const scanning = ref(false)
@@ -116,6 +131,44 @@ async function loadRuns() {
   }
 }
 
+// Trip detection is pure rule work on data already extracted, so it is
+// refreshed on load rather than hidden behind a button.
+async function loadTrips() {
+  if (!config.value?.enabled) {
+    trips.value = []
+    return
+  }
+  try {
+    const result = await expenseApi.refreshTrips()
+    trips.value = result.suggestions || []
+  } catch (err) {
+    error.value = readError(err, 'expense.loadFailed')
+  }
+}
+
+async function acceptTrip(trip) {
+  acceptingTrip.value = trip.uuid
+  error.value = ''
+  try {
+    await expenseApi.acceptTrip(trip.uuid)
+    await Promise.all([loadTrips(), groupSection.value?.load()])
+    await invoiceSection.value?.load()
+  } catch (err) {
+    error.value = readError(err, 'expense.trips.acceptFailed')
+  } finally {
+    acceptingTrip.value = ''
+  }
+}
+
+async function dismissTrip(trip) {
+  try {
+    await expenseApi.dismissTrip(trip.uuid)
+    await loadTrips()
+  } catch (err) {
+    error.value = readError(err, 'expense.trips.acceptFailed')
+  }
+}
+
 async function releaseLink(link) {
   releasing.value = link.uuid
   error.value = ''
@@ -134,7 +187,7 @@ async function loadConfig() {
   error.value = ''
   try {
     config.value = await expenseApi.getConfig()
-    await loadRuns()
+    await Promise.all([loadRuns(), loadTrips()])
   } catch (err) {
     error.value = readError(err, 'expense.loadFailed')
   } finally {

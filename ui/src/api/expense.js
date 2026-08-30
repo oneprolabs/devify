@@ -65,6 +65,48 @@ export const expenseApi = {
     return apiClient
       .post(`/v1/apps/expense/invoices/${uuid}/reextract`)
       .then(extractData)
+  },
+
+  getGroups() {
+    return apiClient.get('/v1/apps/expense/groups').then(extractData)
+  },
+
+  createGroup(payload) {
+    return apiClient.post('/v1/apps/expense/groups', payload).then(extractData)
+  },
+
+  getGroupSummary(uuid) {
+    return apiClient
+      .get(`/v1/apps/expense/groups/${uuid}/summary`)
+      .then(extractData)
+  },
+
+  addGroupItems(uuid, invoiceUuids) {
+    return apiClient
+      .post(`/v1/apps/expense/groups/${uuid}/items`, {
+        invoice_uuids: invoiceUuids
+      })
+      .then(extractData)
+  },
+
+  getTrips() {
+    return apiClient.get('/v1/apps/expense/trips').then(extractData)
+  },
+
+  refreshTrips() {
+    return apiClient.post('/v1/apps/expense/trips').then(extractData)
+  },
+
+  acceptTrip(uuid) {
+    return apiClient
+      .post(`/v1/apps/expense/trips/${uuid}/accept`)
+      .then(extractData)
+  },
+
+  dismissTrip(uuid) {
+    return apiClient
+      .post(`/v1/apps/expense/trips/${uuid}/dismiss`)
+      .then(extractData)
   }
 }
 

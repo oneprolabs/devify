@@ -8,6 +8,7 @@ import os
 from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
@@ -16,10 +17,18 @@ from rest_framework.views import APIView
 
 from billing.services.config_service import get_credit_policy
 from billing.services.credits_service import CreditsService
-from expense.models import Invoice, InvoiceScanRun, InvoiceSourceFile
+from expense.models import (
+    ExpenseGroup,
+    Invoice,
+    InvoiceScanRun,
+    InvoiceSourceFile,
+    TripSuggestion,
+)
 from expense.serializers import (
     ExpenseAppConfigSerializer,
     ExpenseUserConfigSerializer,
+    ExpenseGroupSerializer,
+    GroupItemsSerializer,
     InvoiceDetailSerializer,
     InvoiceListSerializer,
     InvoiceScanRunDetailSerializer,
@@ -27,6 +36,7 @@ from expense.serializers import (
     InvoiceSourceFileSerializer,
     InvoiceUpdateSerializer,
     ScanRequestSerializer,
+    TripSuggestionSerializer,
 )
 from expense.services.config_service import (
     get_app_config,
@@ -34,6 +44,10 @@ from expense.services.config_service import (
     set_user_enabled,
 )
 from expense.services.scan_scheduler import sync_scan_periodic_task
+from expense.services import export as export_service
+from expense.services import groups as group_service
+from expense.services import trips as trip_service
+from expense.services import naming
 from expense.services.classification import remember_correction
 from expense.services.scanner import preview_scan, start_scan
 
@@ -376,4 +390,264 @@ class ExpenseInvoiceFileAPIView(APIView):
             as_attachment=False,
             filename=filename,
         )
+
+
+def _bad_request(message):
+    return Response(
+        {"code": 400, "message": str(message), "data": None},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+class ExpenseGroupListAPIView(APIView):
+    """Reimbursement groups belonging to the current user."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset = ExpenseGroup.objects.filter(user=request.user)
+        if request.query_params.get("status"):
+            queryset = queryset.filter(
+                status=request.query_params["status"]
+            )
+        return _response(ExpenseGroupSerializer(queryset, many=True).data)
+
+    def post(self, request):
+        serializer = ExpenseGroupSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        if ExpenseGroup.objects.filter(
+            user=request.user, name=serializer.validated_data["name"]
+        ).exists():
+            return _bad_request(_("A group with that name already exists."))
+
+        group = serializer.save(user=request.user)
+        return _response(
+            ExpenseGroupSerializer(group).data,
+            message=_("created"),
+            code=201,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class ExpenseGroupDetailAPIView(APIView):
+    """Read, rename, restate or delete one group."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_object(self, request, uuid):
+        return get_object_or_404(ExpenseGroup, uuid=uuid, user=request.user)
+
+    def get(self, request, uuid):
+        group = self._get_object(request, uuid)
+        data = ExpenseGroupSerializer(group).data
+        data["invoices"] = InvoiceListSerializer(
+            [
+                item.invoice
+                for item in group.items.select_related("invoice").order_by(
+                    "sort_order", "id"
+                )
+            ],
+            many=True,
+        ).data
+        return _response(data)
+
+    def patch(self, request, uuid):
+        group = self._get_object(request, uuid)
+        serializer = ExpenseGroupSerializer(
+            group, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        group = serializer.save()
+        return _response(ExpenseGroupSerializer(group).data)
+
+    def delete(self, request, uuid):
+        group = self._get_object(request, uuid)
+        group.delete()
+        return _response(None, message=_("deleted"))
+
+
+class ExpenseGroupItemsAPIView(APIView):
+    """Add invoices to a group, or take them back out."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _get_group(self, request, uuid):
+        return get_object_or_404(ExpenseGroup, uuid=uuid, user=request.user)
+
+    def post(self, request, uuid):
+        group = self._get_group(request, uuid)
+        serializer = GroupItemsSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            added = group_service.add_invoices(
+                group,
+                [
+                    str(item)
+                    for item in serializer.validated_data["invoice_uuids"]
+                ],
+            )
+        except group_service.GroupError as exc:
+            return _bad_request(exc)
+
+        data = ExpenseGroupSerializer(group).data
+        data["added"] = added
+        return _response(data)
+
+    def delete(self, request, uuid):
+        group = self._get_group(request, uuid)
+        serializer = GroupItemsSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        removed = group_service.remove_invoices(
+            group,
+            [
+                str(item)
+                for item in serializer.validated_data["invoice_uuids"]
+            ],
+        )
+        data = ExpenseGroupSerializer(group).data
+        data["removed"] = removed
+        return _response(data)
+
+
+class ExpenseGroupSummaryAPIView(APIView):
+    """The figures a claim form asks for, structured and as pasteable text."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uuid):
+        group = get_object_or_404(ExpenseGroup, uuid=uuid, user=request.user)
+        return _response(group_service.build_summary(group))
+
+
+class ExpenseGroupExportAPIView(APIView):
+    """
+    Package the group as a zip of uniformly named files.
+
+    ``preview=true`` returns the filenames the current template would
+    produce, so a naming template can be checked before it is used.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uuid):
+        group = get_object_or_404(ExpenseGroup, uuid=uuid, user=request.user)
+        template = (
+            request.query_params.get("template")
+            or get_user_config(request.user).filename_template
+        )
+        by_category = request.query_params.get("flat") != "true"
+
+        try:
+            if request.query_params.get("preview") == "true":
+                plan = export_service.plan_export(
+                    group, template, by_category
+                )
+                return _response(
+                    {
+                        "total_bytes": plan["total_bytes"],
+                        "missing_files": plan["missing_files"],
+                        "files": [
+                            {
+                                "filename": entry["filename"],
+                                "path": entry["arcname"],
+                                "size": entry["size"],
+                            }
+                            for entry in plan["entries"]
+                        ],
+                    }
+                )
+
+            archive_path = export_service.write_archive(
+                group, template, by_category
+            )
+        except export_service.ExportError as exc:
+            return _bad_request(exc)
+
+        group.exported_at = timezone.now()
+        group.save(update_fields=["exported_at", "updated_at"])
+
+        # The archive is a scratch file; hand it to the client and let it
+        # go rather than leaving copies behind on the worker.
+        handle = open(archive_path, "rb")
+        os.unlink(archive_path)
+        return FileResponse(
+            handle,
+            as_attachment=True,
+            filename=f"{naming.sanitize(group.name)}.zip",
+            content_type="application/zip",
+        )
+
+
+class ExpenseTripListAPIView(APIView):
+    """Business trips inferred from the invoice timeline."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset = TripSuggestion.objects.filter(
+            user=request.user, status=TripSuggestion.Status.SUGGESTED
+        )
+        return _response(TripSuggestionSerializer(queryset, many=True).data)
+
+    def post(self, request):
+        """Recompute suggestions. Costs nothing; calls no model."""
+        config = get_user_config(request.user)
+        created = trip_service.refresh_suggestions(
+            request.user, config.home_city
+        )
+        queryset = TripSuggestion.objects.filter(
+            user=request.user, status=TripSuggestion.Status.SUGGESTED
+        )
+        return _response(
+            {
+                "created": created,
+                "suggestions": TripSuggestionSerializer(
+                    queryset, many=True
+                ).data,
+            }
+        )
+
+
+class ExpenseTripAcceptAPIView(APIView):
+    """Turn one suggestion into a real group."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uuid):
+        suggestion = get_object_or_404(
+            TripSuggestion, uuid=uuid, user=request.user
+        )
+        if suggestion.status != TripSuggestion.Status.SUGGESTED:
+            return _bad_request(_("This suggestion was already decided."))
+
+        try:
+            group = trip_service.accept(
+                suggestion, (request.data or {}).get("name", "")
+            )
+        except group_service.GroupError as exc:
+            return _bad_request(exc)
+
+        return _response(
+            ExpenseGroupSerializer(group).data,
+            message=_("accepted"),
+            code=201,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class ExpenseTripDismissAPIView(APIView):
+    """Set one suggestion aside without acting on it."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uuid):
+        suggestion = get_object_or_404(
+            TripSuggestion, uuid=uuid, user=request.user
+        )
+        suggestion.status = TripSuggestion.Status.DISMISSED
+        suggestion.save(update_fields=["status", "updated_at"])
+        return _response(TripSuggestionSerializer(suggestion).data)
 

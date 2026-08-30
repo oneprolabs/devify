@@ -1117,6 +1117,37 @@
     "scanFloorNote": "Only mail received after {time} is processed; earlier mail needs a manual run.",
     "never": "Not scanned yet",
     "loadFailed": "Could not load the configuration. Please try again.",
-    "saveFailed": "Could not save. Please try again."
+    "saveFailed": "Could not save. Please try again.",
+    "scan": {
+      "previewTitle": "Scan estimate",
+      "previewSubtitle": "See how many emails will be processed and what it costs before starting.",
+      "action": "Scan now",
+      "confirm": "Start scan",
+      "scanned": "Emails scanned",
+      "candidates": "Candidates",
+      "estimatedCost": "Estimated cost",
+      "credits": "Credits used",
+      "costNote": "Each email containing invoices costs {credits} credit, however many invoices it carries.",
+      "pendingDependency": "{count} forwarded-message attachment(s) (.eml) cannot be read yet; they are rescanned automatically once ingestion supports them.",
+      "blockedLinks": "{count} download link(s) are outside the allowed domains and were not fetched:",
+      "historyTitle": "Scan history",
+      "historySubtitle": "How many emails each scan covered and what it cost.",
+      "empty": "No scans yet.",
+      "startedAt": "Started",
+      "trigger": "Trigger",
+      "status": "Status",
+      "previewFailed": "Could not estimate the scan. Please try again.",
+      "startFailed": "Could not start the scan. Please try again.",
+      "triggers": {
+        "scheduled": "Scheduled",
+        "manual": "Manual",
+        "backfill": "Backfill"
+      },
+      "statuses": {
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    }
   }
 }

@@ -1126,6 +1126,37 @@
     "scanFloorNote": "仅处理 {time} 之后收到的邮件，历史邮件需要手动处理。",
     "never": "尚未扫描",
     "loadFailed": "加载配置失败，请稍后重试。",
-    "saveFailed": "保存失败，请稍后重试。"
+    "saveFailed": "保存失败，请稍后重试。",
+    "scan": {
+      "previewTitle": "扫描预估",
+      "previewSubtitle": "先看清楚会处理多少邮件、消耗多少点数，再决定是否开始。",
+      "action": "立即扫描",
+      "confirm": "开始扫描",
+      "scanned": "扫描邮件",
+      "candidates": "候选邮件",
+      "estimatedCost": "预计消耗",
+      "credits": "实际消耗",
+      "costNote": "每封含发票的邮件消耗 {credits} 点，不论其中有几张发票。",
+      "pendingDependency": "有 {count} 个转发邮件附件（.eml）暂时无法解析，等主流程支持后会自动重扫。",
+      "blockedLinks": "有 {count} 个下载链接不在允许的域名内，未自动下载：",
+      "historyTitle": "扫描记录",
+      "historySubtitle": "每次扫描处理了多少邮件、消耗了多少点数。",
+      "empty": "还没有扫描记录。",
+      "startedAt": "开始时间",
+      "trigger": "触发方式",
+      "status": "状态",
+      "previewFailed": "预估失败，请稍后重试。",
+      "startFailed": "启动扫描失败，请稍后重试。",
+      "triggers": {
+        "scheduled": "定时",
+        "manual": "手动",
+        "backfill": "补处理"
+      },
+      "statuses": {
+        "running": "进行中",
+        "completed": "已完成",
+        "failed": "失败"
+      }
+    }
   }
 }

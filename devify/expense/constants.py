@@ -56,3 +56,28 @@ INVOICE_TYPE_CATEGORY_MAP = {
     "taxi": ExpenseCategory.TRANSPORT_LOCAL,
     "hotel": ExpenseCategory.ACCOMMODATION,
 }
+
+
+# Attachment gating for candidate filtering.
+PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf"}
+OFD_CONTENT_TYPES = {"application/ofd", "application/x-ofd"}
+
+# Signature images and logos cluster below this size; invoices do not.
+MIN_IMAGE_BYTES = 20 * 1024
+
+# Default keyword set used when the user has not configured their own.
+# Matching is case-insensitive against subject, body and attachment names.
+DEFAULT_INVOICE_KEYWORDS = (
+    "发票",
+    "电子发票",
+    "增值税",
+    "行程单",
+    "车票",
+    "机票",
+    "报销",
+    "税号",
+    "invoice",
+    "receipt",
+    "fapiao",
+    "itinerary",
+)

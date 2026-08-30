@@ -17,18 +17,36 @@
         </div>
       </BaseCard>
 
-      <p
-        v-else-if="error"
-        class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-      >
-        {{ error }}
-      </p>
+      <template v-else>
+        <p
+          v-if="error"
+          class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
+          {{ error }}
+        </p>
 
-      <ExpenseEnableCard
-        v-else-if="config"
-        :model-value="config"
-        :saving="saving"
-        @toggle="handleToggle"
+        <ExpenseEnableCard
+          v-if="config"
+          :model-value="config"
+          :saving="saving"
+          @toggle="handleToggle"
+        />
+
+        <ScanRunList
+          v-if="config?.enabled"
+          :runs="runs"
+          :scanning="scanning"
+          @scan="openPreview"
+        />
+      </template>
+
+      <ScanPreviewDialog
+        v-if="previewOpen"
+        :preview="preview"
+        :loading="previewLoading"
+        :error="previewError"
+        @close="previewOpen = false"
+        @confirm="confirmScan"
       />
     </div>
   </AppLayout>
@@ -40,22 +58,48 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import ExpenseEnableCard from '@/components/expense/ExpenseEnableCard.vue'
+import ScanPreviewDialog from '@/components/expense/ScanPreviewDialog.vue'
+import ScanRunList from '@/components/expense/ScanRunList.vue'
 import { expenseApi } from '@/api/expense'
 
 const { t } = useI18n()
 
 const config = ref(null)
+const runs = ref([])
 const loading = ref(true)
 const saving = ref(false)
+const scanning = ref(false)
 const error = ref('')
+
+const previewOpen = ref(false)
+const previewLoading = ref(false)
+const previewError = ref('')
+const preview = ref(null)
+
+function readError(err, fallbackKey) {
+  return err?.response?.data?.message || t(fallbackKey)
+}
+
+async function loadRuns() {
+  if (!config.value?.enabled) {
+    runs.value = []
+    return
+  }
+  try {
+    runs.value = await expenseApi.getScanRuns()
+  } catch (err) {
+    error.value = readError(err, 'expense.loadFailed')
+  }
+}
 
 async function loadConfig() {
   loading.value = true
   error.value = ''
   try {
     config.value = await expenseApi.getConfig()
+    await loadRuns()
   } catch (err) {
-    error.value = err?.response?.data?.message || t('expense.loadFailed')
+    error.value = readError(err, 'expense.loadFailed')
   } finally {
     loading.value = false
   }
@@ -66,10 +110,40 @@ async function handleToggle(enabled) {
   error.value = ''
   try {
     config.value = await expenseApi.updateConfig({ enabled })
+    await loadRuns()
   } catch (err) {
-    error.value = err?.response?.data?.message || t('expense.saveFailed')
+    error.value = readError(err, 'expense.saveFailed')
   } finally {
     saving.value = false
+  }
+}
+
+// The cost is always shown before a scan starts, never after.
+async function openPreview() {
+  previewOpen.value = true
+  previewLoading.value = true
+  previewError.value = ''
+  preview.value = null
+  try {
+    preview.value = await expenseApi.previewScan({})
+  } catch (err) {
+    previewError.value = readError(err, 'expense.scan.previewFailed')
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+async function confirmScan() {
+  scanning.value = true
+  previewOpen.value = false
+  error.value = ''
+  try {
+    await expenseApi.startScan({})
+    await loadRuns()
+  } catch (err) {
+    error.value = readError(err, 'expense.scan.startFailed')
+  } finally {
+    scanning.value = false
   }
 }
 

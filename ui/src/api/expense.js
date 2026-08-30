@@ -15,6 +15,24 @@ export const expenseApi = {
 
   updateConfig(payload) {
     return apiClient.patch('/v1/apps/expense/config', payload).then(extractData)
+  },
+
+  previewScan(payload = {}) {
+    return apiClient
+      .post('/v1/apps/expense/scan/preview', payload)
+      .then(extractData)
+  },
+
+  startScan(payload = {}) {
+    return apiClient.post('/v1/apps/expense/scan', payload).then(extractData)
+  },
+
+  getScanRuns() {
+    return apiClient.get('/v1/apps/expense/scan-runs').then(extractData)
+  },
+
+  getScanRun(uuid) {
+    return apiClient.get(`/v1/apps/expense/scan-runs/${uuid}`).then(extractData)
   }
 }
 

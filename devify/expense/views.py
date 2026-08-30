@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -11,9 +13,13 @@ from rest_framework.views import APIView
 
 from billing.services.config_service import get_credit_policy
 from billing.services.credits_service import CreditsService
+from expense.models import InvoiceScanRun
 from expense.serializers import (
     ExpenseAppConfigSerializer,
     ExpenseUserConfigSerializer,
+    InvoiceScanRunDetailSerializer,
+    InvoiceScanRunSerializer,
+    ScanRequestSerializer,
 )
 from expense.services.config_service import (
     get_app_config,
@@ -21,6 +27,7 @@ from expense.services.config_service import (
     set_user_enabled,
 )
 from expense.services.scan_scheduler import sync_scan_periodic_task
+from expense.services.scanner import preview_scan, start_scan
 
 logger = logging.getLogger(__name__)
 
@@ -105,3 +112,79 @@ class ExpenseAdminConfigAPIView(APIView):
         data = ExpenseAppConfigSerializer(config).data
         data["schedule_sync"] = sync_result
         return _response(data)
+
+
+class ExpenseScanPreviewAPIView(APIView):
+    """
+    Report what a scan would find and cost, without doing it.
+
+    Nothing is written and nothing is charged here, so the UI can put a
+    real number in front of the user before they commit to spending.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ScanRequestSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        result = preview_scan(
+            request.user,
+            lookback_days=payload.get("lookback_days"),
+            email_uuids=[str(item) for item in payload.get("email_uuids", [])]
+            or None,
+        )
+        return _response(result)
+
+
+class ExpenseScanAPIView(APIView):
+    """Start a scan and hand back the run to poll."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ScanRequestSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        email_uuids = [str(item) for item in payload.get("email_uuids", [])]
+        trigger = (
+            InvoiceScanRun.Trigger.BACKFILL
+            if payload.get("lookback_days") or email_uuids
+            else InvoiceScanRun.Trigger.MANUAL
+        )
+
+        run = start_scan(
+            request.user,
+            trigger=trigger,
+            lookback_days=payload.get("lookback_days"),
+            email_uuids=email_uuids or None,
+        )
+        return _response(
+            InvoiceScanRunSerializer(run).data,
+            message=_("scan started"),
+            code=202,
+            status_code=status.HTTP_202_ACCEPTED,
+        )
+
+
+class ExpenseScanRunListAPIView(APIView):
+    """Scan history for the current user."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        queryset = InvoiceScanRun.objects.filter(user=request.user)[:50]
+        return _response(InvoiceScanRunSerializer(queryset, many=True).data)
+
+
+class ExpenseScanRunDetailAPIView(APIView):
+    """One scan batch including its per-email verdicts."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uuid):
+        run = get_object_or_404(InvoiceScanRun, uuid=uuid, user=request.user)
+        return _response(InvoiceScanRunDetailSerializer(run).data)
+

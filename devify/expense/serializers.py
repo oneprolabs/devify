@@ -7,7 +7,11 @@ from uuid import UUID
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from expense.models import ExpenseAppConfig, ExpenseUserConfig
+from expense.models import (
+    ExpenseAppConfig,
+    ExpenseUserConfig,
+    InvoiceScanRun,
+)
 
 
 def _validate_string_list(value, field_label):
@@ -111,3 +115,61 @@ class ExpenseAppConfigSerializer(serializers.ModelSerializer):
         if value is not None and not isinstance(value, UUID):
             raise serializers.ValidationError(_("Invalid UUID"))
         return value
+
+
+class InvoiceScanRunSerializer(serializers.ModelSerializer):
+    """Scan batch, with the credit figures the user cares about."""
+
+    estimated_credits = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InvoiceScanRun
+        fields = [
+            "uuid",
+            "trigger",
+            "status",
+            "started_at",
+            "finished_at",
+            "emails_scanned",
+            "candidate_emails",
+            "links_fetched",
+            "invoices_created",
+            "duplicates",
+            "not_invoice",
+            "failed",
+            "credits_consumed",
+            "estimated_credits",
+            "error_message",
+        ]
+        read_only_fields = fields
+
+    def get_estimated_credits(self, obj) -> int:
+        summary = (obj.details or {}).get("summary") or {}
+        return summary.get("estimated_credits", 0)
+
+
+class InvoiceScanRunDetailSerializer(InvoiceScanRunSerializer):
+    """Adds the per-email verdicts behind the summary numbers."""
+
+    class Meta(InvoiceScanRunSerializer.Meta):
+        fields = InvoiceScanRunSerializer.Meta.fields + ["details"]
+        read_only_fields = fields
+
+
+class ScanRequestSerializer(serializers.Serializer):
+    """Payload shared by the scan and preview endpoints."""
+
+    lookback_days = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1, max_value=365
+    )
+    email_uuids = serializers.ListField(
+        child=serializers.UUIDField(), required=False, allow_empty=False
+    )
+
+    def validate(self, attrs):
+        if attrs.get("lookback_days") and attrs.get("email_uuids"):
+            raise serializers.ValidationError(
+                _("Provide either lookback_days or email_uuids, not both.")
+            )
+        return attrs
+

@@ -101,6 +101,7 @@ testpaths = [
     "devify/accounts/tests",
     "devify/threadline/tests",
     "devify/relay/tests",
+    "devify/expense/tests",
     "devify/billing/tests",
 ]
 python_files = ["test_*.py"]

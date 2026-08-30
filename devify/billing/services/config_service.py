@@ -256,6 +256,7 @@ def get_credit_policy() -> dict[str, int]:
     return {
         'default_free_credits': config.default_free_credits,
         'workflow_cost_credits': config.workflow_cost_credits,
+        'invoice_email_cost_credits': config.invoice_email_cost_credits,
     }
 
 

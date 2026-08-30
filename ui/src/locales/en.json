@@ -73,7 +73,9 @@
     "relayName": "Relay",
     "todoApp": "To-do App",
     "relayDesc": "Subscribe to workflow completions and deliver them to Feishu, Jira, or GitHub Issues.",
-    "todoDesc": "Collect follow-up tasks and keep post-analysis actions organized in one place."
+    "todoDesc": "Collect follow-up tasks and keep post-analysis actions organized in one place.",
+    "expenseName": "Expense",
+    "expenseDesc": "Collect invoices from email, classify them and package them for reimbursement."
   },
   "relay": {
     "pageTitle": "Relay",
@@ -1101,5 +1103,20 @@
     "clickToView": "View link",
     "openLink": "Open link",
     "hideLink": "Hide link"
+  },
+  "expense": {
+    "pageTitle": "Expense",
+    "pageSubtitle": "Turn invoices in your mailbox into ready-to-file reimbursement batches.",
+    "enableTitle": "Enable invoice recognition",
+    "enableDesc": "Once enabled, new mail is scanned on the platform schedule and any invoices found are filed. Turning it off only stops future scans; invoices already filed are kept.",
+    "priceLabel": "Pricing",
+    "priceValue": "{credits} credit per email containing invoices",
+    "balanceLabel": "Balance",
+    "lastScanLabel": "Last scan",
+    "billingNote": "One email costs 1 credit no matter how many invoices it carries. Emails with no invoice, duplicates, and skips for insufficient credits are never charged.",
+    "scanFloorNote": "Only mail received after {time} is processed; earlier mail needs a manual run.",
+    "never": "Not scanned yet",
+    "loadFailed": "Could not load the configuration. Please try again.",
+    "saveFailed": "Could not save. Please try again."
   }
 }

@@ -73,7 +73,9 @@
     "relayName": "智能投递",
     "todoApp": "待办应用",
     "relayDesc": "订阅工作流完成事件，并投递到飞书、Jira 或 GitHub Issue。",
-    "todoDesc": "收集后续待办，把分析后的动作统一整理在一个地方。"
+    "todoDesc": "收集后续待办，把分析后的动作统一整理在一个地方。",
+    "expenseName": "发票管家",
+    "expenseDesc": "自动识别邮件中的发票，分类归档并按报销组打包下载。"
   },
   "relay": {
     "pageTitle": "智能投递",
@@ -1110,5 +1112,20 @@
     "clickToView": "查看链接",
     "openLink": "打开链接",
     "hideLink": "隐藏链接"
+  },
+  "expense": {
+    "pageTitle": "发票管家",
+    "pageSubtitle": "从邮件中自动整理发票，按报销组汇总填报信息与附件。",
+    "enableTitle": "开启发票识别",
+    "enableDesc": "开启后，系统会按平台设定的周期扫描新邮件，识别其中的发票并归档。关闭只停止后续扫描，已识别的发票会保留。",
+    "priceLabel": "计费方式",
+    "priceValue": "每封含发票的邮件 {credits} 点",
+    "balanceLabel": "当前余额",
+    "lastScanLabel": "上次扫描",
+    "billingNote": "一封邮件不论识别出几张发票都只扣 1 点；未识别出发票、重复发票、余额不足均不扣点。",
+    "scanFloorNote": "仅处理 {time} 之后收到的邮件，历史邮件需要手动处理。",
+    "never": "尚未扫描",
+    "loadFailed": "加载配置失败，请稍后重试。",
+    "saveFailed": "保存失败，请稍后重试。"
   }
 }

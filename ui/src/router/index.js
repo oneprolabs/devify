@@ -97,6 +97,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/apps/expense',
+    name: 'ExpenseApp',
+    component: () => import('@/pages/apps/Expense.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/todos',
     name: 'Todos',
     component: () => import('@/pages/TodosPage.vue'),

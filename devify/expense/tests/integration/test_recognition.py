@@ -393,3 +393,230 @@ class TestExpenseDate:
         assert invoice.issue_date == date(2026, 8, 6)
         assert invoice.expense_date == date(2026, 7, 20)
 
+
+
+class TestSameEmailCopies:
+    """
+    One expense, several files.
+
+    Senders attach the same invoice as PDF, OFD and XML, plus an itinerary
+    for the same ride. Only some of those carry an invoice number, so
+    without this the same money lands in the list three times and any
+    claim built from it is inflated.
+    """
+
+    def test_an_unnumbered_copy_collapses_into_the_invoice(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="invoice.pdf")
+        attach(user, email, filename="itinerary.pdf")
+
+        side_effect = [
+            invoice_fields(invoice_no="26117000001180197970"),
+            invoice_fields(invoice_no="", seller_name="首汽约车"),
+        ]
+        with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
+            recognize_email(email)
+
+        assert Invoice.objects.filter(status="extracted").count() == 1
+        assert Invoice.objects.filter(status="duplicate").count() == 1
+
+    def test_it_collapses_whichever_order_they_arrive_in(self, user):
+        # Which file the sender put first must not decide the outcome.
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="itinerary.pdf")
+        attach(user, email, filename="invoice.pdf")
+
+        side_effect = [
+            invoice_fields(invoice_no="", seller_name="首汽约车"),
+            invoice_fields(invoice_no="26117000001180197970"),
+        ]
+        with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
+            recognize_email(email)
+
+        kept = Invoice.objects.get(status="extracted")
+        assert kept.invoice_no == "26117000001180197970"
+        assert Invoice.objects.filter(status="duplicate").count() == 1
+
+    def test_the_numbered_invoice_is_the_one_kept(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="itinerary.pdf")
+        attach(user, email, filename="invoice.pdf")
+
+        side_effect = [
+            invoice_fields(invoice_no="", seller_name="高德地图"),
+            invoice_fields(invoice_no="INV-9", seller_name="首约科技"),
+        ]
+        with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
+            recognize_email(email)
+
+        assert Invoice.objects.get(status="extracted").seller_name == "首约科技"
+
+    def test_a_different_amount_is_a_different_expense(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="ride-a.pdf")
+        attach(user, email, filename="ride-b.pdf")
+
+        side_effect = [
+            invoice_fields(invoice_no="", total_amount=Decimal("20.39")),
+            invoice_fields(invoice_no="", total_amount=Decimal("54.69")),
+        ]
+        with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
+            recognize_email(email)
+
+        assert Invoice.objects.filter(status="extracted").count() == 2
+
+    def test_the_same_amount_in_another_email_is_left_alone(self, user):
+        # Two lunches at the same price in different weeks are two lunches.
+        give_credits(user, 10)
+        first = make_email(user)
+        attach(user, first, filename="a.pdf")
+        second = make_email(user)
+        attach(user, second, filename="b.pdf")
+
+        with stub_decode(), patch(
+            EXTRACT_PATH,
+            side_effect=[
+                invoice_fields(invoice_no=""),
+                invoice_fields(invoice_no=""),
+            ],
+        ):
+            recognize_email(first)
+            recognize_email(second)
+
+        assert Invoice.objects.filter(status="extracted").count() == 2
+
+
+class TestTravelDate:
+    """
+    A taxi invoice is cut weeks after the ride.
+
+    The itinerary in the same email knows when the journey happened, and
+    that is the date a claim has to be filed under, so the invoice takes
+    it before the itinerary is set aside.
+    """
+
+    def test_the_invoice_inherits_the_ride_date(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="invoice.pdf")
+        attach(user, email, filename="itinerary.pdf")
+
+        billed_on = date(2026, 8, 6)
+        travelled_on = date(2026, 7, 22)
+        side_effect = [
+            invoice_fields(
+                invoice_no="INV-1",
+                issue_date=billed_on,
+                expense_date=billed_on,
+            ),
+            invoice_fields(
+                invoice_no="",
+                issue_date=billed_on,
+                expense_date=travelled_on,
+            ),
+        ]
+        with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
+            recognize_email(email)
+
+        assert Invoice.objects.get(status="extracted").expense_date == (
+            travelled_on
+        )
+
+    def test_it_works_when_the_itinerary_is_read_first(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="itinerary.pdf")
+        attach(user, email, filename="invoice.pdf")
+
+        billed_on = date(2026, 8, 6)
+        travelled_on = date(2026, 6, 23)
+        side_effect = [
+            invoice_fields(
+                invoice_no="",
+                issue_date=billed_on,
+                expense_date=travelled_on,
+            ),
+            invoice_fields(
+                invoice_no="INV-2",
+                issue_date=billed_on,
+                expense_date=billed_on,
+            ),
+        ]
+        with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
+            recognize_email(email)
+
+        assert Invoice.objects.get(status="extracted").expense_date == (
+            travelled_on
+        )
+
+    def test_a_date_the_invoice_already_knows_is_not_overwritten(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="invoice.pdf")
+        attach(user, email, filename="copy.pdf")
+
+        known = date(2026, 7, 1)
+        side_effect = [
+            invoice_fields(
+                invoice_no="INV-3",
+                issue_date=date(2026, 8, 6),
+                expense_date=known,
+            ),
+            invoice_fields(
+                invoice_no="",
+                issue_date=date(2026, 8, 6),
+                expense_date=date(2026, 5, 5),
+            ),
+        ]
+        with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
+            recognize_email(email)
+
+        assert Invoice.objects.get(status="extracted").expense_date == known
+
+
+class TestDuplicatesAreNotWork:
+    """A duplicate is a second copy of money already listed."""
+
+    def test_duplicates_are_left_out_of_the_counts(self, user, api_client):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="invoice.pdf")
+        attach(user, email, filename="same.ofd")
+
+        with stub_decode(), patch(
+            EXTRACT_PATH,
+            side_effect=[invoice_fields(), invoice_fields()],
+        ):
+            recognize_email(email)
+        api_client.force_authenticate(user=user)
+
+        data = api_client.get("/api/v1/apps/expense/invoices").data["data"]
+
+        assert data["counts"]["todo"] == 1
+        assert data["counts"]["all"] == 1
+        assert len(data["invoices"]) == 1
+
+    def test_they_stay_reachable_with_an_explicit_filter(
+        self, user, api_client
+    ):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="invoice.pdf")
+        attach(user, email, filename="same.ofd")
+
+        with stub_decode(), patch(
+            EXTRACT_PATH,
+            side_effect=[invoice_fields(), invoice_fields()],
+        ):
+            recognize_email(email)
+        api_client.force_authenticate(user=user)
+
+        response = api_client.get(
+            "/api/v1/apps/expense/invoices?status=duplicate"
+        )
+
+        assert len(response.data["data"]["invoices"]) == 1

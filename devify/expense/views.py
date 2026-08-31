@@ -273,14 +273,11 @@ class ExpenseInvoiceListAPIView(APIView):
         if params.get("status"):
             queryset = queryset.filter(status=params["status"])
         else:
-            # Failed reads and non-invoices are noise in the default view;
-            # they stay reachable through an explicit status filter.
-            queryset = queryset.filter(
-                status__in=[
-                    Invoice.Status.EXTRACTED,
-                    Invoice.Status.DUPLICATE,
-                ]
-            )
+            # Failed reads, non-invoices and duplicates are noise in the
+            # default view: none of them can be claimed, and counting them
+            # inflates every chip. They stay reachable through an explicit
+            # status filter.
+            queryset = queryset.filter(status=Invoice.Status.EXTRACTED)
 
         if params.get("category"):
             queryset = queryset.filter(category=params["category"])

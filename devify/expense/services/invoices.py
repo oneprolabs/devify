@@ -73,10 +73,10 @@ def by_stage(queryset, stage: str):
 
 def stage_counts(user) -> dict:
     """One count per chip, plus the total."""
-    base = Invoice.objects.filter(
-        user=user,
-        status__in=[Invoice.Status.EXTRACTED, Invoice.Status.DUPLICATE],
-    )
+    # Only claimable invoices are counted. A duplicate is a second copy of
+    # money already in the list, so counting it would overstate the work
+    # left and the chips would no longer add up to anything real.
+    base = Invoice.objects.filter(user=user, status=Invoice.Status.EXTRACTED)
     counts = {
         stage: by_stage(base, stage).count()
         for stage in ("todo", "claiming", "reimbursed", "filed")

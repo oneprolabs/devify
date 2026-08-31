@@ -91,6 +91,97 @@ def build_dedup_key(fields: dict, attachment, source_file=None) -> str:
     return hashlib.md5(seed.encode("utf-8")).hexdigest()
 
 
+def find_sibling(email, fields, lookup) -> Invoice | None:
+    """
+    Find the invoice this document is another copy of, within its email.
+
+    Senders attach one expense several times over: the same invoice as PDF,
+    OFD and XML, plus an itinerary for the same ride. Only some of those
+    carry an invoice number, so the number-based key misses the rest and
+    the same money lands in the list two or three times. Inside a single
+    email an identical amount is the same expense, not a coincidence.
+    """
+    amount = fields.get("total_amount")
+    if fields.get("invoice_no") or amount in (None, ""):
+        return None
+
+    return (
+        Invoice.objects.filter(
+            user=email.user,
+            email_message=email,
+            total_amount=amount,
+            status=Invoice.Status.EXTRACTED,
+        )
+        .exclude(**lookup)
+        .order_by("id")
+        .first()
+    )
+
+
+def absorb_unnumbered_copies(invoice: Invoice) -> int:
+    """
+    Take over copies of this invoice that were read before it.
+
+    ``find_sibling`` only looks backwards, so which document a sender put
+    first decides the outcome: an itinerary read before its invoice keeps
+    its own row and the money is counted twice. The numbered invoice is
+    always the one to keep, so when it arrives late it collects the copies
+    that came before it - and their travel date with them.
+    """
+    if not invoice.invoice_no or invoice.total_amount is None:
+        return 0
+
+    copies = list(
+        Invoice.objects.filter(
+            user_id=invoice.user_id,
+            email_message_id=invoice.email_message_id,
+            total_amount=invoice.total_amount,
+            invoice_no="",
+            status=Invoice.Status.EXTRACTED,
+        ).exclude(pk=invoice.pk)
+    )
+    for copy in copies:
+        lift_travel_date(
+            invoice,
+            {
+                "expense_date": copy.expense_date,
+                "issue_date": copy.issue_date,
+            },
+        )
+        copy.status = Invoice.Status.DUPLICATE
+        copy.duplicate_of = invoice
+        copy.dedup_key = None
+        copy.save(
+            update_fields=[
+                "status",
+                "duplicate_of",
+                "dedup_key",
+                "updated_at",
+            ]
+        )
+    return len(copies)
+
+
+def lift_travel_date(invoice: Invoice, fields: dict) -> None:
+    """
+    Take the travel date from a copy that knows it.
+
+    A taxi invoice is cut weeks after the ride, so the invoice alone dates
+    the expense wrong. The itinerary attached to the same email carries the
+    real date, and it is the one a claim should be filed under - so when
+    the copy knows the journey and the invoice does not, the invoice
+    inherits it before the copy is set aside.
+    """
+    travelled = fields.get("expense_date")
+    if not travelled or travelled == fields.get("issue_date"):
+        return
+    if invoice.expense_date and invoice.expense_date != invoice.issue_date:
+        return
+
+    invoice.expense_date = travelled
+    invoice.save(update_fields=["expense_date", "updated_at"])
+
+
 def _model_for(decoded, app_config) -> str:
     """Text decodes go to the cheap model; only pixels need the vision one."""
     if decoded.mode == "text":
@@ -201,6 +292,8 @@ def _persist(
         .exclude(**lookup)
         .first()
     )
+    if existing is None:
+        existing = find_sibling(email, fields, lookup)
 
     payload = {
         **defaults,
@@ -234,6 +327,7 @@ def _persist(
         payload["duplicate_of"] = existing
         # The duplicate must not claim the key the original already holds.
         payload["dedup_key"] = None
+        lift_travel_date(existing, fields)
 
     try:
         with transaction.atomic():
@@ -248,6 +342,9 @@ def _persist(
         invoice, _ = Invoice.objects.update_or_create(
             **lookup, defaults=payload
         )
+
+    if invoice.status == Invoice.Status.EXTRACTED:
+        absorb_unnumbered_copies(invoice)
 
     return invoice, (
         "duplicate"

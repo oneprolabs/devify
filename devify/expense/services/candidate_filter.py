@@ -120,11 +120,14 @@ def resolve_keywords(user_config) -> list[str]:
     return configured or list(DEFAULT_INVOICE_KEYWORDS)
 
 
-def resolve_allowed_domains(app_config, user_config) -> list[str]:
-    """Platform allowlist plus whatever the user added."""
-    domains = list(app_config.link_domain_allowlist or []) + list(
-        user_config.extra_link_domains or []
-    )
+def resolve_allowed_domains(app_config, user_config=None) -> list[str]:
+    """
+    The operator's allowlist, empty meaning no restriction.
+
+    There is no per-user list: with an empty platform allowlist already
+    admitting any public host, a user-level one had nothing left to do.
+    """
+    domains = list(app_config.link_domain_allowlist or [])
     cleaned = []
     for domain in domains:
         text = str(domain or "").strip().lower().lstrip(".")
@@ -200,9 +203,19 @@ def _normalize_url(raw: str) -> str:
 
 
 def domain_allowed(url: str, allowed_domains: list[str]) -> bool:
+    """
+    An empty allowlist places no restriction.
+
+    Invoices come from a long tail of billing platforms, so demanding that
+    every domain be listed in advance would leave most links unusable.
+    Whether the host is safe to reach is settled by the address checks in
+    the fetcher, not here.
+    """
     host = (urlparse(url).hostname or "").lower()
     if not host:
         return False
+    if not allowed_domains:
+        return True
     return any(
         host == domain or host.endswith("." + domain)
         for domain in allowed_domains

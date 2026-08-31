@@ -46,7 +46,6 @@ class ExpenseUserConfigSerializer(serializers.ModelSerializer):
             "sender_allowlist",
             "keyword_filters",
             "filename_template",
-            "extra_link_domains",
             "created_at",
             "updated_at",
         ]
@@ -62,9 +61,6 @@ class ExpenseUserConfigSerializer(serializers.ModelSerializer):
 
     def validate_keyword_filters(self, value):
         return _validate_string_list(value, "keyword_filters")
-
-    def validate_extra_link_domains(self, value):
-        return _validate_string_list(value, "extra_link_domains")
 
 
 class ExpenseAppConfigSerializer(serializers.ModelSerializer):
@@ -316,6 +312,8 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
     duplicate_of_uuid = serializers.CharField(
         source="duplicate_of.uuid", read_only=True, default=""
     )
+    file_content_type = serializers.SerializerMethodField()
+    has_file = serializers.SerializerMethodField()
 
     class Meta(InvoiceListSerializer.Meta):
         fields = InvoiceListSerializer.Meta.fields + [
@@ -327,11 +325,30 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
             "source_type",
             "source_url",
             "filename",
+            "file_content_type",
+            "has_file",
             "duplicate_of_uuid",
             "error_message",
             "updated_at",
         ]
         read_only_fields = fields
+
+    def _source(self, obj):
+        return obj.email_attachment or obj.source_file
+
+    def get_file_content_type(self, obj) -> str:
+        """
+        Lets the drawer decide how to render the original.
+
+        An image and a PDF need different elements, and a format no
+        browser renders needs to say so rather than showing a blank frame.
+        """
+        source = self._source(obj)
+        return getattr(source, "content_type", "") if source else ""
+
+    def get_has_file(self, obj) -> bool:
+        source = self._source(obj)
+        return bool(getattr(source, "file_path", "")) if source else False
 
 
 class InvoiceUpdateSerializer(serializers.ModelSerializer):

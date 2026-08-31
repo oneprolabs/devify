@@ -78,6 +78,17 @@ export const expenseApi = {
       .then(extractData)
   },
 
+  // The original carries tax numbers, so it is served behind auth rather
+  // than from a static path. That means fetching bytes and rendering them
+  // locally instead of pointing an <img> at a URL.
+  getInvoiceFile(uuid) {
+    return apiClient
+      .get(`/v1/apps/expense/invoices/${uuid}/file`, {
+        responseType: 'blob'
+      })
+      .then((response) => response.data)
+  },
+
   reextractInvoice(uuid) {
     return apiClient
       .post(`/v1/apps/expense/invoices/${uuid}/reextract`)

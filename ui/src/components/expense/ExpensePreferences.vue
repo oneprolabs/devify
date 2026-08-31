@@ -70,7 +70,7 @@
         </span>
       </label>
 
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div>
         <label class="block">
           <span class="mb-1 block text-sm font-medium text-gray-700">
             {{ t('expense.prefs.senders') }}
@@ -83,21 +83,6 @@
           />
           <span class="mt-1 block text-xs text-gray-500">
             {{ t('expense.prefs.sendersHelp') }}
-          </span>
-        </label>
-
-        <label class="block">
-          <span class="mb-1 block text-sm font-medium text-gray-700">
-            {{ t('expense.prefs.linkDomains') }}
-          </span>
-          <textarea
-            v-model="domainsText"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            rows="3"
-            :placeholder="t('expense.prefs.linkDomainsPlaceholder')"
-          />
-          <span class="mt-1 block text-xs text-gray-500">
-            {{ t('expense.prefs.linkDomainsHelp') }}
           </span>
         </label>
       </div>
@@ -134,7 +119,6 @@ const defaultTemplate = '{issue_date}_{category}_{seller}_{amount}_{invoice_no}'
 const form = reactive({ home_city: '', filename_template: '' })
 const keywordsText = ref('')
 const sendersText = ref('')
-const domainsText = ref('')
 const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
@@ -155,7 +139,6 @@ function load(config) {
   form.filename_template = config.filename_template || ''
   keywordsText.value = toText(config.keyword_filters)
   sendersText.value = toText(config.sender_allowlist)
-  domainsText.value = toText(config.extra_link_domains)
 }
 
 watch(() => props.config, load, { immediate: true })
@@ -169,8 +152,7 @@ async function save() {
       home_city: form.home_city,
       filename_template: form.filename_template,
       keyword_filters: toList(keywordsText.value),
-      sender_allowlist: toList(sendersText.value),
-      extra_link_domains: toList(domainsText.value)
+      sender_allowlist: toList(sendersText.value)
     })
     saved.value = true
     emit('updated', updated)

@@ -6,14 +6,21 @@ which is the textbook shape of an SSRF. Every control below is required,
 not defence in depth for its own sake:
 
 1. https only
-2. the host must be on an allowlist, checked again on every redirect hop
-3. every address the host resolves to must be public, checked again on
-   every hop
+2. every address the host resolves to must be public, checked again on
+   every redirect hop
+3. an optional host allowlist, also rechecked on every hop
 4. hard caps on size, time and redirect count
 5. the declared content type must match the file's actual magic bytes
 
-The allowlist is the primary control. The address checks exist because a
-name on the allowlist can still resolve somewhere it should not.
+The address check is what actually stops an SSRF: it is what keeps the
+server out of the private network, and it is applied per hop so a
+redirect cannot slip past it.
+
+The allowlist is a way for an operator to narrow that further, not a
+precondition for the feature to work. An empty allowlist therefore means
+"any public host", because invoices arrive from a long tail of billing
+platforms that no operator could enumerate up front; requiring one would
+have left ordinary invoices undownloadable.
 """
 
 from __future__ import annotations
@@ -138,7 +145,13 @@ def assert_safe_url(
             InvoiceSourceFile.FetchStatus.BLOCKED_DOMAIN, "URL has no host"
         )
 
-    if not skip_allowlist and not domain_allowed(host, allowed_domains):
+    # An empty allowlist places no restriction; the address checks below
+    # still apply either way.
+    if (
+        allowed_domains
+        and not skip_allowlist
+        and not domain_allowed(host, allowed_domains)
+    ):
         raise UnsafeUrl(
             InvoiceSourceFile.FetchStatus.BLOCKED_DOMAIN,
             f"Host {host} is not on the allowlist",

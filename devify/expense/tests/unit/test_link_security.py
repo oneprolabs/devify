@@ -69,6 +69,17 @@ class TestSchemeAndDomain:
         with pytest.raises(UnsafeUrl):
             assert_safe_url("file:///etc/passwd", ALLOWED)
 
+    def test_an_empty_allowlist_admits_any_public_host(self):
+        # The address check is what stops an SSRF; the allowlist is an
+        # operator's optional narrowing on top of it.
+        with resolves_to("8.8.8.8"):
+            assert_safe_url("https://anything.test/a", [])
+
+    def test_an_empty_allowlist_still_refuses_a_private_target(self):
+        with resolves_to("10.0.0.5"), pytest.raises(UnsafeUrl) as info:
+            assert_safe_url("https://anything.test/a", [])
+        assert info.value.status == InvoiceSourceFile.FetchStatus.BLOCKED_IP
+
     def test_unlisted_domain_is_refused(self):
         with resolves_to("8.8.8.8"), pytest.raises(UnsafeUrl) as info:
             assert_safe_url("https://evil.test/a", ALLOWED)

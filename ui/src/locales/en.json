@@ -1219,7 +1219,6 @@
       "reviewHint": "The amounts do not add up, or the read was low-confidence. Check the fields before saving.",
       "learnHint": "Once you correct a category, the next invoice from this seller goes there automatically.",
       "ticketDetails": "Ticket details",
-      "viewOriginal": "View original",
       "reextract": "Read again",
       "saveFailed": "Could not save. Please try again.",
       "reextractStarted": "Reading again; this costs another credit.",
@@ -1267,7 +1266,12 @@
         "rejected": "Not reimbursable",
         "expired": "Past the deadline",
         "other": "Other reason"
-      }
+      },
+      "original": "Original document",
+      "originalMissing": "The original file is no longer available.",
+      "originalNotViewable": "This format cannot be shown in a browser (OFD, for example).",
+      "originalDownload": "Download the original",
+      "originalFailed": "Could not load the original."
     },
     "groups": {
       "title": "Reimbursement groups",
@@ -1347,10 +1351,7 @@
       "keywordsHelp": "Only mail matching a keyword is recognized. Leave blank to use the built-in list.",
       "senders": "Only scan these senders",
       "sendersPlaceholder": "One address or domain per line",
-      "sendersHelp": "Leave blank to accept every sender.",
-      "linkDomains": "Extra allowed download domains",
-      "linkDomainsPlaceholder": "One domain per line",
-      "linkDomainsHelp": "A link in the body is only fetched when its domain is on the platform allowlist or in this list."
+      "sendersHelp": "Leave blank to accept every sender."
     },
     "tabsInvoices": "Invoices",
     "tabsGroups": "Groups",

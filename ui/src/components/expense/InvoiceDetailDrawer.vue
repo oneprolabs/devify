@@ -91,6 +91,62 @@
           {{ t('expense.invoices.learnHint') }}
         </p>
 
+        <div class="space-y-2">
+          <h3 class="text-sm font-medium text-gray-900">
+            {{ t('expense.invoices.original') }}
+          </h3>
+
+          <p
+            v-if="!invoice.has_file"
+            class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500"
+          >
+            {{ t('expense.invoices.originalMissing') }}
+          </p>
+
+          <div
+            v-else-if="fileLoading"
+            class="h-64 animate-pulse rounded-lg bg-gray-100"
+          ></div>
+
+          <p
+            v-else-if="fileError"
+            class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+          >
+            {{ fileError }}
+          </p>
+
+          <img
+            v-else-if="fileUrl && previewKind === 'image'"
+            :src="fileUrl"
+            :alt="t('expense.invoices.original')"
+            class="w-full rounded-lg border border-gray-200"
+          />
+
+          <iframe
+            v-else-if="fileUrl && previewKind === 'pdf'"
+            :src="fileUrl"
+            class="h-[32rem] w-full rounded-lg border border-gray-200"
+            :title="t('expense.invoices.original')"
+          ></iframe>
+
+          <div
+            v-else
+            class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
+          >
+            <p class="text-xs text-gray-500">
+              {{ t('expense.invoices.originalNotViewable') }}
+            </p>
+            <a
+              v-if="fileUrl"
+              :href="fileUrl"
+              :download="invoice.filename || 'invoice'"
+              class="text-xs text-primary-600 hover:underline"
+            >
+              {{ t('expense.invoices.originalDownload') }}
+            </a>
+          </div>
+        </div>
+
         <div
           v-if="invoice.ticket_details && hasTicketDetails"
           class="space-y-2"
@@ -110,24 +166,14 @@
       <footer
         class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 p-5"
       >
-        <div class="flex gap-2">
-          <BaseButton
-            v-if="fileUrl"
-            size="sm"
-            variant="outline"
-            @click="openOriginal"
-          >
-            {{ t('expense.invoices.viewOriginal') }}
-          </BaseButton>
-          <BaseButton
-            size="sm"
-            variant="outline"
-            :loading="reextracting"
-            @click="$emit('reextract', invoice)"
-          >
-            {{ t('expense.invoices.reextract') }}
-          </BaseButton>
-        </div>
+        <BaseButton
+          size="sm"
+          variant="outline"
+          :loading="reextracting"
+          @click="$emit('reextract', invoice)"
+        >
+          {{ t('expense.invoices.reextract') }}
+        </BaseButton>
 
         <BaseButton size="sm" :loading="saving" @click="$emit('save', form)">
           {{ t('common.save') }}
@@ -138,10 +184,10 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import apiConfig from '@/config/api'
+import { expenseApi } from '@/api/expense'
 
 const props = defineProps({
   invoice: {
@@ -206,12 +252,50 @@ const hasTicketDetails = computed(
   () => Object.keys(props.invoice.ticket_details || {}).length > 0
 )
 
-const fileUrl = computed(
-  () =>
-    `${apiConfig.apiBaseUrl}/v1/apps/expense/invoices/${props.invoice.uuid}/file`
+const fileUrl = ref('')
+const fileLoading = ref(false)
+const fileError = ref('')
+
+const previewKind = computed(() => {
+  const type = (props.invoice.file_content_type || '').toLowerCase()
+  if (type.startsWith('image/')) return 'image'
+  if (type.includes('pdf')) return 'pdf'
+  // OFD and anything else has no browser renderer; offer the file instead
+  // of an empty frame.
+  return 'other'
+})
+
+function releaseFile() {
+  if (fileUrl.value) {
+    URL.revokeObjectURL(fileUrl.value)
+    fileUrl.value = ''
+  }
+}
+
+async function loadFile(invoice) {
+  releaseFile()
+  fileError.value = ''
+  if (!invoice?.has_file) return
+
+  fileLoading.value = true
+  try {
+    const blob = await expenseApi.getInvoiceFile(invoice.uuid)
+    fileUrl.value = URL.createObjectURL(blob)
+  } catch (err) {
+    fileError.value =
+      err?.response?.data?.message || t('expense.invoices.originalFailed')
+  } finally {
+    fileLoading.value = false
+  }
+}
+
+watch(
+  () => props.invoice?.uuid,
+  () => loadFile(props.invoice),
+  {
+    immediate: true
+  }
 )
 
-function openOriginal() {
-  window.open(fileUrl.value, '_blank', 'noopener')
-}
+onBeforeUnmount(releaseFile)
 </script>

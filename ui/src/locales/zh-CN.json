@@ -1228,7 +1228,6 @@
       "reviewHint": "金额不自洽或识别置信度偏低，请核对后保存。",
       "learnHint": "改过分类后，同一销售方的下一张发票会自动归到这里，不再重新判断。",
       "ticketDetails": "票据信息",
-      "viewOriginal": "查看原件",
       "reextract": "重新识别",
       "saveFailed": "保存失败，请稍后重试。",
       "reextractStarted": "已开始重新识别，会再消耗 1 点。",
@@ -1276,7 +1275,12 @@
         "rejected": "公司不予报销",
         "expired": "已过报销期限",
         "other": "其他原因"
-      }
+      },
+      "original": "发票原件",
+      "originalMissing": "原件文件已不可用。",
+      "originalNotViewable": "这个格式浏览器无法直接预览(例如 OFD)。",
+      "originalDownload": "下载原件",
+      "originalFailed": "原件加载失败。"
     },
     "groups": {
       "title": "报销组",
@@ -1356,10 +1360,7 @@
       "keywordsHelp": "只有命中关键词的邮件才会进入识别。留空则使用内置词表。",
       "senders": "只扫描这些发件人",
       "sendersPlaceholder": "每行一个邮箱或域名",
-      "sendersHelp": "留空表示不限制发件人。",
-      "linkDomains": "额外放行的下载域名",
-      "linkDomainsPlaceholder": "每行一个域名",
-      "linkDomainsHelp": "正文里的下载链接只有域名在平台白名单或此列表中才会自动下载。"
+      "sendersHelp": "留空表示不限制发件人。"
     },
     "tabsInvoices": "发票",
     "tabsGroups": "报销组",

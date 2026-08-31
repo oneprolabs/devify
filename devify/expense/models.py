@@ -108,9 +108,6 @@ class ExpenseUserConfig(models.Model):
         blank=True,
         verbose_name=_("Filename Template"),
     )
-    extra_link_domains = models.JSONField(
-        default=list, blank=True, verbose_name=_("Extra Link Domains")
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

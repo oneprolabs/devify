@@ -141,12 +141,25 @@ class TestPreviewScan:
 
     def test_blocked_links_surface_for_the_user_to_allow(self, user):
         set_user_enabled(get_user_config(user), True)
+        config = get_app_config()
+        config.link_domain_allowlist = ["fapiao.example.com"]
+        config.save(update_fields=["link_domain_allowlist"])
         email = make_email(user, body="https://random.test/invoice.pdf")
         attach(user, email)
 
         result = preview_scan(user, lookback_days=30)
 
         assert len(result["blocked_links"]) == 1
+
+    def test_links_are_usable_without_an_operator_allowlist(self, user):
+        set_user_enabled(get_user_config(user), True)
+        email = make_email(user, body="https://random.test/invoice.pdf")
+        attach(user, email)
+
+        result = preview_scan(user, lookback_days=30)
+
+        assert result["blocked_links"] == []
+        assert result["link_sources"] == 1
 
     def test_targeted_uuids_ignore_the_window(self, user):
         set_user_enabled(get_user_config(user), True)

@@ -62,7 +62,6 @@ class FakeAppConfig:
 class FakeUserConfig:
     keyword_filters = []
     sender_allowlist = []
-    extra_link_domains = []
 
 
 class TestClassifyAttachment:
@@ -152,6 +151,11 @@ class TestDomainAllowlist:
             "https://elsewhere.test/a", ["fapiao.example.com"]
         )
 
+    def test_an_empty_allowlist_places_no_restriction(self):
+        # Invoices arrive from a long tail of billing platforms, so an
+        # operator who lists none is not asking for everything blocked.
+        assert domain_allowed("https://anything.test/a", [])
+
 
 class TestExtractBodyLinks:
     def test_allowlisted_https_link_is_kept(self):
@@ -168,11 +172,17 @@ class TestExtractBodyLinks:
         assert allowed == []
         assert blocked[0].reason == SkipReason.NOT_HTTPS
 
-    def test_unlisted_domain_is_blocked_but_reported(self):
+    def test_unlisted_domain_is_blocked_when_the_operator_restricts(self):
         email = FakeEmail(text_content="https://random.test/invoice.pdf")
         allowed, blocked = extract_body_links(email, ["fapiao.example.com"])
         assert allowed == []
         assert blocked[0].reason == SkipReason.BLOCKED_DOMAIN
+
+    def test_any_https_link_is_kept_when_no_allowlist_is_set(self):
+        email = FakeEmail(text_content="https://random.test/invoice.pdf")
+        allowed, blocked = extract_body_links(email, [])
+        assert allowed == ["https://random.test/invoice.pdf"]
+        assert blocked == []
 
     def test_trailing_punctuation_is_trimmed(self):
         email = FakeEmail(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -19,6 +19,7 @@ from billing.services.config_service import get_credit_policy
 from billing.services.credits_service import CreditsService
 from expense.models import (
     ExpenseGroup,
+    ExpenseGroupItem,
     Invoice,
     InvoiceScanRun,
     InvoiceSourceFile,
@@ -291,6 +292,23 @@ class ExpenseInvoiceListAPIView(APIView):
             queryset = queryset.filter(issue_date__lte=params["end"])
         if params.get("needs_review") == "true":
             queryset = queryset.filter(needs_review=True)
+
+        # "What have I not claimed yet?" is the question the list exists to
+        # answer, so it has to be askable. A group that was archived no
+        # longer holds its invoices.
+        grouped = params.get("grouped")
+        if grouped in ("true", "false"):
+            claimed = ExpenseGroupItem.objects.filter(
+                invoice=OuterRef("pk"),
+                group__status__in=[
+                    ExpenseGroup.Status.DRAFT,
+                    ExpenseGroup.Status.SUBMITTED,
+                    ExpenseGroup.Status.REIMBURSED,
+                ],
+            )
+            queryset = queryset.annotate(is_claimed=Exists(claimed)).filter(
+                is_claimed=(grouped == "true")
+            )
         if params.get("q"):
             term = params["q"]
             queryset = queryset.filter(

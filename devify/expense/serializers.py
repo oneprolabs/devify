@@ -213,6 +213,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "invoice_type",
             "invoice_no",
             "issue_date",
+            "expense_date",
             "seller_name",
             "total_amount",
             "tax_amount",

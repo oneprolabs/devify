@@ -17,6 +17,7 @@ from expense.constants import (
     MIN_IMAGE_BYTES,
     OFD_CONTENT_TYPES,
     PDF_CONTENT_TYPES,
+    XML_CONTENT_TYPES,
 )
 
 
@@ -178,6 +179,11 @@ def classify_attachment(attachment, app_config):
         return SourceKind.ATTACHMENT, None
 
     if content_type in OFD_CONTENT_TYPES or extension == "ofd":
+        return SourceKind.ATTACHMENT, None
+
+    # A fully digital invoice ships its XML alongside the PDF, and that
+    # copy carries the fields exactly.
+    if content_type in XML_CONTENT_TYPES or extension == "xml":
         return SourceKind.ATTACHMENT, None
 
     if content_type.startswith("image/") or attachment.is_image:

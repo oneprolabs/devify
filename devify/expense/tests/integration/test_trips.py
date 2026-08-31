@@ -33,6 +33,7 @@ def make_invoice(user, city, day, category, counter=[0], **overrides):
         "status": Invoice.Status.EXTRACTED,
         "invoice_no": f"T{counter[0]:08d}",
         "issue_date": date(2026, 8, day),
+        "expense_date": date(2026, 8, day),
         "seller_name": "某供应商",
         "total_amount": Decimal("100.00"),
         "category": category,
@@ -280,3 +281,33 @@ class TestTripAPI:
         response = api_client.post(f"{TRIPS_URL}/{suggestion.uuid}/accept")
 
         assert response.status_code == 404
+
+
+class TestTravelDateDrivesGrouping:
+    def test_a_ticket_invoiced_later_still_joins_its_journey(self, user):
+        # A July journey invoiced in August belongs to the July trip;
+        # clustering on the issue date would file it a month out.
+        make_invoice(user, "北京", 1, ExpenseCategory.MEALS)
+        outbound = make_invoice(user, "上海", 12, ExpenseCategory.TRANSPORT_LONG)
+        outbound.issue_date = date(2026, 9, 5)
+        outbound.save(update_fields=["issue_date"])
+        make_invoice(user, "上海", 13, ExpenseCategory.ACCOMMODATION)
+        make_invoice(user, "北京", 15, ExpenseCategory.TRANSPORT_LONG)
+
+        trips = trip_service.detect_trips(user, "北京")
+
+        assert len(trips) == 1
+        assert trips[0]["start_date"] == date(2026, 8, 12)
+
+    def test_the_group_period_follows_the_expense_dates(self, user):
+        from expense.services.groups import build_summary
+
+        seed_trip(user)
+        trip_service.refresh_suggestions(user, "北京")
+        group = trip_service.accept(TripSuggestion.objects.get())
+
+        summary = build_summary(group)
+
+        assert summary["period_start"] == "2026-08-12"
+        assert summary["period_end"] == "2026-08-15"
+

@@ -5,7 +5,7 @@ The model is mocked throughout: these assert the billing rule and the
 deduplication behaviour, not the quality of the model's reading.
 """
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -34,6 +34,7 @@ def invoice_fields(**overrides):
         "invoice_no": "25117000000012345678",
         "invoice_code": "",
         "issue_date": timezone.now().date(),
+        "expense_date": timezone.now().date(),
         "seller_name": "滴滴出行",
         "seller_tax_id": "",
         "buyer_name": "",
@@ -369,3 +370,26 @@ class TestModelRouting:
 
         model_uuid = extract_mock.call_args.args[3]
         assert model_uuid == "11111111-1111-1111-1111-111111111111"
+
+
+class TestExpenseDate:
+    def test_the_travel_date_is_stored_not_just_the_issue_date(self, user):
+        # A July journey invoiced in August has to keep both dates, or
+        # grouping files the trip a month out.
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+        fields = invoice_fields(
+            invoice_type="train",
+            issue_date=date(2026, 8, 6),
+            expense_date=date(2026, 7, 20),
+            ticket_details={"depart_at": "2026-07-20 06:52"},
+        )
+
+        with stub_decode(), patch(EXTRACT_PATH, return_value=fields):
+            recognize_email(email)
+
+        invoice = Invoice.objects.get(email_message=email)
+        assert invoice.issue_date == date(2026, 8, 6)
+        assert invoice.expense_date == date(2026, 7, 20)
+

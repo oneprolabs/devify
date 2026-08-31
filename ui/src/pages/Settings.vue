@@ -532,6 +532,46 @@
           <form class="space-y-5" @submit.prevent="saveEmailConfig">
             <MailboxSection :virtual-email="autoAssignedEmail" />
 
+            <div
+              class="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between"
+              :class="
+                emailForm.processingPaused
+                  ? 'border-amber-200 bg-amber-50'
+                  : 'border-gray-200 bg-gray-50'
+              "
+            >
+              <div>
+                <p class="text-sm font-medium text-gray-900">
+                  {{ t('settings.pauseProcessing') }}
+                </p>
+                <p class="mt-1 max-w-xl text-xs leading-relaxed text-gray-600">
+                  {{ t('settings.pauseProcessingHelp') }}
+                </p>
+              </div>
+              <label class="flex flex-shrink-0 items-center gap-2 text-sm">
+                <input
+                  v-model="emailForm.processingPaused"
+                  type="checkbox"
+                  class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                {{ t('settings.pauseProcessingLabel') }}
+              </label>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <BaseInput
+                v-model="emailForm.folder"
+                :label="t('settings.imapFolder')"
+                :placeholder="t('settings.imapFolderPlaceholder')"
+              />
+              <BaseInput
+                v-model="emailForm.maxAgeDays"
+                :label="t('settings.maxAgeDays')"
+                type="number"
+                :placeholder="t('settings.maxAgeDaysPlaceholder')"
+              />
+            </div>
+
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -698,6 +738,7 @@ import { settingsApi } from '@/api/settings'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import MailboxSection from '@/components/settings/MailboxSection.vue'
 import SceneSelector from '@/components/ui/SceneSelector.vue'
 import { getTimezoneLabel } from '@/utils/timezones'
@@ -730,6 +771,7 @@ const preferenceForm = reactive({
 // Filters live on the account rather than on each mailbox: someone who
 // only wants invoices wants that from every mailbox they connect.
 const emailForm = reactive({
+  processingPaused: false,
   folder: 'INBOX',
   filtersText: '',
   excludePatternsText: '',
@@ -855,6 +897,7 @@ function normalizeEmailConfig(value) {
       ? raw.filter_config
       : {}
 
+  emailForm.processingPaused = Boolean(raw.processing_paused)
   emailForm.folder = filterConfig.folder || 'INBOX'
   emailForm.filtersText = formatListValue(filterConfig.filters)
   emailForm.excludePatternsText = Array.isArray(filterConfig.exclude_patterns)
@@ -867,6 +910,7 @@ function buildEmailConfig() {
   // already stored is carried through untouched.
   return {
     ...(rawEmailConfig.value || {}),
+    processing_paused: Boolean(emailForm.processingPaused),
     filter_config: {
       folder: emailForm.folder.trim() || 'INBOX',
       filters: parseListValue(emailForm.filtersText),

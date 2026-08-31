@@ -47,7 +47,7 @@ def infer_home_city(user, explicit: str = "") -> str:
         Invoice.objects.filter(
             user=user,
             status=Invoice.Status.EXTRACTED,
-            issue_date__gte=since,
+            expense_date__gte=since,
         )
         .exclude(city="")
         .values_list("city", flat=True)
@@ -64,10 +64,10 @@ def claimable(user):
         Invoice.objects.filter(
             user=user,
             status=Invoice.Status.EXTRACTED,
-            issue_date__isnull=False,
+            expense_date__isnull=False,
         )
         .exclude(group_items__isnull=False)
-        .order_by("issue_date", "id")
+        .order_by("expense_date", "id")
     )
 
 
@@ -104,19 +104,19 @@ def detect_trips(user, home_city: str = "") -> list[dict]:
             if going_out:
                 open_trip = {
                     "destination_city": invoice.city,
-                    "start_date": invoice.issue_date,
-                    "end_date": invoice.issue_date,
+                    "start_date": invoice.expense_date,
+                    "end_date": invoice.expense_date,
                     "has_return": False,
                 }
             continue
 
         if coming_back:
-            open_trip["end_date"] = invoice.issue_date
+            open_trip["end_date"] = invoice.expense_date
             open_trip["has_return"] = True
             trips.append(open_trip)
             open_trip = None
         elif going_out:
-            open_trip["end_date"] = invoice.issue_date
+            open_trip["end_date"] = invoice.expense_date
 
     if open_trip is not None:
         trips.append(open_trip)
@@ -134,8 +134,8 @@ def _fill_trip(trip: dict, invoices, home: str) -> dict:
     members = [
         invoice
         for invoice in invoices
-        if invoice.issue_date
-        and start <= invoice.issue_date <= end
+        if invoice.expense_date
+        and start <= invoice.expense_date <= end
         and (
             invoice.city != home
             # The journey home is a trip cost too. Its destination is the

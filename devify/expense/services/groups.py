@@ -138,7 +138,12 @@ def recalculate(group: ExpenseGroup) -> ExpenseGroup:
         Decimal("0"),
     )
 
-    dates = [invoice.issue_date for invoice in invoices if invoice.issue_date]
+    # The period a claim covers is when the money was spent.
+    dates = [
+        invoice.expense_date or invoice.issue_date
+        for invoice in invoices
+        if invoice.expense_date or invoice.issue_date
+    ]
     group.period_start = min(dates) if dates else None
     group.period_end = max(dates) if dates else None
 

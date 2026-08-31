@@ -105,12 +105,38 @@ def _to_date(value):
     text = str(value or "").strip()
     if not text:
         return None
-    for pattern in ("%Y-%m-%d", "%Y/%m/%d", "%Y年%m月%d日", "%Y%m%d"):
-        try:
-            return datetime.strptime(text, pattern).date()
-        except ValueError:
-            continue
+
+    # Travel dates often arrive with a time attached ("2026-07-20 06:52"),
+    # so the date part is taken on its own.
+    head = text.replace("T", " ").split(" ")[0]
+
+    for candidate in (text, head):
+        for pattern in ("%Y-%m-%d", "%Y/%m/%d", "%Y年%m月%d日", "%Y%m%d"):
+            try:
+                return datetime.strptime(candidate, pattern).date()
+            except ValueError:
+                continue
     return None
+
+
+# Fields that say when the expense happened rather than when it was
+# invoiced, in the order they should be trusted.
+TRAVEL_DATE_KEYS = ("depart_at", "check_in", "start_at")
+
+
+def resolve_expense_date(ticket_details: dict, issue_date):
+    """
+    Work out when the money was actually spent.
+
+    A train ticket for July can be invoiced in August, and grouping by the
+    issue date would then file the journey under the wrong month.
+    """
+    if isinstance(ticket_details, dict):
+        for key in TRAVEL_DATE_KEYS:
+            parsed = _to_date(ticket_details.get(key))
+            if parsed:
+                return parsed
+    return issue_date
 
 
 def _clean_text(value, limit: int) -> str:
@@ -174,13 +200,17 @@ def normalize(raw: dict) -> dict:
 
     items = raw.get("items")
     ticket_details = raw.get("ticket_details")
+    if not isinstance(ticket_details, dict):
+        ticket_details = {}
+    issue_date = _to_date(raw.get("issue_date"))
 
     return {
         "is_invoice": True,
         "invoice_type": invoice_type,
         "invoice_no": _clean_text(raw.get("invoice_no"), 64),
         "invoice_code": _clean_text(raw.get("invoice_code"), 64),
-        "issue_date": _to_date(raw.get("issue_date")),
+        "issue_date": issue_date,
+        "expense_date": resolve_expense_date(ticket_details, issue_date),
         "seller_name": _clean_text(raw.get("seller_name"), 255),
         "seller_tax_id": _clean_text(raw.get("seller_tax_id"), 64),
         "buyer_name": _clean_text(raw.get("buyer_name"), 255),
@@ -193,9 +223,7 @@ def normalize(raw: dict) -> dict:
         "category": category,
         "category_source": category_source,
         "items": items if isinstance(items, list) else [],
-        "ticket_details": (
-            ticket_details if isinstance(ticket_details, dict) else {}
-        ),
+        "ticket_details": ticket_details,
         "confidence": confidence,
         "needs_review": (
             not amounts_consistent or confidence < LOW_CONFIDENCE

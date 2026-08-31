@@ -1,5 +1,6 @@
 """Unit tests for extraction normalization and validation."""
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -10,6 +11,7 @@ from expense.services.extractor import (
     check_amounts,
     normalize,
     resolve_category,
+    resolve_expense_date,
 )
 
 
@@ -129,3 +131,57 @@ class TestNormalize:
 
     def test_missing_currency_defaults_to_cny(self):
         assert normalize(raw_invoice(currency=""))["currency"] == "CNY"
+
+
+class TestResolveExpenseDate:
+    def test_a_travel_date_wins_over_the_issue_date(self):
+        # A July journey invoiced in August belongs to July.
+        issued = date(2026, 8, 6)
+
+        resolved = resolve_expense_date({"depart_at": "2026-07-20"}, issued)
+
+        assert resolved == date(2026, 7, 20)
+
+    def test_a_departure_time_is_tolerated(self):
+        resolved = resolve_expense_date(
+            {"depart_at": "2026-07-20 06:52"}, date(2026, 8, 6)
+        )
+
+        assert resolved == date(2026, 7, 20)
+
+    def test_a_hotel_uses_its_check_in(self):
+        resolved = resolve_expense_date(
+            {"check_in": "2026-07-21"}, date(2026, 8, 6)
+        )
+
+        assert resolved == date(2026, 7, 21)
+
+    def test_it_falls_back_to_the_issue_date(self):
+        assert resolve_expense_date({}, date(2026, 8, 6)) == date(2026, 8, 6)
+
+    def test_an_unreadable_travel_date_falls_back(self):
+        resolved = resolve_expense_date(
+            {"depart_at": "不详"}, date(2026, 8, 6)
+        )
+
+        assert resolved == date(2026, 8, 6)
+
+
+class TestNormalizeExpenseDate:
+    def test_a_train_ticket_carries_its_travel_date(self):
+        result = normalize(
+            raw_invoice(
+                invoice_type="train",
+                issue_date="2026-08-06",
+                ticket_details={"depart_at": "2026-07-20 06:52"},
+            )
+        )
+
+        assert result["issue_date"] == date(2026, 8, 6)
+        assert result["expense_date"] == date(2026, 7, 20)
+
+    def test_an_ordinary_invoice_uses_its_issue_date(self):
+        result = normalize(raw_invoice(issue_date="2026-08-12"))
+
+        assert result["expense_date"] == date(2026, 8, 12)
+

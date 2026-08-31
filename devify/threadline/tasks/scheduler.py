@@ -13,6 +13,7 @@ from threadline.tasks.cleanup import (
     ShareLinkCleanupManager,
 )
 from threadline.tasks.email_fetch import imap_email_fetch, haraka_email_fetch
+from threadline.services.processing_control import paused_user_ids
 from threadline.tasks.email_workflow import process_email_workflow
 from threadline.state_machine import EmailStatus
 from threadline.utils.task_cleanup import cleanup_stale_tasks
@@ -216,6 +217,13 @@ def schedule_reset_stuck_processing_emails(timeout_minutes=30):
             ),
             updated_at__lt=now - timedelta(minutes=timeout_minutes),
         )
+
+        # Mail parked by a user who paused processing is not stuck, it is
+        # waiting. Retrying it here would defeat the pause, and the second
+        # pass would then mark a perfectly good backlog as failed.
+        paused = paused_user_ids()
+        if paused:
+            stuck_emails = stuck_emails.exclude(user_id__in=paused)
 
         fetched_retry_count = 0
         fetched_failed_count = 0

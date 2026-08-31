@@ -11,6 +11,7 @@ from expense.services.decoder import (
     decode_ofd,
     decode_pdf,
     decode_source,
+    decode_xml,
 )
 
 
@@ -208,3 +209,66 @@ class TestDecodeSource:
     def test_missing_file_is_reported(self, tmp_path):
         with pytest.raises(DecodeError):
             decode_source(str(tmp_path / "gone.pdf"), filename="gone.pdf")
+
+
+INVOICE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<EInvoice xmlns="urn:einvoice">
+  <Header>
+    <InvoiceNumber>25117000000012345678</InvoiceNumber>
+    <IssueDate>2026-08-12</IssueDate>
+  </Header>
+  <Seller name="滴滴出行">
+    <TaxNo>91110108MA002XY31Z</TaxNo>
+  </Seller>
+  <Total>128.50</Total>
+</EInvoice>
+"""
+
+
+class TestDecodeXml:
+    def test_fields_are_read_without_any_recognition(self, tmp_path):
+        # The XML is the authoritative copy, so nothing has to be read off
+        # pixels and no OCR error can reach an amount.
+        target = tmp_path / "invoice.xml"
+        target.write_text(INVOICE_XML, encoding="utf-8")
+
+        decoded = decode_xml(str(target))
+
+        assert decoded.mode == DecodeMode.TEXT
+        assert decoded.decoder == "xml"
+        assert "InvoiceNumber: 25117000000012345678" in decoded.text
+        assert "Total: 128.50" in decoded.text
+
+    def test_labels_survive_so_values_keep_their_meaning(self, tmp_path):
+        target = tmp_path / "invoice.xml"
+        target.write_text(INVOICE_XML, encoding="utf-8")
+
+        text = decode_xml(str(target)).text
+
+        assert "TaxNo: 91110108MA002XY31Z" in text
+        assert "Seller.name: 滴滴出行" in text
+
+    def test_malformed_xml_is_rejected(self, tmp_path):
+        target = tmp_path / "broken.xml"
+        target.write_text("<EInvoice><unclosed>", encoding="utf-8")
+
+        with pytest.raises(DecodeError):
+            decode_xml(str(target))
+
+    def test_an_empty_document_is_rejected(self, tmp_path):
+        target = tmp_path / "empty.xml"
+        target.write_text("<EInvoice/>", encoding="utf-8")
+
+        with pytest.raises(DecodeError):
+            decode_xml(str(target))
+
+    def test_the_dispatcher_routes_xml(self, tmp_path):
+        target = tmp_path / "invoice.xml"
+        target.write_text(INVOICE_XML, encoding="utf-8")
+
+        decoded = decode_source(
+            str(target), content_type="text/xml", filename="invoice.xml"
+        )
+
+        assert decoded.decoder == "xml"
+

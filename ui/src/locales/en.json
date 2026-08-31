@@ -747,7 +747,10 @@
     "connectionFailed": "Could not connect. Check the host, username and password.",
     "confirmRemoveMailbox": "Remove this mailbox? Mail already fetched is kept.",
     "connectionOkFor": "{name} connected",
-    "confirmRemoveMailboxTitle": "Remove mailbox"
+    "confirmRemoveMailboxTitle": "Remove mailbox",
+    "pauseProcessing": "Pause processing",
+    "pauseProcessingLabel": "Paused",
+    "pauseProcessingHelp": "Mail is still collected but nothing is analysed and no credits are spent. Everything already collected waits and resumes automatically when you lift the pause. Useful right after connecting a mailbox with a lot of history, before your filters are tuned."
   },
   "dashboard": {
     "title": "Dashboard",

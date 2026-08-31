@@ -210,6 +210,7 @@ def _persist(
         "invoice_no": fields["invoice_no"],
         "invoice_code": fields["invoice_code"],
         "issue_date": fields["issue_date"],
+        "expense_date": fields["expense_date"],
         "seller_name": fields["seller_name"],
         "seller_tax_id": fields["seller_tax_id"],
         "buyer_name": fields["buyer_name"],

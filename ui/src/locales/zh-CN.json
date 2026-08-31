@@ -756,7 +756,10 @@
     "connectionFailed": "连接失败，请检查主机、账号和密码。",
     "confirmRemoveMailbox": "确定要移除这个邮箱吗？已经收取的邮件不会被删除。",
     "connectionOkFor": "{name} 连接成功",
-    "confirmRemoveMailboxTitle": "移除邮箱"
+    "confirmRemoveMailboxTitle": "移除邮箱",
+    "pauseProcessing": "暂停邮件处理",
+    "pauseProcessingLabel": "暂停",
+    "pauseProcessingHelp": "暂停后仍会正常收取邮件,但不会进入分析流程,也不会消耗点数。已收取的邮件会保持待处理状态,恢复后自动继续。适合刚绑定邮箱、历史邮件很多、还没调好过滤条件时使用。"
   },
   "dashboard": {
     "title": "仪表盘",

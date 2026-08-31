@@ -166,6 +166,54 @@ def decode_ofd(path: str) -> DecodedSource:
     )
 
 
+
+def _xml_lines(element, prefix: str = "") -> list[str]:
+    """Flatten an element tree into `label: value` lines."""
+    lines = []
+    tag = element.tag.rsplit("}", 1)[-1]
+    label = f"{prefix}{tag}" if prefix else tag
+
+    for name, value in (element.attrib or {}).items():
+        name = name.rsplit("}", 1)[-1]
+        text = str(value).strip()
+        if text:
+            lines.append(f"{label}.{name}: {text}")
+
+    text = (element.text or "").strip()
+    if text:
+        lines.append(f"{label}: {text}")
+
+    for child in element:
+        lines.extend(_xml_lines(child))
+
+    return lines
+
+
+def decode_xml(path: str) -> DecodedSource:
+    """
+    Read the XML that a fully digital invoice ships alongside its PDF.
+
+    This is the authoritative record: the fields are already structured and
+    exact, so nothing has to be recognized from pixels and no OCR error can
+    creep into an amount or a tax number. Element names differ between
+    issuers, so the tree is flattened into labelled lines and the labels
+    carry the meaning through.
+    """
+    from xml.etree import ElementTree
+
+    try:
+        tree = ElementTree.parse(path)
+    except ElementTree.ParseError as exc:
+        raise DecodeError(f"XML is not readable: {exc}") from exc
+
+    lines = _xml_lines(tree.getroot())
+    text = "\n".join(lines)
+    if not text.strip():
+        raise DecodeError("XML contains no readable fields")
+
+    return DecodedSource(mode=DecodeMode.TEXT, text=text, decoder="xml")
+
+
 def decode_image(path: str) -> DecodedSource:
     """Hand the image straight to a vision model."""
     file_path = Path(path)
@@ -200,6 +248,10 @@ def decode_source(
     is_ofd = normalized in ("application/ofd", "application/x-ofd")
     if is_ofd or extension == "ofd":
         return decode_ofd(path)
+
+    is_xml = normalized in ("application/xml", "text/xml")
+    if is_xml or extension == "xml":
+        return decode_xml(path)
 
     if normalized.startswith("image/") or extension in (
         "png",

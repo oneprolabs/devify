@@ -15,6 +15,7 @@ from django.conf import settings
 
 from agentcore_task.adapters.django import prevent_duplicate_task
 from threadline.models import EmailMailbox, EmailMessage, Settings
+from threadline.services.processing_control import is_processing_paused
 from threadline.utils.email import (
     EmailProcessor,
     EmailSaveService,
@@ -29,6 +30,16 @@ def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
     """
     Queue merge coordination only for real EmailMessage instances.
     """
+    if is_processing_paused(email_msg.user_id):
+        # The mail is kept; only the workflow waits. It resumes from
+        # FETCHED once the user lifts the pause.
+        logger.info(
+            "Processing paused for user %s, email %s parked",
+            email_msg.user_id,
+            email_msg.id,
+        )
+        return
+
     if not isinstance(email_msg, EmailMessage):
         logger.debug(
             "Skipping merge queue for non-model email record: %r", email_msg

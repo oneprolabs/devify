@@ -7,7 +7,7 @@ import pytest
 from django.utils import timezone
 
 from expense.constants import ExpenseCategory
-from expense.models import CategoryRule, Invoice
+from expense.models import CategoryRule, ExpenseGroup, Invoice
 from threadline.models import EmailAttachment, EmailMessage
 
 
@@ -302,3 +302,60 @@ class TestInvoiceFile:
         response = api_client.get(f"{LIST_URL}/{invoice.uuid}/file")
 
         assert response.status_code == 404
+
+
+class TestClaimedFilter:
+    """
+    "What have I not claimed yet?" is the question the list exists to
+    answer, so it has to be askable.
+    """
+
+    def _grouped(self, user, invoice, status=ExpenseGroup.Status.DRAFT):
+        from expense.services.groups import add_invoices
+
+        group = ExpenseGroup.objects.create(
+            user=user, name=f"group-{invoice.invoice_no}", status=status
+        )
+        add_invoices(group, [str(invoice.uuid)])
+        return group
+
+    def test_unclaimed_invoices_can_be_isolated(self, api_client, user):
+        claimed = make_invoice(user, invoice_no="A1")
+        make_invoice(user, invoice_no="B1")
+        self._grouped(user, claimed)
+        api_client.force_authenticate(user=user)
+
+        rows = api_client.get(f"{LIST_URL}?grouped=false").data["data"]
+
+        assert [row["invoice_no"] for row in rows] == ["B1"]
+
+    def test_claimed_invoices_can_be_isolated(self, api_client, user):
+        claimed = make_invoice(user, invoice_no="A2")
+        make_invoice(user, invoice_no="B2")
+        self._grouped(user, claimed)
+        api_client.force_authenticate(user=user)
+
+        rows = api_client.get(f"{LIST_URL}?grouped=true").data["data"]
+
+        assert [row["invoice_no"] for row in rows] == ["A2"]
+
+    def test_an_archived_group_releases_its_invoices(self, api_client, user):
+        # Archiving settles a claim and hands the invoices back.
+        invoice = make_invoice(user, invoice_no="C1")
+        group = self._grouped(user, invoice)
+        group.status = ExpenseGroup.Status.ARCHIVED
+        group.save(update_fields=["status"])
+        api_client.force_authenticate(user=user)
+
+        rows = api_client.get(f"{LIST_URL}?grouped=false").data["data"]
+
+        assert [row["invoice_no"] for row in rows] == ["C1"]
+
+    def test_without_the_filter_everything_is_listed(self, api_client, user):
+        claimed = make_invoice(user, invoice_no="A3")
+        make_invoice(user, invoice_no="B3")
+        self._grouped(user, claimed)
+        api_client.force_authenticate(user=user)
+
+        assert len(api_client.get(LIST_URL).data["data"]) == 2
+

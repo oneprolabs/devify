@@ -299,6 +299,15 @@ class Invoice(models.Model):
     issue_date = models.DateField(
         null=True, blank=True, verbose_name=_("Issue Date")
     )
+    # When the money was actually spent, which is not always when the
+    # invoice was written: a train ticket for July can be invoiced in
+    # August. Grouping and date filters follow this, not the issue date.
+    expense_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_("Expense Date"),
+        help_text=_("Travel or consumption date; falls back to issue date"),
+    )
     seller_name = models.CharField(
         max_length=255, blank=True, verbose_name=_("Seller Name")
     )
@@ -411,6 +420,7 @@ class Invoice(models.Model):
         indexes = [
             models.Index(fields=["user", "status"]),
             models.Index(fields=["user", "issue_date"]),
+            models.Index(fields=["user", "expense_date"]),
             models.Index(fields=["user", "category"]),
             models.Index(fields=["user", "city", "issue_date"]),
         ]

@@ -118,10 +118,13 @@ class ExpenseAdminConfigAPIView(APIView):
 
     def put(self, request):
         config = get_app_config()
+        # Partial on purpose: the admin page saves one section at a time,
+        # and a full replace would blank the cron and the limits whenever
+        # someone changed only the models.
         serializer = ExpenseAppConfigSerializer(
             config,
             data=request.data,
-            partial=False,
+            partial=True,
             context={"request": request},
         )
         serializer.is_valid(raise_exception=True)

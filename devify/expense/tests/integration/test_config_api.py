@@ -120,6 +120,29 @@ class TestAdminConfigAPI:
         assert crontab.hour == "4"
         assert get_app_config().scan_schedule == "15 4 * * *"
 
+    def test_saving_one_section_leaves_the_others_alone(
+        self, api_client, admin_user
+    ):
+        # The admin page saves per section; a full replace would blank the
+        # cron whenever someone only changed the models.
+        api_client.force_authenticate(user=admin_user)
+        api_client.put(
+            ADMIN_CONFIG_URL,
+            {"scan_schedule": "15 4 * * *", "max_pdf_pages": 5},
+            format="json",
+        )
+
+        api_client.put(
+            ADMIN_CONFIG_URL,
+            {"llm_config_uuid": "33333333-3333-3333-3333-333333333333"},
+            format="json",
+        )
+
+        config = get_app_config()
+        assert config.scan_schedule == "15 4 * * *"
+        assert config.max_pdf_pages == 5
+        assert str(config.llm_config_uuid).startswith("33333333")
+
     def test_rejects_a_malformed_cron(self, api_client, admin_user):
         api_client.force_authenticate(user=admin_user)
 

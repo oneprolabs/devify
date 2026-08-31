@@ -185,3 +185,64 @@ class TestNormalizeExpenseDate:
 
         assert result["expense_date"] == date(2026, 8, 12)
 
+
+
+class TestModelFallback:
+    """
+    Both model slots are optional.
+
+    They let an operator send text to a cheap model and rendered pages to a
+    multimodal one. Leaving them empty must fall back to the deployment
+    default rather than refusing work the default model can do.
+    """
+
+    def test_an_empty_slot_falls_back_to_the_default(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from expense.services import recognition
+        from expense.services.decoder import DecodedSource, DecodeMode
+
+        monkeypatch.setattr(
+            "agentcore_metering.adapters.django.services.config_source"
+            ".get_default_llm_config_uuid",
+            lambda: "default-uuid",
+        )
+        config = SimpleNamespace(
+            llm_config_uuid=None, text_llm_config_uuid=None
+        )
+        decoded = DecodedSource(
+            mode=DecodeMode.IMAGE, images=[("image/png", b"x")]
+        )
+
+        assert recognition._model_for(decoded, config) == "default-uuid"
+
+    def test_a_configured_slot_wins_over_the_default(self):
+        from types import SimpleNamespace
+
+        from expense.services import recognition
+        from expense.services.decoder import DecodedSource, DecodeMode
+
+        config = SimpleNamespace(
+            llm_config_uuid="vision-uuid", text_llm_config_uuid="text-uuid"
+        )
+
+        text = DecodedSource(mode=DecodeMode.TEXT, text="x" * 60)
+        image = DecodedSource(
+            mode=DecodeMode.IMAGE, images=[("image/png", b"x")]
+        )
+
+        assert recognition._model_for(text, config) == "text-uuid"
+        assert recognition._model_for(image, config) == "vision-uuid"
+
+    def test_one_slot_covers_both_paths(self):
+        from types import SimpleNamespace
+
+        from expense.services import recognition
+        from expense.services.decoder import DecodedSource, DecodeMode
+
+        config = SimpleNamespace(
+            llm_config_uuid="only-uuid", text_llm_config_uuid=None
+        )
+        text = DecodedSource(mode=DecodeMode.TEXT, text="x" * 60)
+
+        assert recognition._model_for(text, config) == "only-uuid"

@@ -183,12 +183,35 @@ def lift_travel_date(invoice: Invoice, fields: dict) -> None:
 
 
 def _model_for(decoded, app_config) -> str:
-    """Text decodes go to the cheap model; only pixels need the vision one."""
+    """
+    Pick the model for how this document was decoded.
+
+    Both slots are optional. They exist so an operator can send extracted
+    text to a cheap model and rendered pages to a multimodal one; leaving
+    them empty falls back to the deployment's default config, the same way
+    the rest of the pipeline behaves. Requiring them would refuse work the
+    default model can perfectly well do.
+    """
     if decoded.mode == "text":
-        return str(
-            app_config.text_llm_config_uuid or app_config.llm_config_uuid or ""
+        chosen = (
+            app_config.text_llm_config_uuid or app_config.llm_config_uuid
         )
-    return str(app_config.llm_config_uuid or "")
+    else:
+        chosen = (
+            app_config.llm_config_uuid or app_config.text_llm_config_uuid
+        )
+
+    if chosen:
+        return str(chosen)
+
+    # A plain lookup, not `ensure_default_llm_config`: that helper seeds
+    # threadline's workflow config as a side effect, and reading which
+    # model to use here has no business rewriting another app's settings.
+    from agentcore_metering.adapters.django.services.config_source import (
+        get_default_llm_config_uuid,
+    )
+
+    return str(get_default_llm_config_uuid() or "")
 
 
 def _extract_file(email, file_path, content_type, filename, app_config):

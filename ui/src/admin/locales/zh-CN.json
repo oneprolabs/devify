@@ -84,6 +84,10 @@
       "llm": {
         "title": "大语言模型",
         "description": "查看当前可用的模型配置，并进入完整的大模型管理页。"
+      },
+      "expense": {
+        "title": "发票管家",
+        "description": "选择识别发票时使用的模型。"
       }
     },
     "selectPlaceholder": "请选择",
@@ -100,7 +104,15 @@
     "availableConfigs": "当前可用配置：{count} 个",
     "selectedImageModel": "图片模型：{label}",
     "selectedTextModel": "文本模型：{label}",
-    "selectedRelayModel": "智能渠道模型：{label}"
+    "selectedRelayModel": "智能渠道模型：{label}",
+    "expense": {
+      "textModelTitle": "文本处理模型",
+      "textModelDesc": "用于带文本层的 PDF 和 OFD 发票——直接读取文字，比让模型看图更省也更准。",
+      "imageModelTitle": "图片识别模型",
+      "imageModelDesc": "用于图片附件和没有文本层的扫描件。这条路径会把整页发票作为图片发给模型，需要选择支持多模态的模型。",
+      "useDefaultModel": "使用系统默认模型",
+      "modelHint": "两项都可以留空：留空时使用系统默认模型，应用照常工作。只有当你想让两条路径用不同模型时才需要分别指定。"
+    }
   },
   "billing": {
     "menuTitle": "订阅管理",

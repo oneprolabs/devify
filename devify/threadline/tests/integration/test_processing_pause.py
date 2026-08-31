@@ -178,3 +178,66 @@ class TestStuckReset:
 
         email.refresh_from_db()
         assert email.status == EmailStatus.FETCHED.value
+
+
+class TestSweepWindow:
+    """
+    The sweep catches a trigger that went missing moments ago. Without a
+    floor it rescans the whole history on every run and eventually marks a
+    large backlog failed.
+    """
+
+    WORKFLOW = "threadline.tasks.scheduler.process_email_workflow"
+
+    def _age(self, email, hours):
+        EmailMessage.objects.filter(pk=email.pk).update(
+            updated_at=timezone.now() - timedelta(hours=hours)
+        )
+
+    def test_recently_stuck_mail_is_swept(self, django_user_model):
+        from threadline.tasks.scheduler import (
+            schedule_reset_stuck_processing_emails,
+        )
+
+        user = django_user_model.objects.create_user("p11", password="x")
+        email = make_email(user)
+        self._age(email, 2)
+
+        with patch(self.WORKFLOW) as workflow:
+            schedule_reset_stuck_processing_emails()
+
+        queued = {call.args[0] for call in workflow.delay.call_args_list}
+        assert str(email.id) in queued
+
+    def test_long_untouched_mail_is_left_alone(self, django_user_model):
+        from threadline.tasks.scheduler import (
+            schedule_reset_stuck_processing_emails,
+        )
+
+        user = django_user_model.objects.create_user("p12", password="x")
+        email = make_email(user)
+        self._age(email, 24 * 30)
+
+        with patch(self.WORKFLOW) as workflow:
+            schedule_reset_stuck_processing_emails()
+
+        queued = {call.args[0] for call in workflow.delay.call_args_list}
+        assert str(email.id) not in queued
+        email.refresh_from_db()
+        assert email.status == EmailStatus.FETCHED.value
+
+    def test_the_floor_can_be_widened(self, django_user_model):
+        from threadline.tasks.scheduler import (
+            schedule_reset_stuck_processing_emails,
+        )
+
+        user = django_user_model.objects.create_user("p13", password="x")
+        email = make_email(user)
+        self._age(email, 24 * 30)
+
+        with patch(self.WORKFLOW) as workflow:
+            schedule_reset_stuck_processing_emails(max_age_hours=24 * 60)
+
+        queued = {call.args[0] for call in workflow.delay.call_args_list}
+        assert str(email.id) in queued
+

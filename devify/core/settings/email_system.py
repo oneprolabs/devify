@@ -181,3 +181,14 @@ SHARE_LINK_CLEANUP_CONFIG = {
 #   a single account can create for the scheduler.
 MAX_USER_MAILBOXES = int(os.getenv('MAX_USER_MAILBOXES', '5'))
 
+
+# STUCK_EMAIL_MAX_AGE_HOURS: How far back the stuck-email sweep looks.
+# - The sweep catches a workflow trigger that was lost moments ago.
+# - Mail untouched for longer than this is treated as historical and left
+#   alone, so a large backlog is not rescanned on every run and then
+#   marked failed.
+# - Set to 0 to disable the floor and sweep everything.
+STUCK_EMAIL_MAX_AGE_HOURS = int(
+    os.getenv('STUCK_EMAIL_MAX_AGE_HOURS', '48')
+)
+

@@ -190,7 +190,9 @@ def schedule_share_link_cleanup():
 @prevent_duplicate_task(
     "stuck_email_reset", timeout=settings.TASK_TIMEOUT_MINUTES * 60
 )
-def schedule_reset_stuck_processing_emails(timeout_minutes=30):
+def schedule_reset_stuck_processing_emails(
+    timeout_minutes=30, max_age_hours=None
+):
     """
     Reset emails stuck in FETCHED or PROCESSING state.
     """
@@ -217,6 +219,20 @@ def schedule_reset_stuck_processing_emails(timeout_minutes=30):
             ),
             updated_at__lt=now - timedelta(minutes=timeout_minutes),
         )
+
+        # The job exists to catch a workflow trigger that went missing a
+        # moment ago. Mail that has sat untouched for days is not stuck,
+        # it is historical, and sweeping it on every run means scanning a
+        # backlog forever and eventually failing all of it.
+        floor_hours = (
+            max_age_hours
+            if max_age_hours is not None
+            else getattr(settings, "STUCK_EMAIL_MAX_AGE_HOURS", 48)
+        )
+        if floor_hours:
+            stuck_emails = stuck_emails.filter(
+                updated_at__gte=now - timedelta(hours=floor_hours)
+            )
 
         # Mail parked by a user who paused processing is not stuck, it is
         # waiting. Retrying it here would defeat the pause, and the second

@@ -754,7 +754,9 @@
     "passwordUnchanged": "留空则不修改密码",
     "connectionOk": "连接成功",
     "connectionFailed": "连接失败，请检查主机、账号和密码。",
-    "confirmRemoveMailbox": "确定要移除这个邮箱吗？已经收取的邮件不会被删除。"
+    "confirmRemoveMailbox": "确定要移除这个邮箱吗？已经收取的邮件不会被删除。",
+    "connectionOkFor": "{name} 连接成功",
+    "confirmRemoveMailboxTitle": "移除邮箱"
   },
   "dashboard": {
     "title": "仪表盘",

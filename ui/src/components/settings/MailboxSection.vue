@@ -43,6 +43,13 @@
       </p>
 
       <p
+        v-else-if="notice"
+        class="rounded-md bg-green-50 p-3 text-sm font-medium text-green-800"
+      >
+        {{ notice }}
+      </p>
+
+      <p
         v-if="!mailboxes.length && !showForm"
         class="rounded-lg border border-dashed border-gray-300 py-6 text-center text-sm text-gray-500"
       >
@@ -197,6 +204,17 @@
       </div>
     </div>
   </div>
+
+  <ConfirmDialog
+    :show="!!pendingRemoval"
+    :title="t('settings.confirmRemoveMailboxTitle')"
+    :message="t('settings.confirmRemoveMailbox')"
+    :confirm-text="t('common.delete')"
+    variant="danger"
+    :loading="!!removing"
+    @close="pendingRemoval = null"
+    @confirm="confirmRemoval"
+  />
 </template>
 
 <script setup>
@@ -204,6 +222,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { mailboxApi } from '@/api/mailboxes'
 
 defineProps({
@@ -223,6 +242,8 @@ const saving = ref(false)
 const testing = ref('')
 const removing = ref('')
 const error = ref('')
+const notice = ref('')
+const pendingRemoval = ref(null)
 
 const emptyForm = () => ({
   name: '',
@@ -237,6 +258,21 @@ const emptyForm = () => ({
 })
 
 const form = reactive(emptyForm())
+
+let noticeTimer = null
+
+function clearFeedback() {
+  error.value = ''
+  notice.value = ''
+}
+
+function showNotice(message) {
+  notice.value = message
+  clearTimeout(noticeTimer)
+  noticeTimer = setTimeout(() => {
+    notice.value = ''
+  }, 4000)
+}
 
 function readError(err, fallbackKey) {
   const data = err?.response?.data
@@ -332,15 +368,14 @@ async function save() {
 
 async function testDraft() {
   testing.value = 'draft'
-  error.value = ''
+  clearFeedback()
   try {
     // When editing, the password field is left blank to keep the stored
     // one; send the uuid so the test can use it too.
     const payload = { ...form }
     if (editing.value) payload.uuid = editing.value.uuid
     await mailboxApi.testDraft(payload)
-    error.value = ''
-    window.alert(t('settings.connectionOk'))
+    showNotice(t('settings.connectionOk'))
   } catch (err) {
     error.value = readError(err, 'settings.connectionFailed')
   } finally {
@@ -350,10 +385,10 @@ async function testDraft() {
 
 async function testStored(box) {
   testing.value = box.uuid
-  error.value = ''
+  clearFeedback()
   try {
     await mailboxApi.testStored(box.uuid)
-    window.alert(t('settings.connectionOk'))
+    showNotice(t('settings.connectionOkFor', { name: box.display_name }))
   } catch (err) {
     error.value = readError(err, 'settings.connectionFailed')
   } finally {
@@ -362,12 +397,18 @@ async function testStored(box) {
   }
 }
 
-async function remove(box) {
-  if (!window.confirm(t('settings.confirmRemoveMailbox'))) return
+function remove(box) {
+  pendingRemoval.value = box
+}
+
+async function confirmRemoval() {
+  const box = pendingRemoval.value
+  if (!box) return
   removing.value = box.uuid
-  error.value = ''
+  clearFeedback()
   try {
     await mailboxApi.remove(box.uuid)
+    pendingRemoval.value = null
     await load()
   } catch (err) {
     error.value = readError(err, 'settings.mailboxSaveFailed')

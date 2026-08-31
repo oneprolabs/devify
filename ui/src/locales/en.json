@@ -745,7 +745,9 @@
     "passwordUnchanged": "Leave blank to keep the stored password",
     "connectionOk": "Connected",
     "connectionFailed": "Could not connect. Check the host, username and password.",
-    "confirmRemoveMailbox": "Remove this mailbox? Mail already fetched is kept."
+    "confirmRemoveMailbox": "Remove this mailbox? Mail already fetched is kept.",
+    "connectionOkFor": "{name} connected",
+    "confirmRemoveMailboxTitle": "Remove mailbox"
   },
   "dashboard": {
     "title": "Dashboard",

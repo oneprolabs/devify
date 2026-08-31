@@ -198,12 +198,79 @@ class InvoiceSourceFileSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+# What each kind of ticket is worth saying on one line, in reading order.
+TICKET_LINE_KEYS = (
+    "train_no",
+    "flight_no",
+    "from_station",
+    "from_city",
+    "to_station",
+    "to_city",
+    "seat_class",
+    "cabin",
+    "nights",
+    "distance",
+    "passenger",
+)
+
+
+def summarize_invoice(invoice) -> str:
+    """
+    The one line that tells a person what they are looking at.
+
+    A row showing only the seller and the amount forces a click to tell two
+    taxi rides apart, so the goods name and whatever the ticket carries -
+    stations, flight number, nights - are folded into a single line here
+    where the shapes of both JSON fields are known.
+    """
+    parts = []
+    items = invoice.items if isinstance(invoice.items, list) else []
+    for item in items[:2]:
+        if isinstance(item, dict) and item.get("name"):
+            parts.append(str(item["name"]).strip())
+
+    details = (
+        invoice.ticket_details
+        if isinstance(invoice.ticket_details, dict)
+        else {}
+    )
+    route = [details.get(key) for key in ("from_station", "from_city")]
+    origin = next((value for value in route if value), "")
+    arrive = [details.get(key) for key in ("to_station", "to_city")]
+    destination = next((value for value in arrive if value), "")
+    if origin and destination:
+        parts.append(f"{origin} → {destination}")
+
+    for key in TICKET_LINE_KEYS:
+        if key in ("from_station", "from_city", "to_station", "to_city"):
+            continue
+        value = details.get(key)
+        if value:
+            parts.append(f"{value} 晚" if key == "nights" else str(value))
+
+    # The clock time is what tells two taxi rides on the same day apart.
+    # The date is already on the row, so only the time is worth repeating.
+    clock = _clock_time(details.get("depart_at") or details.get("start_at"))
+    if clock:
+        parts.append(clock)
+
+    return " · ".join(parts)
+
+
+def _clock_time(value) -> str:
+    text = str(value or "").strip()
+    if len(text) >= 16 and ":" in text[10:]:
+        return text[11:16]
+    return ""
+
+
 class InvoiceListSerializer(serializers.ModelSerializer):
-    """Row shape for the invoice table."""
+    """Row shape for the invoice list."""
 
     email_subject = serializers.CharField(
         source="email_message.subject", read_only=True, default=""
     )
+    summary_line = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -215,6 +282,8 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "issue_date",
             "expense_date",
             "seller_name",
+            "buyer_name",
+            "buyer_tax_id",
             "total_amount",
             "tax_amount",
             "currency",
@@ -223,10 +292,16 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "city",
             "needs_review",
             "confidence",
+            "disposition",
+            "filed_reason",
+            "summary_line",
             "email_subject",
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_summary_line(self, obj) -> str:
+        return summarize_invoice(obj)
 
 
 class InvoiceDetailSerializer(InvoiceListSerializer):
@@ -246,8 +321,6 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
         fields = InvoiceListSerializer.Meta.fields + [
             "invoice_code",
             "seller_tax_id",
-            "buyer_name",
-            "buyer_tax_id",
             "amount_excl_tax",
             "items",
             "ticket_details",

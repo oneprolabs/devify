@@ -3,10 +3,18 @@
     <div class="space-y-5">
       <div>
         <h3 class="text-lg font-semibold text-gray-900">
-          {{ t('expense.groups.addTitle') }}
+          {{
+            moving
+              ? t('expense.groups.moveTitle')
+              : t('expense.groups.addTitle')
+          }}
         </h3>
         <p class="mt-1 text-sm text-gray-500">
-          {{ t('expense.groups.addSubtitle', { count }) }}
+          {{
+            moving
+              ? t('expense.groups.moveSubtitle', { count })
+              : t('expense.groups.addSubtitle', { count })
+          }}
         </p>
       </div>
 
@@ -79,7 +87,11 @@
       </div>
 
       <p class="text-xs leading-relaxed text-gray-500">
-        {{ t('expense.groups.doubleClaimNote') }}
+        {{
+          moving
+            ? t('expense.groups.moveNote')
+            : t('expense.groups.doubleClaimNote')
+        }}
       </p>
 
       <div class="flex justify-end gap-3">
@@ -87,7 +99,11 @@
           {{ t('common.cancel') }}
         </BaseButton>
         <BaseButton :disabled="!canConfirm" :loading="saving" @click="confirm">
-          {{ t('expense.groups.addConfirm') }}
+          {{
+            moving
+              ? t('expense.groups.moveConfirm')
+              : t('expense.groups.addConfirm')
+          }}
         </BaseButton>
       </div>
     </div>
@@ -105,6 +121,13 @@ const props = defineProps({
   invoiceUuids: {
     type: Array,
     required: true
+  },
+  // Adding refuses an invoice another group already holds, because a
+  // double claim cannot be undone. Moving is the deliberate correction,
+  // so it detaches the old membership instead of complaining about it.
+  mode: {
+    type: String,
+    default: 'add'
   }
 })
 
@@ -121,6 +144,7 @@ const saving = ref(false)
 const error = ref('')
 
 const count = computed(() => props.invoiceUuids.length)
+const moving = computed(() => props.mode === 'move')
 
 // An archived group is finished; adding to it would reopen a settled
 // claim, so only live ones are offered.
@@ -155,7 +179,11 @@ async function confirm() {
       })
       uuid = created.uuid
     }
-    await expenseApi.addGroupItems(uuid, props.invoiceUuids)
+    if (moving.value) {
+      await expenseApi.moveGroupItems(uuid, props.invoiceUuids)
+    } else {
+      await expenseApi.addGroupItems(uuid, props.invoiceUuids)
+    }
     emit('added')
   } catch (err) {
     error.value = err?.response?.data?.message || t('expense.groups.addFailed')

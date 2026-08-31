@@ -46,45 +46,41 @@
           {{ error }}
         </p>
 
-        <!-- Data: what the app has found and what to do with it -->
-        <template v-if="activeTab === 'data'">
-          <BaseCard v-if="!config?.enabled">
-            <p class="py-8 text-center text-sm text-gray-500">
-              {{ t('expense.disabledHint') }}
-            </p>
-          </BaseCard>
+        <BaseCard v-if="activeTab !== 'settings' && !config?.enabled">
+          <p class="py-8 text-center text-sm text-gray-500">
+            {{ t('expense.disabledHint') }}
+          </p>
+        </BaseCard>
 
-          <template v-else>
-            <TripSuggestionCard
-              :trips="trips"
-              :accepting="acceptingTrip"
-              @accept="acceptTrip"
-              @dismiss="dismissTrip"
-            />
+        <!-- Invoices: everything the app found, filtered by where each
+             one is headed rather than split across another row of tabs -->
+        <template v-else-if="activeTab === 'invoices'">
+          <TripSuggestionCard
+            :trips="trips"
+            :accepting="acceptingTrip"
+            @accept="acceptTrip"
+            @dismiss="dismissTrip"
+          />
 
-            <InvoiceSection
-              ref="invoiceSection"
-              @rescanned="refreshData"
-              @grouped="groupSection?.load()"
-            />
+          <InvoiceSection
+            ref="invoiceSection"
+            @rescanned="refreshData"
+            @grouped="groupSection?.load()"
+          />
 
-            <GroupSection ref="groupSection" />
-
-            <PendingLinkList
-              :links="links"
-              :releasing="releasing"
-              @release="releaseLink"
-            />
-
-            <ScanRunList
-              :runs="runs"
-              :scanning="scanning"
-              @scan="openPreview"
-            />
-          </template>
+          <PendingLinkList
+            :links="links"
+            :releasing="releasing"
+            @release="releaseLink"
+          />
         </template>
 
-        <!-- Settings: the switch and how scanning behaves -->
+        <!-- Groups: one group is one real claim form -->
+        <template v-else-if="activeTab === 'groups'">
+          <GroupSection ref="groupSection" />
+        </template>
+
+        <!-- Settings: the switch, how scanning behaves, and its history -->
         <template v-else>
           <ExpenseEnableCard
             v-if="config"
@@ -97,6 +93,13 @@
             v-if="config?.enabled"
             :config="config"
             @updated="onConfigUpdated"
+          />
+
+          <ScanRunList
+            v-if="config?.enabled"
+            :runs="runs"
+            :scanning="scanning"
+            @scan="openPreview"
           />
         </template>
       </template>
@@ -130,9 +133,12 @@ import { expenseApi } from '@/api/expense'
 
 const { t } = useI18n()
 
-const activeTab = ref('data')
+// Tabs separate resources, not states: an invoice's status is a filter
+// within its own list, so it never becomes a second row of tabs.
+const activeTab = ref('invoices')
 const tabs = computed(() => [
-  { value: 'data', label: t('expense.tabsData') },
+  { value: 'invoices', label: t('expense.tabsInvoices') },
+  { value: 'groups', label: t('expense.tabsGroups') },
   { value: 'settings', label: t('expense.tabsSettings') }
 ])
 

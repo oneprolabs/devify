@@ -13,6 +13,22 @@
       />
     </div>
 
+    <div v-if="buyers.length">
+      <label class="mb-1 block text-xs text-gray-500">
+        {{ t('expense.invoices.buyer') }}
+      </label>
+      <select
+        :value="modelValue.buyer"
+        class="max-w-[16rem] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+        @change="update('buyer', $event.target.value)"
+      >
+        <option value="">{{ t('expense.invoices.allBuyers') }}</option>
+        <option v-for="row in buyers" :key="row.name" :value="row.name">
+          {{ row.name }} ({{ row.count }})
+        </option>
+      </select>
+    </div>
+
     <div>
       <label class="mb-1 block text-xs text-gray-500">
         {{ t('expense.invoices.category') }}
@@ -27,30 +43,6 @@
           {{ t(`expense.categories.${key}`) }}
         </option>
       </select>
-    </div>
-
-    <div>
-      <label class="mb-1 block text-xs text-gray-500">
-        {{ t('expense.invoices.from') }}
-      </label>
-      <input
-        :value="modelValue.start"
-        type="date"
-        class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-        @change="update('start', $event.target.value)"
-      />
-    </div>
-
-    <div>
-      <label class="mb-1 block text-xs text-gray-500">
-        {{ t('expense.invoices.to') }}
-      </label>
-      <input
-        :value="modelValue.end"
-        type="date"
-        class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-        @change="update('end', $event.target.value)"
-      />
     </div>
 
     <label class="flex items-center gap-2 pb-2 text-sm text-gray-700">
@@ -72,6 +64,12 @@ const props = defineProps({
   modelValue: {
     type: Object,
     required: true
+  },
+  // Derived from the invoices themselves rather than configured, so the
+  // list always matches what actually arrived.
+  buyers: {
+    type: Array,
+    default: () => []
   }
 })
 

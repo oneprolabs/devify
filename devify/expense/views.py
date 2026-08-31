@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -19,7 +19,6 @@ from billing.services.config_service import get_credit_policy
 from billing.services.credits_service import CreditsService
 from expense.models import (
     ExpenseGroup,
-    ExpenseGroupItem,
     Invoice,
     InvoiceScanRun,
     InvoiceSourceFile,
@@ -46,6 +45,7 @@ from expense.services.config_service import (
 )
 from expense.services.scan_scheduler import sync_scan_periodic_task
 from expense.services import export as export_service
+from expense.services import invoices as invoice_service
 from expense.services import groups as group_service
 from expense.services import trips as trip_service
 from expense.services import naming
@@ -293,22 +293,15 @@ class ExpenseInvoiceListAPIView(APIView):
         if params.get("needs_review") == "true":
             queryset = queryset.filter(needs_review=True)
 
-        # "What have I not claimed yet?" is the question the list exists to
-        # answer, so it has to be askable. A group that was archived no
-        # longer holds its invoices.
-        grouped = params.get("grouped")
-        if grouped in ("true", "false"):
-            claimed = ExpenseGroupItem.objects.filter(
-                invoice=OuterRef("pk"),
-                group__status__in=[
-                    ExpenseGroup.Status.DRAFT,
-                    ExpenseGroup.Status.SUBMITTED,
-                    ExpenseGroup.Status.REIMBURSED,
-                ],
-            )
-            queryset = queryset.annotate(is_claimed=Exists(claimed)).filter(
-                is_claimed=(grouped == "true")
-            )
+        if params.get("buyer"):
+            queryset = queryset.filter(buyer_name=params["buyer"])
+
+        # The lifecycle stage is the list's primary question -- what have I
+        # not claimed yet -- so it is a first-class filter rather than
+        # something to reconstruct from group membership by hand.
+        stage = params.get("stage")
+        if stage and stage != "all":
+            queryset = invoice_service.by_stage(queryset, stage)
         if params.get("q"):
             term = params["q"]
             queryset = queryset.filter(
@@ -317,8 +310,14 @@ class ExpenseInvoiceListAPIView(APIView):
                 | Q(buyer_name__icontains=term)
             )
 
-        queryset = queryset.select_related("email_message")[:200]
-        return _response(InvoiceListSerializer(queryset, many=True).data)
+        rows = queryset.select_related("email_message")[:200]
+        return _response(
+            {
+                "invoices": InvoiceListSerializer(rows, many=True).data,
+                "counts": invoice_service.stage_counts(request.user),
+                "buyers": invoice_service.buyer_titles(request.user),
+            }
+        )
 
 
 class ExpenseInvoiceDetailAPIView(APIView):
@@ -458,16 +457,20 @@ class ExpenseGroupDetailAPIView(APIView):
 
     def get(self, request, uuid):
         group = self._get_object(request, uuid)
+        invoices = group_service.group_invoices(group)
         data = ExpenseGroupSerializer(group).data
-        data["invoices"] = InvoiceListSerializer(
-            [
-                item.invoice
-                for item in group.items.select_related("invoice").order_by(
-                    "sort_order", "id"
-                )
-            ],
-            many=True,
-        ).data
+        data["invoices"] = InvoiceListSerializer(invoices, many=True).data
+        # A claim form is filled in one category at a time, so the detail
+        # view offers the same invoices already split that way.
+        data["sections"] = [
+            {
+                **section,
+                "invoices": InvoiceListSerializer(
+                    section["invoices"], many=True
+                ).data,
+            }
+            for section in group_service.category_sections(invoices)
+        ]
         return _response(data)
 
     def patch(self, request, uuid):
@@ -511,6 +514,34 @@ class ExpenseGroupItemsAPIView(APIView):
 
         data = ExpenseGroupSerializer(group).data
         data["added"] = added
+        return _response(data)
+
+    def put(self, request, uuid):
+        """
+        Move invoices into this group from wherever they are now.
+
+        POST refuses an invoice held by another group because claiming the
+        same expense twice is unrecoverable. Putting one in the wrong group
+        is an ordinary mistake, though, so correcting it gets its own verb
+        rather than making the user detach and re-attach by hand.
+        """
+        group = self._get_group(request, uuid)
+        serializer = GroupItemsSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = group_service.move_invoices(
+                group,
+                [
+                    str(item)
+                    for item in serializer.validated_data["invoice_uuids"]
+                ],
+            )
+        except group_service.GroupError as exc:
+            return _bad_request(exc)
+
+        data = ExpenseGroupSerializer(group).data
+        data.update(result)
         return _response(data)
 
     def delete(self, request, uuid):
@@ -668,4 +699,49 @@ class ExpenseTripDismissAPIView(APIView):
         suggestion.status = TripSuggestion.Status.DISMISSED
         suggestion.save(update_fields=["status", "updated_at"])
         return _response(TripSuggestionSerializer(suggestion).data)
+
+
+class ExpenseInvoiceFileAwayAPIView(APIView):
+    """
+    Set invoices aside as never-to-be-claimed, or put them back.
+
+    Without this an invoice that will never be claimed has nowhere to go
+    and keeps asking to be dealt with.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = GroupItemsSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        uuids = [
+            str(item) for item in serializer.validated_data["invoice_uuids"]
+        ]
+        reason = (request.data or {}).get("reason", "")
+
+        filed = invoice_service.file_invoices(request.user, uuids, reason)
+        return _response(
+            {
+                "filed": filed,
+                "skipped": len(uuids) - filed,
+                "counts": invoice_service.stage_counts(request.user),
+            },
+            message=_("filed"),
+        )
+
+    def delete(self, request):
+        serializer = GroupItemsSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
+        uuids = [
+            str(item) for item in serializer.validated_data["invoice_uuids"]
+        ]
+
+        restored = invoice_service.unfile_invoices(request.user, uuids)
+        return _response(
+            {
+                "restored": restored,
+                "counts": invoice_service.stage_counts(request.user),
+            },
+            message=_("restored"),
+        )
 

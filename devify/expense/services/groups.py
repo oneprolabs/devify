@@ -16,6 +16,7 @@ from django.utils.translation import gettext as _
 
 from expense.constants import CATEGORY_LABELS_CN, ExpenseCategory
 from expense.models import ExpenseGroup, ExpenseGroupItem, Invoice
+from expense.services import invoices as invoice_service
 from expense.services.money import to_chinese_amount
 
 logger = logging.getLogger(__name__)
@@ -106,8 +107,84 @@ def add_invoices(group: ExpenseGroup, uuids) -> int:
         order += 1
         added += 1
 
+    # A group is a claim in progress, so nothing in one is filed away.
+    invoice_service.unfile_invoices(
+        group.user, [str(invoice.uuid) for invoice in invoices]
+    )
+
     recalculate(group)
     return added
+
+
+@transaction.atomic
+def move_invoices(group: ExpenseGroup, uuids) -> dict:
+    """
+    Relocate invoices into this group, wherever they are now.
+
+    Filing a claim means sorting receipts, and sorting means changing your
+    mind. ``add_invoices`` refuses an invoice held elsewhere because
+    claiming twice is unrecoverable; this is the deliberate correction, so
+    it detaches the old membership instead of complaining about it. A
+    reimbursed group is the exception: that money has been paid out, and
+    moving a receipt out of it would rewrite a settled claim.
+    """
+    invoices = claimable_invoices(group.user, uuids)
+
+    held = list(
+        ExpenseGroupItem.objects.filter(
+            invoice__in=invoices,
+            group__status__in=ACTIVE_GROUP_STATES,
+        )
+        .exclude(group=group)
+        .select_related("group")
+    )
+
+    settled = sorted(
+        {
+            item.group.name
+            for item in held
+            if item.group.status == ExpenseGroup.Status.REIMBURSED
+        }
+    )
+    if settled:
+        raise GroupError(
+            _("Already reimbursed in: %(groups)s")
+            % {"groups": ", ".join(settled)}
+        )
+
+    sources = sorted({item.group.name for item in held})
+    source_groups = {item.group_id: item.group for item in held}
+    if held:
+        ExpenseGroupItem.objects.filter(
+            id__in=[item.id for item in held]
+        ).delete()
+
+    existing = set(
+        ExpenseGroupItem.objects.filter(group=group).values_list(
+            "invoice_id", flat=True
+        )
+    )
+    order = ExpenseGroupItem.objects.filter(group=group).count()
+    moved = 0
+    for invoice in invoices:
+        if invoice.id in existing:
+            continue
+        ExpenseGroupItem.objects.create(
+            group=group, invoice=invoice, sort_order=order
+        )
+        order += 1
+        moved += 1
+
+    # A group is a claim in progress, so nothing in one is filed away.
+    invoice_service.unfile_invoices(
+        group.user, [str(invoice.uuid) for invoice in invoices]
+    )
+
+    for source in source_groups.values():
+        recalculate(source)
+    recalculate(group)
+
+    return {"moved": moved, "from_groups": sources}
 
 
 @transaction.atomic
@@ -183,18 +260,57 @@ def category_breakdown(invoices) -> list[dict]:
     ]
 
 
+def group_invoices(group: ExpenseGroup) -> list[Invoice]:
+    """The group's invoices in the order the user arranged them."""
+    return [
+        item.invoice
+        for item in ExpenseGroupItem.objects.filter(group=group)
+        .select_related("invoice")
+        .order_by("sort_order", "id")
+    ]
+
+
+def category_sections(invoices) -> list[dict]:
+    """
+    The group's invoices split by category, each with its subtotal.
+
+    A claim form is filled in one category at a time - meals on one line,
+    transport on the next - so a flat list means adding the numbers up by
+    hand. The sections are ordered by amount, largest first, which is also
+    the order the lines usually matter in.
+    """
+    buckets: dict[str, list[Invoice]] = {}
+    for invoice in invoices:
+        key = invoice.category or ExpenseCategory.OTHER
+        buckets.setdefault(key, []).append(invoice)
+
+    sections = []
+    for key, rows in buckets.items():
+        amount = sum(
+            (row.total_amount or Decimal("0") for row in rows), Decimal("0")
+        )
+        sections.append(
+            {
+                "category": key,
+                "label": CATEGORY_LABELS.get(key, key),
+                "count": len(rows),
+                "amount": str(amount),
+                "invoices": rows,
+            }
+        )
+
+    return sorted(
+        sections, key=lambda row: Decimal(row["amount"]), reverse=True
+    )
+
+
 def build_summary(group: ExpenseGroup) -> dict:
     """
     Everything needed to fill in a claim form, structured and as text.
 
     The text block is what most people actually use: one copy, one paste.
     """
-    invoices = [
-        item.invoice
-        for item in ExpenseGroupItem.objects.filter(group=group)
-        .select_related("invoice")
-        .order_by("sort_order", "id")
-    ]
+    invoices = group_invoices(group)
 
     total = group.total_amount or Decimal("0")
     breakdown = category_breakdown(invoices)

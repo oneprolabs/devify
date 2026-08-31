@@ -11,6 +11,7 @@ from expense.views import (
     ExpenseGroupSummaryAPIView,
     ExpenseInvoiceDetailAPIView,
     ExpenseInvoiceFileAPIView,
+    ExpenseInvoiceFileAwayAPIView,
     ExpenseInvoiceListAPIView,
     ExpenseInvoiceReextractAPIView,
     ExpenseLinkAllowAPIView,
@@ -55,6 +56,11 @@ urlpatterns = [
         "apps/expense/invoices",
         ExpenseInvoiceListAPIView.as_view(),
         name="expense-invoices",
+    ),
+    path(
+        "apps/expense/invoices/file-away",
+        ExpenseInvoiceFileAwayAPIView.as_view(),
+        name="expense-invoice-file-away",
     ),
     path(
         "apps/expense/invoices/<uuid:uuid>",

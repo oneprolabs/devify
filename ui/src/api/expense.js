@@ -61,6 +61,23 @@ export const expenseApi = {
       .then(extractData)
   },
 
+  fileAwayInvoices(invoiceUuids, reason) {
+    return apiClient
+      .post('/v1/apps/expense/invoices/file-away', {
+        invoice_uuids: invoiceUuids,
+        reason
+      })
+      .then(extractData)
+  },
+
+  restoreInvoices(invoiceUuids) {
+    return apiClient
+      .delete('/v1/apps/expense/invoices/file-away', {
+        data: { invoice_uuids: invoiceUuids }
+      })
+      .then(extractData)
+  },
+
   reextractInvoice(uuid) {
     return apiClient
       .post(`/v1/apps/expense/invoices/${uuid}/reextract`)
@@ -88,6 +105,17 @@ export const expenseApi = {
   addGroupItems(uuid, invoiceUuids) {
     return apiClient
       .post(`/v1/apps/expense/groups/${uuid}/items`, {
+        invoice_uuids: invoiceUuids
+      })
+      .then(extractData)
+  },
+
+  // Moving is its own verb: adding refuses an invoice another group holds,
+  // because claiming twice cannot be undone, but correcting which group it
+  // belongs to is ordinary.
+  moveGroupItems(uuid, invoiceUuids) {
+    return apiClient
+      .put(`/v1/apps/expense/groups/${uuid}/items`, {
         invoice_uuids: invoiceUuids
       })
       .then(extractData)

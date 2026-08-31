@@ -234,6 +234,10 @@ class Invoice(models.Model):
         QUOTA = "quota", _("Quota Invoice")
         OTHER = "other", _("Other")
 
+    class Disposition(models.TextChoices):
+        TO_CLAIM = "to_claim", _("To Claim")
+        FILED = "filed", _("Filed, Not Claimed")
+
     class CategorySource(models.TextChoices):
         RULE = "rule", _("Ticket Type Rule")
         USER_RULE = "user_rule", _("User Rule")
@@ -383,6 +387,23 @@ class Invoice(models.Model):
         default="unverified",
         verbose_name=_("Verification Status"),
     )
+    # Where this invoice is headed. Without a third option, an invoice
+    # that will never be claimed has nowhere to go and sits in the
+    # unclaimed list forever, asking to be dealt with.
+    disposition = models.CharField(
+        max_length=16,
+        choices=Disposition.choices,
+        default="to_claim",
+        db_index=True,
+        verbose_name=_("Disposition"),
+    )
+    filed_reason = models.CharField(
+        max_length=32,
+        blank=True,
+        verbose_name=_("Filed Reason"),
+        help_text=_("Why it will not be claimed: personal, rejected, expired"),
+    )
+    filed_at = models.DateTimeField(null=True, blank=True)
     # Nullable on purpose: MySQL/MariaDB does not support partial indexes,
     # so the uniqueness below has to be expressed with NULLs (which never
     # collide) rather than a filtered constraint on empty strings.

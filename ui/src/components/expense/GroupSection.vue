@@ -1,50 +1,58 @@
 <template>
-  <BaseCard>
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-semibold text-gray-900">
-            {{ t('expense.groups.title') }}
-          </h2>
-          <p class="mt-1 text-sm text-gray-500">
-            {{ t('expense.groups.subtitle') }}
-          </p>
-        </div>
-
-        <div class="flex gap-2">
-          <input
-            v-model="newName"
-            type="text"
-            class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-            :placeholder="t('expense.groups.namePlaceholder')"
-            @keyup.enter="create"
-          />
-          <BaseButton size="sm" :loading="creating" @click="create">
-            {{ t('expense.groups.create') }}
-          </BaseButton>
-        </div>
+  <div class="space-y-4">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">
+          {{ t('expense.groups.title') }}
+        </h2>
+        <p class="mt-1 text-sm text-gray-500">
+          {{ t('expense.groups.subtitle') }}
+        </p>
       </div>
 
-      <p
-        v-if="error"
-        class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-      >
-        {{ error }}
-      </p>
+      <div class="flex gap-2">
+        <input
+          v-model="newName"
+          type="text"
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+          :placeholder="t('expense.groups.namePlaceholder')"
+          @keyup.enter="create"
+        />
+        <BaseButton size="sm" :loading="creating" @click="create">
+          {{ t('expense.groups.create') }}
+        </BaseButton>
+      </div>
+    </div>
 
-      <p v-if="!groups.length" class="py-6 text-center text-sm text-gray-500">
+    <FilterChips v-model="filter" :options="filterOptions" />
+
+    <p
+      v-if="error"
+      class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+    >
+      {{ error }}
+    </p>
+
+    <BaseCard>
+      <p v-if="!visible.length" class="py-6 text-center text-sm text-gray-500">
         {{ t('expense.groups.empty') }}
       </p>
 
       <ul v-else class="divide-y divide-gray-100">
         <li
-          v-for="group in groups"
+          v-for="group in visible"
           :key="group.uuid"
           class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
         >
           <button type="button" class="min-w-0 text-left" @click="open(group)">
             <p class="truncate text-sm font-medium text-gray-900">
               {{ group.name }}
+              <span
+                v-if="group.status !== 'draft'"
+                class="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
+              >
+                {{ t(`expense.groups.statuses.${group.status}`) }}
+              </span>
             </p>
             <p class="mt-0.5 text-xs text-gray-500">
               {{
@@ -61,7 +69,11 @@
 
           <div class="flex gap-2">
             <BaseButton size="sm" variant="outline" @click="open(group)">
-              {{ t('expense.groups.viewSummary') }}
+              {{
+                selected?.uuid === group.uuid
+                  ? t('common.collapse')
+                  : t('common.expand')
+              }}
             </BaseButton>
             <BaseButton
               size="sm"
@@ -74,71 +86,30 @@
           </div>
         </li>
       </ul>
-    </div>
-  </BaseCard>
+    </BaseCard>
 
-  <BaseModal :show="!!summary" @close="close">
-    <div v-if="summary" class="space-y-4">
-      <h3 class="text-lg font-semibold text-gray-900">
-        {{ selectedName }}
-      </h3>
+    <GroupDetailPanel
+      v-if="selected && summary"
+      :group="selected"
+      :summary="summary"
+      :sections="sections"
+      :removing="removing"
+      :exporting="exporting === selected.uuid"
+      :error="detailError"
+      @close="close"
+      @remove="removeInvoice"
+      @move="startMove"
+      @export="exportGroup"
+    />
+  </div>
 
-      <div class="flex gap-4 border-b border-gray-200">
-        <button
-          v-for="view in views"
-          :key="view.value"
-          type="button"
-          class="border-b-2 px-1 py-2 text-sm font-medium transition-colors"
-          :class="
-            activeView === view.value
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          "
-          @click="activeView = view.value"
-        >
-          {{ view.label }}
-        </button>
-      </div>
-
-      <GroupSummaryPanel v-if="activeView === 'summary'" :summary="summary" />
-
-      <div v-else class="space-y-3">
-        <p
-          v-if="!detail?.invoices?.length"
-          class="py-6 text-center text-sm text-gray-500"
-        >
-          {{ t('expense.groups.noInvoices') }}
-        </p>
-
-        <ul v-else class="divide-y divide-gray-100">
-          <li
-            v-for="invoice in detail.invoices"
-            :key="invoice.uuid"
-            class="flex items-center justify-between gap-3 py-2"
-          >
-            <div class="min-w-0">
-              <p class="truncate text-sm text-gray-900">
-                {{ invoice.seller_name || t('expense.invoices.untitled') }}
-              </p>
-              <p class="mt-0.5 text-xs text-gray-500">
-                {{ invoice.issue_date || '-' }} ·
-                {{ t(`expense.categories.${invoice.category || 'other'}`) }} ·
-                {{ invoice.currency || 'CNY' }} {{ invoice.total_amount }}
-              </p>
-            </div>
-            <BaseButton
-              size="sm"
-              variant="secondary"
-              :loading="removing === invoice.uuid"
-              @click="removeInvoice(invoice)"
-            >
-              {{ t('expense.groups.removeItem') }}
-            </BaseButton>
-          </li>
-        </ul>
-      </div>
-    </div>
-  </BaseModal>
+  <AddToGroupDialog
+    v-if="moving"
+    :invoice-uuids="[moving.uuid]"
+    mode="move"
+    @close="moving = null"
+    @added="onMoved"
+  />
 </template>
 
 <script setup>
@@ -146,35 +117,62 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
-import GroupSummaryPanel from '@/components/expense/GroupSummaryPanel.vue'
+import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
+import FilterChips from '@/components/expense/FilterChips.vue'
+import GroupDetailPanel from '@/components/expense/GroupDetailPanel.vue'
 import { expenseApi } from '@/api/expense'
 import apiConfig from '@/config/api'
 
 const { t } = useI18n()
 
 const groups = ref([])
+const filter = ref('live')
 const summary = ref(null)
-const detail = ref(null)
-const activeView = ref('summary')
-const removing = ref('')
+const sections = ref([])
 const selected = ref(null)
+const moving = ref(null)
+const removing = ref('')
 const newName = ref('')
 const creating = ref(false)
 const exporting = ref('')
 const error = ref('')
+const detailError = ref('')
 
-const selectedName = computed(() => selected.value?.name || '')
+const LIVE_STATES = ['draft', 'submitted']
 
-const views = computed(() => [
-  { value: 'summary', label: t('expense.groups.viewSummary') },
-  { value: 'items', label: t('expense.groups.viewItems') }
+const visible = computed(() => {
+  if (filter.value === 'live') {
+    return groups.value.filter((group) => LIVE_STATES.includes(group.status))
+  }
+  if (filter.value === 'reimbursed') {
+    return groups.value.filter((group) => group.status === 'reimbursed')
+  }
+  return groups.value
+})
+
+const filterOptions = computed(() => [
+  {
+    value: 'live',
+    label: t('expense.groups.filters.live'),
+    count: groups.value.filter((group) => LIVE_STATES.includes(group.status))
+      .length
+  },
+  {
+    value: 'reimbursed',
+    label: t('expense.groups.filters.reimbursed'),
+    count: groups.value.filter((group) => group.status === 'reimbursed').length
+  },
+  {
+    value: 'all',
+    label: t('expense.groups.filters.all'),
+    count: groups.value.length
+  }
 ])
 
 function close() {
+  selected.value = null
   summary.value = null
-  detail.value = null
-  activeView.value = 'summary'
+  sections.value = []
 }
 
 function readError(err, fallbackKey) {
@@ -205,17 +203,25 @@ async function create() {
   }
 }
 
+async function loadDetail(uuid) {
+  const [summaryData, detailData] = await Promise.all([
+    expenseApi.getGroupSummary(uuid),
+    expenseApi.getGroup(uuid)
+  ])
+  summary.value = summaryData
+  sections.value = detailData.sections || []
+  selected.value = detailData
+}
+
 async function open(group) {
+  if (selected.value?.uuid === group.uuid) {
+    close()
+    return
+  }
   error.value = ''
-  selected.value = group
-  activeView.value = 'summary'
+  detailError.value = ''
   try {
-    const [summaryData, detailData] = await Promise.all([
-      expenseApi.getGroupSummary(group.uuid),
-      expenseApi.getGroup(group.uuid)
-    ])
-    summary.value = summaryData
-    detail.value = detailData
+    await loadDetail(group.uuid)
   } catch (err) {
     error.value = readError(err, 'expense.loadFailed')
   }
@@ -223,21 +229,31 @@ async function open(group) {
 
 async function removeInvoice(invoice) {
   removing.value = invoice.uuid
-  error.value = ''
+  detailError.value = ''
   try {
     await expenseApi.removeGroupItems(selected.value.uuid, [invoice.uuid])
     // Totals and membership both moved, so reload the group and the list.
-    const [summaryData, detailData] = await Promise.all([
-      expenseApi.getGroupSummary(selected.value.uuid),
-      expenseApi.getGroup(selected.value.uuid)
-    ])
-    summary.value = summaryData
-    detail.value = detailData
+    await loadDetail(selected.value.uuid)
     await load()
   } catch (err) {
-    error.value = readError(err, 'expense.groups.createFailed')
+    detailError.value = readError(err, 'expense.groups.createFailed')
   } finally {
     removing.value = ''
+  }
+}
+
+function startMove(invoice) {
+  moving.value = invoice
+}
+
+async function onMoved() {
+  moving.value = null
+  detailError.value = ''
+  try {
+    await loadDetail(selected.value.uuid)
+    await load()
+  } catch (err) {
+    detailError.value = readError(err, 'expense.loadFailed')
   }
 }
 

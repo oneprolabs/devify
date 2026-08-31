@@ -58,7 +58,10 @@
       "previous": "上一页",
       "next": "下一页",
       "page": "第 {current} 页，共 {total} 页"
-    }
+    },
+    "undo": "撤销",
+    "collapse": "收起",
+    "expand": "展开"
   },
   "virtualEmail": {
     "yourAddress": "您的AI智能邮箱"
@@ -966,7 +969,12 @@
   },
   "todos": {
     "title": "待办事项",
-    "calendar": "日历视图",
+    "calendar": {
+      "viewMode": "视图模式",
+      "monthView": "月视图",
+      "weekView": "周视图",
+      "moreTodos": "还有 {count} 个"
+    },
     "list": "列表视图",
     "add": "添加",
     "edit": "编辑",
@@ -1042,12 +1050,6 @@
       "current": "当前范围",
       "startDate": "开始日期",
       "endDate": "结束日期"
-    },
-    "calendar": {
-      "viewMode": "视图模式",
-      "monthView": "月视图",
-      "weekView": "周视图",
-      "moreTodos": "还有 {count} 个"
     },
     "groupBy": {
       "date": "按日期",
@@ -1218,17 +1220,10 @@
       "searchPlaceholder": "销售方 / 发票号码 / 抬头",
       "category": "分类",
       "allCategories": "全部分类",
-      "from": "开票起",
-      "to": "开票止",
       "needsReviewOnly": "只看待复核",
       "empty": "还没有识别出发票。",
-      "issueDate": "开票日期",
-      "seller": "销售方",
-      "amount": "价税合计",
-      "state": "状态",
       "duplicate": "重复",
       "needsReview": "待复核",
-      "ok": "正常",
       "untitled": "未识别销售方",
       "reviewHint": "金额不自洽或识别置信度偏低，请核对后保存。",
       "learnHint": "改过分类后，同一销售方的下一张发票会自动归到这里，不再重新判断。",
@@ -1255,10 +1250,33 @@
         "model": "由模型判定",
         "user": "你手动设置"
       },
-      "selectAll": "全选",
       "notClaimable": "只有已识别的发票可以加入报销组",
       "selectedCount": "已选 {count} 张",
-      "clearSelection": "取消选择"
+      "clearSelection": "取消选择",
+      "buyer": "抬头",
+      "allBuyers": "全部抬头",
+      "titleCompany": "公司",
+      "titlePersonal": "个人",
+      "monthLabel": "{year} 年 {month} 月",
+      "monthSummary": "{count} 张 · ¥{amount}",
+      "noDate": "无日期",
+      "spentOn": "消费",
+      "issuedOn": "开票",
+      "fileAway": "归档 · 不报销",
+      "fileAwayTitle": "归档这些发票",
+      "fileAwaySubtitle": "选中的 {count} 张不会再出现在未报销里，随时可以移回。",
+      "fileAwayNote": "归档只是换个去处，不删除任何数据，也不影响已经识别出来的内容。",
+      "filedNotice": "已归档 {count} 张，不再出现在未报销里",
+      "filedNoticeHint": "切到上面的「已归档」就能看到，随时可以移回。",
+      "goToFiled": "去查看",
+      "restore": "移回未报销",
+      "fileFailed": "操作失败，请稍后重试。",
+      "filedReasons": {
+        "personal": "个人消费",
+        "rejected": "公司不予报销",
+        "expired": "已过报销期限",
+        "other": "其他原因"
+      }
     },
     "groups": {
       "title": "报销组",
@@ -1268,7 +1286,6 @@
       "empty": "还没有报销组。",
       "line": "{count} 张票据 · 合计 {amount} 元",
       "businessTrip": "出差",
-      "viewSummary": "查看汇总",
       "export": "导出附件",
       "createFailed": "创建失败，请检查名称是否重复。",
       "formFields": "报销单填报字段",
@@ -1287,19 +1304,42 @@
       "doubleClaimNote": "同一张发票不能同时属于两个未归档的报销组,重复加入会被拒绝。",
       "viewItems": "组内发票",
       "noInvoices": "这个报销组还没有发票。",
-      "removeItem": "移出"
+      "removeItem": "移出",
+      "moveAction": "移到其他组",
+      "moveTitle": "移到其他报销组",
+      "moveSubtitle": "把选中的 {count} 张发票从当前报销组挪到另一个组。",
+      "moveConfirm": "移动",
+      "moveNote": "移动会自动把它们从原来的报销组里取出，两边的合计都会重新计算。已报销的组不能动。",
+      "moveItem": "移到其他组",
+      "sectionSummary": "{count} 张 · ¥{amount}",
+      "sectionsHint": "按分类分组，对应报销单上的每一行",
+      "exportSection": "导出",
+      "exportZip": "附件压缩包",
+      "exportZipHint": "按分类分目录，文件名统一，附 manifest.csv。",
+      "statuses": {
+        "draft": "进行中",
+        "submitted": "已提交",
+        "reimbursed": "已报销",
+        "archived": "已归档"
+      },
+      "filters": {
+        "live": "进行中",
+        "reimbursed": "已报销",
+        "all": "全部"
+      }
     },
     "trips": {
-      "title": "检测到出差",
-      "subtitle": "根据长途交通票和异地消费自动归集，采纳后会生成报销组。",
+      "title": "检测到 {count} 次出差",
+      "subtitle": "按长途票和异地消费自动归集。采纳后生成报销组，不采纳不影响任何东西。",
       "headline": "{start} → {end} {city}",
       "detail": "{count} 张票据 · 合计 {amount} 元",
       "accept": "采纳",
       "dismiss": "忽略",
       "freeNote": "行程归集完全按规则计算，不调用模型、不消耗点数。",
-      "acceptFailed": "操作失败，请稍后重试。"
+      "acceptFailed": "操作失败，请稍后重试。",
+      "confident": "可信度高",
+      "unsure": "只找到去程，没找到返程票，请核对日期"
     },
-    "tabsData": "数据",
     "tabsSettings": "设置",
     "disabledHint": "发票管家尚未开启。到「设置」里打开后，系统会按周期扫描邮件并在这里展示识别出的发票。",
     "prefs": {
@@ -1320,6 +1360,15 @@
       "linkDomains": "额外放行的下载域名",
       "linkDomainsPlaceholder": "每行一个域名",
       "linkDomainsHelp": "正文里的下载链接只有域名在平台白名单或此列表中才会自动下载。"
+    },
+    "tabsInvoices": "发票",
+    "tabsGroups": "报销组",
+    "stages": {
+      "todo": "未报销",
+      "claiming": "报销中",
+      "reimbursed": "已报销",
+      "filed": "已归档",
+      "all": "全部"
     }
   }
 }

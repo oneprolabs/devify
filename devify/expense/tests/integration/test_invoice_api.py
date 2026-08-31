@@ -58,7 +58,7 @@ class TestInvoiceList:
 
         response = api_client.get(LIST_URL)
 
-        assert len(response.data["data"]) == 1
+        assert len(response.data["data"]["invoices"]) == 1
 
     def test_noise_is_hidden_by_default(self, api_client, user):
         make_invoice(user)
@@ -68,7 +68,7 @@ class TestInvoiceList:
 
         response = api_client.get(LIST_URL)
 
-        assert len(response.data["data"]) == 1
+        assert len(response.data["data"]["invoices"]) == 1
 
     def test_noise_is_reachable_with_an_explicit_filter(
         self, api_client, user
@@ -78,7 +78,7 @@ class TestInvoiceList:
 
         response = api_client.get(f"{LIST_URL}?status=failed")
 
-        assert len(response.data["data"]) == 1
+        assert len(response.data["data"]["invoices"]) == 1
 
     def test_category_filter(self, api_client, user):
         make_invoice(user)
@@ -87,7 +87,7 @@ class TestInvoiceList:
 
         response = api_client.get(f"{LIST_URL}?category=meals")
 
-        assert len(response.data["data"]) == 1
+        assert len(response.data["data"]["invoices"]) == 1
 
     def test_date_range_filter(self, api_client, user):
         make_invoice(user, issue_date=date(2026, 1, 5))
@@ -96,15 +96,18 @@ class TestInvoiceList:
 
         response = api_client.get(f"{LIST_URL}?start=2026-06-01")
 
-        assert len(response.data["data"]) == 1
+        assert len(response.data["data"]["invoices"]) == 1
 
     def test_keyword_search_covers_seller_and_number(self, api_client, user):
         make_invoice(user, seller_name="滴滴出行")
         make_invoice(user, seller_name="某酒店", invoice_no="999")
         api_client.force_authenticate(user=user)
 
-        assert len(api_client.get(f"{LIST_URL}?q=滴滴").data["data"]) == 1
-        assert len(api_client.get(f"{LIST_URL}?q=999").data["data"]) == 1
+        by_seller = api_client.get(f"{LIST_URL}?q=滴滴")
+        by_number = api_client.get(f"{LIST_URL}?q=999")
+
+        assert len(by_seller.data["data"]["invoices"]) == 1
+        assert len(by_number.data["data"]["invoices"]) == 1
 
     def test_needs_review_filter(self, api_client, user):
         make_invoice(user)
@@ -113,7 +116,7 @@ class TestInvoiceList:
 
         response = api_client.get(f"{LIST_URL}?needs_review=true")
 
-        assert len(response.data["data"]) == 1
+        assert len(response.data["data"]["invoices"]) == 1
 
 
 class TestInvoiceDetail:
@@ -319,15 +322,19 @@ class TestClaimedFilter:
         add_invoices(group, [str(invoice.uuid)])
         return group
 
+    def _numbers(self, api_client, query=""):
+        response = api_client.get(f"{LIST_URL}{query}")
+        return [
+            row["invoice_no"] for row in response.data["data"]["invoices"]
+        ]
+
     def test_unclaimed_invoices_can_be_isolated(self, api_client, user):
         claimed = make_invoice(user, invoice_no="A1")
         make_invoice(user, invoice_no="B1")
         self._grouped(user, claimed)
         api_client.force_authenticate(user=user)
 
-        rows = api_client.get(f"{LIST_URL}?grouped=false").data["data"]
-
-        assert [row["invoice_no"] for row in rows] == ["B1"]
+        assert self._numbers(api_client, "?stage=todo") == ["B1"]
 
     def test_claimed_invoices_can_be_isolated(self, api_client, user):
         claimed = make_invoice(user, invoice_no="A2")
@@ -335,9 +342,7 @@ class TestClaimedFilter:
         self._grouped(user, claimed)
         api_client.force_authenticate(user=user)
 
-        rows = api_client.get(f"{LIST_URL}?grouped=true").data["data"]
-
-        assert [row["invoice_no"] for row in rows] == ["A2"]
+        assert self._numbers(api_client, "?stage=claiming") == ["A2"]
 
     def test_an_archived_group_releases_its_invoices(self, api_client, user):
         # Archiving settles a claim and hands the invoices back.
@@ -347,9 +352,7 @@ class TestClaimedFilter:
         group.save(update_fields=["status"])
         api_client.force_authenticate(user=user)
 
-        rows = api_client.get(f"{LIST_URL}?grouped=false").data["data"]
-
-        assert [row["invoice_no"] for row in rows] == ["C1"]
+        assert self._numbers(api_client, "?stage=todo") == ["C1"]
 
     def test_without_the_filter_everything_is_listed(self, api_client, user):
         claimed = make_invoice(user, invoice_no="A3")
@@ -357,5 +360,5 @@ class TestClaimedFilter:
         self._grouped(user, claimed)
         api_client.force_authenticate(user=user)
 
-        assert len(api_client.get(LIST_URL).data["data"]) == 2
+        assert len(self._numbers(api_client)) == 2
 

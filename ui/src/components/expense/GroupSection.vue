@@ -77,12 +77,66 @@
     </div>
   </BaseCard>
 
-  <BaseModal :show="!!summary" @close="summary = null">
+  <BaseModal :show="!!summary" @close="close">
     <div v-if="summary" class="space-y-4">
       <h3 class="text-lg font-semibold text-gray-900">
         {{ selectedName }}
       </h3>
-      <GroupSummaryPanel :summary="summary" />
+
+      <div class="flex gap-4 border-b border-gray-200">
+        <button
+          v-for="view in views"
+          :key="view.value"
+          type="button"
+          class="border-b-2 px-1 py-2 text-sm font-medium transition-colors"
+          :class="
+            activeView === view.value
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          "
+          @click="activeView = view.value"
+        >
+          {{ view.label }}
+        </button>
+      </div>
+
+      <GroupSummaryPanel v-if="activeView === 'summary'" :summary="summary" />
+
+      <div v-else class="space-y-3">
+        <p
+          v-if="!detail?.invoices?.length"
+          class="py-6 text-center text-sm text-gray-500"
+        >
+          {{ t('expense.groups.noInvoices') }}
+        </p>
+
+        <ul v-else class="divide-y divide-gray-100">
+          <li
+            v-for="invoice in detail.invoices"
+            :key="invoice.uuid"
+            class="flex items-center justify-between gap-3 py-2"
+          >
+            <div class="min-w-0">
+              <p class="truncate text-sm text-gray-900">
+                {{ invoice.seller_name || t('expense.invoices.untitled') }}
+              </p>
+              <p class="mt-0.5 text-xs text-gray-500">
+                {{ invoice.issue_date || '-' }} ·
+                {{ t(`expense.categories.${invoice.category || 'other'}`) }} ·
+                {{ invoice.currency || 'CNY' }} {{ invoice.total_amount }}
+              </p>
+            </div>
+            <BaseButton
+              size="sm"
+              variant="secondary"
+              :loading="removing === invoice.uuid"
+              @click="removeInvoice(invoice)"
+            >
+              {{ t('expense.groups.removeItem') }}
+            </BaseButton>
+          </li>
+        </ul>
+      </div>
     </div>
   </BaseModal>
 </template>
@@ -101,6 +155,9 @@ const { t } = useI18n()
 
 const groups = ref([])
 const summary = ref(null)
+const detail = ref(null)
+const activeView = ref('summary')
+const removing = ref('')
 const selected = ref(null)
 const newName = ref('')
 const creating = ref(false)
@@ -108,6 +165,17 @@ const exporting = ref('')
 const error = ref('')
 
 const selectedName = computed(() => selected.value?.name || '')
+
+const views = computed(() => [
+  { value: 'summary', label: t('expense.groups.viewSummary') },
+  { value: 'items', label: t('expense.groups.viewItems') }
+])
+
+function close() {
+  summary.value = null
+  detail.value = null
+  activeView.value = 'summary'
+}
 
 function readError(err, fallbackKey) {
   return err?.response?.data?.message || t(fallbackKey)
@@ -140,10 +208,36 @@ async function create() {
 async function open(group) {
   error.value = ''
   selected.value = group
+  activeView.value = 'summary'
   try {
-    summary.value = await expenseApi.getGroupSummary(group.uuid)
+    const [summaryData, detailData] = await Promise.all([
+      expenseApi.getGroupSummary(group.uuid),
+      expenseApi.getGroup(group.uuid)
+    ])
+    summary.value = summaryData
+    detail.value = detailData
   } catch (err) {
     error.value = readError(err, 'expense.loadFailed')
+  }
+}
+
+async function removeInvoice(invoice) {
+  removing.value = invoice.uuid
+  error.value = ''
+  try {
+    await expenseApi.removeGroupItems(selected.value.uuid, [invoice.uuid])
+    // Totals and membership both moved, so reload the group and the list.
+    const [summaryData, detailData] = await Promise.all([
+      expenseApi.getGroupSummary(selected.value.uuid),
+      expenseApi.getGroup(selected.value.uuid)
+    ])
+    summary.value = summaryData
+    detail.value = detailData
+    await load()
+  } catch (err) {
+    error.value = readError(err, 'expense.groups.createFailed')
+  } finally {
+    removing.value = ''
   }
 }
 

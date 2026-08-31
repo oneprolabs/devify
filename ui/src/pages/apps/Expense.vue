@@ -62,7 +62,11 @@
               @dismiss="dismissTrip"
             />
 
-            <InvoiceSection ref="invoiceSection" @rescanned="refreshData" />
+            <InvoiceSection
+              ref="invoiceSection"
+              @rescanned="refreshData"
+              @grouped="groupSection?.load()"
+            />
 
             <GroupSection ref="groupSection" />
 

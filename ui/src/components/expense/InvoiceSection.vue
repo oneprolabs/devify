@@ -19,9 +19,42 @@
         {{ error }}
       </p>
 
-      <InvoiceTable :invoices="invoices" @select="open" />
+      <div
+        v-if="selectedUuids.length"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary-200 bg-primary-50 p-3"
+      >
+        <span class="text-sm text-primary-900">
+          {{
+            t('expense.invoices.selectedCount', {
+              count: selectedUuids.length
+            })
+          }}
+        </span>
+        <div class="flex gap-2">
+          <BaseButton size="sm" variant="secondary" @click="selectedUuids = []">
+            {{ t('expense.invoices.clearSelection') }}
+          </BaseButton>
+          <BaseButton size="sm" @click="addOpen = true">
+            {{ t('expense.groups.addAction') }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <InvoiceTable
+        v-model="selectedUuids"
+        :invoices="invoices"
+        selectable
+        @select="open"
+      />
     </div>
   </BaseCard>
+
+  <AddToGroupDialog
+    v-if="addOpen"
+    :invoice-uuids="selectedUuids"
+    @close="addOpen = false"
+    @added="onAdded"
+  />
 
   <InvoiceDetailDrawer
     v-if="selected"
@@ -38,17 +71,21 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
 import InvoiceDetailDrawer from '@/components/expense/InvoiceDetailDrawer.vue'
 import InvoiceFilters from '@/components/expense/InvoiceFilters.vue'
 import InvoiceTable from '@/components/expense/InvoiceTable.vue'
 import { expenseApi } from '@/api/expense'
 
-const emit = defineEmits(['rescanned'])
+const emit = defineEmits(['rescanned', 'grouped'])
 
 const { t } = useI18n()
 
 const invoices = ref([])
+const selectedUuids = ref([])
+const addOpen = ref(false)
 const selected = ref(null)
 const saving = ref(false)
 const reextracting = ref(false)
@@ -121,6 +158,14 @@ async function reextract(invoice) {
   } finally {
     reextracting.value = false
   }
+}
+
+async function onAdded() {
+  addOpen.value = false
+  selectedUuids.value = []
+  await load()
+  // The group totals changed, so whoever owns that list needs to know.
+  emit('grouped')
 }
 
 watch(filters, load, { deep: true })

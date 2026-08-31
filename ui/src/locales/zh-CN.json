@@ -1249,7 +1249,11 @@
         "user_rule": "按你此前的修正判定",
         "model": "由模型判定",
         "user": "你手动设置"
-      }
+      },
+      "selectAll": "全选",
+      "notClaimable": "只有已识别的发票可以加入报销组",
+      "selectedCount": "已选 {count} 张",
+      "clearSelection": "取消选择"
     },
     "groups": {
       "title": "报销组",
@@ -1268,7 +1272,17 @@
       "invoiceCount": "票据张数",
       "totalAmount": "价税合计",
       "taxAmount": "税额合计",
-      "amountInWords": "金额大写"
+      "amountInWords": "金额大写",
+      "addAction": "加入报销组",
+      "addTitle": "加入报销组",
+      "addSubtitle": "把选中的 {count} 张发票放进一个报销组。",
+      "addToNew": "新建报销组",
+      "addConfirm": "加入",
+      "addFailed": "加入失败,请稍后重试。",
+      "doubleClaimNote": "同一张发票不能同时属于两个未归档的报销组,重复加入会被拒绝。",
+      "viewItems": "组内发票",
+      "noInvoices": "这个报销组还没有发票。",
+      "removeItem": "移出"
     },
     "trips": {
       "title": "检测到出差",

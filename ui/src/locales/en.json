@@ -1240,7 +1240,11 @@
         "user_rule": "From your earlier correction",
         "model": "Proposed by the model",
         "user": "Set by you"
-      }
+      },
+      "selectAll": "Select all",
+      "notClaimable": "Only recognized invoices can be claimed",
+      "selectedCount": "{count} selected",
+      "clearSelection": "Clear"
     },
     "groups": {
       "title": "Reimbursement groups",
@@ -1259,7 +1263,17 @@
       "invoiceCount": "Invoices",
       "totalAmount": "Total",
       "taxAmount": "Tax",
-      "amountInWords": "In words"
+      "amountInWords": "In words",
+      "addAction": "Add to group",
+      "addTitle": "Add to a group",
+      "addSubtitle": "Put the {count} selected invoices into a reimbursement group.",
+      "addToNew": "Create a new group",
+      "addConfirm": "Add",
+      "addFailed": "Could not add them. Please try again.",
+      "doubleClaimNote": "An invoice cannot sit in two live groups at once; a repeat claim is refused.",
+      "viewItems": "Invoices",
+      "noInvoices": "This group has no invoices yet.",
+      "removeItem": "Remove"
     },
     "trips": {
       "title": "Business trip detected",

@@ -81,10 +81,22 @@ export const expenseApi = {
       .then(extractData)
   },
 
+  getGroup(uuid) {
+    return apiClient.get(`/v1/apps/expense/groups/${uuid}`).then(extractData)
+  },
+
   addGroupItems(uuid, invoiceUuids) {
     return apiClient
       .post(`/v1/apps/expense/groups/${uuid}/items`, {
         invoice_uuids: invoiceUuids
+      })
+      .then(extractData)
+  },
+
+  removeGroupItems(uuid, invoiceUuids) {
+    return apiClient
+      .delete(`/v1/apps/expense/groups/${uuid}/items`, {
+        data: { invoice_uuids: invoiceUuids }
       })
       .then(extractData)
   },

@@ -334,7 +334,11 @@ async function testDraft() {
   testing.value = 'draft'
   error.value = ''
   try {
-    await mailboxApi.testDraft(form)
+    // When editing, the password field is left blank to keep the stored
+    // one; send the uuid so the test can use it too.
+    const payload = { ...form }
+    if (editing.value) payload.uuid = editing.value.uuid
+    await mailboxApi.testDraft(payload)
     error.value = ''
     window.alert(t('settings.connectionOk'))
   } catch (err) {

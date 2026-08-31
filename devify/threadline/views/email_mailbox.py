@@ -105,21 +105,35 @@ class EmailMailboxTestAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, uuid=None):
+        # The validator takes the whole email config and reads `imap_config`
+        # out of it, so the settings have to stay nested here.
         if uuid:
             mailbox = get_object_or_404(
                 EmailMailbox, uuid=uuid, user=request.user
             )
-            config = mailbox.to_email_config()["imap_config"]
+            config = mailbox.to_email_config()
         else:
             payload = request.data or {}
+            port = payload.get("imap_port") or 993
+            password = payload.get("password") or ""
+            if not password and payload.get("uuid"):
+                # Editing a mailbox leaves the password field empty to keep
+                # the stored one; the test has to use it too.
+                stored = EmailMailbox.objects.filter(
+                    uuid=payload["uuid"], user=request.user
+                ).first()
+                password = stored.password if stored else ""
             config = {
-                "imap_host": payload.get("imap_host", ""),
-                "imap_port": payload.get("imap_port", 993),
-                "imap_ssl_port": payload.get("imap_port", 993),
-                "use_ssl": payload.get("use_ssl", True),
-                "username": payload.get("username", ""),
-                "password": payload.get("password", ""),
-                "folder": payload.get("folder", "INBOX"),
+                "imap_config": {
+                    "imap_host": (payload.get("imap_host") or "").strip(),
+                    "imap_port": port,
+                    "imap_ssl_port": port,
+                    "use_ssl": payload.get("use_ssl", True),
+                    "username": (payload.get("username") or "").strip(),
+                    "password": password,
+                    "folder": payload.get("folder") or "INBOX",
+                },
+                "filter_config": {},
             }
 
         is_valid, error_message = EmailConfigManager.validate_imap_connection(

@@ -280,3 +280,116 @@ class TestChannelsRunInParallel:
 
         domain = django_settings.AUTO_ASSIGN_EMAIL_DOMAIN
         assert EmailAlias.find_user_by_email(f"m20@{domain}") == user
+
+
+class TestConnectionCheck:
+    """
+    The validator reads `imap_config` out of the config it is handed, so
+    the endpoint has to keep the settings nested. Passing the inner dict
+    made every check fail with "imap_host is missing".
+    """
+
+    VALIDATE = (
+        "threadline.views.email_mailbox."
+        "EmailConfigManager.validate_imap_connection"
+    )
+
+    def test_a_draft_is_checked_with_a_nested_config(
+        self, api_client, django_user_model
+    ):
+        from unittest.mock import patch
+
+        user = django_user_model.objects.create_user("m21", password="x")
+        api_client.force_authenticate(user=user)
+
+        with patch(self.VALIDATE, return_value=(True, "")) as validate:
+            response = api_client.post(
+                f"{LIST_URL}/test",
+                {
+                    "imap_host": "imap.example.com",
+                    "imap_port": 993,
+                    "username": "a@example.com",
+                    "password": "secret",
+                },
+                format="json",
+            )
+
+        config = validate.call_args.args[0]
+        assert response.status_code == 200
+        assert config["imap_config"]["imap_host"] == "imap.example.com"
+        assert config["imap_config"]["password"] == "secret"
+
+    def test_a_stored_mailbox_is_checked_with_its_own_settings(
+        self, api_client, django_user_model
+    ):
+        from unittest.mock import patch
+
+        user = django_user_model.objects.create_user("m22", password="x")
+        mailbox = make_mailbox(user)
+        api_client.force_authenticate(user=user)
+
+        with patch(self.VALIDATE, return_value=(True, "")) as validate:
+            api_client.post(f"{LIST_URL}/{mailbox.uuid}/test")
+
+        config = validate.call_args.args[0]
+        assert config["imap_config"]["imap_host"] == "imap.example.com"
+        assert config["imap_config"]["password"] == "secret"
+
+    def test_editing_reuses_the_stored_password(
+        self, api_client, django_user_model
+    ):
+        from unittest.mock import patch
+
+        user = django_user_model.objects.create_user("m23", password="x")
+        mailbox = make_mailbox(user)
+        api_client.force_authenticate(user=user)
+
+        with patch(self.VALIDATE, return_value=(True, "")) as validate:
+            api_client.post(
+                f"{LIST_URL}/test",
+                {
+                    "uuid": str(mailbox.uuid),
+                    "imap_host": "imap.example.com",
+                    "username": "a@example.com",
+                    "password": "",
+                },
+                format="json",
+            )
+
+        config = validate.call_args.args[0]
+        assert config["imap_config"]["password"] == "secret"
+
+    def test_a_failure_is_reported_with_its_reason(
+        self, api_client, django_user_model
+    ):
+        from unittest.mock import patch
+
+        user = django_user_model.objects.create_user("m24", password="x")
+        api_client.force_authenticate(user=user)
+
+        with patch(self.VALIDATE, return_value=(False, "auth failed")):
+            response = api_client.post(
+                f"{LIST_URL}/test",
+                {
+                    "imap_host": "imap.example.com",
+                    "username": "a@example.com",
+                    "password": "wrong",
+                },
+                format="json",
+            )
+
+        assert response.status_code == 400
+        assert "auth failed" in response.data["message"]
+
+    def test_another_users_mailbox_cannot_be_checked(
+        self, api_client, django_user_model
+    ):
+        mine = django_user_model.objects.create_user("m25", password="x")
+        theirs = django_user_model.objects.create_user("m26", password="x")
+        mailbox = make_mailbox(theirs)
+        api_client.force_authenticate(user=mine)
+
+        response = api_client.post(f"{LIST_URL}/{mailbox.uuid}/test")
+
+        assert response.status_code == 404
+

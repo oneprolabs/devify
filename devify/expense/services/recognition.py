@@ -27,6 +27,7 @@ from expense.models import Invoice, InvoiceSourceFile
 from expense.services.candidate_filter import (
     SkipReason,
     SourceKind,
+    body_anchors,
     evaluate_email,
     resolve_allowed_domains,
 )
@@ -38,6 +39,7 @@ from expense.services.link_fetcher import (
     MAX_LINKS_PER_EMAIL,
     fetch_link,
 )
+from expense.services.link_picker import pick_invoice_links
 
 logger = logging.getLogger(__name__)
 
@@ -437,6 +439,39 @@ def _tally(stats: dict, result: str) -> None:
         stats["failed"] += 1
 
 
+def _links_worth_following(email, verdict, app_config) -> set:
+    """
+    Ask which of this email's links actually fetch a document.
+
+    Structure gets the decorations out - what the mail client renders is
+    never the invoice - but 「下载发票」 and an advertisement are both
+    anchors a person could click, and only the words tell them apart. That
+    reading is cheap enough to buy: a list of addresses and their link
+    text, no document content, answered by the text model. Fetching a page
+    that turns out to be an advert costs a request, a stored failure and a
+    line in the user's list, every time the email arrives.
+    """
+    urls = {
+        source.url
+        for source in verdict.sources
+        if source.kind == SourceKind.BODY_LINK and source.url
+    }
+    if not urls:
+        return set()
+
+    anchors = [
+        anchor for anchor in body_anchors(email) if anchor["url"] in urls
+    ]
+    if not anchors:
+        return urls
+
+    model_uuid = (
+        app_config.text_llm_config_uuid or app_config.llm_config_uuid or ""
+    )
+    picked = pick_invoice_links(email.subject or "", anchors, model_uuid)
+    return {anchor["url"] for anchor in picked}
+
+
 def _handle_link(
     email, url, app_config, allowed_domains, force, stats
 ) -> str | None:
@@ -566,9 +601,12 @@ def recognize_email(email, force: bool = False, bill: bool = True) -> dict:
     by_id = {a.id: a for a in attachments}
     allowed_domains = resolve_allowed_domains(app_config, user_config)
     links_done = 0
+    wanted_links = _links_worth_following(email, verdict, app_config)
 
     for source in verdict.sources:
         if source.kind == SourceKind.BODY_LINK:
+            if source.url not in wanted_links:
+                continue
             if links_done >= MAX_LINKS_PER_EMAIL:
                 stats["skipped"] += 1
                 continue

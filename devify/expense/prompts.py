@@ -54,3 +54,32 @@ Sender: {sender}
 Received: {received_at}
 Filename: {filename}
 """
+
+
+LINK_PICK_PROMPT = """\
+You are given the links found in one email, each with the words it was
+shown as. Decide which of them download an invoice, a receipt or a travel
+itinerary.
+
+Return a single JSON object and nothing else:
+
+{{"invoice_links": [0, 2]}}
+
+The numbers are the indexes of the links to follow, in the list below.
+
+Rules:
+- Most billing emails carry advertisements, help pages, app download
+  banners and unsubscribe links alongside the one that matters. Return
+  only the links that fetch the document itself.
+- The words a person would have clicked are the strongest signal:
+  「下载发票」「查看行程单」「发票下载」「点击下载」 name a document,
+  while 「立即领取」「下载APP」「查看详情」「退订」 do not.
+- When the email says the invoice is attached and no link fetches one,
+  return an empty list. Guessing costs a download and gets a web page.
+- Return an empty list rather than a link you are unsure about.
+
+Email subject: {subject}
+
+Links:
+{links}
+"""

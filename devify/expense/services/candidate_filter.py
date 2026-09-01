@@ -223,8 +223,10 @@ def domain_allowed(url: str, allowed_domains: list[str]) -> bool:
 
 
 ANCHOR_PATTERN = re.compile(
-    r"<a\b[^>]*?href\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE
+    r"<a\b[^>]*?href\s*=\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a\s*>",
+    re.IGNORECASE | re.DOTALL,
 )
+TAG_PATTERN = re.compile(r"<[^>]+>")
 
 
 def body_urls(email) -> list[str]:
@@ -240,17 +242,33 @@ def body_urls(email) -> list[str]:
     A plain-text body has no markup to tell them apart, and no decorations
     either, so there every URL still counts.
     """
+    return [link["url"] for link in body_anchors(email)]
+
+
+def body_anchors(email) -> list[dict]:
+    """
+    The same links, each with the words it was shown as.
+
+    "下载发票" and "查看广告" are the difference between a document and an
+    advertisement, and no amount of looking at the URL reveals it, so the
+    text a person would have clicked travels with the address.
+    """
     html = email.html_content or ""
     if html.strip():
-        anchors = [
-            url.strip()
-            for url in ANCHOR_PATTERN.findall(html)
-            if url.strip().lower().startswith(("http://", "https://"))
-        ]
+        anchors = []
+        for url, label in ANCHOR_PATTERN.findall(html):
+            url = url.strip()
+            if not url.lower().startswith(("http://", "https://")):
+                continue
+            text = TAG_PATTERN.sub(" ", label)
+            anchors.append({"url": url, "text": " ".join(text.split())[:80]})
         if anchors:
             return anchors
 
-    return URL_PATTERN.findall(email.text_content or "")
+    return [
+        {"url": url, "text": ""}
+        for url in URL_PATTERN.findall(email.text_content or "")
+    ]
 
 
 def extract_body_links(email, allowed_domains: list[str]):

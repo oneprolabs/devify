@@ -241,3 +241,86 @@ class TestSweepWindow:
         queued = {call.args[0] for call in workflow.delay.call_args_list}
         assert str(email.id) in queued
 
+
+
+class TestPauseHoldsInsideTheTask:
+    """
+    A queued task outlives the moment it was queued.
+
+    Redis redelivers anything the worker took but never acknowledged, so a
+    task queued before the pause arrives at the worker after it. Checking
+    only at dispatch let those redelivered jobs spend credits on mail the
+    user had asked us to leave alone.
+    """
+
+    WORKFLOW_PATH = (
+        "threadline.tasks.email_workflow.execute_email_processing_workflow"
+    )
+
+    def test_a_queued_task_stops_when_the_brake_is_on(
+        self, django_user_model
+    ):
+        from threadline.tasks.email_workflow import process_email_workflow
+
+        user = django_user_model.objects.create_user("p10", password="x")
+        email = make_email(user)
+        set_processing_paused(user, True)
+
+        with patch(self.WORKFLOW_PATH) as run:
+            process_email_workflow(str(email.id))
+
+        run.assert_not_called()
+
+    def test_the_email_is_left_where_it_was(self, django_user_model):
+        from threadline.tasks.email_workflow import process_email_workflow
+
+        user = django_user_model.objects.create_user("p11", password="x")
+        email = make_email(user)
+        set_processing_paused(user, True)
+
+        with patch(self.WORKFLOW_PATH):
+            process_email_workflow(str(email.id))
+
+        email.refresh_from_db()
+        assert email.status == EmailStatus.FETCHED.value
+
+    def test_a_running_user_is_processed_normally(self, django_user_model):
+        from threadline.tasks.email_workflow import process_email_workflow
+
+        user = django_user_model.objects.create_user("p12", password="x")
+        email = make_email(user)
+
+        with patch(self.WORKFLOW_PATH) as run:
+            run.return_value = {"success": True}
+            process_email_workflow(str(email.id))
+
+        run.assert_called_once()
+
+    def test_a_force_retry_still_goes_through(self, django_user_model):
+        # Asking for one email explicitly is not the same as letting the
+        # backlog run, so the brake does not block it.
+        from threadline.tasks.email_workflow import process_email_workflow
+
+        user = django_user_model.objects.create_user("p13", password="x")
+        email = make_email(user)
+        set_processing_paused(user, True)
+
+        with patch(self.WORKFLOW_PATH) as run:
+            run.return_value = {"success": True}
+            process_email_workflow(str(email.id), force=True)
+
+        run.assert_called_once()
+
+    def test_one_users_pause_does_not_stop_another(self, django_user_model):
+        from threadline.tasks.email_workflow import process_email_workflow
+
+        paused = django_user_model.objects.create_user("p14", password="x")
+        running = django_user_model.objects.create_user("p15", password="x")
+        set_processing_paused(paused, True)
+        email = make_email(running)
+
+        with patch(self.WORKFLOW_PATH) as run:
+            run.return_value = {"success": True}
+            process_email_workflow(str(email.id))
+
+        run.assert_called_once()

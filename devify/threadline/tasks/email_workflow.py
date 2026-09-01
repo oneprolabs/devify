@@ -21,6 +21,7 @@ from django.conf import settings
 
 from agentcore_task.adapters.django import prevent_duplicate_task
 from threadline.models import EmailMessage
+from threadline.services.processing_control import is_processing_paused
 from threadline.agents.workflow import execute_email_processing_workflow
 from threadline.utils.task_tracer import TaskTracer
 
@@ -87,6 +88,20 @@ def process_email_workflow(
         email = EmailMessage.objects.select_related("user", "merged_into").get(
             id=email_id
         )
+
+        # The brake has to hold here, not only where work is scheduled.
+        # A queued task outlives the moment it was queued: Redis redelivers
+        # anything the worker took but never acknowledged, so a pause set
+        # after dispatch was quietly spending credits on mail the user had
+        # asked us to leave alone. A force retry is an explicit request and
+        # still goes through.
+        if not force and is_processing_paused(email.user_id):
+            logger.info(
+                "Processing paused for user %s, leaving email %s parked",
+                email.user_id,
+                email_id,
+            )
+            return str(email_id)
 
         tracer = TaskTracer("EMAIL_WORKFLOW")
         task_id = getattr(process_email_workflow.request, "id", "") or ""

@@ -52,6 +52,10 @@ class DecodedSource:
     images: list[tuple[str, bytes]] = field(default_factory=list)
     page_count: int = 0
     decoder: str = ""
+    # Fields the document states about itself, in the shape extraction
+    # returns. A 全电 OFD names which drawn object holds which field, so
+    # those values are known exactly rather than read back off the page.
+    fields: dict = field(default_factory=dict)
 
     @property
     def is_empty(self) -> bool:
@@ -133,6 +137,115 @@ def _strip_ofd_markup(fragment: str) -> str:
     return OFD_XML_TAG_PATTERN.sub("", fragment).strip()
 
 
+# Doc_0/Tags/CustomTag.xml names the drawn object that carries each
+# invoice field, so the values can be read from the document's own index
+# instead of being recognized off the page.
+OFD_TAG_FIELDS = {
+    "InvoiceNo": "invoice_no",
+    "IssueDate": "issue_date",
+    "BuyerName": "buyer_name",
+    "BuyerTaxID": "buyer_tax_id",
+    "SellerName": "seller_name",
+    "SellerTaxID": "seller_tax_id",
+    "TaxInclusiveTotalAmount": "total_amount",
+    "TaxExclusiveTotalAmount": "amount_excl_tax",
+    "TaxTotalAmount": "tax_amount",
+}
+
+OFD_TAG_REF_PATTERN = re.compile(
+    r"<(?:[\w.-]+:)?(\w+)>\s*"
+    r"<[^>]*ObjectRef[^>]*>(\d+)</[^>]*ObjectRef>",
+    re.IGNORECASE,
+)
+OFD_TEXT_OBJECT_PATTERN = re.compile(
+    r"<[^>]*TextObject[^>]*\bID=\"(\d+)\"[^>]*>(.*?)</[^>]*TextObject>",
+    re.IGNORECASE | re.DOTALL,
+)
+OFD_AMOUNT_CHARS = "¥￥, \t\r\n"
+OFD_DATE_PATTERN = re.compile(r"(\d{4})\D+(\d{1,2})\D+(\d{1,2})")
+
+
+def _ofd_object_text(content: str) -> dict:
+    """Map each drawn object's id to the text it renders."""
+    texts = {}
+    for object_id, body in OFD_TEXT_OBJECT_PATTERN.findall(content):
+        parts = [
+            _strip_ofd_markup(match)
+            for match in OFD_TEXT_PATTERN.findall(body)
+        ]
+        value = "".join(part for part in parts if part)
+        if value:
+            texts[object_id] = value
+    return texts
+
+
+def _ofd_clean_amount(value: str) -> str:
+    return value.strip(OFD_AMOUNT_CHARS).replace(",", "")
+
+
+def _ofd_clean_date(value: str) -> str:
+    match = OFD_DATE_PATTERN.search(value)
+    if not match:
+        return ""
+    year, month, day = match.groups()
+    return f"{year}-{int(month):02d}-{int(day):02d}"
+
+
+def _ofd_declared_fields(archive) -> dict:
+    """
+    Read the invoice out of the document's own field index.
+
+    Only the fields the index names are returned: it carries no invoice
+    type, category or line items, so this states what the document is
+    certain about and leaves the rest to be read as usual.
+    """
+    names = {name.lower(): name for name in archive.namelist()}
+    tag_name = next(
+        (
+            original
+            for lowered, original in names.items()
+            if lowered.endswith("customtag.xml")
+        ),
+        None,
+    )
+    content_name = next(
+        (
+            original
+            for lowered, original in names.items()
+            if lowered.endswith("content.xml")
+        ),
+        None,
+    )
+    if not tag_name or not content_name:
+        return {}
+
+    tags = archive.read(tag_name).decode("utf-8", errors="ignore")
+    refs = {
+        OFD_TAG_FIELDS[element]: object_id
+        for element, object_id in OFD_TAG_REF_PATTERN.findall(tags)
+        if element in OFD_TAG_FIELDS
+    }
+    if not refs:
+        return {}
+
+    content = archive.read(content_name).decode("utf-8", errors="ignore")
+    texts = _ofd_object_text(content)
+
+    fields = {}
+    for name, object_id in refs.items():
+        value = texts.get(object_id, "").strip()
+        if not value:
+            continue
+        if name in ("total_amount", "amount_excl_tax", "tax_amount"):
+            value = _ofd_clean_amount(value)
+        elif name == "issue_date":
+            value = _ofd_clean_date(value)
+        if value:
+            fields[name] = value
+
+    return fields
+
+
 def decode_ofd(path: str) -> DecodedSource:
     """
     Read an OFD by opening it as what it is: a zip of XML.
@@ -147,7 +260,13 @@ def decode_ofd(path: str) -> DecodedSource:
         raise DecodeError(f"OFD is not a readable zip: {exc}") from exc
 
     fragments: list[str] = []
+    declared: dict = {}
     with archive:
+        try:
+            declared = _ofd_declared_fields(archive)
+        except Exception:  # pragma: no cover - a broken index is not fatal
+            logger.warning("OFD field index unreadable in %s", path)
+
         names = [
             name
             for name in archive.namelist()
@@ -174,7 +293,10 @@ def decode_ofd(path: str) -> DecodedSource:
         raise DecodeError("OFD contains no readable text")
 
     return DecodedSource(
-        mode=DecodeMode.TEXT, text=text, decoder="ofd_xml"
+        mode=DecodeMode.TEXT,
+        text=text,
+        decoder="ofd_xml",
+        fields=declared,
     )
 
 

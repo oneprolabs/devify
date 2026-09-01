@@ -87,6 +87,38 @@ def build_ofd_with_cdata(path, parts):
         )
 
 
+def build_ofd_with_index(path, fields, extra_text=""):
+    """
+    Build a 全电 OFD the way issuers do.
+
+    CustomTag.xml names the drawn object holding each field; Content.xml
+    draws them, with the values in CDATA.
+    """
+    tags = "".join(
+        f"<ofd:{element}><ofd:ObjectRef PageRef='1'>{oid}</ofd:ObjectRef>"
+        f"</ofd:{element}>"
+        for element, (oid, _) in fields.items()
+    )
+    objects = "".join(
+        f"<ofd:TextObject ID=\"{oid}\" Size='3.0'>"
+        f"<ofd:TextCode X='0' Y='3'><![CDATA[{value}]]></ofd:TextCode>"
+        f"</ofd:TextObject>"
+        for _, (oid, value) in fields.items()
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("OFD.xml", "<ofd:OFD xmlns:ofd='urn:ofd'/>")
+        archive.writestr(
+            "Doc_0/Tags/CustomTag.xml",
+            f"<ofd:root xmlns:ofd='urn:ofd'>{tags}</ofd:root>",
+        )
+        archive.writestr(
+            "Doc_0/Pages/Page_0/Content.xml",
+            f"<ofd:Page xmlns:ofd='urn:ofd'>{objects}"
+            f"<ofd:TextObject ID='999'><ofd:TextCode X='0' Y='0'>"
+            f"{extra_text}</ofd:TextCode></ofd:TextObject></ofd:Page>",
+        )
+
+
 def build_png(path):
     from PIL import Image
 
@@ -140,6 +172,100 @@ class TestDecodePdf:
         urls = decode_pdf(str(target)).image_data_urls()
 
         assert urls[0].startswith("data:image/png;base64,")
+
+
+class TestOfdFieldIndex:
+    """
+    A 全电 OFD names which drawn object carries which field.
+
+    Reading the invoice out of that index settles the fields it would be
+    worst to misread - the number and the amounts - without asking a model
+    to recognize them off the page.
+    """
+
+    SAMPLE = {
+        "InvoiceNo": ("55", "26312000005014116361"),
+        "IssueDate": ("57", "2026年08月06日"),
+        "BuyerName": ("71", "北京万云博华科技中心（有限合伙）"),
+        "BuyerTaxID": ("76", "91110105MA01UYHY0T"),
+        "SellerName": ("88", "上海申茂旅游发展有限公司"),
+        "TaxInclusiveTotalAmount": ("102", "¥71.62"),
+        "TaxTotalAmount": ("96", "¥2.09"),
+    }
+
+    def test_the_declared_fields_are_read(self, tmp_path):
+        target = tmp_path / "index.ofd"
+        build_ofd_with_index(target, self.SAMPLE)
+
+        decoded = decode_ofd(str(target))
+
+        assert decoded.fields["invoice_no"] == "26312000005014116361"
+        assert decoded.fields["seller_name"] == "上海申茂旅游发展有限公司"
+
+    def test_amounts_lose_their_currency_mark(self, tmp_path):
+        target = tmp_path / "index.ofd"
+        build_ofd_with_index(target, self.SAMPLE)
+
+        decoded = decode_ofd(str(target))
+
+        assert decoded.fields["total_amount"] == "71.62"
+        assert decoded.fields["tax_amount"] == "2.09"
+
+    def test_the_chinese_date_becomes_a_date(self, tmp_path):
+        target = tmp_path / "index.ofd"
+        build_ofd_with_index(target, self.SAMPLE)
+
+        decoded = decode_ofd(str(target))
+
+        assert decoded.fields["issue_date"] == "2026-08-06"
+
+    def test_the_text_is_still_produced_for_the_model(self, tmp_path):
+        # The index carries no invoice type, category or line items, so
+        # the page still has to be read as usual.
+        target = tmp_path / "index.ofd"
+        build_ofd_with_index(target, self.SAMPLE, extra_text="旅客运输服务")
+
+        decoded = decode_ofd(str(target))
+
+        assert "旅客运输服务" in decoded.text
+
+    def test_an_ofd_without_an_index_declares_nothing(self, tmp_path):
+        # Three of nine real files came from generators that ship no index.
+        target = tmp_path / "plain.ofd"
+        build_ofd(target, "电子发票 号码 25117000000012345678")
+
+        decoded = decode_ofd(str(target))
+
+        assert decoded.fields == {}
+
+    def test_a_field_the_page_never_drew_is_left_out(self, tmp_path):
+        target = tmp_path / "index.ofd"
+        build_ofd_with_index(
+            target,
+            {
+                "InvoiceNo": ("55", "26312000005014116361"),
+                "SellerTaxID": ("93", ""),
+            },
+        )
+
+        decoded = decode_ofd(str(target))
+
+        assert "seller_tax_id" not in decoded.fields
+
+    def test_a_broken_index_does_not_break_the_read(self, tmp_path):
+        target = tmp_path / "broken.ofd"
+        with zipfile.ZipFile(target, "w") as archive:
+            archive.writestr("OFD.xml", "<ofd:OFD xmlns:ofd='urn:ofd'/>")
+            archive.writestr("Doc_0/Tags/CustomTag.xml", "<not xml at all")
+            archive.writestr(
+                "Doc_0/Pages/Page_0/Content.xml",
+                "<ofd:Page xmlns:ofd='urn:ofd'><ofd:TextCode X='0' Y='0'>"
+                "电子发票 128.50</ofd:TextCode></ofd:Page>",
+            )
+
+        decoded = decode_ofd(str(target))
+
+        assert "128.50" in decoded.text
 
 
 class TestDecodeOfd:

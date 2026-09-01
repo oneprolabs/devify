@@ -236,9 +236,21 @@ def normalize(raw: dict) -> dict:
 
 
 def extract(decoded, email, filename: str, model_uuid: str, node_name: str):
-    """Run one document through the model and normalize the result."""
+    """
+    Run one document through the model and normalize the result.
+
+    Where the document states a field itself - a 全电 OFD names which drawn
+    object holds its invoice number and its amounts - that value wins over
+    the model's reading of the same page. The index carries no invoice
+    type, category or line items, so the model is still what makes sense
+    of the document; this only settles the fields it would be worst to get
+    wrong.
+    """
     context = build_context(email, filename)
     raw = call_model(decoded, context, model_uuid, node_name)
+    declared = getattr(decoded, "fields", None) or {}
+    if declared and raw.get("is_invoice"):
+        raw = {**raw, **declared}
     normalized = normalize(raw)
     normalized["raw_extraction"] = raw
     return normalized

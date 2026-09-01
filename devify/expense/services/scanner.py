@@ -52,10 +52,19 @@ def resolve_since(user_config, lookback_days: int | None = None):
 
 
 def collect_emails(user, since=None, email_uuids=None):
-    """Emails in scope, newest first."""
-    queryset = EmailMessage.objects.filter(user=user).filter(
-        merged_into__isnull=True
-    )
+    """
+    Emails in scope, newest first.
+
+    Merged records are included, unlike everywhere else in threadline.
+    Merging records that two emails belong to one conversation; it never
+    moves their content, so a merged-away email still holds the only copy
+    of its own attachments. Platform invoice mail merges readily - every
+    高德打车 notification carries the same template body, which the
+    similarity matcher cannot tell from a real thread - and skipping those
+    records hid six invoices from the manual backfill while the pipeline,
+    which processes each email in its own right, had already read them.
+    """
+    queryset = EmailMessage.objects.filter(user=user)
     if email_uuids:
         queryset = queryset.filter(uuid__in=email_uuids)
     elif since:

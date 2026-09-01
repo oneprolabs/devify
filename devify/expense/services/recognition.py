@@ -298,16 +298,42 @@ def _persist(
         else {"source_file": source_file}
     )
 
-    if not fields.get("is_invoice"):
+    # A document that says "invoice" while carrying no amount, no number
+    # and no seller was not read, whatever the model claims. Two OFD files
+    # came back exactly like this and each was filed as a real ¥0.00
+    # invoice: a phantom in the unclaimed list, which the duplicate
+    # collapse could not catch either because zero matches no other amount.
+    unreadable = bool(fields.get("is_invoice")) and not any(
+        (
+            fields.get("total_amount"),
+            fields.get("invoice_no"),
+            fields.get("seller_name"),
+        )
+    )
+
+    if unreadable or not fields.get("is_invoice"):
+        # "Not an invoice" and "an invoice we could not read" deserve
+        # different answers: the first is settled, the second is worth
+        # retrying, and only the second should look like something went
+        # wrong.
         invoice, _ = Invoice.objects.update_or_create(
             **lookup,
             defaults={
                 **defaults,
-                "status": Invoice.Status.NOT_INVOICE,
+                "status": (
+                    Invoice.Status.FAILED
+                    if unreadable
+                    else Invoice.Status.NOT_INVOICE
+                ),
+                "error_message": (
+                    "Decoded, but no amount, number or seller was found"
+                    if unreadable
+                    else ""
+                ),
                 "dedup_key": None,
             },
         )
-        return invoice, "not_invoice"
+        return invoice, ("failed" if unreadable else "not_invoice")
 
     dedup_key = build_dedup_key(fields, attachment, source_file)
     existing = (

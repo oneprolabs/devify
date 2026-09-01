@@ -620,3 +620,120 @@ class TestDuplicatesAreNotWork:
         )
 
         assert len(response.data["data"]["invoices"]) == 1
+
+
+class TestUnreadableDocuments:
+    """
+    A document that decoded to nothing usable is a failed read.
+
+    Two OFD files came back claiming to be invoices while carrying no
+    amount, no number and no seller, and each was filed as a real ¥0.00
+    invoice. It sat in the unclaimed list pretending to be money, and the
+    duplicate collapse could not catch it either, because zero matches no
+    other amount.
+    """
+
+    def test_nothing_usable_is_not_filed_as_an_invoice(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        empty = invoice_fields(
+            invoice_no="",
+            seller_name="",
+            total_amount=None,
+        )
+        with stub_decode(), patch(EXTRACT_PATH, return_value=empty):
+            recognize_email(email)
+
+        assert Invoice.objects.filter(status="extracted").count() == 0
+
+    def test_it_is_recorded_as_failed_so_it_can_be_retried(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        empty = invoice_fields(
+            invoice_no="", seller_name="", total_amount=None
+        )
+        with stub_decode(), patch(EXTRACT_PATH, return_value=empty):
+            recognize_email(email)
+
+        invoice = Invoice.objects.get()
+        assert invoice.status == "failed"
+        assert "no amount" in invoice.error_message
+
+    def test_an_unreadable_document_is_not_charged(self, user):
+        # Nothing was produced, so there is nothing to pay for.
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        empty = invoice_fields(
+            invoice_no="", seller_name="", total_amount=None
+        )
+        with stub_decode(), patch(EXTRACT_PATH, return_value=empty):
+            stats = recognize_email(email)
+
+        assert stats["credits_consumed"] == 0
+
+    def test_a_genuine_zero_amount_invoice_still_lands(self, user):
+        # Zero alone is not the signal; it is zero with nothing else.
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        free = invoice_fields(
+            total_amount=None, invoice_no="", seller_name="某某酒店"
+        )
+        with stub_decode(), patch(EXTRACT_PATH, return_value=free):
+            recognize_email(email)
+
+        assert Invoice.objects.filter(status="extracted").count() == 1
+
+    def test_a_real_non_invoice_is_still_just_that(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        with stub_decode(), patch(
+            EXTRACT_PATH, return_value={"is_invoice": False}
+        ):
+            recognize_email(email)
+
+        assert Invoice.objects.get().status == "not_invoice"
+
+
+class TestMergedEmailsAreInScope:
+    """
+    Merging says two emails belong to one conversation. It never moves
+    their content, so a merged-away email still holds the only copy of its
+    own attachments - and platform invoice mail merges readily, because
+    every notification from one sender carries the same template body.
+    """
+
+    def test_a_merged_email_is_still_scanned(self, user):
+        from expense.services.scanner import collect_emails
+
+        canonical = make_email(user)
+        merged = make_email(user)
+        merged.merged_into = canonical
+        merged.save(update_fields=["merged_into"])
+
+        in_scope = list(collect_emails(user))
+
+        assert merged in in_scope
+
+    def test_its_invoices_are_found_by_a_scan(self, user):
+        from expense.services.scanner import evaluate_scope
+
+        canonical = make_email(user)
+        merged = make_email(user)
+        attach(user, merged, filename="invoice.pdf")
+        merged.merged_into = canonical
+        merged.save(update_fields=["merged_into"])
+
+        result = evaluate_scope(user)
+        scanned = {c.email_id for c in result["candidates"]}
+
+        assert merged.id in scanned

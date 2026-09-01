@@ -102,7 +102,13 @@ class TestPreviewScan:
 
         assert result["emails_scanned"] == 0
 
-    def test_merged_children_are_skipped(self, user):
+    def test_merged_children_are_still_scanned(self, user):
+        # Merging records that two emails belong to one conversation; it
+        # never moves their content, so a merged-away email still holds
+        # the only copy of its own attachments. Platform invoice mail
+        # merges readily - one sender's notifications all share a template
+        # body - and skipping those records hid six real invoices from the
+        # backfill while the pipeline had already read them.
         set_user_enabled(get_user_config(user), True)
         parent = make_email(user)
         attach(user, parent)
@@ -113,7 +119,7 @@ class TestPreviewScan:
 
         result = preview_scan(user, lookback_days=30)
 
-        assert result["emails_scanned"] == 1
+        assert result["emails_scanned"] == 2
 
     def test_another_users_email_is_invisible(self, user, other_user):
         set_user_enabled(get_user_config(user), True)

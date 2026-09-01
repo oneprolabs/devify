@@ -204,14 +204,17 @@ def normalize(raw: dict) -> dict:
         ticket_details = {}
     issue_date = _to_date(raw.get("issue_date"))
 
+    invoice_no = _clean_text(raw.get("invoice_no"), 64)
+    seller_name = _clean_text(raw.get("seller_name"), 255)
+
     return {
         "is_invoice": True,
         "invoice_type": invoice_type,
-        "invoice_no": _clean_text(raw.get("invoice_no"), 64),
+        "invoice_no": invoice_no,
         "invoice_code": _clean_text(raw.get("invoice_code"), 64),
         "issue_date": issue_date,
         "expense_date": resolve_expense_date(ticket_details, issue_date),
-        "seller_name": _clean_text(raw.get("seller_name"), 255),
+        "seller_name": seller_name,
         "seller_tax_id": _clean_text(raw.get("seller_tax_id"), 64),
         "buyer_name": _clean_text(raw.get("buyer_name"), 255),
         "buyer_tax_id": _clean_text(raw.get("buyer_tax_id"), 64),

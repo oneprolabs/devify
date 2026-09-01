@@ -73,6 +73,20 @@ def build_ofd(path, text: str):
         )
 
 
+def build_ofd_with_cdata(path, parts):
+    """Build an OFD the way real issuers do: labels plain, values in CDATA."""
+    body = []
+    for plain, cdata in parts:
+        inner = plain if plain is not None else f"<![CDATA[{cdata}]]>"
+        body.append(f"<ofd:TextCode X='0' Y='0'>{inner}</ofd:TextCode>")
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("OFD.xml", "<ofd:OFD xmlns:ofd='urn:ofd'/>")
+        archive.writestr(
+            "Doc_0/Pages/Page_0/Content.xml",
+            "<ofd:Page xmlns:ofd='urn:ofd'>" + "".join(body) + "</ofd:Page>",
+        )
+
+
 def build_png(path):
     from PIL import Image
 
@@ -153,6 +167,44 @@ class TestDecodeOfd:
 
         with pytest.raises(DecodeError):
             decode_ofd(str(target))
+
+    def test_values_wrapped_in_cdata_are_read(self, tmp_path):
+        # Real issuers put the form labels in as plain text and the values
+        # in CDATA. A CDATA section looks exactly like one long tag to a
+        # tag stripper, so getting this wrong reads an invoice as a blank
+        # form: the labels survive and every number disappears.
+        target = tmp_path / "cdata.ofd"
+        build_ofd_with_cdata(
+            target,
+            [("发票号码：", None), (None, "26312000005014116361"),
+             ("价税合计", None), (None, "¥71.62")],
+        )
+
+        decoded = decode_ofd(str(target))
+
+        assert "26312000005014116361" in decoded.text
+        assert "71.62" in decoded.text
+
+    def test_labels_still_come_through(self, tmp_path):
+        target = tmp_path / "cdata.ofd"
+        build_ofd_with_cdata(
+            target, [("发票号码：", None), (None, "26312000005014116361")]
+        )
+
+        decoded = decode_ofd(str(target))
+
+        assert "发票号码" in decoded.text
+
+    def test_an_ofd_of_nothing_but_labels_is_still_decoded(self, tmp_path):
+        # It decodes, but it says nothing an invoice needs. Recognition is
+        # what refuses to file that as a ¥0.00 invoice, not the decoder.
+        target = tmp_path / "labels.ofd"
+        build_ofd(target, "发票号码： 开票日期： 价税合计")
+
+        decoded = decode_ofd(str(target))
+
+        assert "发票号码" in decoded.text
+        assert decoded.mode == DecodeMode.TEXT
 
 
 class TestDecodeImage:

@@ -31,6 +31,7 @@ OFD_TEXT_PATTERN = re.compile(
     r"<[^>]*TextCode[^>]*>(.*?)</[^>]*TextCode>", re.IGNORECASE | re.DOTALL
 )
 OFD_XML_TAG_PATTERN = re.compile(r"<[^>]+>")
+OFD_CDATA_PATTERN = re.compile(r"<!\[CDATA\[(.*?)\]\]>", re.DOTALL)
 
 
 class DecodeMode:
@@ -118,6 +119,17 @@ def decode_pdf(path: str, max_pages: int = 3) -> DecodedSource:
 
 
 def _strip_ofd_markup(fragment: str) -> str:
+    """
+    Take the text out of a TextCode element.
+
+    CDATA has to be unwrapped before tags are stripped, because a CDATA
+    section looks exactly like one long tag to the stripper and would be
+    deleted whole. Issuers put the labels in as plain text and the values
+    in CDATA, so getting this wrong reads an invoice as a blank form:
+    "发票号码：" and "价税合计" survive while the number and the amount do
+    not.
+    """
+    fragment = OFD_CDATA_PATTERN.sub(lambda m: m.group(1), fragment)
     return OFD_XML_TAG_PATTERN.sub("", fragment).strip()
 
 

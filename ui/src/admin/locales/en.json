@@ -107,7 +107,7 @@
     "selectedRelayModel": "Smart channel model: {label}",
     "expense": {
       "textModelTitle": "Text model",
-      "textModelDesc": "Used for PDF and OFD invoices that carry a text layer, which is read directly rather than shown to the model as a picture.",
+      "textModelDesc": "For PDF and OFD invoices that carry a text layer - reading the text is cheaper and more accurate than showing the model a picture of it. It also decides which link in an email body fetches the invoice, so adverts and help pages are not downloaded.",
       "imageModelTitle": "Image model",
       "imageModelDesc": "Used for image attachments and scans without a text layer. This path sends whole invoice pages as images, so pick a model that can read them.",
       "useDefaultModel": "Use the system default",

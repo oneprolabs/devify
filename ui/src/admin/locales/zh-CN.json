@@ -107,7 +107,7 @@
     "selectedRelayModel": "智能渠道模型：{label}",
     "expense": {
       "textModelTitle": "文本处理模型",
-      "textModelDesc": "用于带文本层的 PDF 和 OFD 发票——直接读取文字，比让模型看图更省也更准。",
+      "textModelDesc": "用于带文本层的 PDF 和 OFD 发票——直接读取文字，比让模型看图更省也更准。也用来判断邮件正文里哪个链接才是发票下载，避免把广告和帮助页抓回来。",
       "imageModelTitle": "图片识别模型",
       "imageModelDesc": "用于图片附件和没有文本层的扫描件。这条路径会把整页发票作为图片发给模型，需要选择支持多模态的模型。",
       "useDefaultModel": "使用系统默认模型",

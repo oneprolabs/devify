@@ -1050,6 +1050,21 @@ class EmailMailbox(models.Model):
             "attachment filename"
         ),
     )
+    # Filters may be set per mailbox. An empty one inherits the account
+    # default, which is also what the virtual address uses: that is a
+    # channel rather than a connection, so it has no row to configure.
+    filters = models.JSONField(
+        default=list, blank=True, verbose_name=_("Subject Filters")
+    )
+    exclude_patterns = models.JSONField(
+        default=list, blank=True, verbose_name=_("Exclude Patterns")
+    )
+    max_age_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Max Age Days"),
+        help_text=_("Leave empty to use the account default"),
+    )
     last_fetched_at = models.DateTimeField(
         null=True, blank=True, verbose_name=_("Last Fetched At")
     )
@@ -1090,11 +1105,18 @@ class EmailMailbox(models.Model):
         Keeping the existing dict contract means the processor, parser and
         save path stay untouched by the move to multiple mailboxes.
 
-        The account-wide filters still apply; ``invoice_only`` narrows this
-        one mailbox further, which is why it lives here rather than beside
-        them.
+        The account settings act as defaults. Anything set on the mailbox
+        replaces them for this connection alone, so a work inbox and a
+        personal one can be filtered differently without repeating the
+        shared rules on every mailbox.
         """
         filter_config = dict(filter_config or {})
+        if self.filters:
+            filter_config["filters"] = list(self.filters)
+        if self.exclude_patterns:
+            filter_config["exclude_patterns"] = list(self.exclude_patterns)
+        if self.max_age_days is not None:
+            filter_config["max_age_days"] = self.max_age_days
         if self.invoice_only:
             filter_config["subject_any"] = self.invoice_subject_terms()
 

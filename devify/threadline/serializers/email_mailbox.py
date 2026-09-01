@@ -7,6 +7,19 @@ from rest_framework import serializers
 from threadline.models import EmailMailbox
 
 
+def _clean_lines(value, field_label):
+    """Drop blanks and duplicates from a filter list."""
+    if value in (None, ""):
+        return []
+    if not isinstance(value, list):
+        raise serializers.ValidationError(
+            _("%(field)s must be a list of strings.")
+            % {"field": field_label}
+        )
+    cleaned = [str(item or "").strip() for item in value]
+    return list(dict.fromkeys(item for item in cleaned if item))
+
+
 class EmailMailboxSerializer(serializers.ModelSerializer):
     """
     A connected mailbox and its health.
@@ -33,6 +46,9 @@ class EmailMailboxSerializer(serializers.ModelSerializer):
             "password",
             "has_password",
             "folder",
+            "filters",
+            "exclude_patterns",
+            "max_age_days",
             "delete_after_fetch",
             "invoice_only",
             "enabled",
@@ -115,3 +131,9 @@ class EmailMailboxSerializer(serializers.ModelSerializer):
         if not validated_data.get("password"):
             validated_data.pop("password", None)
         return super().update(instance, validated_data)
+
+    def validate_filters(self, value):
+        return _clean_lines(value, "filters")
+
+    def validate_exclude_patterns(self, value):
+        return _clean_lines(value, "exclude_patterns")

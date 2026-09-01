@@ -755,7 +755,11 @@
     "pauseProcessingLabel": "Paused",
     "pauseProcessingHelp": "Mail is still collected but nothing is analysed and no credits are spent. Everything already collected waits and resumes automatically when you lift the pause. Useful right after connecting a mailbox with a lot of history, before your filters are tuned.",
     "invoiceOnly": "Invoices only",
-    "invoiceOnlyHelp": "Fetch only mail whose subject or attachment name names an invoice. The rest is never downloaded, processed or charged. An invoice with a neutral subject (rare) needs the expense app's manual backfill."
+    "invoiceOnlyHelp": "Fetch only mail whose subject or attachment name names an invoice. The rest is never downloaded, processed or charged. An invoice with a neutral subject (rare) needs the expense app's manual backfill.",
+    "mailboxFilterHint": "These filters apply to this mailbox only. Leave a box empty to use the account defaults below.",
+    "inheritsAccount": "Empty uses the account default",
+    "accountDefaultsTitle": "Account defaults",
+    "accountDefaultsHint": "Used by any mailbox that does not set its own, and by the virtual address, which is a channel rather than a connection and has no settings of its own."
   },
   "dashboard": {
     "title": "Dashboard",

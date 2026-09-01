@@ -393,3 +393,109 @@ class TestConnectionCheck:
 
         assert response.status_code == 404
 
+
+class TestPerMailboxFilters:
+    """
+    Filters sit on the mailbox, with the account settings as defaults.
+
+    A work inbox and a personal one want different rules, but a rule that
+    is common to both should not have to be repeated on each. An empty
+    field therefore inherits rather than filtering on nothing — which is
+    also what the virtual address relies on, since it is a channel rather
+    than a connection and has no row of its own.
+    """
+
+    def test_an_unset_filter_inherits_the_account_default(
+        self, django_user_model
+    ):
+        user = django_user_model.objects.create_user("f1", password="x")
+        mailbox = make_mailbox(user)
+
+        config = mailbox.to_email_config(
+            filter_config={"filters": ["发票"], "max_age_days": 30}
+        )["filter_config"]
+
+        assert config["filters"] == ["发票"]
+        assert config["max_age_days"] == 30
+
+    def test_a_mailbox_value_replaces_the_default(self, django_user_model):
+        user = django_user_model.objects.create_user("f2", password="x")
+        mailbox = make_mailbox(user)
+        mailbox.filters = ["行程单"]
+        mailbox.max_age_days = 3
+        mailbox.save(update_fields=["filters", "max_age_days"])
+
+        config = mailbox.to_email_config(
+            filter_config={"filters": ["发票"], "max_age_days": 30}
+        )["filter_config"]
+
+        assert config["filters"] == ["行程单"]
+        assert config["max_age_days"] == 3
+
+    def test_overrides_are_per_field(self, django_user_model):
+        # Setting one rule must not silently drop the others.
+        user = django_user_model.objects.create_user("f3", password="x")
+        mailbox = make_mailbox(user)
+        mailbox.filters = ["行程单"]
+        mailbox.save(update_fields=["filters"])
+
+        config = mailbox.to_email_config(
+            filter_config={
+                "filters": ["发票"],
+                "exclude_patterns": ["广告"],
+                "max_age_days": 30,
+            }
+        )["filter_config"]
+
+        assert config["filters"] == ["行程单"]
+        assert config["exclude_patterns"] == ["广告"]
+        assert config["max_age_days"] == 30
+
+    def test_zero_days_is_a_real_override_not_an_absence(
+        self, django_user_model
+    ):
+        user = django_user_model.objects.create_user("f4", password="x")
+        mailbox = make_mailbox(user)
+        mailbox.max_age_days = 0
+        mailbox.save(update_fields=["max_age_days"])
+
+        config = mailbox.to_email_config(
+            filter_config={"max_age_days": 30}
+        )["filter_config"]
+
+        assert config["max_age_days"] == 0
+
+    def test_blank_and_duplicate_entries_are_cleaned(
+        self, api_client, django_user_model
+    ):
+        user = django_user_model.objects.create_user("f5", password="x")
+        mailbox = make_mailbox(user)
+        api_client.force_authenticate(user=user)
+
+        response = api_client.patch(
+            f"{LIST_URL}/{mailbox.uuid}",
+            {"filters": ["发票", "  ", "发票", "行程单"]},
+            format="json",
+        )
+
+        assert response.data["data"]["filters"] == ["发票", "行程单"]
+
+    def test_clearing_a_filter_returns_it_to_the_default(
+        self, api_client, django_user_model
+    ):
+        user = django_user_model.objects.create_user("f6", password="x")
+        mailbox = make_mailbox(user)
+        mailbox.max_age_days = 3
+        mailbox.save(update_fields=["max_age_days"])
+        api_client.force_authenticate(user=user)
+
+        api_client.patch(
+            f"{LIST_URL}/{mailbox.uuid}", {"max_age_days": None}, format="json"
+        )
+        mailbox.refresh_from_db()
+
+        config = mailbox.to_email_config(
+            filter_config={"max_age_days": 30}
+        )["filter_config"]
+        assert config["max_age_days"] == 30
+

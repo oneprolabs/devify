@@ -567,6 +567,15 @@
               />
             </div>
 
+            <div>
+              <h4 class="text-sm font-medium text-gray-900">
+                {{ t('settings.accountDefaultsTitle') }}
+              </h4>
+              <p class="mt-1 text-xs text-gray-500">
+                {{ t('settings.accountDefaultsHint') }}
+              </p>
+            </div>
+
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">

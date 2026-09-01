@@ -158,6 +158,45 @@
           />
         </div>
 
+        <div class="space-y-4 rounded-lg border border-gray-200 bg-white p-3">
+          <p class="text-xs text-gray-500">
+            {{ t('settings.mailboxFilterHint') }}
+          </p>
+
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium text-gray-700">
+                {{ t('settings.imapFilters') }}
+              </span>
+              <textarea
+                v-model="filtersText"
+                rows="3"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                :placeholder="t('settings.inheritsAccount')"
+              />
+            </label>
+
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium text-gray-700">
+                {{ t('settings.excludePatterns') }}
+              </span>
+              <textarea
+                v-model="excludeText"
+                rows="3"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                :placeholder="t('settings.inheritsAccount')"
+              />
+            </label>
+          </div>
+
+          <BaseInput
+            v-model="form.max_age_days"
+            :label="t('settings.maxAgeDays')"
+            type="number"
+            :placeholder="t('settings.inheritsAccount')"
+          />
+        </div>
+
         <div class="flex flex-wrap gap-4">
           <label class="flex items-center gap-2 text-sm text-gray-700">
             <input
@@ -271,10 +310,27 @@ const emptyForm = () => ({
   use_ssl: true,
   delete_after_fetch: false,
   invoice_only: false,
+  max_age_days: '',
   enabled: true
 })
 
 const form = reactive(emptyForm())
+// Filters are edited as lines and stored as lists; an empty box means
+// this mailbox inherits the account default rather than filtering on
+// nothing.
+const filtersText = ref('')
+const excludeText = ref('')
+
+function toLines(text) {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function fromLines(list) {
+  return Array.isArray(list) ? list.join('\n') : ''
+}
 
 let noticeTimer = null
 
@@ -336,7 +392,8 @@ function statusClass(box) {
 
 function startAdd() {
   Object.assign(form, emptyForm())
-  editing.value = null
+  filtersText.value = ''
+  excludeText.value = editing.value = null
   showForm.value = true
 }
 
@@ -352,8 +409,11 @@ function startEdit(box) {
     use_ssl: box.use_ssl,
     delete_after_fetch: box.delete_after_fetch,
     invoice_only: box.invoice_only,
+    max_age_days: box.max_age_days ?? '',
     enabled: box.enabled
   })
+  filtersText.value = fromLines(box.filters)
+  excludeText.value = fromLines(box.exclude_patterns)
   editing.value = box
   showForm.value = true
 }
@@ -368,7 +428,15 @@ async function save() {
   saving.value = true
   error.value = ''
   try {
-    const payload = { ...form }
+    const payload = {
+      ...form,
+      filters: toLines(filtersText.value),
+      exclude_patterns: toLines(excludeText.value),
+      max_age_days:
+        form.max_age_days === '' || form.max_age_days === null
+          ? null
+          : Number(form.max_age_days)
+    }
     if (editing.value && !payload.password) delete payload.password
     if (editing.value) {
       await mailboxApi.update(editing.value.uuid, payload)

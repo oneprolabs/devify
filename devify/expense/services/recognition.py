@@ -483,9 +483,13 @@ def _handle_link(
     return result
 
 
-def recognize_email(email, force: bool = False) -> dict:
+def recognize_email(email, force: bool = False, bill: bool = True) -> dict:
     """
     Recognize every invoice in one email and bill for it once.
+
+    ``bill=False`` is for the email workflow, which has already charged for
+    this email: the invoice path replaces the generic one rather than
+    running alongside it, so the user pays once either way.
 
     Returns a stats dict the scan run aggregates.
     """
@@ -501,8 +505,11 @@ def recognize_email(email, force: bool = False) -> dict:
     cost = cost_per_email()
 
     # Checking the balance up front avoids burning model calls the user
-    # cannot pay for.
-    if not charge and not CreditsService.check_credits(email.user_id, cost):
+    # cannot pay for. When the caller has already charged, the email is
+    # paid for and there is nothing left to check.
+    if bill and not charge and not CreditsService.check_credits(
+        email.user_id, cost
+    ):
         by_id = {a.id: a for a in attachments}
         for source in verdict.sources:
             attachment = by_id.get(source.attachment_id)
@@ -590,7 +597,7 @@ def recognize_email(email, force: bool = False) -> dict:
 
     # One charge for the email, and only when it actually produced something
     # new. Duplicates and non-invoices stay free.
-    if stats["extracted"] > 0 and (force or charge is None):
+    if bill and stats["extracted"] > 0 and (force or charge is None):
         try:
             transaction_record = CreditsService.consume_credits(
                 user_id=email.user_id,

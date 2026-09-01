@@ -111,6 +111,10 @@ class EmailState(TypedDict, total=False):
     retry_scene: str | None
     trigger_source: str | None
 
+    # How many invoices this email turned out to hold. Zero means the
+    # workflow carries on down the normal path.
+    invoice_count: int | None
+
     # Credits-related fields
     credits_consumed: bool | None
     credits_transaction_id: str | None
@@ -181,6 +185,7 @@ def create_email_state(
         "updated_at": current_time,
         "llm_calls": [],
         "ocr_calls": [],
+        "invoice_count": 0,
         "credits_consumed": None,
         "credits_transaction_id": None,
         "credits_refunded": None,

@@ -1038,6 +1038,18 @@ class EmailMailbox(models.Model):
     )
 
     enabled = models.BooleanField(default=True, verbose_name=_("Enabled"))
+    # A mailbox that only exists to receive invoices should not drag the
+    # rest of its mail through the pipeline: every fetched email costs a
+    # credit, and one real mailbox here held 1937 messages of which 407
+    # were invoices.
+    invoice_only = models.BooleanField(
+        default=False,
+        verbose_name=_("Invoices Only"),
+        help_text=_(
+            "Fetch only the mail that names an invoice, by subject or "
+            "attachment filename"
+        ),
+    )
     last_fetched_at = models.DateTimeField(
         null=True, blank=True, verbose_name=_("Last Fetched At")
     )
@@ -1077,7 +1089,15 @@ class EmailMailbox(models.Model):
 
         Keeping the existing dict contract means the processor, parser and
         save path stay untouched by the move to multiple mailboxes.
+
+        The account-wide filters still apply; ``invoice_only`` narrows this
+        one mailbox further, which is why it lives here rather than beside
+        them.
         """
+        filter_config = dict(filter_config or {})
+        if self.invoice_only:
+            filter_config["subject_any"] = self.invoice_subject_terms()
+
         return {
             "mode": "custom_imap",
             "imap_config": {
@@ -1090,8 +1110,23 @@ class EmailMailbox(models.Model):
                 "folder": self.folder,
                 "delete_after_fetch": self.delete_after_fetch,
             },
-            "filter_config": filter_config or {},
+            "filter_config": filter_config,
         }
+
+    def invoice_subject_terms(self) -> list:
+        """
+        The words that make an email an invoice, for this user.
+
+        Deferred import: the fetch path must keep working for a user who
+        never switched the expense app on, and this is the only place
+        threadline needs to know what an invoice looks like.
+        """
+        try:
+            from expense.services.routing import subject_terms
+
+            return subject_terms(self.user)
+        except Exception:  # pragma: no cover - expense is optional
+            return ["发票", "行程单", "invoice"]
 
 class EmailAlias(models.Model):
     """

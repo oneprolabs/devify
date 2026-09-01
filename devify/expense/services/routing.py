@@ -19,21 +19,50 @@ from expense.services.config_service import get_app_config, get_user_config
 logger = logging.getLogger(__name__)
 
 
-def keyword_is_deliberate(email, attachments, keywords) -> bool:
+def says_invoice(subject: str, filenames, keywords) -> bool:
     """
     Require the keyword where a sender puts it on purpose.
 
     The scan filter also searches the body, which is right when a person
-    has asked for a scan but far too loose to decide routing on its own:
-    across a real mailbox it matched every phone bill and usage report
-    that mentioned 发票 once in a footer. The subject and the filenames are
+    has asked for a scan but far too loose to decide on its own: across a
+    real mailbox it matched every phone bill and usage report that
+    mentioned 发票 once in a footer. The subject and the filenames are
     where a sender says what an email is.
+
+    Takes plain strings so the fetch path, which has only a parsed message
+    and no database rows yet, applies exactly the same rule.
     """
-    subject = (email.subject or "").lower()
-    names = " ".join(
-        (item.filename or item.safe_filename or "") for item in attachments
+    haystack = " ".join(
+        [subject or ""] + [name or "" for name in filenames]
     ).lower()
-    return any(word in subject or word in names for word in keywords)
+    return any(word in haystack for word in keywords)
+
+
+def keyword_is_deliberate(email, attachments, keywords) -> bool:
+    return says_invoice(
+        email.subject or "",
+        [
+            (item.filename or item.safe_filename or "")
+            for item in attachments
+        ],
+        keywords,
+    )
+
+
+def subject_terms(user) -> list[str]:
+    """
+    The keywords worth handing to an IMAP SUBJECT search.
+
+    IMAP matches substrings, so a keyword that contains another one can
+    never add a result: 电子发票 is already covered by 发票, and every extra
+    term deepens the nested OR the server has to parse.
+    """
+    keywords = sorted(resolve_keywords(get_user_config(user)), key=len)
+    kept: list[str] = []
+    for word in keywords:
+        if not any(shorter in word for shorter in kept):
+            kept.append(word)
+    return kept
 
 
 def should_route_to_invoices(email, attachments=None) -> bool:

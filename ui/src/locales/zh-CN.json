@@ -762,7 +762,9 @@
     "confirmRemoveMailboxTitle": "移除邮箱",
     "pauseProcessing": "暂停邮件处理",
     "pauseProcessingLabel": "暂停",
-    "pauseProcessingHelp": "暂停后仍会正常收取邮件,但不会进入分析流程,也不会消耗点数。已收取的邮件会保持待处理状态,恢复后自动继续。适合刚绑定邮箱、历史邮件很多、还没调好过滤条件时使用。"
+    "pauseProcessingHelp": "暂停后仍会正常收取邮件,但不会进入分析流程,也不会消耗点数。已收取的邮件会保持待处理状态,恢复后自动继续。适合刚绑定邮箱、历史邮件很多、还没调好过滤条件时使用。",
+    "invoiceOnly": "只收发票",
+    "invoiceOnlyHelp": "这个邮箱只抓取标题或附件名里提到发票的邮件，其余不下载、不处理、不扣点。标题里不带关键词的发票（少见）需要用发票管家手动补处理。"
   },
   "dashboard": {
     "title": "仪表盘",

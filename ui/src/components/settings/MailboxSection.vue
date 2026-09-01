@@ -185,6 +185,22 @@
           </label>
         </div>
 
+        <div>
+          <label class="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              v-model="form.invoice_only"
+              type="checkbox"
+              class="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span>
+              {{ t('settings.invoiceOnly') }}
+              <span class="mt-0.5 block text-xs text-gray-500">
+                {{ t('settings.invoiceOnlyHelp') }}
+              </span>
+            </span>
+          </label>
+        </div>
+
         <div class="flex flex-wrap justify-end gap-2">
           <BaseButton type="button" variant="secondary" @click="cancel">
             {{ t('common.cancel') }}
@@ -254,6 +270,7 @@ const emptyForm = () => ({
   folder: 'INBOX',
   use_ssl: true,
   delete_after_fetch: false,
+  invoice_only: false,
   enabled: true
 })
 
@@ -334,6 +351,7 @@ function startEdit(box) {
     folder: box.folder,
     use_ssl: box.use_ssl,
     delete_after_fetch: box.delete_after_fetch,
+    invoice_only: box.invoice_only,
     enabled: box.enabled
   })
   editing.value = box

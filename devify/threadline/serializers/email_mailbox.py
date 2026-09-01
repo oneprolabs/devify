@@ -34,6 +34,7 @@ class EmailMailboxSerializer(serializers.ModelSerializer):
             "has_password",
             "folder",
             "delete_after_fetch",
+            "invoice_only",
             "enabled",
             "last_fetched_at",
             "last_success_at",

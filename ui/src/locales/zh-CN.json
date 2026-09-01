@@ -1356,13 +1356,14 @@
       "homeCityPlaceholder": "例如：北京",
       "homeCityHelp": "用于判断哪些消费属于出差。留空则按最近的消费记录自动推断。",
       "filenameTemplate": "导出命名模板",
-      "filenameTemplateHelp": "可用字段：issue_date、category、seller、amount、invoice_no、city、buyer。留空使用默认模板。",
+      "filenameTemplateHelp": "决定导出压缩包里每个文件的名字。",
       "keywords": "发票关键词",
       "keywordsPlaceholder": "每行一个，例如：\n发票\n行程单",
       "keywordsHelp": "只有命中关键词的邮件才会进入识别。留空则使用内置词表。",
       "senders": "只识别这些发件人",
       "sendersPlaceholder": "每行一个邮箱或域名",
-      "sendersHelp": "留空表示不限制发件人。"
+      "sendersHelp": "留空表示不限制发件人。",
+      "filenameLoading": "加载中…"
     },
     "tabsInvoices": "发票",
     "tabsGroups": "报销组",
@@ -1372,6 +1373,27 @@
       "reimbursed": "已报销",
       "filed": "已归档",
       "all": "全部"
+    },
+    "naming": {
+      "title": "导出文件名设置",
+      "subtitle": "导出发票原件时使用的文件名格式。勾选要包含的字段，拖动或用箭头调整顺序。",
+      "previewTitle": "文件命名预览效果",
+      "required": "（必选）",
+      "alwaysOn": "这个字段不能去掉：没有它文件名认不出是哪一张",
+      "restoreDefault": "恢复默认",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "fields": {
+        "index": "序号",
+        "issue_date": "开票日期",
+        "category": "归类",
+        "seller": "销方抬头",
+        "amount": "金额",
+        "invoice_no": "发票号码",
+        "buyer": "购方抬头",
+        "invoice_type": "发票类型",
+        "city": "消费城市"
+      }
     }
   }
 }

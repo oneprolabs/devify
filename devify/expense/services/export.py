@@ -88,7 +88,9 @@ def plan_export(group, template: str = "", by_category: bool = True):
     missing = 0
 
     for index, invoice in enumerate(invoices, start=1):
-        filename = naming.render(invoice, template, taken)
+        filename = naming.render(
+            invoice, template, taken, index=index
+        )
         path = source_path(invoice)
         if not path:
             missing += 1

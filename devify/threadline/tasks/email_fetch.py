@@ -52,10 +52,11 @@ def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
 
 def _user_filter_config(user_id: int) -> dict:
     """
-    Read the user's shared filter settings.
+    Read the account-wide filter defaults.
 
-    Filters stay on the account rather than on each mailbox: a user who
-    wants only invoices wants that from every mailbox they connect.
+    A mailbox may override any of these for itself; these are what applies
+    when it does not, and what the virtual address uses, since that is a
+    channel rather than a connection and has no row to configure.
     """
     setting = Settings.objects.filter(
         user_id=user_id, key="email_config", is_active=True

@@ -45,6 +45,16 @@ export const expenseApi = {
       .then(extractData)
   },
 
+  getNaming() {
+    return apiClient.get('/v1/apps/expense/naming').then(extractData)
+  },
+
+  previewNaming(fields) {
+    return apiClient
+      .post('/v1/apps/expense/naming', { fields })
+      .then(extractData)
+  },
+
   getInvoices(params = {}) {
     return apiClient
       .get('/v1/apps/expense/invoices', { params })

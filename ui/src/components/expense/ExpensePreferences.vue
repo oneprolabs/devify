@@ -39,20 +39,27 @@
           </span>
         </label>
 
-        <label class="block">
+        <div class="block">
           <span class="mb-1 block text-sm font-medium text-gray-700">
             {{ t('expense.prefs.filenameTemplate') }}
           </span>
-          <input
-            v-model="form.filename_template"
-            type="text"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            :placeholder="defaultTemplate"
-          />
+          <div
+            class="flex items-center justify-between gap-3 rounded-lg border border-gray-300 px-3 py-2"
+          >
+            <span
+              class="truncate font-mono text-xs text-gray-600"
+              :title="namingSample"
+            >
+              {{ namingSample || t('expense.prefs.filenameLoading') }}
+            </span>
+            <BaseButton size="sm" variant="outline" @click="namingOpen = true">
+              {{ t('common.edit') }}
+            </BaseButton>
+          </div>
           <span class="mt-1 block text-xs text-gray-500">
             {{ t('expense.prefs.filenameTemplateHelp') }}
           </span>
-        </label>
+        </div>
       </div>
 
       <label class="block">
@@ -94,13 +101,20 @@
       </div>
     </div>
   </BaseCard>
+
+  <FilenameTemplateDialog
+    v-if="namingOpen"
+    @close="namingOpen = false"
+    @saved="loadNamingSample"
+  />
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import FilenameTemplateDialog from '@/components/expense/FilenameTemplateDialog.vue'
 import { expenseApi } from '@/api/expense'
 
 const props = defineProps({
@@ -114,9 +128,9 @@ const emit = defineEmits(['updated'])
 
 const { t } = useI18n()
 
-const defaultTemplate = '{issue_date}_{category}_{seller}_{amount}_{invoice_no}'
-
-const form = reactive({ home_city: '', filename_template: '' })
+const form = reactive({ home_city: '' })
+const namingOpen = ref(false)
+const namingSample = ref('')
 const keywordsText = ref('')
 const sendersText = ref('')
 const saving = ref(false)
@@ -136,12 +150,23 @@ function toList(text) {
 
 function load(config) {
   form.home_city = config.home_city || ''
-  form.filename_template = config.filename_template || ''
   keywordsText.value = toText(config.keyword_filters)
   sendersText.value = toText(config.sender_allowlist)
 }
 
+// The name is easier to judge from an example than from a template
+// string, so the field shows what the current layout produces.
+async function loadNamingSample() {
+  try {
+    const data = await expenseApi.getNaming()
+    namingSample.value = (data.preview || [])[0] || ''
+  } catch {
+    namingSample.value = ''
+  }
+}
+
 watch(() => props.config, load, { immediate: true })
+onMounted(loadNamingSample)
 
 async function save() {
   saving.value = true
@@ -150,7 +175,6 @@ async function save() {
   try {
     const updated = await expenseApi.updateConfig({
       home_city: form.home_city,
-      filename_template: form.filename_template,
       keyword_filters: toList(keywordsText.value),
       sender_allowlist: toList(sendersText.value)
     })

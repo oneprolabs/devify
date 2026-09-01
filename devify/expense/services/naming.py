@@ -9,7 +9,29 @@ from __future__ import annotations
 
 import re
 
-DEFAULT_TEMPLATE = "{issue_date}_{category}_{seller}_{amount}_{invoice_no}"
+DEFAULT_TEMPLATE = "{index}_{issue_date}_{category}_{seller}_{amount}"
+
+# The fields a user may put in an export filename.
+#
+# `required` fields cannot be switched off. Without who was paid and how
+# much, two files in the same claim are indistinguishable, and a name built
+# from the remaining fields alone is not worth reading.
+FIELD_DEFS = (
+    {"key": "index", "required": False},
+    {"key": "issue_date", "required": False},
+    {"key": "category", "required": False},
+    {"key": "seller", "required": True},
+    {"key": "amount", "required": True},
+    {"key": "invoice_no", "required": False},
+    {"key": "buyer", "required": False},
+    {"key": "invoice_type", "required": False},
+    {"key": "city", "required": False},
+)
+
+FIELD_KEYS = tuple(field["key"] for field in FIELD_DEFS)
+REQUIRED_FIELDS = tuple(
+    field["key"] for field in FIELD_DEFS if field["required"]
+)
 
 # Characters no common filesystem accepts, plus control characters.
 ILLEGAL_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
@@ -30,12 +52,15 @@ def sanitize(value: str) -> str:
     return text
 
 
-def invoice_fields(invoice) -> dict:
+def invoice_fields(invoice, index=None) -> dict:
     from expense.constants import CATEGORY_LABELS_CN
 
     category = invoice.category or ""
 
     return {
+        # Position within the export, so a claim reads in the order it was
+        # filed. Only the export knows it, so it is passed in.
+        "index": str(index) if index is not None else "",
         "issue_date": (
             invoice.issue_date.strftime("%Y%m%d") if invoice.issue_date else ""
         ),
@@ -62,14 +87,44 @@ def extension_for(invoice) -> str:
     return f".{suffix}" if suffix and len(suffix) <= 5 else ""
 
 
-def render(invoice, template: str = "", taken: set[str] | None = None) -> str:
+def template_from_fields(fields) -> str:
+    """
+    Turn a chosen field order into a template string.
+
+    The stored format stays a template so the sanitising, truncation and
+    collision handling all keep working unchanged, and a template written
+    by hand still loads.
+    """
+    chosen = [key for key in fields if key in FIELD_KEYS]
+    for required in REQUIRED_FIELDS:
+        if required not in chosen:
+            chosen.append(required)
+    return "_".join("{%s}" % key for key in chosen)
+
+
+def fields_from_template(template: str) -> list[str]:
+    """Read a template back as the field list the picker shows."""
+    found = [
+        key
+        for key in PLACEHOLDER.findall(template or "")
+        if key in FIELD_KEYS
+    ]
+    return list(dict.fromkeys(found))
+
+
+def render(
+    invoice,
+    template: str = "",
+    taken: set[str] | None = None,
+    index=None,
+) -> str:
     """
     Build the filename for one invoice.
 
     Missing fields drop out with their separator rather than leaving a gap,
     because non-standard tickets routinely have no invoice number.
     """
-    values = invoice_fields(invoice)
+    values = invoice_fields(invoice, index=index)
     body = PLACEHOLDER.sub(
         lambda match: sanitize(values.get(match.group(1), "")),
         template or DEFAULT_TEMPLATE,

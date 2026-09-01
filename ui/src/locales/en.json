@@ -1347,13 +1347,14 @@
       "homeCityPlaceholder": "e.g. Beijing",
       "homeCityHelp": "Used to tell business travel from everyday spending. Leave blank to infer it from recent invoices.",
       "filenameTemplate": "Export filename template",
-      "filenameTemplateHelp": "Available fields: issue_date, category, seller, amount, invoice_no, city, buyer. Leave blank for the default.",
+      "filenameTemplateHelp": "Decides what each file inside the export archive is called.",
       "keywords": "Invoice keywords",
       "keywordsPlaceholder": "One per line, e.g.\ninvoice\nreceipt",
       "keywordsHelp": "Only mail matching a keyword is recognized. Leave blank to use the built-in list.",
       "senders": "Only read these senders",
       "sendersPlaceholder": "One address or domain per line",
-      "sendersHelp": "Leave blank to accept every sender."
+      "sendersHelp": "Leave blank to accept every sender.",
+      "filenameLoading": "Loading…"
     },
     "tabsInvoices": "Invoices",
     "tabsGroups": "Groups",
@@ -1363,6 +1364,27 @@
       "reimbursed": "Reimbursed",
       "filed": "Filed",
       "all": "All"
+    },
+    "naming": {
+      "title": "Export filename",
+      "subtitle": "How exported invoice files are named. Tick the fields to include and drag or use the arrows to order them.",
+      "previewTitle": "Preview",
+      "required": "(always on)",
+      "alwaysOn": "This field cannot be removed: without it the file cannot be told apart",
+      "restoreDefault": "Restore default",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "fields": {
+        "index": "Number",
+        "issue_date": "Issue date",
+        "category": "Category",
+        "seller": "Seller",
+        "amount": "Amount",
+        "invoice_no": "Invoice number",
+        "buyer": "Buyer",
+        "invoice_type": "Invoice type",
+        "city": "City"
+      }
     }
   }
 }

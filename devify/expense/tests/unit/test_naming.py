@@ -48,10 +48,13 @@ class TestSanitize:
 
 class TestRender:
     def test_default_template(self):
+        name = naming.render(fake_invoice(), index=1)
+        assert name == "1_20260812_市内交通_滴滴出行_128.50.pdf"
+
+    def test_the_number_is_left_out_when_there_is_no_position(self):
+        # Rendering outside an export has nothing to number.
         name = naming.render(fake_invoice())
-        assert name == (
-            "20260812_市内交通_滴滴出行_128.50_25117000000012345678.pdf"
-        )
+        assert name == "20260812_市内交通_滴滴出行_128.50.pdf"
 
     def test_missing_fields_leave_no_double_separator(self):
         # Non-standard tickets routinely carry no invoice number.
@@ -117,3 +120,46 @@ class TestRender:
             invoice_no="",
         )
         assert naming.render(invoice).startswith("11111111-")
+
+
+class TestFieldPicker:
+    """
+    The picker writes the template, so the two must agree.
+
+    Seller and amount are not offered as choices: a name missing either
+    cannot be told apart from the next file in the same claim.
+    """
+
+    def test_a_field_order_becomes_a_template(self):
+        template = naming.template_from_fields(
+            ["index", "category", "amount", "seller"]
+        )
+        assert template == "{index}_{category}_{amount}_{seller}"
+
+    def test_required_fields_are_put_back(self):
+        template = naming.template_from_fields(["index", "category"])
+        assert "{seller}" in template
+        assert "{amount}" in template
+
+    def test_unknown_fields_are_dropped(self):
+        template = naming.template_from_fields(["index", "nonsense"])
+        assert "nonsense" not in template
+
+    def test_a_template_reads_back_as_its_fields(self):
+        fields = ["index", "category", "seller", "amount"]
+        assert (
+            naming.fields_from_template(naming.template_from_fields(fields))
+            == fields
+        )
+
+    def test_the_default_round_trips(self):
+        assert naming.template_from_fields(
+            naming.fields_from_template(naming.DEFAULT_TEMPLATE)
+        ) == naming.DEFAULT_TEMPLATE
+
+    def test_a_hand_written_template_still_loads(self):
+        assert naming.fields_from_template("{city}-{invoice_no}") == [
+            "city",
+            "invoice_no",
+        ]
+

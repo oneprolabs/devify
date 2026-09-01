@@ -560,11 +560,6 @@
 
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <BaseInput
-                v-model="emailForm.folder"
-                :label="t('settings.imapFolder')"
-                :placeholder="t('settings.imapFolderPlaceholder')"
-              />
-              <BaseInput
                 v-model="emailForm.maxAgeDays"
                 :label="t('settings.maxAgeDays')"
                 type="number"
@@ -898,7 +893,6 @@ function normalizeEmailConfig(value) {
       : {}
 
   emailForm.processingPaused = Boolean(raw.processing_paused)
-  emailForm.folder = filterConfig.folder || 'INBOX'
   emailForm.filtersText = formatListValue(filterConfig.filters)
   emailForm.excludePatternsText = Array.isArray(filterConfig.exclude_patterns)
     ? filterConfig.exclude_patterns.join('\n')
@@ -912,7 +906,6 @@ function buildEmailConfig() {
     ...(rawEmailConfig.value || {}),
     processing_paused: Boolean(emailForm.processingPaused),
     filter_config: {
-      folder: emailForm.folder.trim() || 'INBOX',
       filters: parseListValue(emailForm.filtersText),
       exclude_patterns: parseListValue(emailForm.excludePatternsText),
       max_age_days: Number(emailForm.maxAgeDays) || 7

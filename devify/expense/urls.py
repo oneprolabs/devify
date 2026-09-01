@@ -13,6 +13,7 @@ from expense.views import (
     ExpenseInvoiceFileAPIView,
     ExpenseInvoiceFileAwayAPIView,
     ExpenseInvoiceListAPIView,
+    ExpenseNamingAPIView,
     ExpenseInvoiceReextractAPIView,
     ExpenseLinkAllowAPIView,
     ExpenseLinkListAPIView,
@@ -116,6 +117,11 @@ urlpatterns = [
         "apps/expense/trips/<uuid:uuid>/dismiss",
         ExpenseTripDismissAPIView.as_view(),
         name="expense-trip-dismiss",
+    ),
+    path(
+        "apps/expense/naming",
+        ExpenseNamingAPIView.as_view(),
+        name="expense-naming",
     ),
     path(
         "apps/expense/links",

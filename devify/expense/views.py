@@ -49,6 +49,7 @@ from expense.services import invoices as invoice_service
 from expense.services import groups as group_service
 from expense.services import trips as trip_service
 from expense.services import naming
+from expense.services.naming import FIELD_DEFS, FIELD_KEYS
 from expense.services.classification import remember_correction
 from expense.services.scanner import preview_scan, start_scan
 
@@ -744,4 +745,91 @@ class ExpenseInvoiceFileAwayAPIView(APIView):
             },
             message=_("restored"),
         )
+
+
+class ExpenseNamingAPIView(APIView):
+    """
+    The export filename layout, and what it produces.
+
+    Preview uses the user's own invoices so the sample reads like their
+    data; a synthetic one stands in only when they have none yet.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _sample_invoices(self, user):
+        from datetime import date
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        invoices = list(
+            Invoice.objects.filter(
+                user=user, status=Invoice.Status.EXTRACTED
+            ).order_by("-issue_date", "-id")[:3]
+        )
+        if invoices:
+            return invoices
+
+        return [
+            SimpleNamespace(
+                uuid="sample",
+                issue_date=date(2026, 8, 12),
+                category="transport_local",
+                seller_name="滴滴出行科技有限公司",
+                total_amount=Decimal("46.13"),
+                invoice_no="25117000000012345678",
+                invoice_type="vat_electronic",
+                city="上海",
+                buyer_name="某某科技有限公司",
+                email_attachment=SimpleNamespace(
+                    filename="invoice.pdf", file_path="invoice.pdf"
+                ),
+                source_file=None,
+            )
+        ]
+
+    def get(self, request):
+        config = get_user_config(request.user)
+        template = config.filename_template or naming.DEFAULT_TEMPLATE
+        selected = naming.fields_from_template(template)
+
+        taken = set()
+        preview = [
+            naming.render(invoice, template, taken, index=index)
+            for index, invoice in enumerate(
+                self._sample_invoices(request.user), start=1
+            )
+        ]
+
+        return _response(
+            {
+                "template": template,
+                "default_template": naming.DEFAULT_TEMPLATE,
+                "selected_fields": selected,
+                "available_fields": list(FIELD_DEFS),
+                "preview": preview,
+            }
+        )
+
+    def post(self, request):
+        """Preview a field order without saving it."""
+        fields = (request.data or {}).get("fields")
+        if not isinstance(fields, list):
+            return _bad_request(_("fields must be a list."))
+
+        unknown = [key for key in fields if key not in FIELD_KEYS]
+        if unknown:
+            return _bad_request(
+                _("Unknown fields: %(items)s") % {"items": ", ".join(unknown)}
+            )
+
+        template = naming.template_from_fields(fields)
+        taken = set()
+        preview = [
+            naming.render(invoice, template, taken, index=index)
+            for index, invoice in enumerate(
+                self._sample_invoices(request.user), start=1
+            )
+        ]
+        return _response({"template": template, "preview": preview})
 

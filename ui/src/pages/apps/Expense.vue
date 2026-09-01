@@ -161,6 +161,18 @@ const previewLoading = ref(false)
 const previewError = ref('')
 const preview = ref(null)
 
+// A link belongs on this list only when allowing it once would actually
+// produce the invoice. A page that wants a login, a file that was too
+// large or the wrong type cannot be fixed from here, and listing them as
+// pending work left the user with a to-do list of nothing to do.
+const ACTIONABLE_LINK_STATES = ['blocked_domain', 'not_https']
+
+function isActionable(link) {
+  return (
+    ACTIONABLE_LINK_STATES.includes(link.fetch_status) && !link.user_allowed
+  )
+}
+
 function readError(err, fallbackKey) {
   return err?.response?.data?.message || t(fallbackKey)
 }
@@ -177,7 +189,7 @@ async function loadRuns() {
       expenseApi.getLinks()
     ])
     runs.value = runList
-    links.value = linkList.filter((link) => link.fetch_status !== 'ok')
+    links.value = linkList.filter(isActionable)
   } catch (err) {
     error.value = readError(err, 'expense.loadFailed')
   }

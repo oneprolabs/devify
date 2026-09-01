@@ -222,6 +222,37 @@ def domain_allowed(url: str, allowed_domains: list[str]) -> bool:
     )
 
 
+ANCHOR_PATTERN = re.compile(
+    r"<a\b[^>]*?href\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE
+)
+
+
+def body_urls(email) -> list[str]:
+    """
+    The links in a body that could lead to an invoice.
+
+    An invoice is something a person is asked to click, so in an HTML body
+    only anchors count. Running a URL pattern over the whole markup also
+    collects every decoration the mail client renders - 12306 alone drew
+    mail_top.jpg, mail_line.jpg and mail_logo.jpg - and each of those was
+    then offered to the user as a download to allow.
+
+    A plain-text body has no markup to tell them apart, and no decorations
+    either, so there every URL still counts.
+    """
+    html = email.html_content or ""
+    if html.strip():
+        anchors = [
+            url.strip()
+            for url in ANCHOR_PATTERN.findall(html)
+            if url.strip().lower().startswith(("http://", "https://"))
+        ]
+        if anchors:
+            return anchors
+
+    return URL_PATTERN.findall(email.text_content or "")
+
+
 def extract_body_links(email, allowed_domains: list[str]):
     """
     Pull download links out of the body.
@@ -230,17 +261,15 @@ def extract_body_links(email, allowed_domains: list[str]):
     offer a one-off override instead of leaving the user wondering why an
     invoice never appeared.
     """
-    body = " ".join(
-        part for part in (email.text_content, email.html_content) if part
-    )
-    if not body:
+    candidates = body_urls(email)
+    if not candidates:
         return [], []
 
     allowed: list[str] = []
     blocked: list[SkippedSource] = []
     seen: set[str] = set()
 
-    for raw in URL_PATTERN.findall(body):
+    for raw in candidates:
         url = _normalize_url(raw)
         if url in seen:
             continue

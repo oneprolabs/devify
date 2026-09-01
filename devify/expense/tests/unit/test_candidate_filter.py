@@ -1,11 +1,14 @@
 """Unit tests for the zero-cost candidate filter."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from expense.constants import MIN_IMAGE_BYTES
 from expense.services.candidate_filter import (
     SkipReason,
     SourceKind,
+    body_urls,
     classify_attachment,
     domain_allowed,
     evaluate_email,
@@ -312,3 +315,72 @@ class TestEvaluateEmail:
             FakeEmail(), [FakeAttachment()], FakeAppConfig(), config
         )
         assert not verdict.is_candidate
+
+
+class TestBodyUrls:
+    """
+    Which links in a body could lead to an invoice.
+
+    An invoice is something a person is asked to click. Running a URL
+    pattern over the whole markup also collects everything the mail client
+    renders: 12306 alone drew mail_top.jpg, mail_line.jpg and
+    mail_logo.jpg, and each was offered to the user as a download to allow.
+    """
+
+    def _email(self, html="", text=""):
+        return SimpleNamespace(html_content=html, text_content=text)
+
+    def test_an_anchor_is_a_link(self):
+        html = '<a href="https://fapiao.example.com/d/9f2c">下载发票</a>'
+
+        assert body_urls(self._email(html=html)) == [
+            "https://fapiao.example.com/d/9f2c"
+        ]
+
+    def test_a_decoration_is_not(self):
+        html = (
+            '<img src="http://mobile.12306.cn/weixin/resources/weixin/'
+            'images/mail/mail_line.jpg">'
+            '<a href="https://fapiao.example.com/d/9f2c">下载</a>'
+        )
+
+        assert body_urls(self._email(html=html)) == [
+            "https://fapiao.example.com/d/9f2c"
+        ]
+
+    def test_a_body_of_nothing_but_decoration_offers_nothing(self):
+        html = (
+            '<img src="http://x.test/images/mail/mail_top.jpg">'
+            '<img src="http://x.test/images/mail/mail_logo.jpg">'
+        )
+
+        assert body_urls(self._email(html=html)) == []
+
+    def test_plain_text_keeps_every_url(self):
+        # There is no markup to tell them apart, and no decorations either.
+        text = "下载地址 https://fapiao.example.com/d/9f2c 请及时下载"
+
+        assert body_urls(self._email(text=text)) == [
+            "https://fapiao.example.com/d/9f2c"
+        ]
+
+    def test_text_is_used_when_the_html_has_no_anchors(self):
+        email = self._email(
+            html='<img src="http://x.test/logo.png">',
+            text="https://fapiao.example.com/d/9f2c",
+        )
+
+        assert body_urls(email) == ["https://fapiao.example.com/d/9f2c"]
+
+    def test_several_anchors_all_count(self):
+        html = (
+            '<a href="https://a.test/one.pdf">A</a>'
+            '<a href="https://b.test/two.pdf">B</a>'
+        )
+
+        assert len(body_urls(self._email(html=html))) == 2
+
+    def test_a_mailto_is_not_a_download(self):
+        html = '<a href="mailto:billing@example.com">联系我们</a>'
+
+        assert body_urls(self._email(html=html)) == []

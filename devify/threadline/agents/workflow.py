@@ -97,7 +97,9 @@ def create_email_processing_graph():
     Workflow sequence:
     1. WorkflowPrepareNode - Load email data and validate
     2. CreditsCheckNode - Check and consume credits
-    3. ImageIntentNode - Process image attachments with multimodal LLM
+    3. InvoiceNode - Recognize invoices and skip the rest, or fall
+       through when the email is an ordinary one
+    4. ImageIntentNode - Process image attachments with multimodal LLM
     4. LLMEmailNode - Process email content with LLM
     5. SummaryNode - Generate email summary
     6. MetadataNode - Extract structured metadata from summary
@@ -114,6 +116,10 @@ def create_email_processing_graph():
     from threadline.agents.nodes.credits_check_node import CreditsCheckNode
     from threadline.agents.nodes.error_handler_node import ErrorHandlerNode
     from threadline.agents.nodes.image_intent_node import ImageIntentNode
+    from threadline.agents.nodes.invoice_node import (
+        InvoiceNode,
+        route_after_invoice,
+    )
     from threadline.agents.nodes.llm_email_node import LLMEmailNode
     from threadline.agents.nodes.metadata_node import MetadataNode
     from threadline.agents.nodes.summary_node import SummaryNode
@@ -126,6 +132,7 @@ def create_email_processing_graph():
 
     workflow.add_node("workflow_prepare", WorkflowPrepareNode())
     workflow.add_node("credits_check", CreditsCheckNode())
+    workflow.add_node("invoice", InvoiceNode())
     workflow.add_node("image_intent", ImageIntentNode())
     workflow.add_node("llm_email", LLMEmailNode())
     workflow.add_node("summary", SummaryNode())
@@ -135,7 +142,20 @@ def create_email_processing_graph():
 
     workflow.add_edge(START, "workflow_prepare")
     workflow.add_edge("workflow_prepare", "credits_check")
-    workflow.add_edge("credits_check", "image_intent")
+    workflow.add_edge("credits_check", "invoice")
+
+    # An invoice notification is a document delivery, not a conversation,
+    # so it takes the invoice path and skips the summary nobody would read.
+    # Anything else - including an email that only looked like one - goes
+    # down the normal path on the same single charge.
+    workflow.add_conditional_edges(
+        "invoice",
+        route_after_invoice,
+        {
+            "workflow_finalize": "workflow_finalize",
+            "image_intent": "image_intent",
+        },
+    )
     workflow.add_edge("image_intent", "llm_email")
     workflow.add_edge("llm_email", "summary")
     workflow.add_edge("summary", "metadata")

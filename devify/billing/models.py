@@ -389,6 +389,9 @@ class BillingConfig(models.Model):
     enabled_providers = models.JSONField(default=list, blank=True)
     default_free_credits = models.IntegerField(default=10)
     workflow_cost_credits = models.IntegerField(default=1)
+    # Expense app: one email carrying invoices costs this many credits,
+    # regardless of how many invoices it turns out to contain.
+    invoice_email_cost_credits = models.IntegerField(default=1)
     auto_refund_system_errors = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

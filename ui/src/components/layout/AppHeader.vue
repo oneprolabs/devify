@@ -793,6 +793,15 @@ const appCards = computed(() => [
     active: route.name === 'RelayApp'
   },
   {
+    key: 'expense',
+    to: '/apps/expense',
+    title: t('apps.expenseName'),
+    description: t('apps.expenseDesc'),
+    iconPath:
+      'M9 14l2 2 4-4M5 8h14M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z',
+    active: route.name === 'ExpenseApp'
+  },
+  {
     key: 'todos',
     to: '/todos',
     title: t('todos.title'),

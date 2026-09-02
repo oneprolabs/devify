@@ -15,6 +15,7 @@ from typing import Dict, Mapping
 WORKFLOW_STAGES = (
     "prepare",
     "credits",
+    "invoice",
     "images",
     "llm",
     "summary",
@@ -75,6 +76,7 @@ def estimate_initial_workflow_units(
         [
             ("prepare", 1),
             ("credits", 1),
+            ("invoice", 1),
             (
                 "images",
                 sum(
@@ -144,6 +146,7 @@ def estimate_prepare_workflow_units(
         [
             ("prepare", 1),
             ("credits", 1),
+            ("invoice", 1),
             (
                 "images",
                 sum(

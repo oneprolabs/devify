@@ -226,6 +226,10 @@ class IMAPClient:
             for c in self._process_filter_item(f)
         ]
 
+        subject_any = self.filter_config.get('subject_any') or []
+        if subject_any:
+            criteria.append(self._build_subject_any(subject_any))
+
         # Priority: use 'since' from config, then 'max_age_days'
         since_date = self.filter_config.get('since')
         if since_date:
@@ -244,6 +248,25 @@ class IMAPClient:
             ' '.join(criteria) if criteria else self.SEARCH_CRITERIA_ALL
         )
         return self._search_criteria
+
+    @staticmethod
+    def _build_subject_any(terms: list) -> str:
+        """
+        Match a subject against any of several words.
+
+        IMAP joins criteria with AND, so listing the words plainly would
+        demand a subject containing all of them and match nothing. OR is
+        binary and goes in front, which is why N words need N-1 of them
+        nested.
+        """
+        clauses = [f'SUBJECT "{term}"' for term in terms if term]
+        if not clauses:
+            return ''
+
+        expression = clauses[-1]
+        for clause in reversed(clauses[:-1]):
+            expression = f'OR {clause} {expression}'
+        return expression
 
     def _process_filter_item(self, filter_item: str) -> list:
         """
@@ -311,8 +334,17 @@ class IMAPClient:
                 return
 
             logger.info(f"Search criteria: {self.search_criteria}")
+            # Non-ASCII criteria have to travel as bytes with a charset;
+            # handing imaplib a str with Chinese in it raises before the
+            # request is ever sent.
+            criteria = self.search_criteria
+            charset = None
+            if any(ord(char) > 127 for char in criteria):
+                criteria = criteria.encode('utf-8')
+                charset = 'UTF-8'
+
             status, message_numbers = self.imap_client.search(
-                None, self.search_criteria
+                charset, criteria
             )
 
             if status != 'OK':

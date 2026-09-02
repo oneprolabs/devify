@@ -189,16 +189,55 @@ class EmailProcessor:
                     raw_email_data
                 )
 
-                if parsed_email:
-                    # Yield immediately to avoid accumulating all emails
-                    # in memory
-                    yield parsed_email
-                else:
+                if not parsed_email:
                     logger.warning("Failed to parse email, skipping")
+                    continue
+
+                if not self._wanted(parsed_email):
+                    logger.info(
+                        "Skipping %s: not an invoice",
+                        (parsed_email.get("subject") or "")[:60],
+                    )
+                    continue
+
+                # Yield immediately to avoid accumulating all emails
+                # in memory
+                yield parsed_email
 
         except Exception as e:
             logger.error(f"Error in IMAP email processing: {e}")
             raise
+
+    def _wanted(self, parsed_email: Dict) -> bool:
+        """
+        Apply the invoice rule locally, whatever the server did.
+
+        Server-side search is a bandwidth saving, not a guarantee: a real
+        IMAP server here answered OK to a body search and returned the
+        entire mailbox, which is indistinguishable from having filtered.
+        Deciding again here means correctness lives in one place and a
+        server that quietly ignores the criteria only costs traffic.
+        """
+        terms = (self.filter_config or {}).get("subject_any") or []
+        if not terms:
+            return True
+
+        filenames = [
+            attachment.get("filename") or attachment.get("safe_filename")
+            for attachment in (parsed_email.get("attachments") or [])
+        ]
+        try:
+            from expense.services.routing import says_invoice
+
+            return says_invoice(
+                parsed_email.get("subject") or "", filenames, terms
+            )
+        except ImportError:  # pragma: no cover - expense is optional
+            haystack = " ".join(
+                [parsed_email.get("subject") or ""]
+                + [name or "" for name in filenames]
+            ).lower()
+            return any(term in haystack for term in terms)
 
     def _process_file(self) -> Generator[Dict, None, None]:
         """

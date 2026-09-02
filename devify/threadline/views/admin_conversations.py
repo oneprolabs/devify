@@ -19,6 +19,7 @@ from agentcore_task.adapters.django.models import TaskExecution
 from agentcore_task.adapters.django.serializers import (
     TaskExecutionSerializer,
 )
+from expense.models import Invoice
 from threadline.models import EmailMessage
 from threadline.serializers import (
     AdminConversationListSerializer,
@@ -83,6 +84,15 @@ class AdminConversationListAPIView(APIView):
             EmailMessage.objects.select_related("user", "merged_into")
             .annotate(
                 relay_delivery_count=Count("relay_events__deliveries"),
+                # Which emails the expense app took over. The foreign key
+                # already records this exactly, so counting it beats
+                # stamping a tag that would have to be kept in step with
+                # re-recognition, deletion and copy collapsing.
+                invoice_count=Count(
+                    "invoices",
+                    filter=Q(invoices__status=Invoice.Status.EXTRACTED),
+                    distinct=True,
+                ),
             )
             .order_by("-received_at", "-id")
         )
@@ -121,6 +131,14 @@ class AdminConversationListAPIView(APIView):
         user_id = (request.query_params.get("user_id") or "").strip()
         if user_id:
             queryset = queryset.filter(user_id=user_id)
+
+        # "Did the expense app take this one?" - the question a support
+        # request starts from when a user says an invoice never arrived.
+        has_invoices = (request.query_params.get("has_invoices") or "").strip()
+        if has_invoices == "true":
+            queryset = queryset.filter(invoice_count__gt=0)
+        elif has_invoices == "false":
+            queryset = queryset.filter(invoice_count=0)
 
         queryset = _apply_date_boundaries(
             queryset,

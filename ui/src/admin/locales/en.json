@@ -84,6 +84,10 @@
       "llm": {
         "title": "Large Language Models",
         "description": "Review available model configs and open the full model management page."
+      },
+      "expense": {
+        "title": "Expense",
+        "description": "Choose the models used to read invoices."
       }
     },
     "selectPlaceholder": "Select",
@@ -100,7 +104,15 @@
     "availableConfigs": "Available configs: {count}",
     "selectedImageModel": "Image model: {label}",
     "selectedTextModel": "Text model: {label}",
-    "selectedRelayModel": "Smart channel model: {label}"
+    "selectedRelayModel": "Smart channel model: {label}",
+    "expense": {
+      "textModelTitle": "Text model",
+      "textModelDesc": "For PDF and OFD invoices that carry a text layer - reading the text is cheaper and more accurate than showing the model a picture of it. It also decides which link in an email body fetches the invoice, so adverts and help pages are not downloaded.",
+      "imageModelTitle": "Image model",
+      "imageModelDesc": "Used for image attachments and scans without a text layer. This path sends whole invoice pages as images, so pick a model that can read them.",
+      "useDefaultModel": "Use the system default",
+      "modelHint": "Both may be left empty: the system default is used and the app works as normal. Set them only when you want the two paths to use different models."
+    }
   },
   "billing": {
     "menuTitle": "Subscription Management",

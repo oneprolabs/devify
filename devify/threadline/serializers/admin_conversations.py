@@ -17,6 +17,9 @@ class AdminConversationListSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     user_display = serializers.SerializerMethodField()
     relay_delivery_count = serializers.IntegerField(read_only=True)
+    # Comes from the queryset annotation; the foreign key is the record
+    # of which emails the expense app took over.
+    invoice_count = serializers.IntegerField(read_only=True)
     is_canonical = serializers.SerializerMethodField()
 
     class Meta:
@@ -37,6 +40,7 @@ class AdminConversationListSerializer(serializers.ModelSerializer):
             "user_id",
             "user_display",
             "relay_delivery_count",
+            "invoice_count",
             "is_canonical",
             "created_at",
         ]

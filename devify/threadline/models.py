@@ -9,6 +9,8 @@ from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
+from billing.fields import EncryptedTextField
+
 from threadline.state_machine import (
     EmailStatus,
     get_initial_email_status,
@@ -985,6 +987,171 @@ class ThreadlineShareLink(models.Model):
         self.view_count += 1
         self.last_viewed_at = timestamp
 
+
+
+class EmailMailbox(models.Model):
+    """
+    One IMAP mailbox a user has connected.
+
+    Mailboxes are separate rows rather than entries inside the user's
+    email settings because each one needs its own state: which fetch
+    succeeded last, what failed and why. With several mailboxes attached,
+    a single shared error field would leave the user unable to tell which
+    one is broken.
+
+    This channel runs alongside the virtual address rather than instead of
+    it; a user can receive on both.
+    """
+
+    uuid = models.UUIDField(
+        default=uuid_lib.uuid4,
+        unique=True,
+        editable=False,
+        verbose_name=_("UUID"),
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mailboxes",
+        verbose_name=_("User"),
+    )
+    name = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("Name"),
+        help_text=_("Label shown in the UI; defaults to the address"),
+    )
+    imap_host = models.CharField(max_length=255, verbose_name=_("IMAP Host"))
+    imap_port = models.PositiveIntegerField(
+        default=993, verbose_name=_("IMAP Port")
+    )
+    use_ssl = models.BooleanField(default=True, verbose_name=_("Use SSL"))
+    username = models.CharField(max_length=255, verbose_name=_("Username"))
+    # Stored encrypted at rest. The previous single-mailbox configuration
+    # kept this in plain text inside a JSON settings blob.
+    password = EncryptedTextField(blank=True, default="")
+    folder = models.CharField(
+        max_length=100, default="INBOX", verbose_name=_("Folder")
+    )
+    delete_after_fetch = models.BooleanField(
+        default=False, verbose_name=_("Delete After Fetch")
+    )
+
+    enabled = models.BooleanField(default=True, verbose_name=_("Enabled"))
+    # A mailbox that only exists to receive invoices should not drag the
+    # rest of its mail through the pipeline: every fetched email costs a
+    # credit, and one real mailbox here held 1937 messages of which 407
+    # were invoices.
+    invoice_only = models.BooleanField(
+        default=False,
+        verbose_name=_("Invoices Only"),
+        help_text=_(
+            "Fetch only the mail that names an invoice, by subject or "
+            "attachment filename"
+        ),
+    )
+    # Filters may be set per mailbox. An empty one inherits the account
+    # default, which is also what the virtual address uses: that is a
+    # channel rather than a connection, so it has no row to configure.
+    filters = models.JSONField(
+        default=list, blank=True, verbose_name=_("Subject Filters")
+    )
+    exclude_patterns = models.JSONField(
+        default=list, blank=True, verbose_name=_("Exclude Patterns")
+    )
+    max_age_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_("Max Age Days"),
+        help_text=_("Leave empty to use the account default"),
+    )
+    last_fetched_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("Last Fetched At")
+    )
+    last_success_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("Last Success At")
+    )
+    last_error = models.TextField(blank=True, verbose_name=_("Last Error"))
+    consecutive_failures = models.PositiveIntegerField(
+        default=0, verbose_name=_("Consecutive Failures")
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _("Email Mailbox")
+        verbose_name_plural = _("Email Mailboxes")
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "imap_host", "username"],
+                name="threadline_mailbox_user_host_username_uniq",
+            )
+        ]
+        indexes = [models.Index(fields=["enabled"])]
+
+    def __str__(self) -> str:
+        return f"{self.display_name} -> {self.user_id}"
+
+    @property
+    def display_name(self) -> str:
+        return self.name or self.username
+
+    def to_email_config(self, filter_config=None) -> dict:
+        """
+        Render this mailbox in the shape the fetch pipeline expects.
+
+        Keeping the existing dict contract means the processor, parser and
+        save path stay untouched by the move to multiple mailboxes.
+
+        Filters belong to the mailbox and nowhere else. They used to have
+        an account-wide layer underneath, kept on the theory that the
+        virtual address needed somewhere to be configured - but the
+        virtual address arrives over SMTP, and that path never reads a
+        filter config at all. All the layer did was put half of one
+        mailbox's settings on a different screen.
+        """
+        filter_config = {
+            "filters": list(self.filters or []),
+            "exclude_patterns": list(self.exclude_patterns or []),
+        }
+        if self.max_age_days is not None:
+            filter_config["max_age_days"] = self.max_age_days
+        if self.invoice_only:
+            filter_config["subject_any"] = self.invoice_subject_terms()
+
+        return {
+            "mode": "custom_imap",
+            "imap_config": {
+                "imap_host": self.imap_host,
+                "imap_port": self.imap_port,
+                "imap_ssl_port": self.imap_port,
+                "use_ssl": self.use_ssl,
+                "username": self.username,
+                "password": self.password,
+                "folder": self.folder,
+                "delete_after_fetch": self.delete_after_fetch,
+            },
+            "filter_config": filter_config,
+        }
+
+    def invoice_subject_terms(self) -> list:
+        """
+        The words that make an email an invoice, for this user.
+
+        Deferred import only to avoid a circular one at module load; the
+        expense app is always installed, so a failure here is a real fault
+        and must not be swallowed. It used to fall back to a literal list,
+        which meant any error inside the lookup silently replaced the words
+        the user had configured with three hardcoded ones - the filter went
+        on working, on the wrong terms, with nothing to show for it. The
+        fetch loop already isolates and records a failure per mailbox, so
+        letting it raise names the mailbox instead of hiding the cause.
+        """
+        from expense.services.routing import subject_terms
+
+        return subject_terms(self.user)
 
 class EmailAlias(models.Model):
     """

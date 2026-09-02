@@ -282,6 +282,116 @@
             </div>
           </section>
 
+          <section
+            id="expense-settings"
+            class="scroll-mt-6 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden"
+          >
+            <div class="border-b border-gray-200 px-6 py-5">
+              <h2 class="text-base font-semibold text-gray-900">
+                {{ t('appSettings.sections.expense.title') }}
+              </h2>
+              <p class="mt-1 text-sm text-gray-500">
+                {{ t('appSettings.sections.expense.description') }}
+              </p>
+            </div>
+            <div class="p-6 space-y-6">
+              <BaseLoading v-if="loadingExpenseConfig || loadingModels" />
+              <template v-else>
+                <div class="space-y-3">
+                  <div>
+                    <h3 class="text-sm font-semibold text-gray-900">
+                      {{ t('appSettings.expense.textModelTitle') }}
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-600">
+                      {{ t('appSettings.expense.textModelDesc') }}
+                    </p>
+                  </div>
+                  <div class="max-w-xl">
+                    <select
+                      v-model="expenseForm.text_llm_config_uuid"
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    >
+                      <option value="">
+                        {{ t('appSettings.expense.useDefaultModel') }}
+                      </option>
+                      <option
+                        v-for="model in modelOptions"
+                        :key="`expense-text-${model.uuid}`"
+                        :value="model.uuid"
+                      >
+                        {{ modelLabel(model) }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="space-y-3">
+                  <div>
+                    <h3 class="text-sm font-semibold text-gray-900">
+                      {{ t('appSettings.expense.imageModelTitle') }}
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-600">
+                      {{ t('appSettings.expense.imageModelDesc') }}
+                    </p>
+                  </div>
+                  <div class="max-w-xl">
+                    <select
+                      v-model="expenseForm.llm_config_uuid"
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    >
+                      <option value="">
+                        {{ t('appSettings.expense.useDefaultModel') }}
+                      </option>
+                      <option
+                        v-for="model in modelOptions"
+                        :key="`expense-image-${model.uuid}`"
+                        :value="model.uuid"
+                      >
+                        {{ modelLabel(model) }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <p
+                  class="rounded-md bg-gray-50 p-3 text-xs leading-relaxed text-gray-600"
+                >
+                  {{ t('appSettings.expense.modelHint') }}
+                </p>
+
+                <div
+                  class="flex items-center justify-end gap-3 border-t border-gray-200 pt-6"
+                >
+                  <BaseButton
+                    variant="secondary"
+                    size="sm"
+                    :disabled="savingExpense"
+                    @click="resetExpenseSettings"
+                  >
+                    {{ t('appSettings.reset') }}
+                  </BaseButton>
+                  <BaseButton
+                    variant="primary"
+                    size="sm"
+                    :loading="savingExpense"
+                    @click="saveExpenseSettings"
+                  >
+                    {{ t('appSettings.saveChanges') }}
+                  </BaseButton>
+                </div>
+
+                <p v-if="expenseSaveError" class="mt-2 text-sm text-red-600">
+                  {{ expenseSaveError }}
+                </p>
+                <p
+                  v-if="expenseSaveSuccess"
+                  class="mt-2 text-sm text-green-600"
+                >
+                  {{ t('appSettings.saveSuccess') }}
+                </p>
+              </template>
+            </div>
+          </section>
         </div>
 
         <aside class="xl:sticky xl:top-6">
@@ -331,6 +441,7 @@ import {
   llmAdminApi,
   notificationsAdminApi,
   relayAdminApi,
+  expenseAdminApi,
   threadlineAdminApi
 } from '@/admin/api'
 import AdminLayout from '@/admin/layout/AdminLayout.vue'
@@ -355,6 +466,10 @@ const threadlineSaveError = ref('')
 const threadlineSaveSuccess = ref(false)
 const relaySaveError = ref('')
 const relaySaveSuccess = ref(false)
+const expenseSaveError = ref('')
+const expenseSaveSuccess = ref(false)
+const loadingExpenseConfig = ref(false)
+const savingExpense = ref(false)
 
 const modelOptions = ref([])
 const channelOptions = ref([])
@@ -372,6 +487,18 @@ const threadlineInitial = reactive({
 })
 
 const relayForm = reactive({
+  llm_config_uuid: ''
+})
+
+// Both slots are optional: empty means the deployment default, which is
+// what makes the app usable before anyone tunes it.
+const expenseForm = reactive({
+  text_llm_config_uuid: '',
+  llm_config_uuid: ''
+})
+
+const expenseInitial = reactive({
+  text_llm_config_uuid: '',
   llm_config_uuid: ''
 })
 
@@ -416,7 +543,8 @@ const sectionItems = computed(() => [
     id: 'threadline-settings',
     label: t('appSettings.sections.threadline.title')
   },
-  { id: 'relay-settings', label: t('appSettings.sections.relay.title') }
+  { id: 'relay-settings', label: t('appSettings.sections.relay.title') },
+  { id: 'expense-settings', label: t('appSettings.sections.expense.title') }
 ])
 
 function resetThreadlineGlobal() {
@@ -439,6 +567,13 @@ function resetRelaySettings() {
   relaySaveSuccess.value = false
 }
 
+function resetExpenseSettings() {
+  expenseForm.text_llm_config_uuid = expenseInitial.text_llm_config_uuid
+  expenseForm.llm_config_uuid = expenseInitial.llm_config_uuid
+  expenseSaveError.value = ''
+  expenseSaveSuccess.value = false
+}
+
 function applyThreadlineConfig(raw) {
   if (!raw || typeof raw !== 'object') return
   threadlineForm.image_llm_config_uuid = raw.image_llm_config_uuid || ''
@@ -454,6 +589,14 @@ function applyRelayConfig(raw) {
   if (!raw || typeof raw !== 'object') return
   relayForm.llm_config_uuid = raw.llm_config_uuid || ''
   relayInitial.llm_config_uuid = relayForm.llm_config_uuid
+}
+
+function applyExpenseConfig(data) {
+  const raw = data && typeof data === 'object' ? data : {}
+  expenseForm.text_llm_config_uuid = raw.text_llm_config_uuid || ''
+  expenseForm.llm_config_uuid = raw.llm_config_uuid || ''
+  expenseInitial.text_llm_config_uuid = expenseForm.text_llm_config_uuid
+  expenseInitial.llm_config_uuid = expenseForm.llm_config_uuid
 }
 
 async function loadModels() {
@@ -522,12 +665,25 @@ async function loadRelayConfig() {
   }
 }
 
+async function loadExpenseConfig() {
+  loadingExpenseConfig.value = true
+  try {
+    const data = await expenseAdminApi.getExpenseConfig()
+    applyExpenseConfig(data)
+  } catch (error) {
+    showError(extractErrorMessage(error, t('common.error')))
+  } finally {
+    loadingExpenseConfig.value = false
+  }
+}
+
 async function loadAll() {
   await Promise.all([
     loadModels(),
     loadChannels(),
     loadThreadlineConfig(),
-    loadRelayConfig()
+    loadRelayConfig(),
+    loadExpenseConfig()
   ])
 }
 
@@ -613,6 +769,32 @@ async function saveRelaySettings() {
     showError(relaySaveError.value)
   } finally {
     savingRelay.value = false
+  }
+}
+
+async function saveExpenseSettings() {
+  expenseSaveError.value = ''
+  expenseSaveSuccess.value = false
+  savingExpense.value = true
+  try {
+    const data = await expenseAdminApi.updateExpenseConfig({
+      text_llm_config_uuid: expenseForm.text_llm_config_uuid || null,
+      llm_config_uuid: expenseForm.llm_config_uuid || null
+    })
+    applyExpenseConfig(data)
+    expenseSaveSuccess.value = true
+    showSuccess(t('appSettings.saveSuccess'))
+    setTimeout(() => {
+      expenseSaveSuccess.value = false
+    }, 2500)
+  } catch (error) {
+    expenseSaveError.value = extractErrorMessage(
+      error,
+      t('appSettings.saveFailed')
+    )
+    showError(expenseSaveError.value)
+  } finally {
+    savingExpense.value = false
   }
 }
 

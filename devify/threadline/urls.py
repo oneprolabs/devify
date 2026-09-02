@@ -37,6 +37,11 @@ from .views.email_alias import (
     EmailAliasDetailAPIView,
     EmailAliasValidationAPIView,
 )
+from .views.email_mailbox import (
+    EmailMailboxDetailAPIView,
+    EmailMailboxListAPIView,
+    EmailMailboxTestAPIView,
+)
 from .views.monitoring import (
     task_metrics,
     task_status_summary,
@@ -61,6 +66,27 @@ urlpatterns = [
         "settings/<int:pk>",
         SettingsDetailAPIView.as_view(),
         name="settings-detail",
+    ),
+    # Connected mailboxes; these run alongside the virtual address
+    path(
+        "settings/mailboxes",
+        EmailMailboxListAPIView.as_view(),
+        name="mailboxes-list",
+    ),
+    path(
+        "settings/mailboxes/test",
+        EmailMailboxTestAPIView.as_view(),
+        name="mailboxes-test",
+    ),
+    path(
+        "settings/mailboxes/<uuid:uuid>",
+        EmailMailboxDetailAPIView.as_view(),
+        name="mailboxes-detail",
+    ),
+    path(
+        "settings/mailboxes/<uuid:uuid>/test",
+        EmailMailboxTestAPIView.as_view(),
+        name="mailboxes-test-detail",
     ),
     # Email alias management endpoints (under settings)
     path(

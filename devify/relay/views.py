@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from agentcore_task.adapters.django.models import TaskExecution
 from agentcore_metering.adapters.django.models import LLMConfig
+from core.app_registry import APP_REGISTRY
 from relay.models import RelayAppConfig, RelayDelivery, RelayEvent, RelaySubscription
 from relay.serializers import (
     RelayAppConfigSerializer,
@@ -81,16 +82,7 @@ class AppsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        apps = [
-            {
-                "key": "relay",
-                "name": _("Relay"),
-                "name_zh": _("智能投递"),
-                "path": "/apps/relay",
-                "description": _("Route workflow completions to external tools."),
-            }
-        ]
-        return _response(apps)
+        return _response(APP_REGISTRY.list_apps())
 
 
 class RelaySubscriptionListAPIView(APIView):

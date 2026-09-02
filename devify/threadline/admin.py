@@ -48,6 +48,7 @@ from .models import (
     Settings,
     EmailTask,
     EmailAlias,
+    EmailMailbox,
     EmailMessage,
     EmailAttachment,
     Issue,
@@ -803,6 +804,29 @@ class IssueAdmin(admin.ModelAdmin):
             .get_queryset(request)
             .select_related("user", "email_message")
         )
+
+
+@admin.register(EmailMailbox)
+class EmailMailboxAdmin(admin.ModelAdmin):
+    list_display = [
+        "display_name",
+        "user",
+        "imap_host",
+        "enabled",
+        "last_success_at",
+        "consecutive_failures",
+    ]
+    list_filter = ["enabled", "use_ssl"]
+    search_fields = ["name", "username", "imap_host", "user__username"]
+    readonly_fields = [
+        "uuid",
+        "last_fetched_at",
+        "last_success_at",
+        "last_error",
+        "consecutive_failures",
+        "created_at",
+        "updated_at",
+    ]
 
 
 @admin.register(EmailAlias)

@@ -13,6 +13,7 @@ from threadline.tasks.cleanup import (
     ShareLinkCleanupManager,
 )
 from threadline.tasks.email_fetch import imap_email_fetch, haraka_email_fetch
+from threadline.services.processing_control import paused_user_ids
 from threadline.tasks.email_workflow import process_email_workflow
 from threadline.state_machine import EmailStatus
 from threadline.utils.task_cleanup import cleanup_stale_tasks
@@ -189,7 +190,9 @@ def schedule_share_link_cleanup():
 @prevent_duplicate_task(
     "stuck_email_reset", timeout=settings.TASK_TIMEOUT_MINUTES * 60
 )
-def schedule_reset_stuck_processing_emails(timeout_minutes=30):
+def schedule_reset_stuck_processing_emails(
+    timeout_minutes=30, max_age_hours=None
+):
     """
     Reset emails stuck in FETCHED or PROCESSING state.
     """
@@ -216,6 +219,27 @@ def schedule_reset_stuck_processing_emails(timeout_minutes=30):
             ),
             updated_at__lt=now - timedelta(minutes=timeout_minutes),
         )
+
+        # The job exists to catch a workflow trigger that went missing a
+        # moment ago. Mail that has sat untouched for days is not stuck,
+        # it is historical, and sweeping it on every run means scanning a
+        # backlog forever and eventually failing all of it.
+        floor_hours = (
+            max_age_hours
+            if max_age_hours is not None
+            else getattr(settings, "STUCK_EMAIL_MAX_AGE_HOURS", 48)
+        )
+        if floor_hours:
+            stuck_emails = stuck_emails.filter(
+                updated_at__gte=now - timedelta(hours=floor_hours)
+            )
+
+        # Mail parked by a user who paused processing is not stuck, it is
+        # waiting. Retrying it here would defeat the pause, and the second
+        # pass would then mark a perfectly good backlog as failed.
+        paused = paused_user_ids()
+        if paused:
+            stuck_emails = stuck_emails.exclude(user_id__in=paused)
 
         fetched_retry_count = 0
         fetched_failed_count = 0

@@ -475,7 +475,10 @@ class TestZipArchives:
         # that, can still be rendered for the vision model.
         path = self._archive(
             tmp_path,
-            {"ticket.ofd": b"PK\x03\x04ofd", "ticket.pdf": build_pdf("Ticket 26119110010007290784")},
+            {
+                "ticket.ofd": b"PK\x03\x04ofd",
+                "ticket.pdf": build_pdf("Ticket 2611911001"),
+            },
         )
 
         decoded = decode_source(path, filename="invoice.zip")
@@ -484,7 +487,7 @@ class TestZipArchives:
         assert "pdf" in decoded.decoder
 
     def test_the_decoder_is_named_through_the_archive(self, tmp_path):
-        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 26119110010007290784")})
+        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")})
 
         decoded = decode_source(path, filename="invoice.zip")
 
@@ -511,16 +514,139 @@ class TestZipArchives:
         from expense.services import decoder as decoder_module
 
         monkeypatch.setattr(decoder_module, "MAX_ZIP_MEMBER_BYTES", 10)
-        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 26119110010007290784")})
+        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")})
 
         with pytest.raises(DecodeError, match="too large"):
             decode_source(path, filename="invoice.zip")
 
     def test_the_content_type_routes_it_too(self, tmp_path):
-        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 26119110010007290784")})
+        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")})
 
         decoded = decode_source(
             path, content_type="application/zip", filename="anything"
         )
 
         assert decoded.decoder.startswith("zip:")
+
+
+class TestOfdDrawnAsGraphics:
+    """
+    Some issuers print the invoice rather than write it.
+
+    The characters arrive as filled vector outlines with no text object
+    anywhere in the file, so no amount of parsing will read them. The page
+    is drawn instead and sent down the path a scanned PDF takes.
+    """
+
+    def _ofd(self, tmp_path, content, res=None):
+        import zipfile
+
+        path = tmp_path / "invoice.ofd"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("OFD.xml", "<ofd:OFD/>")
+            archive.writestr("Doc_0/Pages/Page_0/Content.xml", content)
+            if res is not None:
+                archive.writestr("Doc_0/DocumentRes.xml", res)
+        return str(path)
+
+    def _page(self, paths):
+        return (
+            '<ofd:Page xmlns:ofd="http://www.ofdspec.org/2016">'
+            "<ofd:Area><ofd:PhysicalBox>0 0 100 50</ofd:PhysicalBox>"
+            "</ofd:Area>" + paths + "</ofd:Page>"
+        )
+
+    def _path(self, data, draw_param=None):
+        reference = f' DrawParam="{draw_param}"' if draw_param else ""
+        return (
+            f'<ofd:PathObject Boundary="0 0 100 50" Fill="true"{reference}>'
+            f"<ofd:AbbreviatedData>{data}</ofd:AbbreviatedData>"
+            "</ofd:PathObject>"
+        )
+
+    def test_a_drawn_page_is_rendered_instead_of_refused(self, tmp_path):
+        path = self._ofd(
+            tmp_path,
+            self._page(self._path("M 10 10 L 90 10 L 90 40 L 10 40 C")),
+        )
+
+        decoded = decode_source(path, filename="invoice.ofd")
+
+        assert decoded.mode == DecodeMode.IMAGE
+        assert decoded.decoder == "ofd_render"
+        assert len(decoded.images) == 1
+
+    def test_the_page_background_does_not_black_out_the_invoice(
+        self, tmp_path
+    ):
+        # The first path in a real invoice is a full-page rectangle filled
+        # white. Painting every path the same colour hid the document
+        # behind it, which is exactly what a vision model cannot read.
+        res = (
+            '<ofd:Res xmlns:ofd="http://www.ofdspec.org/2016"><ofd:DrawParams>'
+            '<ofd:DrawParam ID="4"><ofd:FillColor Value="255 255 255"/>'
+            "</ofd:DrawParam>"
+            '<ofd:DrawParam ID="8"><ofd:FillColor Value="0 0 0"/>'
+            "</ofd:DrawParam></ofd:DrawParams></ofd:Res>"
+        )
+        paths = self._path(
+            "M 0 0 L 100 0 L 100 50 L 0 50 C", draw_param="4"
+        ) + self._path("M 10 10 L 30 10 L 30 20 L 10 20 C", draw_param="8")
+        path = self._ofd(tmp_path, self._page(paths), res=res)
+
+        decoded = decode_source(path, filename="invoice.ofd")
+
+        from io import BytesIO
+
+        from PIL import Image
+
+        page = Image.open(BytesIO(decoded.images[0][1])).convert("L")
+        pixels = list(page.get_flattened_data())
+        light = sum(1 for value in pixels if value > 200)
+        # Most of the page stays white; only the marked rectangle is dark.
+        assert light > len(pixels) * 0.7
+
+    def test_readable_text_is_still_preferred(self, tmp_path):
+        import zipfile
+
+        path = tmp_path / "text.ofd"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr(
+                "Doc_0/Pages/Page_0/Content.xml",
+                '<ofd:Page xmlns:ofd="http://www.ofdspec.org/2016">'
+                "<ofd:TextCode>发票号码 123</ofd:TextCode></ofd:Page>",
+            )
+
+        decoded = decode_source(str(path), filename="text.ofd")
+
+        # Reading the markup is cheaper and exact; drawing is the fallback.
+        assert decoded.mode == DecodeMode.TEXT
+        assert decoded.decoder == "ofd_xml"
+
+    def test_an_ofd_with_neither_text_nor_paths_is_refused(self, tmp_path):
+        path = self._ofd(tmp_path, self._page(""))
+
+        with pytest.raises(DecodeError, match="neither text nor a page"):
+            decode_source(path, filename="invoice.ofd")
+
+    def test_a_curve_is_flattened_rather_than_dropped(self):
+        from expense.services.decoder import _ofd_subpaths
+
+        # A glyph stroke is mostly curves; dropping them would leave the
+        # character as a few disconnected corners.
+        straight = _ofd_subpaths("M 0 0 L 10 0 L 10 10 C")
+        curved = _ofd_subpaths("M 0 0 Q 5 0 10 10 L 0 10 C")
+
+        assert len(straight[0]) == 3
+        assert len(curved[0]) > 3
+
+    def test_an_unknown_command_stops_the_path(self):
+        from expense.services.decoder import _ofd_subpaths
+
+        # Its operands cannot be placed, so everything after it would be
+        # drawn at the wrong coordinates.
+        subpaths = _ofd_subpaths(
+            "M 0 0 L 10 0 L 10 10 C M 0 0 Z 5 5 L 9 9 C"
+        )
+
+        assert len(subpaths) == 1

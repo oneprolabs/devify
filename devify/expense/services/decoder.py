@@ -247,13 +247,252 @@ def _ofd_declared_fields(archive) -> dict:
     return fields
 
 
-def decode_ofd(path: str) -> DecodedSource:
+# An OFD page states its size in millimetres; this many pixels per
+# millimetre gives a page a vision model can read without producing an
+# image too large to send.
+OFD_PIXELS_PER_MM = 4
+OFD_MAX_PAGE_PIXELS = 4000
+# A quadratic segment is drawn as this many straight ones. Glyph curves
+# are small, and more segments buy nothing a model would notice.
+OFD_CURVE_STEPS = 8
+
+OFD_PAGE_PATTERN = re.compile(
+    r"<(?:\w+:)?PhysicalBox>([^<]+)</(?:\w+:)?PhysicalBox>"
+)
+OFD_PATH_OBJECT_PATTERN = re.compile(
+    r"<(?:\w+:)?PathObject\b([^>]*)>(.*?)</(?:\w+:)?PathObject>", re.S
+)
+OFD_PATH_PATTERN = re.compile(
+    r"<(?:\w+:)?AbbreviatedData>([^<]*)</(?:\w+:)?AbbreviatedData>"
+)
+OFD_DRAW_PARAM_PATTERN = re.compile(
+    r"<(?:\w+:)?DrawParam\b([^>]*)>(.*?)</(?:\w+:)?DrawParam>", re.S
+)
+OFD_FILL_COLOR_PATTERN = re.compile(
+    r"<(?:\w+:)?FillColor\b[^>]*Value=\"([^\"]+)\""
+)
+OFD_ID_PATTERN = re.compile(r'ID="([^"]+)"')
+OFD_DRAW_PARAM_REF_PATTERN = re.compile(r'DrawParam="([^"]+)"')
+OFD_TOKEN_PATTERN = re.compile(r"[A-Za-z]|-?\d+(?:\.\d+)?")
+
+BLACK = (0, 0, 0)
+
+
+def _ofd_fill_colors(archive) -> dict:
+    """
+    Map each draw parameter to the colour it fills with.
+
+    Without this every path is drawn the same, and the first one is the
+    page background: a full-page rectangle filled white, which painted
+    black hides the whole invoice behind it.
+    """
+    colors: dict = {}
+    for name in archive.namelist():
+        if not name.lower().endswith(".xml"):
+            continue
+        if "res" not in name.lower():
+            continue
+        try:
+            raw = archive.read(name).decode("utf-8", errors="ignore")
+        except KeyError:
+            continue
+        for attrs, body in OFD_DRAW_PARAM_PATTERN.findall(raw):
+            found = OFD_ID_PATTERN.search(attrs)
+            fill = OFD_FILL_COLOR_PATTERN.search(body)
+            if not found or not fill:
+                continue
+            parts = fill.group(1).split()
+            if len(parts) < 3:
+                continue
+            try:
+                colors[found.group(1)] = tuple(
+                    max(0, min(255, int(float(part)))) for part in parts[:3]
+                )
+            except ValueError:
+                continue
+    return colors
+
+
+def _ofd_subpaths(data: str) -> list[list[tuple[float, float]]]:
+    """
+    Turn one path's abbreviated data into closed polylines.
+
+    Only the commands a printed invoice uses are handled: move, line,
+    quadratic curve, cubic curve and close. Curves are flattened rather
+    than drawn, because the result is filled and a few straight segments
+    per glyph stroke are indistinguishable at reading size.
+    """
+    tokens = OFD_TOKEN_PATTERN.findall(data or "")
+    subpaths: list[list[tuple[float, float]]] = []
+    current: list[tuple[float, float]] = []
+    index = 0
+
+    def take(count: int) -> list[float]:
+        nonlocal index
+        values = [float(token) for token in tokens[index:index + count]]
+        index += count
+        return values
+
+    while index < len(tokens):
+        command = tokens[index]
+        index += 1
+        if command in ("M", "S"):
+            if len(current) > 2:
+                subpaths.append(current)
+            point = take(2)
+            current = [(point[0], point[1])] if len(point) == 2 else []
+        elif command == "L":
+            point = take(2)
+            if len(point) == 2 and current:
+                current.append((point[0], point[1]))
+        elif command == "Q":
+            values = take(4)
+            if len(values) == 4 and current:
+                x0, y0 = current[-1]
+                cx, cy, x1, y1 = values
+                for step in range(1, OFD_CURVE_STEPS + 1):
+                    t = step / OFD_CURVE_STEPS
+                    inv = 1 - t
+                    current.append(
+                        (
+                            inv * inv * x0 + 2 * inv * t * cx + t * t * x1,
+                            inv * inv * y0 + 2 * inv * t * cy + t * t * y1,
+                        )
+                    )
+        elif command == "B":
+            values = take(6)
+            if len(values) == 6 and current:
+                x0, y0 = current[-1]
+                c1x, c1y, c2x, c2y, x1, y1 = values
+                for step in range(1, OFD_CURVE_STEPS + 1):
+                    t = step / OFD_CURVE_STEPS
+                    inv = 1 - t
+                    current.append(
+                        (
+                            inv ** 3 * x0 + 3 * inv * inv * t * c1x
+                            + 3 * inv * t * t * c2x + t ** 3 * x1,
+                            inv ** 3 * y0 + 3 * inv * inv * t * c1y
+                            + 3 * inv * t * t * c2y + t ** 3 * y1,
+                        )
+                    )
+        elif command == "C":
+            if len(current) > 2:
+                subpaths.append(current)
+            current = []
+        else:
+            # An unknown command carries operands this reader cannot place,
+            # so the rest of the path is no longer trustworthy.
+            break
+
+    if len(current) > 2:
+        subpaths.append(current)
+    return subpaths
+
+
+def _render_ofd_page(content: str, colors: dict):
+    """
+    Draw one page's filled paths, in the colours the document names.
+
+    Subpaths within a path are combined by even-odd, which is what puts
+    the hole in a 口 and the counter in an 8; filling them one after
+    another would black those in.
+    """
+    from PIL import Image, ImageChops, ImageDraw
+
+    box = OFD_PAGE_PATTERN.search(content)
+    if not box:
+        return None
+    numbers = [float(value) for value in box.group(1).split()]
+    if len(numbers) != 4:
+        return None
+    _, _, width_mm, height_mm = numbers
+    if width_mm <= 0 or height_mm <= 0:
+        return None
+
+    width = min(int(width_mm * OFD_PIXELS_PER_MM), OFD_MAX_PAGE_PIXELS)
+    height = min(int(height_mm * OFD_PIXELS_PER_MM), OFD_MAX_PAGE_PIXELS)
+    if width < 2 or height < 2:
+        return None
+
+    scale_x = width / width_mm
+    scale_y = height / height_mm
+    page = Image.new("RGB", (width, height), (255, 255, 255))
+    drawn = 0
+
+    for attrs, body in OFD_PATH_OBJECT_PATTERN.findall(content):
+        data = OFD_PATH_PATTERN.search(body)
+        if not data:
+            continue
+        subpaths = _ofd_subpaths(data.group(1))
+        if not subpaths:
+            continue
+
+        inline = OFD_FILL_COLOR_PATTERN.search(body)
+        if inline:
+            parts = inline.group(1).split()[:3]
+            try:
+                color = tuple(int(float(part)) for part in parts)
+            except ValueError:
+                color = BLACK
+        else:
+            reference = OFD_DRAW_PARAM_REF_PATTERN.search(attrs)
+            color = colors.get(
+                reference.group(1) if reference else "", BLACK
+            )
+        if len(color) != 3:
+            color = BLACK
+
+        mask = Image.new("1", (width, height), 0)
+        for points in subpaths:
+            scaled = [(x * scale_x, y * scale_y) for x, y in points]
+            piece = Image.new("1", (width, height), 0)
+            ImageDraw.Draw(piece).polygon(scaled, fill=1)
+            mask = ImageChops.logical_xor(mask, piece)
+        page.paste(color, (0, 0), mask)
+        drawn += 1
+
+    # A page with a size but no marks renders as a blank sheet, and asking
+    # a model to read one costs a call to be told there is nothing there.
+    return page if drawn else None
+
+
+def _render_ofd(archive, max_pages: int) -> list[tuple[str, bytes]]:
+    """Draw the pages of an OFD whose text is not text."""
+    import io
+
+    colors = _ofd_fill_colors(archive)
+    names = sorted(
+        name
+        for name in archive.namelist()
+        if name.lower().endswith("content.xml")
+    )
+    images: list[tuple[str, bytes]] = []
+    for name in names[:max_pages]:
+        try:
+            content = archive.read(name).decode("utf-8", errors="ignore")
+        except KeyError:
+            continue
+        page = _render_ofd_page(content, colors)
+        if page is None:
+            continue
+        buffer = io.BytesIO()
+        page.save(buffer, format="PNG")
+        images.append(("image/png", buffer.getvalue()))
+    return images
+
+
+def decode_ofd(path: str, max_pages: int = 3) -> DecodedSource:
     """
     Read an OFD by opening it as what it is: a zip of XML.
 
-    The invoice fields live in the markup as text, so pulling them out
-    directly is both cheaper and more accurate than rendering the document
-    and asking a vision model to read it back.
+    The invoice fields usually live in the markup as text, so pulling them
+    out directly is both cheaper and more accurate than rendering the
+    document and asking a vision model to read it back.
+
+    Some issuers print the invoice instead: the characters arrive as filled
+    vector outlines with no text object anywhere in the file. Nothing can
+    read those as text, so the page is drawn and sent down the same path a
+    scanned PDF takes.
     """
     try:
         archive = zipfile.ZipFile(path)
@@ -291,7 +530,16 @@ def decode_ofd(path: str) -> DecodedSource:
 
     text = "\n".join(fragment for fragment in fragments if fragment)
     if not text.strip():
-        raise DecodeError("OFD contains no readable text")
+        with zipfile.ZipFile(path) as archive:
+            images = _render_ofd(archive, max_pages)
+        if images:
+            return DecodedSource(
+                mode=DecodeMode.IMAGE,
+                images=images,
+                decoder="ofd_render",
+                fields=declared,
+            )
+        raise DecodeError("OFD holds neither text nor a page to draw")
 
     return DecodedSource(
         mode=DecodeMode.TEXT,
@@ -450,7 +698,7 @@ def decode_source(
 
     is_ofd = normalized in ("application/ofd", "application/x-ofd")
     if is_ofd or extension == "ofd":
-        return decode_ofd(path)
+        return decode_ofd(path, max_pages=max_pages)
 
     is_xml = normalized in ("application/xml", "text/xml")
     if is_xml or extension == "xml":

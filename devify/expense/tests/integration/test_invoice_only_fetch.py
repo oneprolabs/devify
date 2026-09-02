@@ -81,10 +81,16 @@ class TestMailboxConfig:
 
         assert "subject_any" not in config["filter_config"]
 
-    def test_the_account_filters_still_apply(self, user):
+    def test_the_mailbox_filters_apply_alongside_the_subject_search(
+        self, user
+    ):
+        # Narrowing to invoices does not replace the mailbox's own rules;
+        # both reach the IMAP search together.
         mailbox = make_mailbox(user, invoice_only=True)
+        mailbox.max_age_days = 7
+        mailbox.save(update_fields=["max_age_days"])
 
-        config = mailbox.to_email_config({"max_age_days": 7})
+        config = mailbox.to_email_config()
 
         assert config["filter_config"]["max_age_days"] == 7
         assert config["filter_config"]["subject_any"]

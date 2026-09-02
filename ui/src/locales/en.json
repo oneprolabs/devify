@@ -1354,11 +1354,12 @@
       "filenameTemplateHelp": "Decides what each file inside the export archive is called.",
       "keywords": "Invoice keywords",
       "keywordsPlaceholder": "One per line, e.g.\ninvoice\nreceipt",
-      "keywordsHelp": "Only mail matching a keyword is recognized. Leave blank to use the built-in list.",
+      "keywordsHelp": "Only mail matching a keyword is read as invoices. Empty uses the built-in list.",
       "senders": "Only read these senders",
       "sendersPlaceholder": "One address or domain per line",
       "sendersHelp": "Leave blank to accept every sender.",
-      "filenameLoading": "Loading…"
+      "filenameLoading": "Loading…",
+      "keywordsScope": "Where the match is looked for depends on how the mail arrives: on the automatic path only the subject and attachment names are searched; a scan you start yourself also searches the body. Subject and filenames are where a sender says what an email is, and matching on the body alone pulls in every bill that mentions an invoice in its footer."
     },
     "tabsInvoices": "Invoices",
     "tabsGroups": "Groups",

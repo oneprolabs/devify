@@ -1367,7 +1367,8 @@
       "senders": "只识别这些发件人",
       "sendersPlaceholder": "每行一个邮箱或域名",
       "sendersHelp": "留空表示不限制发件人。",
-      "filenameLoading": "加载中…"
+      "filenameLoading": "加载中…",
+      "keywordsScope": "命中范围分两档：邮件自动进入发票流程时，只看标题和附件名；你手动发起扫描时，正文也会一起搜。标题和附件名是发送方刻意声明这封邮件是什么的地方，只按正文判断会把每一封页脚提到「发票」的账单都算进来。"
     },
     "tabsInvoices": "发票",
     "tabsGroups": "报销组",

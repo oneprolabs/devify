@@ -737,3 +737,76 @@ class TestMergedEmailsAreInScope:
         scanned = {c.email_id for c in result["candidates"]}
 
         assert merged.id in scanned
+
+
+class TestNoDoubleChargeAfterWorkflow:
+    """
+    An email the workflow already recognized must stay free.
+
+    The workflow charges once in credits_check and then recognizes with
+    ``bill=False``. Nothing stops the scheduled scan from picking the same
+    email up afterwards, and the scan bills by default, so the guard has to
+    hold on that second pass too.
+
+    Today it holds because settled attachments are skipped and the charge
+    needs ``extracted > 0``. That is a consequence of the skip rather than a
+    guard of its own, so these tests pin the behaviour: anyone loosening the
+    skip has to come back here and decide what billing should do.
+    """
+
+    def test_a_scan_after_the_workflow_charges_nothing(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        with stub_decode(), patch(
+            EXTRACT_PATH, return_value=invoice_fields()
+        ):
+            # The workflow's pass: recognized, deliberately unbilled.
+            first = recognize_email(email, bill=False)
+            # The scheduled scan's pass over the very same email.
+            second = recognize_email(email)
+
+        assert first["extracted"] == 1
+        assert first["credits_consumed"] == 0
+        assert second["credits_consumed"] == 0
+        assert (
+            EmailCreditsTransaction.objects.filter(
+                user_id=user.id, reason="invoice_extraction"
+            ).count()
+            == 0
+        )
+        assert Invoice.objects.filter(email_message=email).count() == 1
+
+    def test_the_balance_is_untouched_across_both_passes(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+        before = CreditsService.get_credits_balance(user.id)[
+            "available_credits"
+        ]
+
+        with stub_decode(), patch(
+            EXTRACT_PATH, return_value=invoice_fields()
+        ):
+            recognize_email(email, bill=False)
+            recognize_email(email)
+
+        after = CreditsService.get_credits_balance(user.id)[
+            "available_credits"
+        ]
+        assert after == before
+
+    def test_a_scan_on_its_own_still_charges(self, user):
+        # The guard must not have switched billing off for everyone.
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        with stub_decode(), patch(
+            EXTRACT_PATH, return_value=invoice_fields()
+        ):
+            stats = recognize_email(email)
+
+        assert stats["credits_consumed"] == 1
+

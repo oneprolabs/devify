@@ -75,6 +75,11 @@
         <span class="mt-1 block text-xs text-gray-500">
           {{ t('expense.prefs.keywordsHelp') }}
         </span>
+        <span
+          class="mt-2 block rounded-md bg-gray-50 p-2 text-xs leading-relaxed text-gray-500"
+        >
+          {{ t('expense.prefs.keywordsScope') }}
+        </span>
       </label>
 
       <div>

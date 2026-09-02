@@ -629,6 +629,61 @@ class TestOfdDrawnAsGraphics:
         with pytest.raises(DecodeError, match="neither text nor a page"):
             decode_source(path, filename="invoice.ofd")
 
+    def _sized_page(self, width_mm, height_mm, paths):
+        return (
+            '<ofd:Page xmlns:ofd="http://www.ofdspec.org/2016">'
+            "<ofd:Area><ofd:PhysicalBox>"
+            f"0 0 {width_mm} {height_mm}"
+            "</ofd:PhysicalBox></ofd:Area>" + paths + "</ofd:Page>"
+        )
+
+    def _rendered_size(self, tmp_path, width_mm, height_mm):
+        import io
+
+        from PIL import Image
+
+        path = self._ofd(
+            tmp_path,
+            self._sized_page(
+                width_mm,
+                height_mm,
+                self._path("M 1 1 L 2 1 L 2 2 L 1 2 C"),
+            ),
+        )
+        decoded = decode_source(path, filename="invoice.ofd")
+        assert decoded.mode == DecodeMode.IMAGE
+        return Image.open(io.BytesIO(decoded.images[0][1])).size
+
+    def test_an_ordinary_invoice_is_drawn_at_full_resolution(
+        self, tmp_path
+    ):
+        # A4 at 4px/mm is well inside the cap, so the common case is not
+        # quietly downscaled.
+        assert self._rendered_size(tmp_path, 210, 297) == (840, 1188)
+
+    def test_an_absurd_page_is_capped(self, tmp_path):
+        # The cap is a safety valve: no real invoice is a metre across,
+        # but a declared size is not something to trust.
+        width, height = self._rendered_size(tmp_path, 5000, 5000)
+        assert width <= 4000
+        assert height <= 4000
+
+    def test_a_capped_page_keeps_its_proportions(self, tmp_path):
+        """
+        Capping must scale the page, not squash it.
+
+        Width and height are limited independently, so a page long in one
+        direction can hit the cap on that axis alone. Scaling the axes by
+        different factors stretches the glyphs, and characters a model has
+        to read are the last thing to distort.
+        """
+        width_mm, height_mm = 2000, 100
+        width, height = self._rendered_size(tmp_path, width_mm, height_mm)
+
+        assert width / height == pytest.approx(
+            width_mm / height_mm, rel=0.02
+        ), f"page drawn at {width}x{height} for {width_mm}x{height_mm}mm"
+
     def test_a_curve_is_flattened_rather_than_dropped(self):
         from expense.services.decoder import _ofd_subpaths
 

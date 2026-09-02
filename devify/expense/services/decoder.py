@@ -409,8 +409,17 @@ def _render_ofd_page(content: str, colors: dict):
     if width_mm <= 0 or height_mm <= 0:
         return None
 
-    width = min(int(width_mm * OFD_PIXELS_PER_MM), OFD_MAX_PAGE_PIXELS)
-    height = min(int(height_mm * OFD_PIXELS_PER_MM), OFD_MAX_PAGE_PIXELS)
+    # One scale for both axes. Capping them separately squashes a page
+    # that is long in one direction - 2000x100mm came out 10:1 instead of
+    # 20:1 - and characters a model has to read are the last thing to
+    # distort.
+    scale = min(
+        OFD_PIXELS_PER_MM,
+        OFD_MAX_PAGE_PIXELS / width_mm,
+        OFD_MAX_PAGE_PIXELS / height_mm,
+    )
+    width = int(width_mm * scale)
+    height = int(height_mm * scale)
     if width < 2 or height < 2:
         return None
 

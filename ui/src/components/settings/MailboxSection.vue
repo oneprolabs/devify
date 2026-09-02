@@ -172,7 +172,7 @@
                 v-model="filtersText"
                 rows="3"
                 class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                :placeholder="t('settings.inheritsAccount')"
+                :placeholder="t('settings.noFilter')"
               />
             </label>
 
@@ -184,7 +184,7 @@
                 v-model="excludeText"
                 rows="3"
                 class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                :placeholder="t('settings.inheritsAccount')"
+                :placeholder="t('settings.noFilter')"
               />
             </label>
           </div>
@@ -193,7 +193,7 @@
             v-model="form.max_age_days"
             :label="t('settings.maxAgeDays')"
             type="number"
-            :placeholder="t('settings.inheritsAccount')"
+            :placeholder="t('settings.noFilter')"
           />
         </div>
 
@@ -321,15 +321,15 @@ const form = reactive(emptyForm())
 const filtersText = ref('')
 const excludeText = ref('')
 
+function fromLines(list) {
+  return Array.isArray(list) ? list.join('\n') : ''
+}
+
 function toLines(text) {
-  return text
+  return String(text || '')
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-}
-
-function fromLines(list) {
-  return Array.isArray(list) ? list.join('\n') : ''
 }
 
 let noticeTimer = null
@@ -393,7 +393,8 @@ function statusClass(box) {
 function startAdd() {
   Object.assign(form, emptyForm())
   filtersText.value = ''
-  excludeText.value = editing.value = null
+  excludeText.value = ''
+  editing.value = null
   showForm.value = true
 }
 

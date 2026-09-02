@@ -765,10 +765,8 @@
     "pauseProcessingHelp": "暂停后仍会正常收取邮件,但不会进入分析流程,也不会消耗点数。已收取的邮件会保持待处理状态,恢复后自动继续。适合刚绑定邮箱、历史邮件很多、还没调好过滤条件时使用。",
     "invoiceOnly": "只收发票",
     "invoiceOnlyHelp": "这个邮箱只抓取标题或附件名里提到发票的邮件，其余不下载、不处理、不扣点。标题里不带关键词的发票（少见）需要用发票管家手动补处理。",
-    "mailboxFilterHint": "以下过滤只作用于这个邮箱。留空则沿用下方账号级的默认设置。",
-    "inheritsAccount": "留空沿用账号默认",
-    "accountDefaultsTitle": "账号级默认",
-    "accountDefaultsHint": "适用于没有单独设置的邮箱，以及虚拟邮箱——它是一条通道而不是连接，没有自己的配置项。"
+    "mailboxFilterHint": "以下过滤只作用于这个邮箱。留空表示不过滤。",
+    "noFilter": "留空表示不过滤"
   },
   "dashboard": {
     "title": "仪表盘",

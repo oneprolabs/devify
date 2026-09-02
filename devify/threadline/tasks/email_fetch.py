@@ -50,22 +50,6 @@ def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
 
 
 
-def _user_filter_config(user_id: int) -> dict:
-    """
-    Read the account-wide filter defaults.
-
-    A mailbox may override any of these for itself; these are what applies
-    when it does not, and what the virtual address uses, since that is a
-    channel rather than a connection and has no row to configure.
-    """
-    setting = Settings.objects.filter(
-        user_id=user_id, key="email_config", is_active=True
-    ).first()
-    if not setting:
-        return {}
-    return (setting.value or {}).get("filter_config") or {}
-
-
 def _record_mailbox_success(mailbox) -> None:
     mailbox.last_fetched_at = timezone.now()
     mailbox.last_success_at = mailbox.last_fetched_at
@@ -157,9 +141,7 @@ def imap_email_fetch():
 
                 result = fetch_user_imap_emails(
                     user.id,
-                    mailbox.to_email_config(
-                        filter_config=_user_filter_config(user.id)
-                    ),
+                    mailbox.to_email_config(),
                     user_display=user_display,
                 )
                 processed_count += 1

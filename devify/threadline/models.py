@@ -1105,16 +1105,17 @@ class EmailMailbox(models.Model):
         Keeping the existing dict contract means the processor, parser and
         save path stay untouched by the move to multiple mailboxes.
 
-        The account settings act as defaults. Anything set on the mailbox
-        replaces them for this connection alone, so a work inbox and a
-        personal one can be filtered differently without repeating the
-        shared rules on every mailbox.
+        Filters belong to the mailbox and nowhere else. They used to have
+        an account-wide layer underneath, kept on the theory that the
+        virtual address needed somewhere to be configured - but the
+        virtual address arrives over SMTP, and that path never reads a
+        filter config at all. All the layer did was put half of one
+        mailbox's settings on a different screen.
         """
-        filter_config = dict(filter_config or {})
-        if self.filters:
-            filter_config["filters"] = list(self.filters)
-        if self.exclude_patterns:
-            filter_config["exclude_patterns"] = list(self.exclude_patterns)
+        filter_config = {
+            "filters": list(self.filters or []),
+            "exclude_patterns": list(self.exclude_patterns or []),
+        }
         if self.max_age_days is not None:
             filter_config["max_age_days"] = self.max_age_days
         if self.invoice_only:

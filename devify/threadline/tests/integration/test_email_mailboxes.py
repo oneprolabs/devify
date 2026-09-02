@@ -233,8 +233,6 @@ class TestChannelsRunInParallel:
     def test_the_fetch_loop_picks_up_every_enabled_mailbox(
         self, django_user_model
     ):
-        from threadline.tasks.email_fetch import _user_filter_config
-
         user = django_user_model.objects.create_user("m18", password="x")
         make_mailbox(user, username="a@example.com")
         make_mailbox(user, username="b@example.com")
@@ -247,13 +245,14 @@ class TestChannelsRunInParallel:
         )
 
         assert selected.count() == 2
-        assert _user_filter_config(user.id) == {}
 
-    def test_account_filters_apply_to_every_mailbox(self, django_user_model):
-        # Filters live on the account, not per mailbox: someone who wants
-        # only invoices wants that from everywhere they connect.
-        from threadline.tasks.email_fetch import _user_filter_config
-
+    def test_account_settings_no_longer_reach_a_mailbox(
+        self, django_user_model
+    ):
+        # Filters used to have an account-wide layer under the per-mailbox
+        # one. It served nobody: the virtual address arrives over SMTP and
+        # that path reads no filter config, so all the layer did was put
+        # half of one mailbox's settings on another screen.
         user = django_user_model.objects.create_user("m19", password="x")
         Settings.objects.create(
             user=user,
@@ -261,8 +260,11 @@ class TestChannelsRunInParallel:
             value={"filter_config": {"max_age_days": 7}},
             is_active=True,
         )
+        mailbox = make_mailbox(user)
 
-        assert _user_filter_config(user.id) == {"max_age_days": 7}
+        config = mailbox.to_email_config()["filter_config"]
+
+        assert "max_age_days" not in config
 
     def test_the_alias_channel_no_longer_depends_on_a_mode_flag(
         self, django_user_model
@@ -396,62 +398,53 @@ class TestConnectionCheck:
 
 class TestPerMailboxFilters:
     """
-    Filters sit on the mailbox, with the account settings as defaults.
+    Filters belong to the mailbox that uses them, and to nothing else.
 
-    A work inbox and a personal one want different rules, but a rule that
-    is common to both should not have to be repeated on each. An empty
-    field therefore inherits rather than filtering on nothing — which is
-    also what the virtual address relies on, since it is a channel rather
-    than a connection and has no row of its own.
+    They briefly had an account-wide layer underneath, on the theory that
+    the virtual address needed somewhere to be configured. It did not: the
+    virtual address arrives over SMTP, and that path never reads a filter
+    config. The layer only meant half of one mailbox's settings lived on a
+    different screen, so an empty field now means "do not filter on this"
+    rather than "inherit from somewhere else".
     """
 
-    def test_an_unset_filter_inherits_the_account_default(
-        self, django_user_model
-    ):
-        user = django_user_model.objects.create_user("f1", password="x")
-        mailbox = make_mailbox(user)
-
-        config = mailbox.to_email_config(
-            filter_config={"filters": ["发票"], "max_age_days": 30}
-        )["filter_config"]
-
-        assert config["filters"] == ["发票"]
-        assert config["max_age_days"] == 30
-
-    def test_a_mailbox_value_replaces_the_default(self, django_user_model):
+    def test_a_mailbox_uses_its_own_filters(self, django_user_model):
         user = django_user_model.objects.create_user("f2", password="x")
         mailbox = make_mailbox(user)
         mailbox.filters = ["行程单"]
         mailbox.max_age_days = 3
         mailbox.save(update_fields=["filters", "max_age_days"])
 
-        config = mailbox.to_email_config(
-            filter_config={"filters": ["发票"], "max_age_days": 30}
-        )["filter_config"]
+        config = mailbox.to_email_config()["filter_config"]
 
         assert config["filters"] == ["行程单"]
         assert config["max_age_days"] == 3
 
-    def test_overrides_are_per_field(self, django_user_model):
-        # Setting one rule must not silently drop the others.
-        user = django_user_model.objects.create_user("f3", password="x")
+    def test_an_empty_filter_means_no_filter(self, django_user_model):
+        user = django_user_model.objects.create_user("f1", password="x")
         mailbox = make_mailbox(user)
-        mailbox.filters = ["行程单"]
-        mailbox.save(update_fields=["filters"])
 
-        config = mailbox.to_email_config(
-            filter_config={
-                "filters": ["发票"],
-                "exclude_patterns": ["广告"],
-                "max_age_days": 30,
-            }
-        )["filter_config"]
+        config = mailbox.to_email_config()["filter_config"]
 
-        assert config["filters"] == ["行程单"]
-        assert config["exclude_patterns"] == ["广告"]
-        assert config["max_age_days"] == 30
+        assert config["filters"] == []
+        assert config["exclude_patterns"] == []
+        # Absent rather than empty: no age limit at all, which the fetch
+        # reads differently from a limit of zero days.
+        assert "max_age_days" not in config
 
-    def test_zero_days_is_a_real_override_not_an_absence(
+    def test_one_mailbox_does_not_affect_another(self, django_user_model):
+        # The whole point of moving these onto the mailbox: a work inbox
+        # and a personal one want different rules.
+        user = django_user_model.objects.create_user("f3", password="x")
+        work = make_mailbox(user, username="work@example.com")
+        personal = make_mailbox(user, username="personal@example.com")
+        work.filters = ["发票"]
+        work.save(update_fields=["filters"])
+
+        assert work.to_email_config()["filter_config"]["filters"] == ["发票"]
+        assert personal.to_email_config()["filter_config"]["filters"] == []
+
+    def test_zero_days_is_a_real_limit_not_an_absence(
         self, django_user_model
     ):
         user = django_user_model.objects.create_user("f4", password="x")
@@ -459,9 +452,7 @@ class TestPerMailboxFilters:
         mailbox.max_age_days = 0
         mailbox.save(update_fields=["max_age_days"])
 
-        config = mailbox.to_email_config(
-            filter_config={"max_age_days": 30}
-        )["filter_config"]
+        config = mailbox.to_email_config()["filter_config"]
 
         assert config["max_age_days"] == 0
 
@@ -480,7 +471,7 @@ class TestPerMailboxFilters:
 
         assert response.data["data"]["filters"] == ["发票", "行程单"]
 
-    def test_clearing_a_filter_returns_it_to_the_default(
+    def test_clearing_a_filter_leaves_the_mailbox_unfiltered(
         self, api_client, django_user_model
     ):
         user = django_user_model.objects.create_user("f6", password="x")
@@ -494,8 +485,4 @@ class TestPerMailboxFilters:
         )
         mailbox.refresh_from_db()
 
-        config = mailbox.to_email_config(
-            filter_config={"max_age_days": 30}
-        )["filter_config"]
-        assert config["max_age_days"] == 30
-
+        assert "max_age_days" not in mailbox.to_email_config()["filter_config"]

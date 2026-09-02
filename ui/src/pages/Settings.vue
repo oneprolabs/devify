@@ -558,54 +558,6 @@
               </label>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <BaseInput
-                v-model="emailForm.maxAgeDays"
-                :label="t('settings.maxAgeDays')"
-                type="number"
-                :placeholder="t('settings.maxAgeDaysPlaceholder')"
-              />
-            </div>
-
-            <div>
-              <h4 class="text-sm font-medium text-gray-900">
-                {{ t('settings.accountDefaultsTitle') }}
-              </h4>
-              <p class="mt-1 text-xs text-gray-500">
-                {{ t('settings.accountDefaultsHint') }}
-              </p>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  {{ t('settings.imapFilters') }}
-                </label>
-                <textarea
-                  v-model="emailForm.filtersText"
-                  class="input min-h-[96px]"
-                  :placeholder="t('settings.imapFiltersPlaceholder')"
-                />
-                <p class="mt-1 text-xs text-gray-500">
-                  {{ t('settings.imapFiltersHelp') }}
-                </p>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  {{ t('settings.excludePatterns') }}
-                </label>
-                <textarea
-                  v-model="emailForm.excludePatternsText"
-                  class="input min-h-[96px]"
-                  :placeholder="t('settings.excludePatternsPlaceholder')"
-                />
-                <p class="mt-1 text-xs text-gray-500">
-                  {{ t('settings.excludePatternsHelp') }}
-                </p>
-              </div>
-            </div>
-
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p class="text-xs leading-relaxed text-blue-700">
                 {{ t('settings.emailConfigHint') }}
@@ -742,7 +694,6 @@ import { settingsApi } from '@/api/settings'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
 import MailboxSection from '@/components/settings/MailboxSection.vue'
 import SceneSelector from '@/components/ui/SceneSelector.vue'
 import { getTimezoneLabel } from '@/utils/timezones'
@@ -774,12 +725,11 @@ const preferenceForm = reactive({
 
 // Filters live on the account rather than on each mailbox: someone who
 // only wants invoices wants that from every mailbox they connect.
+// Only the processing brake lives here now. Filters belong to the mailbox
+// that uses them, and the virtual address arrives over SMTP, which never
+// reads a filter config at all.
 const emailForm = reactive({
-  processingPaused: false,
-  folder: 'INBOX',
-  filtersText: '',
-  excludePatternsText: '',
-  maxAgeDays: 7
+  processingPaused: false
 })
 
 // Kept so saving the filters cannot drop settings this form does not show.
@@ -866,18 +816,6 @@ function goToEmailSettings() {
   activeSettingsTab.value = 'email'
 }
 
-function parseListValue(text) {
-  return text
-    .split('\n')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-function formatListValue(value) {
-  if (!Array.isArray(value)) return ''
-  return value.join('\n')
-}
-
 function normalizeUiLanguageCode(language) {
   if (!language || typeof language !== 'string') {
     return 'en'
@@ -896,29 +834,15 @@ function normalizeUiLanguageCode(language) {
 function normalizeEmailConfig(value) {
   const raw = value && typeof value === 'object' ? value : {}
   rawEmailConfig.value = raw
-  const filterConfig =
-    raw.filter_config && typeof raw.filter_config === 'object'
-      ? raw.filter_config
-      : {}
-
   emailForm.processingPaused = Boolean(raw.processing_paused)
-  emailForm.filtersText = formatListValue(filterConfig.filters)
-  emailForm.excludePatternsText = Array.isArray(filterConfig.exclude_patterns)
-    ? filterConfig.exclude_patterns.join('\n')
-    : ''
-  emailForm.maxAgeDays = filterConfig.max_age_days || 7
 }
 function buildEmailConfig() {
-  // Only the filter half belongs to this form now; whatever else is
-  // already stored is carried through untouched.
+  // This form owns the brake and nothing else; anything already stored is
+  // carried through untouched rather than rewritten from a screen that no
+  // longer shows it.
   return {
     ...(rawEmailConfig.value || {}),
-    processing_paused: Boolean(emailForm.processingPaused),
-    filter_config: {
-      filters: parseListValue(emailForm.filtersText),
-      exclude_patterns: parseListValue(emailForm.excludePatternsText),
-      max_age_days: Number(emailForm.maxAgeDays) || 7
-    }
+    processing_paused: Boolean(emailForm.processingPaused)
   }
 }
 

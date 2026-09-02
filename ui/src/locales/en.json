@@ -453,7 +453,9 @@
       "file": "File"
     },
     "errorLoading": "Error loading threadline",
-    "errorLoadingDesc": "Failed to load conversation details"
+    "errorLoadingDesc": "Failed to load conversation details",
+    "handledByExpense": "{count} invoice | {count} invoices",
+    "handledByExpenseHint": "Expense read {count} invoices out of this email"
   },
   "metadata": {
     "sectionTitle": "Basic Information",
@@ -757,7 +759,12 @@
     "invoiceOnly": "Invoices only",
     "invoiceOnlyHelp": "Fetch only mail whose subject or attachment name names an invoice. The rest is never downloaded, processed or charged. An invoice with a neutral subject (rare) needs the expense app's manual backfill.",
     "mailboxFilterHint": "These filters apply to this mailbox only. Leave one empty to not filter on it.",
-    "noFilter": "Empty means no filter"
+    "noFilter": "Empty means no filter",
+    "invoiceRuleTitle": "How an email is judged to be an invoice",
+    "invoiceRuleFetch": "1. Download: the mail server is asked for messages whose subject contains a keyword. The server can only search subjects, not attachment names.",
+    "invoiceRuleRoute": "2. Recognition: downloaded mail is checked against both the subject and the attachment filenames; either one is enough.",
+    "invoiceRuleBody": "3. The body is not consulted. Matching it pulls in every phone bill and usage report that mentions an invoice in its footer, and a wrong guess costs a real conversation its summary.",
+    "invoiceRuleMiss": "4. Keywords are set under Expense › Settings. Mail that misses is not lost, only left out of Expense — forward it here with a keyword in the subject to pick it up."
   },
   "dashboard": {
     "title": "Dashboard",

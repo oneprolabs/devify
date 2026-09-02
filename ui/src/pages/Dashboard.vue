@@ -468,6 +468,40 @@
                       :status="getThreadlineDisplayStatus(result)"
                       :progress-percent="getThreadlineProgressPercent(result)"
                     />
+                    <!-- Says where this email ended up: an invoice mail is
+                         read by Expense instead of summarised, and without
+                         this the list gives no sign of that. -->
+                    <span
+                      v-if="result.invoice_count > 0"
+                      class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+                      :title="
+                        t('chats.handledByExpenseHint', {
+                          count: result.invoice_count
+                        })
+                      "
+                    >
+                      <svg
+                        class="h-3 w-3"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      {{
+                        t(
+                          'chats.handledByExpense',
+                          { count: result.invoice_count },
+                          result.invoice_count
+                        )
+                      }}
+                    </span>
                     <span
                       v-if="result.share_status?.is_active"
                       class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium"

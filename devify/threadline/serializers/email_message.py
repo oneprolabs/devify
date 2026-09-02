@@ -253,6 +253,7 @@ class EmailMessageSerializer(serializers.ModelSerializer):
     issue_external_id = serializers.SerializerMethodField()
     issue_url = serializers.SerializerMethodField()
     relay_delivery_count = serializers.SerializerMethodField()
+    invoice_count = serializers.SerializerMethodField()
     relay_deliveries = serializers.SerializerMethodField()
 
     class Meta:
@@ -297,6 +298,7 @@ class EmailMessageSerializer(serializers.ModelSerializer):
             "issue_external_id",
             "issue_url",
             "relay_delivery_count",
+            "invoice_count",
             "relay_deliveries",
             "created_at",
             "updated_at",
@@ -538,6 +540,20 @@ class EmailMessageSerializer(serializers.ModelSerializer):
             return None
         return issue.issue_url
 
+    def get_invoice_count(self, obj):
+        """
+        How many invoices Expense read out of this email.
+
+        Uses the annotation when the list added one, and counts directly
+        otherwise, so a detail view answers the same as a list row.
+        """
+        from expense.services.attribution import extracted_count
+
+        annotated = getattr(obj, "invoice_count", None)
+        if annotated is not None:
+            return annotated
+        return extracted_count(obj)
+
     def get_relay_delivery_count(self, obj):
         """
         Return the number of relay deliveries in the latest relay event.
@@ -618,6 +634,7 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
     issue_external_id = serializers.SerializerMethodField()
     issue_url = serializers.SerializerMethodField()
     relay_delivery_count = serializers.SerializerMethodField()
+    invoice_count = serializers.SerializerMethodField()
     relay_deliveries = serializers.SerializerMethodField()
 
     class Meta:
@@ -655,6 +672,7 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
             "issue_external_id",
             "issue_url",
             "relay_delivery_count",
+            "invoice_count",
             "relay_deliveries",
             "created_at",
         ]
@@ -719,6 +737,20 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
         if not issue:
             return None
         return issue.issue_url
+
+    def get_invoice_count(self, obj):
+        """
+        How many invoices Expense read out of this email.
+
+        Uses the annotation the list adds, and counts directly when
+        it is absent, so every caller gets the same answer.
+        """
+        from expense.services.attribution import extracted_count
+
+        annotated = getattr(obj, "invoice_count", None)
+        if annotated is not None:
+            return annotated
+        return extracted_count(obj)
 
     def get_relay_delivery_count(self, obj):
         """

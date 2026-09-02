@@ -797,6 +797,46 @@ class TestNoDoubleChargeAfterWorkflow:
         ]
         assert after == before
 
+    def test_the_scan_does_not_even_reread_the_attachment(self, user):
+        # What keeps the second pass free is the settled skip, so assert
+        # the skip itself: loosening it has to fail here, not silently
+        # start charging.
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        with stub_decode(), patch(
+            EXTRACT_PATH, return_value=invoice_fields()
+        ):
+            recognize_email(email, bill=False)
+
+        with stub_decode(), patch(EXTRACT_PATH) as extract:
+            extract.return_value = invoice_fields()
+            second = recognize_email(email)
+
+        assert not extract.called, "the scan re-read a settled attachment"
+        assert second["skipped"] == 1
+        assert second["extracted"] == 0
+
+    def test_a_forced_rescan_is_still_an_explicit_charge(self, user):
+        # force is a deliberate request to read the email again, so the
+        # guard above must not swallow that too.
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        with stub_decode(), patch(
+            EXTRACT_PATH, return_value=invoice_fields()
+        ):
+            recognize_email(email, bill=False)
+
+        with stub_decode(), patch(
+            EXTRACT_PATH, return_value=invoice_fields()
+        ):
+            forced = recognize_email(email, force=True)
+
+        assert forced["credits_consumed"] > 0
+
     def test_a_scan_on_its_own_still_charges(self, user):
         # The guard must not have switched billing off for everyone.
         give_credits(user, 10)
@@ -809,4 +849,3 @@ class TestNoDoubleChargeAfterWorkflow:
             stats = recognize_email(email)
 
         assert stats["credits_consumed"] == 1
-

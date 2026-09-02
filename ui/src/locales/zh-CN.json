@@ -463,7 +463,9 @@
       "file": "文件"
     },
     "errorLoading": "加载对话详情失败",
-    "errorLoadingDesc": "无法加载对话详情"
+    "errorLoadingDesc": "无法加载对话详情",
+    "handledByExpense": "发票 {count} 张",
+    "handledByExpenseHint": "发票管家从这封邮件里识别出了 {count} 张发票"
   },
   "metadata": {
     "sectionTitle": "基本信息",
@@ -766,7 +768,12 @@
     "invoiceOnly": "只收发票",
     "invoiceOnlyHelp": "这个邮箱只抓取标题或附件名里提到发票的邮件，其余不下载、不处理、不扣点。标题里不带关键词的发票（少见）需要用发票管家手动补处理。",
     "mailboxFilterHint": "以下过滤只作用于这个邮箱。留空表示不过滤。",
-    "noFilter": "留空表示不过滤"
+    "noFilter": "留空表示不过滤",
+    "invoiceRuleTitle": "我们是怎么判断一封邮件是发票的",
+    "invoiceRuleFetch": "① 下载阶段：向邮件服务器搜索标题含关键词的邮件。这一步受服务器能力限制，只能搜标题，搜不了附件名。",
+    "invoiceRuleRoute": "② 识别阶段：对下载回来的邮件，检查标题和附件文件名，命中任一即交给发票管家识别。",
+    "invoiceRuleBody": "③ 正文不参与判断。正文匹配会把每一封页脚提到「发票」的话费账单、用量报告都算进来，误判的代价是一封真实往来邮件丢掉摘要。",
+    "invoiceRuleMiss": "④ 关键词在「发票管家 › 设置」里配置。没命中的邮件不会丢，只是不进发票管家——把它转发到这个邮箱、标题里带上关键词即可补收。"
   },
   "dashboard": {
     "title": "仪表盘",

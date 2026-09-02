@@ -122,6 +122,11 @@ class EmailMessageAPIView(BaseAPIView):
         """
         Get EmailMessage queryset with related objects
         """
+        # Deferred so threadline keeps working with the expense app
+        # absent: this module is core, and importing an app built on
+        # top of it at import time would invert that.
+        from expense.services.attribution import extracted_count_subquery
+
         return (
             EmailMessage.objects.select_related("user", "merged_into")
             .prefetch_related("merged_children")
@@ -131,6 +136,15 @@ class EmailMessageAPIView(BaseAPIView):
             .prefetch_related("relay_events__deliveries__subscription")
             .prefetch_related("share_links")
             .filter(merged_into__isnull=True)
+            # The invoices an email produced are the record of it having
+            # been taken over by Expense; counting them beats a separate
+            # tag, which would be the same fact stored twice and free to
+            # drift when an invoice is re-read or removed.
+            #
+            # Two counts, because they answer different questions; both
+            # follow a merge, and neither joins the outer query. See
+            # expense.services.attribution for the rules.
+            .annotate(invoice_count=extracted_count_subquery())
             .all()
         )
 
@@ -153,6 +167,17 @@ class EmailMessageAPIView(BaseAPIView):
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 description="Filter by processing status",
+            ),
+            OpenApiParameter(
+                name="handled_by",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                enum=["expense", "none"],
+                description=(
+                    "Whether the expense app took the email over. "
+                    "'expense' keeps only those it read, 'none' only "
+                    "those it did not."
+                ),
             ),
             OpenApiParameter(
                 name="ordering",
@@ -202,6 +227,34 @@ class EmailMessageAPIView(BaseAPIView):
                             | Q(llm_content__icontains=keyword)
                             | Q(text_content__icontains=keyword)
                         )
+
+            # An unknown value is a typo, not "show everything": silently
+            # returning the unfiltered list is how someone concludes the
+            # filter does nothing.
+            handled_by = request.query_params.get("handled_by", None)
+            if handled_by is not None:
+                if handled_by not in ("expense", "none"):
+                    return Response(
+                        {
+                            "code": 400,
+                            "message": _(
+                                "handled_by must be 'expense' or 'none'."
+                            ),
+                            "data": None,
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                from expense.services.attribution import (
+                    handled_count_subquery,
+                )
+
+                queryset = queryset.annotate(
+                    expense_row_count=handled_count_subquery()
+                )
+                if handled_by == "expense":
+                    queryset = queryset.filter(expense_row_count__gt=0)
+                else:
+                    queryset = queryset.filter(expense_row_count=0)
 
             # Filter by status
             message_status = request.query_params.get("status", None)

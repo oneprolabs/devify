@@ -238,6 +238,22 @@
               </span>
             </span>
           </label>
+
+          <!-- Someone whose invoice was not picked up needs to know what
+               was actually looked at, or they cannot tell a missing
+               keyword from a sender who only wrote it in the body. -->
+          <div
+            v-if="form.invoice_only"
+            class="mt-3 space-y-2 rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600"
+          >
+            <p class="font-medium text-gray-700">
+              {{ t('settings.invoiceRuleTitle') }}
+            </p>
+            <p>{{ t('settings.invoiceRuleFetch') }}</p>
+            <p>{{ t('settings.invoiceRuleRoute') }}</p>
+            <p>{{ t('settings.invoiceRuleBody') }}</p>
+            <p>{{ t('settings.invoiceRuleMiss') }}</p>
+          </div>
         </div>
 
         <div class="flex flex-wrap justify-end gap-2">

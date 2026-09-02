@@ -1139,16 +1139,18 @@ class EmailMailbox(models.Model):
         """
         The words that make an email an invoice, for this user.
 
-        Deferred import: the fetch path must keep working for a user who
-        never switched the expense app on, and this is the only place
-        threadline needs to know what an invoice looks like.
+        Deferred import only to avoid a circular one at module load; the
+        expense app is always installed, so a failure here is a real fault
+        and must not be swallowed. It used to fall back to a literal list,
+        which meant any error inside the lookup silently replaced the words
+        the user had configured with three hardcoded ones - the filter went
+        on working, on the wrong terms, with nothing to show for it. The
+        fetch loop already isolates and records a failure per mailbox, so
+        letting it raise names the mailbox instead of hiding the cause.
         """
-        try:
-            from expense.services.routing import subject_terms
+        from expense.services.routing import subject_terms
 
-            return subject_terms(self.user)
-        except Exception:  # pragma: no cover - expense is optional
-            return ["发票", "行程单", "invoice"]
+        return subject_terms(self.user)
 
 class EmailAlias(models.Model):
     """

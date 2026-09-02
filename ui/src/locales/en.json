@@ -1277,7 +1277,10 @@
       "originalMissing": "The original file is no longer available.",
       "originalNotViewable": "This format cannot be shown in a browser (OFD, for example).",
       "originalDownload": "Download the original",
-      "originalFailed": "Could not load the original."
+      "originalFailed": "Could not load the original.",
+      "failed": "Not read",
+      "failedTitle": "This one could not be read",
+      "failedHint": "Usually the file itself: no readable text layer, or a layout that is not a standard invoice. Check the original above; if it looks fine, fill the fields in by hand."
     },
     "groups": {
       "title": "Reimbursement groups",

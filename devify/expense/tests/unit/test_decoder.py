@@ -450,3 +450,77 @@ class TestDecodeXml:
 
         assert decoded.decoder == "xml"
 
+
+
+class TestZipArchives:
+    """
+    Rail operators deliver a ticket as a zip.
+
+    The archive holds one journey as both PDF and OFD, so reading every
+    member would file the same expense twice. One member is chosen, and
+    the archive is treated as what it is: untrusted input from a stranger.
+    """
+
+    def _archive(self, tmp_path, members):
+        import zipfile
+
+        path = tmp_path / "invoice.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            for name, payload in members.items():
+                archive.writestr(name, payload)
+        return str(path)
+
+    def test_the_pdf_is_preferred_over_the_ofd(self, tmp_path):
+        # Both are the same ticket; the PDF has a text layer and, failing
+        # that, can still be rendered for the vision model.
+        path = self._archive(
+            tmp_path,
+            {"ticket.ofd": b"PK\x03\x04ofd", "ticket.pdf": build_pdf("Ticket 26119110010007290784")},
+        )
+
+        decoded = decode_source(path, filename="invoice.zip")
+
+        assert decoded.decoder.startswith("zip:")
+        assert "pdf" in decoded.decoder
+
+    def test_the_decoder_is_named_through_the_archive(self, tmp_path):
+        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 26119110010007290784")})
+
+        decoded = decode_source(path, filename="invoice.zip")
+
+        # Knowing it arrived in a zip is worth keeping for diagnosis; which
+        # PDF route ran inside is the pdf decoder's business, not this one's.
+        assert decoded.decoder.startswith("zip:pdf")
+
+    def test_an_archive_of_nothing_readable_is_refused(self, tmp_path):
+        path = self._archive(tmp_path, {"readme.txt": b"hello"})
+
+        with pytest.raises(DecodeError, match="no readable invoice"):
+            decode_source(path, filename="invoice.zip")
+
+    def test_a_corrupt_archive_is_refused(self, tmp_path):
+        path = tmp_path / "broken.zip"
+        path.write_bytes(b"not a zip at all")
+
+        with pytest.raises(DecodeError, match="could not be opened"):
+            decode_source(str(path), filename="broken.zip")
+
+    def test_an_oversized_member_is_refused(self, tmp_path, monkeypatch):
+        # A zip bomb declares little and expands to a lot, so the guard
+        # has to survive the archive's own headers being untrue.
+        from expense.services import decoder as decoder_module
+
+        monkeypatch.setattr(decoder_module, "MAX_ZIP_MEMBER_BYTES", 10)
+        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 26119110010007290784")})
+
+        with pytest.raises(DecodeError, match="too large"):
+            decode_source(path, filename="invoice.zip")
+
+    def test_the_content_type_routes_it_too(self, tmp_path):
+        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 26119110010007290784")})
+
+        decoded = decode_source(
+            path, content_type="application/zip", filename="anything"
+        )
+
+        assert decoded.decoder.startswith("zip:")

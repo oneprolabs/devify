@@ -61,6 +61,10 @@ INVOICE_TYPE_CATEGORY_MAP = {
 # Attachment gating for candidate filtering.
 PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf"}
 OFD_CONTENT_TYPES = {"application/ofd", "application/x-ofd"}
+ZIP_CONTENT_TYPES = frozenset(
+    {"application/zip", "application/x-zip-compressed"}
+)
+
 XML_CONTENT_TYPES = {"application/xml", "text/xml"}
 
 # Signature images and logos cluster below this size; invoices do not.

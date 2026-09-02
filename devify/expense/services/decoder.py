@@ -14,6 +14,7 @@ import base64
 import logging
 import mimetypes
 import re
+import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -362,6 +363,74 @@ def decode_image(path: str) -> DecodedSource:
     )
 
 
+# A zip arriving from a stranger is untrusted input, so the reader is
+# bounded rather than trusting the archive's own headers.
+MAX_ZIP_ENTRIES = 40
+MAX_ZIP_MEMBER_BYTES = 30 * 1024 * 1024
+
+# Which format to read when an archive carries the same invoice several
+# times, best first. Railway invoices ship PDF and OFD of one ticket, and
+# reading both would file the journey twice. PDF leads because its text
+# layer is the most reliable and, failing that, it can still be rendered
+# for the vision model - an OFD that will not parse has nowhere to go.
+ZIP_FORMAT_PRIORITY = ("pdf", "ofd", "xml", "png", "jpg", "jpeg")
+
+
+def decode_zip(path: str, max_pages: int = 3) -> DecodedSource:
+    """
+    Read the one invoice inside an archive.
+
+    Rail operators deliver a ticket as a zip holding the same document as
+    both PDF and OFD. Only one of them is the expense, so this picks a
+    single member rather than handing back everything it finds.
+    """
+    try:
+        with zipfile.ZipFile(path) as archive:
+            members = [
+                info
+                for info in archive.infolist()[:MAX_ZIP_ENTRIES]
+                if not info.is_dir()
+            ]
+
+            best = None
+            best_rank = len(ZIP_FORMAT_PRIORITY)
+            for info in members:
+                suffix = info.filename.lower().rsplit(".", 1)[-1]
+                if suffix not in ZIP_FORMAT_PRIORITY:
+                    continue
+                rank = ZIP_FORMAT_PRIORITY.index(suffix)
+                if rank < best_rank:
+                    best, best_rank = info, rank
+
+            if best is None:
+                raise DecodeError("Archive holds no readable invoice")
+
+            if best.file_size > MAX_ZIP_MEMBER_BYTES:
+                raise DecodeError("Archive member is too large to read")
+
+            suffix = best.filename.lower().rsplit(".", 1)[-1]
+            # Read the member by name rather than extracting, so a crafted
+            # path in the archive cannot write outside the temp file.
+            with archive.open(best) as source:
+                payload = source.read(MAX_ZIP_MEMBER_BYTES + 1)
+            if len(payload) > MAX_ZIP_MEMBER_BYTES:
+                raise DecodeError("Archive member is too large to read")
+    except DecodeError:
+        raise
+    except zipfile.BadZipFile as exc:
+        raise DecodeError(f"Archive could not be opened: {exc}") from exc
+
+    with tempfile.NamedTemporaryFile(suffix=f".{suffix}") as handle:
+        handle.write(payload)
+        handle.flush()
+        decoded = decode_source(
+            handle.name, filename=best.filename, max_pages=max_pages
+        )
+
+    decoded.decoder = f"zip:{decoded.decoder}"
+    return decoded
+
+
 def decode_source(
     path: str,
     content_type: str = "",
@@ -396,5 +465,9 @@ def decode_source(
         "heic",
     ):
         return decode_image(path)
+
+    is_zip = normalized in ("application/zip", "application/x-zip-compressed")
+    if is_zip or extension == "zip":
+        return decode_zip(path, max_pages=max_pages)
 
     raise DecodeError(f"Unsupported file type: {content_type or extension}")

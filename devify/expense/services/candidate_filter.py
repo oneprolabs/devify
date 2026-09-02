@@ -18,6 +18,7 @@ from expense.constants import (
     OFD_CONTENT_TYPES,
     PDF_CONTENT_TYPES,
     XML_CONTENT_TYPES,
+    ZIP_CONTENT_TYPES,
 )
 
 
@@ -182,6 +183,11 @@ def classify_attachment(attachment, app_config):
         return SourceKind.ATTACHMENT, None
 
     if content_type in OFD_CONTENT_TYPES or extension == "ofd":
+        return SourceKind.ATTACHMENT, None
+
+    # Rail operators deliver a ticket as a zip of the same invoice in two
+    # formats. The decoder opens it and reads one of them.
+    if content_type in ZIP_CONTENT_TYPES or extension == "zip":
         return SourceKind.ATTACHMENT, None
 
     # A fully digital invoice ships its XML alongside the PDF, and that

@@ -91,6 +91,21 @@
           {{ t('expense.invoices.learnHint') }}
         </p>
 
+        <div
+          v-if="invoice.status === 'failed' && invoice.error_message"
+          class="space-y-1 rounded-lg border border-red-200 bg-red-50 p-3"
+        >
+          <p class="text-xs font-medium text-red-800">
+            {{ t('expense.invoices.failedTitle') }}
+          </p>
+          <p class="text-xs leading-relaxed text-red-700">
+            {{ invoice.error_message }}
+          </p>
+          <p class="text-xs leading-relaxed text-red-600">
+            {{ t('expense.invoices.failedHint') }}
+          </p>
+        </div>
+
         <div class="space-y-2">
           <h3 class="text-sm font-medium text-gray-900">
             {{ t('expense.invoices.original') }}

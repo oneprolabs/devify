@@ -89,6 +89,12 @@
               {{ t('expense.invoices.needsReview') }}
             </span>
             <span
+              v-if="invoice.status === 'failed'"
+              class="rounded-full bg-red-100 px-2 py-0.5 text-[11px] text-red-800"
+            >
+              {{ t('expense.invoices.failed') }}
+            </span>
+            <span
               v-if="invoice.disposition === 'filed'"
               class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700"
             >

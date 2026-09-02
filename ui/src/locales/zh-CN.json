@@ -1286,7 +1286,10 @@
       "originalMissing": "原件文件已不可用。",
       "originalNotViewable": "这个格式浏览器无法直接预览(例如 OFD)。",
       "originalDownload": "下载原件",
-      "originalFailed": "原件加载失败。"
+      "originalFailed": "原件加载失败。",
+      "failed": "识别失败",
+      "failedTitle": "这张没能读出来",
+      "failedHint": "多半是原件本身的问题——文件里没有可读的文字层，或者版式不是标准发票。可以点上面的原件自己核对；确认无误的话，直接手工填写下面的字段即可。"
     },
     "groups": {
       "title": "报销组",

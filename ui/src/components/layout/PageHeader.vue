@@ -4,6 +4,18 @@
     :class="paddingClass"
   >
     <div class="flex items-baseline gap-2 min-w-0">
+      <!-- Where this page sits, for the ones nested under an app. -->
+      <template v-if="parent">
+        <router-link
+          :to="parent.to"
+          class="hidden flex-none text-[12.5px] text-ink-3 transition-colors hover:text-ink md:block"
+        >
+          {{ parent.label }}
+        </router-link>
+        <span class="hidden flex-none text-[12.5px] text-ink-4 md:block">
+          /
+        </span>
+      </template>
       <h1 class="truncate text-base font-semibold text-ink md:text-[14.5px]">
         {{ title }}
       </h1>
@@ -32,6 +44,8 @@ import UserMenu from './UserMenu.vue'
 
 const props = defineProps({
   title: { type: String, required: true },
+  // { to, label } for a page that lives inside another.
+  parent: { type: Object, default: null },
   // A count beside the title, already formatted. `null` renders nothing.
   count: { type: [String, Number], default: null },
   // The canvas gives table pages 20px gutters and form pages 24 or 28.

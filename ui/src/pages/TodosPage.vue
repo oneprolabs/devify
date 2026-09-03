@@ -1,6 +1,10 @@
 <template>
   <AppLayout :padded="false">
-    <PageHeader :title="t('todos.title')" :count="openCountLabel">
+    <PageHeader
+      :parent="{ to: '/apps', label: t('apps.centerTitle') }"
+      :title="t('todos.title')"
+      :count="openCountLabel"
+    >
       <label
         class="flex h-8 max-w-[360px] flex-1 items-center gap-2 rounded-md border border-line bg-panel-sub px-2.5"
       >

@@ -1,0 +1,127 @@
+/**
+ * Design tokens for the AImyChats redesign.
+ *
+ * Every value is stored as space-separated RGB channels so Tailwind can apply
+ * its own alpha modifiers (`bg-panel/60`, `bg-opacity-50`). The `--name`
+ * aliases exist for hand-written CSS that needs a plain color.
+ *
+ * Two layers live here:
+ *   1. Semantic tokens (--bg, --panel, --tx, --ac, ...) — what redesigned
+ *      pages use. They are the only colors new markup should reference.
+ *   2. A neutral ramp (--c-n50 ... --c-n900) that backs Tailwind's `gray-*`
+ *      utilities. It inverts in dark mode, so pages not yet redesigned stay
+ *      readable while the migration runs page by page.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --c-bg: 255 255 255;
+  --c-bg-sub: 247 248 250;
+  --c-panel: 255 255 255;
+  --c-panel-sub: 250 251 252;
+
+  /* lines */
+  --c-line: 227 231 237;
+  --c-line-soft: 237 240 244;
+
+  /* text */
+  --c-tx: 15 23 41;
+  --c-tx2: 90 100 116;
+  --c-tx3: 151 160 174;
+  --c-tx4: 182 189 200;
+
+  /* accent */
+  --c-ac: 75 87 200;
+  --c-ac-on: 255 255 255;
+  --c-ac-soft: 238 240 252;
+
+  /* status */
+  --c-ok: 23 130 90;
+  --c-ok-soft: 231 244 238;
+  --c-warn: 180 97 12;
+  --c-warn-soft: 251 240 228;
+  --c-bad: 192 57 46;
+  --c-bad-soft: 251 236 234;
+  --c-chip: 241 243 247;
+
+  /* neutral ramp backing the legacy gray-* utilities */
+  --c-n50: 247 248 250;
+  --c-n100: 241 243 247;
+  --c-n200: 227 231 237;
+  --c-n300: 213 218 226;
+  --c-n400: 182 189 200;
+  --c-n500: 151 160 174;
+  --c-n600: 90 100 116;
+  --c-n700: 61 71 86;
+  --c-n800: 38 48 61;
+  --c-n900: 15 23 41;
+
+  /* list row padding — one comfortable step for now, compact stays unwired */
+  --rowpy: 15px;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --c-bg: 14 17 22;
+  --c-bg-sub: 16 20 26;
+  --c-panel: 19 24 32;
+  --c-panel-sub: 21 26 33;
+
+  --c-line: 35 42 51;
+  --c-line-soft: 27 32 40;
+
+  --c-tx: 230 234 240;
+  --c-tx2: 152 162 179;
+  --c-tx3: 119 130 143;
+  --c-tx4: 95 107 122;
+
+  --c-ac: 47 175 192;
+  --c-ac-on: 14 17 22;
+  --c-ac-soft: 22 48 58;
+
+  --c-ok: 63 185 132;
+  --c-ok-soft: 20 48 42;
+  --c-warn: 214 154 60;
+  --c-warn-soft: 51 41 26;
+  --c-bad: 217 88 79;
+  --c-bad-soft: 52 33 31;
+  --c-chip: 26 33 40;
+
+  --c-n50: 16 20 26;
+  --c-n100: 26 33 40;
+  --c-n200: 35 42 51;
+  --c-n300: 44 53 64;
+  --c-n400: 95 107 122;
+  --c-n500: 119 130 143;
+  --c-n600: 152 162 179;
+  --c-n700: 192 200 210;
+  --c-n800: 213 219 227;
+  --c-n900: 230 234 240;
+}
+
+/* Plain-color aliases for hand-written CSS and inline styles. */
+:root {
+  --bg: rgb(var(--c-bg));
+  --bg-sub: rgb(var(--c-bg-sub));
+  --panel: rgb(var(--c-panel));
+  --panel-sub: rgb(var(--c-panel-sub));
+  --line: rgb(var(--c-line));
+  --line-soft: rgb(var(--c-line-soft));
+  --tx: rgb(var(--c-tx));
+  --tx2: rgb(var(--c-tx2));
+  --tx3: rgb(var(--c-tx3));
+  --tx4: rgb(var(--c-tx4));
+  --ac: rgb(var(--c-ac));
+  --ac-on: rgb(var(--c-ac-on));
+  --ac-soft: rgb(var(--c-ac-soft));
+  --ok: rgb(var(--c-ok));
+  --ok-soft: rgb(var(--c-ok-soft));
+  --warn: rgb(var(--c-warn));
+  --warn-soft: rgb(var(--c-warn-soft));
+  --bad: rgb(var(--c-bad));
+  --bad-soft: rgb(var(--c-bad-soft));
+  --chip: rgb(var(--c-chip));
+}

@@ -87,7 +87,7 @@ const routes = [
   {
     path: '/apps',
     name: 'AppCenter',
-    redirect: '/apps/relay',
+    component: () => import('@/pages/AppCenter.vue'),
     meta: { requiresAuth: true }
   },
   {

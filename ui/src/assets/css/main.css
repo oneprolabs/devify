@@ -1,74 +1,63 @@
 /* Import highlight.js theme for code syntax highlighting */
 @import 'highlight.js/styles/monokai-sublime.css';
 
+@import './tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family:
+      'Noto Sans SC', -apple-system, 'PingFang SC', 'Microsoft YaHei',
+      system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-app text-ink;
   }
 
-  /* Force light background for select, option, and input elements to prevent dark mode issues */
+  /* Form controls follow the theme instead of being pinned to light.
+   * The previous `!important` block here forced white backgrounds and would
+   * override every dark-mode style, so it was removed with the token layer. */
   select,
   select option,
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="number"],
-  input[type="date"],
-  input[type="datetime-local"],
-  input[type="time"],
-  input[type="search"],
-  input[type="tel"],
-  input[type="url"],
-  input[type="color"],
-  input[type="file"],
-  input[type="range"],
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  input[type='date'],
+  input[type='datetime-local'],
+  input[type='time'],
+  input[type='search'],
+  input[type='tel'],
+  input[type='url'],
   textarea {
-    background-color: #ffffff !important;
-    color: #1f2937 !important;
+    background-color: var(--panel);
+    color: var(--tx);
   }
 
-  /* Checkbox and radio buttons - ensure they have proper background */
-  input[type="checkbox"],
-  input[type="radio"] {
-    background-color: #ffffff !important;
-    border-color: #d1d5db !important;
-    accent-color: #2563eb !important;
-  }
-
-  input[type="checkbox"]:checked,
-  input[type="radio"]:checked {
-    background-color: #2563eb !important;
-    border-color: #2563eb !important;
-  }
-
-  input[type="checkbox"]:disabled,
-  input[type="radio"]:disabled {
-    background-color: #f9fafb !important;
-    border-color: #e5e7eb !important;
-    opacity: 0.5 !important;
+  input[type='checkbox'],
+  input[type='radio'] {
+    background-color: var(--panel);
+    border-color: var(--line);
+    accent-color: var(--ac);
   }
 
   select:disabled,
   select:disabled option,
   input:disabled,
   input[readonly],
-  textarea:disabled {
-    background-color: #f9fafb !important;
-    color: #6b7280 !important;
+  textarea:disabled,
+  textarea[readonly] {
+    background-color: var(--panel-sub);
+    color: var(--tx3);
   }
 
-  input[type="date"]:readonly,
-  input[type="datetime-local"]:readonly {
-    background-color: #f9fafb !important;
-    color: #1f2937 !important;
+  ::placeholder {
+    color: var(--tx4);
   }
 }
 
@@ -82,7 +71,7 @@
   }
 
   .btn-secondary {
-    @apply btn bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 focus:ring-primary-500;
+    @apply btn bg-panel text-ink-2 border-line hover:bg-panel-sub focus:ring-primary-500;
   }
 
   .btn-danger {
@@ -94,7 +83,7 @@
   }
 
   .input {
-    @apply block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply block w-full px-3 py-2 text-sm border border-line rounded-lg shadow-sm placeholder-ink-4 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .input-error {
@@ -102,11 +91,11 @@
   }
 
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200;
+    @apply bg-panel rounded-lg shadow-sm border border-line;
   }
 
   .card-header {
-    @apply px-6 py-4 border-b border-gray-200;
+    @apply px-6 py-4 border-b border-line;
   }
 
   .card-body {
@@ -114,7 +103,7 @@
   }
 
   .card-footer {
-    @apply px-6 py-4 border-t border-gray-200 bg-gray-50;
+    @apply px-6 py-4 border-t border-line bg-panel-sub;
   }
 
   .line-clamp-2 {
@@ -131,37 +120,55 @@
   }
 }
 
-/* Vue DatePicker custom theme */
-.dp__theme_light {
-  --dp-font-family: 'Inter', system-ui, sans-serif;
+@layer utilities {
+  /* Pages not yet redesigned paint their cards with `bg-white`. Point that at
+   * the panel token so they stop punching a white hole in dark mode. Literal
+   * white stays available through `text-white`, which colored buttons need. */
+  .bg-white {
+    background-color: rgb(var(--c-panel) / var(--tw-bg-opacity, 1));
+  }
+
+  /* IBM Plex Mono carries every number, id and timestamp, so it always wants
+   * tabular figures — columns of counts and times have to line up. */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Vue DatePicker follows the same tokens as everything else. */
+.dp__theme_light,
+.dp__theme_dark {
+  --dp-font-family: 'Noto Sans SC', system-ui, sans-serif;
   --dp-font-size: 0.85rem;
   --dp-border-radius: 0.625rem;
-  --dp-border-color: #e5e7eb;
-  --dp-text-color: #1f2937;
-  --dp-primary-color: #2563eb;
-  --dp-primary-text-color: #ffffff;
-  --dp-hover-color: #eff6ff;
-  --dp-hover-text-color: #1d4ed8;
-  --dp-primary-disabled-color: #bfdbfe;
-  --dp-secondary-color: #f3f4f6;
-  --dp-menu-border-color: #e5e7eb;
-  --dp-success-color: #16a34a;
-  --dp-icon-color: #6b7280;
+  --dp-background-color: var(--panel);
+  --dp-menu-background-color: var(--panel);
+  --dp-border-color: var(--line);
+  --dp-text-color: var(--tx);
+  --dp-primary-color: var(--ac);
+  --dp-primary-text-color: var(--ac-on);
+  --dp-hover-color: var(--ac-soft);
+  --dp-hover-text-color: var(--ac);
+  --dp-primary-disabled-color: var(--ac-soft);
+  --dp-secondary-color: var(--chip);
+  --dp-menu-border-color: var(--line);
+  --dp-success-color: var(--ok);
+  --dp-icon-color: var(--tx3);
 }
 
 .dp__menu {
-  @apply shadow-xl border border-gray-200 rounded-xl;
+  @apply shadow-xl border border-line rounded-xl;
 }
 
 .dp__input {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Noto Sans SC', system-ui, sans-serif;
   font-size: 0.875rem;
   border-radius: 0.5rem;
   padding: 0.45rem 0.75rem;
 }
 
 .bdtp-compact {
-  @apply flex items-center rounded-md border border-gray-300 bg-white pr-0;
+  @apply flex items-center rounded-md border border-line bg-panel pr-0;
   min-height: 1.25rem;
 }
 
@@ -188,9 +195,9 @@
 }
 
 .dp__range_between {
-  background: rgba(37, 99, 235, 0.1);
+  background: var(--ac-soft);
 }
 
 .dp__today {
-  border-color: rgba(37, 99, 235, 0.7);
+  border-color: var(--ac);
 }

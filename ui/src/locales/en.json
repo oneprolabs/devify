@@ -1399,5 +1399,18 @@
         "city": "City"
       }
     }
+  },
+  "nav": {
+    "account": "Account",
+    "credits": "Credits this period",
+    "tabChats": "Chats",
+    "tabApps": "Apps",
+    "tabSettings": "Settings"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
   }
 }

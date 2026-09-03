@@ -1408,5 +1408,18 @@
         "city": "消费城市"
       }
     }
+  },
+  "nav": {
+    "account": "账户",
+    "credits": "本期积分",
+    "tabChats": "对话",
+    "tabApps": "应用",
+    "tabSettings": "设置"
+  },
+  "theme": {
+    "label": "主题",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
   }
 }

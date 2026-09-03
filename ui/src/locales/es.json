@@ -193,7 +193,6 @@
     "noResults": "No se encontraron resultados coincidentes",
     "tags": "Etiquetas",
     "basicInformation": "Información Básica",
-    "aiSummary": "Resumen IA",
     "processedContent": "Notas de Conversación",
     "summaryProcessing": "El resumen IA está siendo procesado...",
     "processedContentProcessing": "Las notas de conversación están siendo procesadas...",
@@ -453,5 +452,18 @@
     "addPassword": "Añadir contraseña",
     "passwordRemoved": "Contraseña eliminada",
     "passwordUpdated": "Contraseña actualizada"
+  },
+  "nav": {
+    "account": "Cuenta",
+    "credits": "Créditos del período",
+    "tabChats": "Chats",
+    "tabApps": "Apps",
+    "tabSettings": "Ajustes"
+  },
+  "theme": {
+    "label": "Tema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
   }
 }

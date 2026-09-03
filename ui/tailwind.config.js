@@ -1,9 +1,56 @@
 /** @type {import('tailwindcss').Config} */
+
+/**
+ * Colors resolve to the CSS variables declared in `src/assets/css/tokens.css`,
+ * so every utility follows the active theme. `<alpha-value>` keeps Tailwind's
+ * opacity modifiers (`bg-panel/60`) working.
+ */
+const token = (name) => `rgb(var(--c-${name}) / <alpha-value>)`
+
 export default {
+  darkMode: ['class', '[data-theme="dark"]'],
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
+        // Semantic tokens — what redesigned markup should use.
+        app: {
+          DEFAULT: token('bg'),
+          sub: token('bg-sub')
+        },
+        panel: {
+          DEFAULT: token('panel'),
+          sub: token('panel-sub')
+        },
+        line: {
+          DEFAULT: token('line'),
+          soft: token('line-soft')
+        },
+        ink: {
+          DEFAULT: token('tx'),
+          2: token('tx2'),
+          3: token('tx3'),
+          4: token('tx4')
+        },
+        accent: {
+          DEFAULT: token('ac'),
+          on: token('ac-on'),
+          soft: token('ac-soft')
+        },
+        ok: {
+          DEFAULT: token('ok'),
+          soft: token('ok-soft')
+        },
+        warn: {
+          DEFAULT: token('warn'),
+          soft: token('warn-soft')
+        },
+        bad: {
+          DEFAULT: token('bad'),
+          soft: token('bad-soft')
+        },
+        chip: token('chip'),
+
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -16,21 +63,33 @@ export default {
           800: '#1e40af',
           900: '#1e3a8a'
         },
+
+        // Legacy ramp: pages not yet redesigned keep their `gray-*` classes,
+        // which now follow the theme because the ramp inverts in dark mode.
         gray: {
-          50: '#f9fafb',
-          100: '#f3f4f6',
-          200: '#e5e7eb',
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280',
-          600: '#4b5563',
-          700: '#374151',
-          800: '#1f2937',
-          900: '#111827'
+          50: token('n50'),
+          100: token('n100'),
+          200: token('n200'),
+          300: token('n300'),
+          400: token('n400'),
+          500: token('n500'),
+          600: token('n600'),
+          700: token('n700'),
+          800: token('n800'),
+          900: token('n900')
         }
       },
       fontFamily: {
-        sans: ['Inter', 'Noto Sans SC', 'system-ui', 'sans-serif']
+        sans: [
+          'Noto Sans SC',
+          '-apple-system',
+          'PingFang SC',
+          'Microsoft YaHei',
+          'system-ui',
+          'sans-serif'
+        ],
+        display: ['Space Grotesk', 'Noto Sans SC', 'system-ui', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'ui-monospace', 'Menlo', 'monospace']
       },
       borderRadius: {
         DEFAULT: '16px',

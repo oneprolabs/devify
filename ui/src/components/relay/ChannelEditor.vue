@@ -30,8 +30,8 @@
       </button>
     </div>
 
-    <div class="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-4 md:items-start">
-      <div class="md:col-span-1">
+    <div class="flex flex-col gap-3 md:flex-row md:gap-7">
+      <div class="md:w-44 md:flex-none">
         <label class="block text-sm font-medium text-ink-2 mb-1">
           {{ t('relay.name') }}
         </label>
@@ -39,13 +39,13 @@
           {{ t('relay.channelNameHelp') }}
         </p>
       </div>
-      <div class="md:col-span-2">
+      <div class="min-w-0 md:max-w-[640px] md:flex-1">
         <input v-model="editorForm.name" class="input" />
       </div>
     </div>
 
     <div class="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-4 md:items-center">
-      <div class="md:col-span-1">
+      <div class="md:w-44 md:flex-none">
         <label class="block text-sm font-medium text-ink-2 mb-1">
           {{ t('relay.enabled') }}
         </label>
@@ -53,7 +53,7 @@
           {{ t('relay.channelEnabledHelp') }}
         </p>
       </div>
-      <div class="md:col-span-2">
+      <div class="min-w-0 md:max-w-[640px] md:flex-1">
         <label class="flex items-center gap-2 text-sm text-ink-2">
           <input
             v-model="editorForm.enabled"
@@ -65,8 +65,8 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-4 md:items-start">
-      <div class="md:col-span-1">
+    <div class="flex flex-col gap-3 md:flex-row md:gap-7">
+      <div class="md:w-44 md:flex-none">
         <label class="block text-sm font-medium text-ink-2 mb-1">
           {{ t('relay.language') }}
         </label>
@@ -74,7 +74,7 @@
           {{ t('relay.languageHelp') }}
         </p>
       </div>
-      <div class="md:col-span-2">
+      <div class="min-w-0 md:max-w-[640px] md:flex-1">
         <select v-model="editorForm.language" class="input">
           <option value="Chinese">
             {{ t('relay.languageChinese') }}

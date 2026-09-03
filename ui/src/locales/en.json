@@ -884,7 +884,13 @@
     "invoiceRuleFetch": "1. Download: the mail server is asked for messages whose subject contains a keyword. The server can only search subjects, not attachment names.",
     "invoiceRuleRoute": "2. Recognition: downloaded mail is checked against both the subject and the attachment filenames; either one is enough.",
     "invoiceRuleBody": "3. The body is not consulted. Matching it pulls in every phone bill and usage report that mentions an invoice in its footer, and a wrong guess costs a real conversation its summary.",
-    "invoiceRuleMiss": "4. Keywords are set under Expense › Settings. Mail that misses is not lost, only left out of Expense — forward it here with a keyword in the subject to pick it up."
+    "invoiceRuleMiss": "4. Keywords are set under Expense › Settings. Mail that misses is not lost, only left out of Expense — forward it here with a keyword in the subject to pick it up.",
+    "basicInfoDesc": "Profile, sign-in and password",
+    "preferencesDesc": "Language, timezone and processing scene",
+    "emailConfigDesc": "How mail arrives, filters and IMAP",
+    "systemAssigned": "Assigned",
+    "aiEmailInUse": "Using the assigned mailbox.",
+    "authMethodDesc": "Your sign-in address is used for password resets — it is not the AI mailbox."
   },
   "dashboard": {
     "title": "Dashboard",

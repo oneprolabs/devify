@@ -261,7 +261,7 @@
     "resetPasswordError": "发送重置邮件失败，请重试。",
     "emailPlaceholder": "输入您的邮箱",
     "noAccount": "还没有账户？",
-    "haveAccount": "已有账户？",
+    "haveAccount": "已经有账户？",
     "signIn": "登录",
     "signUp": "注册",
     "signingIn": "登录中...",
@@ -298,7 +298,23 @@
     "loginFailedMessage": "登录失败。请检查您的用户名和密码是否正确，或者",
     "registerNewAccount": "注册新账户",
     "period": "。",
-    "processing": "处理中..."
+    "processing": "处理中...",
+    "pitch": {
+      "headline": "把邮件转发过来，\n剩下的交给它整理。",
+      "summary": "转发到你的 AI 智能邮箱 → 整理成纪要、待办与标签 → 投递到飞书、Jira 或 GitHub Issue。",
+      "forward": {
+        "title": "转发到你的 AI 智能邮箱",
+        "body": "系统分配一个专属地址，也可以接自己的 IMAP。支持文字与图片识别。"
+      },
+      "organise": {
+        "title": "整理成纪要、待办与标签",
+        "body": "同一件事的多封往来会自动合并成一条记录，附件一并解析。"
+      },
+      "deliver": {
+        "title": "投递到你已经在用的系统"
+      }
+    },
+    "noAccountYet": "还没有账户？"
   },
   "register": {
     "emailPlaceholder": "请输入您的邮箱地址",

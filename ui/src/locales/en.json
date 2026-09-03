@@ -298,7 +298,23 @@
     },
     "loginFailedMessage": "Login failed. Please check your username and password, or",
     "registerNewAccount": "register a new account",
-    "period": "."
+    "period": ".",
+    "pitch": {
+      "headline": "Forward the mail.\nIt files the rest.",
+      "summary": "Forward to your AI mailbox → filed as summaries, todos and tags → delivered to Feishu, Jira or GitHub Issues.",
+      "forward": {
+        "title": "Forward to your AI mailbox",
+        "body": "An address is assigned to you, or connect your own IMAP. Text and images are both read."
+      },
+      "organise": {
+        "title": "Filed as summaries, todos and tags",
+        "body": "Several messages about one thing merge into a single record, attachments included."
+      },
+      "deliver": {
+        "title": "Delivered where you already work"
+      }
+    },
+    "noAccountYet": "No account yet?"
   },
   "register": {
     "emailPlaceholder": "Enter your email address",

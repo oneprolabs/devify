@@ -1,7 +1,7 @@
 <template>
   <BaseCard v-if="attachments.length" :header-muted="true">
     <template #header>
-      <div class="flex items-center gap-2 text-gray-800">
+      <div class="flex items-center gap-2 text-ink">
         <svg
           class="w-5 h-5 -mt-px flex-none"
           fill="none"
@@ -17,9 +17,7 @@
         </svg>
         <h3 class="text-base font-semibold leading-5">
           {{ t('chats.files.title') }}
-          <span class="text-gray-400 font-normal"
-            >({{ attachments.length }})</span
-          >
+          <span class="text-ink-4 font-normal">({{ attachments.length }})</span>
         </h3>
       </div>
     </template>
@@ -30,12 +28,12 @@
       <div
         v-for="att in attachments"
         :key="att.id"
-        class="group relative rounded-lg border border-gray-200 bg-white overflow-hidden hover:shadow-sm transition-shadow"
+        class="group relative rounded-lg border border-line bg-panel overflow-hidden hover:shadow-sm transition-shadow"
       >
         <!-- Preview / icon area (square) -->
         <button
           type="button"
-          class="block w-full aspect-square bg-gray-50 overflow-hidden"
+          class="block w-full aspect-square bg-app-sub overflow-hidden"
           :title="att.filename"
           @click="onTileClick(att)"
         >
@@ -63,10 +61,10 @@
 
         <!-- Footer: filename + download -->
         <div
-          class="flex items-center gap-1 px-2 py-1.5 border-t border-gray-100"
+          class="flex items-center gap-1 px-2 py-1.5 border-t border-line-soft"
         >
           <span
-            class="flex-1 min-w-0 truncate text-xs text-gray-700"
+            class="flex-1 min-w-0 truncate text-xs text-ink-2"
             :title="att.filename"
           >
             {{ att.filename }}
@@ -75,7 +73,7 @@
             v-if="att.url"
             :href="att.url"
             :download="att.filename"
-            class="flex-none text-gray-400 hover:text-blue-600"
+            class="flex-none text-ink-4 hover:text-accent"
             :title="t('chats.files.download')"
             @click.stop
           >
@@ -98,7 +96,7 @@
         <!-- Size badge -->
         <span
           v-if="att.file_size != null"
-          class="absolute top-1 left-1 rounded bg-black/50 px-1 py-0.5 text-[10px] leading-none text-white"
+          class="absolute top-1 left-1 rounded bg-black/50 px-1 py-0.5 text-[10px] leading-none text-accent-on"
         >
           {{ formatBytes(att.file_size) }}
         </span>
@@ -122,7 +120,7 @@
 
         <div
           v-else
-          class="flex w-full flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+          class="flex w-full flex-col overflow-hidden rounded-lg bg-panel shadow-xl"
           :class="
             preview.type === 'pdf'
               ? 'max-w-5xl h-[90vh]'
@@ -130,24 +128,20 @@
           "
           @click.stop
         >
-          <div
-            class="flex items-center gap-2 border-b border-gray-200 px-4 py-2.5"
-          >
-            <span
-              class="flex-1 min-w-0 truncate text-sm font-medium text-gray-800"
-            >
+          <div class="flex items-center gap-2 border-b border-line px-4 py-2.5">
+            <span class="flex-1 min-w-0 truncate text-sm font-medium text-ink">
               {{ preview.att.filename }}
             </span>
             <a
               :href="preview.att.url"
               :download="preview.att.filename"
-              class="flex-none text-xs font-medium text-blue-600 hover:text-blue-800"
+              class="flex-none text-xs font-medium text-accent hover:text-accent"
             >
               {{ t('chats.files.download') }}
             </a>
             <button
               type="button"
-              class="flex-none text-gray-400 hover:text-gray-700"
+              class="flex-none text-ink-4 hover:text-ink-2"
               :aria-label="t('common.close')"
               @click="closePreview"
             >
@@ -173,15 +167,15 @@
             class="flex-1 w-full border-0"
           />
           <div v-else class="flex-1 overflow-auto p-4">
-            <div v-if="preview.loading" class="text-sm text-gray-500 italic">
+            <div v-if="preview.loading" class="text-sm text-ink-3 italic">
               {{ t('common.loading') }}
             </div>
-            <div v-else-if="preview.error" class="text-sm text-red-500">
+            <div v-else-if="preview.error" class="text-sm text-bad">
               {{ preview.error }}
             </div>
             <pre
               v-else
-              class="whitespace-pre-wrap break-words text-xs text-gray-700"
+              class="whitespace-pre-wrap break-words text-xs text-ink-2"
               >{{ preview.content }}</pre
             >
           </div>
@@ -190,7 +184,7 @@
         <button
           v-if="preview.type === 'image'"
           type="button"
-          class="absolute top-4 right-4 text-white/80 hover:text-white"
+          class="absolute top-4 right-4 text-accent-on/80 hover:text-accent-on"
           :aria-label="t('common.close')"
           @click="closePreview"
         >
@@ -239,17 +233,17 @@ const TEXT_CONTENT_TYPES = [
 // Extension -> colored chip. Lets Word/Excel/PDF/etc. read as intentional
 // file types instead of a generic gray icon.
 const TYPE_COLORS = {
-  pdf: 'bg-red-50 text-red-600',
-  doc: 'bg-blue-50 text-blue-600',
-  docx: 'bg-blue-50 text-blue-600',
-  xls: 'bg-green-50 text-green-600',
-  xlsx: 'bg-green-50 text-green-600',
-  csv: 'bg-green-50 text-green-600',
-  ppt: 'bg-orange-50 text-orange-600',
-  pptx: 'bg-orange-50 text-orange-600',
-  zip: 'bg-amber-50 text-amber-600',
-  rar: 'bg-amber-50 text-amber-600',
-  '7z': 'bg-amber-50 text-amber-600'
+  pdf: 'bg-bad-soft text-bad',
+  doc: 'bg-accent-soft text-accent',
+  docx: 'bg-accent-soft text-accent',
+  xls: 'bg-ok-soft text-ok',
+  xlsx: 'bg-ok-soft text-ok',
+  csv: 'bg-ok-soft text-ok',
+  ppt: 'bg-warn-soft text-warn',
+  pptx: 'bg-warn-soft text-warn',
+  zip: 'bg-warn-soft text-warn',
+  rar: 'bg-warn-soft text-warn',
+  '7z': 'bg-warn-soft text-warn'
 }
 
 const MAX_TEXT_PREVIEW = 100000
@@ -289,7 +283,7 @@ function extLabel(att) {
 }
 
 function chipClass(att) {
-  return TYPE_COLORS[ext(att)] || 'bg-gray-100 text-gray-500'
+  return TYPE_COLORS[ext(att)] || 'bg-chip text-ink-3'
 }
 
 // Unified preview modal state (image or text), null when closed

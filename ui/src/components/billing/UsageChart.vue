@@ -1,7 +1,7 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+  <div class="bg-panel rounded-lg shadow-sm border border-line p-4">
     <div class="mb-4">
-      <h3 class="text-base font-semibold text-gray-900 mb-3">
+      <h3 class="text-base font-semibold text-ink mb-3">
         {{ t('billing.usageStats.title') }}
       </h3>
 
@@ -16,8 +16,8 @@
             :class="[
               'px-4 py-2 text-sm font-medium rounded-md transition-colors',
               selectedPeriod === period.value
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-accent text-accent-on'
+                : 'bg-chip text-ink-2 hover:bg-chip'
             ]"
           >
             {{ period.label }}
@@ -28,14 +28,14 @@
           <input
             v-model="customStartDate"
             type="date"
-            class="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="px-3 py-2 text-sm border border-line rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
             @change="handleCustomDateChange"
           />
-          <span class="text-gray-500">-</span>
+          <span class="text-ink-3">-</span>
           <input
             v-model="customEndDate"
             type="date"
-            class="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="px-3 py-2 text-sm border border-line rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
             @change="handleCustomDateChange"
           />
         </div>
@@ -43,29 +43,29 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-      <div class="bg-gray-50 rounded-lg p-3">
-        <div class="text-xs text-gray-500 mb-0.5">
+      <div class="bg-app-sub rounded-lg p-3">
+        <div class="text-xs text-ink-3 mb-0.5">
           {{ t('billing.usageStats.totalConsumed') }}
         </div>
-        <div class="text-xl font-semibold text-gray-900">
+        <div class="text-xl font-semibold text-ink">
           {{ stats?.total_consumed || 0 }}
         </div>
       </div>
 
-      <div class="bg-gray-50 rounded-lg p-3">
-        <div class="text-xs text-gray-500 mb-0.5">
+      <div class="bg-app-sub rounded-lg p-3">
+        <div class="text-xs text-ink-3 mb-0.5">
           {{ t('billing.usageStats.available') }}
         </div>
-        <div class="text-xl font-semibold text-primary-600">
+        <div class="text-xl font-semibold text-accent">
           {{ stats?.total_available || 0 }}
         </div>
       </div>
 
-      <div class="bg-gray-50 rounded-lg p-3">
-        <div class="text-xs text-gray-500 mb-0.5">
+      <div class="bg-app-sub rounded-lg p-3">
+        <div class="text-xs text-ink-3 mb-0.5">
           {{ t('billing.usageStats.totalCredits') }}
         </div>
-        <div class="text-xl font-semibold text-gray-900">
+        <div class="text-xl font-semibold text-ink">
           {{ stats?.total_credits || 0 }}
         </div>
       </div>
@@ -78,10 +78,10 @@
         :options="chartOptions"
       />
       <div v-else-if="loading" class="flex items-center justify-center h-full">
-        <div class="text-gray-500">{{ t('common.loading') }}</div>
+        <div class="text-ink-3">{{ t('common.loading') }}</div>
       </div>
       <div v-else class="flex items-center justify-center h-full">
-        <div class="text-gray-500">{{ t('common.noData') }}</div>
+        <div class="text-ink-3">{{ t('common.noData') }}</div>
       </div>
     </div>
   </div>
@@ -129,6 +129,18 @@ const periods = [
   { value: 30, label: '30d' }
 ]
 
+// Read the accent from the theme so the line follows light and dark
+// rather than staying the blue it was hard-coded to.
+function accentColor(alpha = 1) {
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue('--c-ac')
+    .trim()
+  const channels = raw || '75 87 200'
+  return alpha === 1
+    ? `rgb(${channels})`
+    : `rgba(${channels.split(/\s+/).join(', ')}, ${alpha})`
+}
+
 const chartData = computed(() => {
   if (!stats.value || !stats.value.stats) {
     return null
@@ -147,8 +159,8 @@ const chartData = computed(() => {
       {
         label: t('billing.usageStats.creditsConsumed'),
         data: consumed,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: accentColor(),
+        backgroundColor: accentColor(0.12),
         tension: 0.3,
         fill: true
       }

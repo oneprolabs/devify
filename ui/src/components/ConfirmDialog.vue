@@ -5,7 +5,7 @@
     @close="handleClose"
     :closeOnBackdrop="false"
   >
-    <p class="text-sm text-gray-700">{{ message }}</p>
+    <p class="text-sm text-ink-2">{{ message }}</p>
     <slot />
     <template #footer>
       <div

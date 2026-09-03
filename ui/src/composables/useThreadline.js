@@ -114,12 +114,12 @@ export function useThreadline(
   // Get status class
   const getStatusClass = (status) => {
     const statusMap = {
-      success: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      processing: 'bg-yellow-100 text-yellow-800',
-      fetched: 'bg-blue-100 text-blue-800'
+      success: 'bg-ok-soft text-ok',
+      failed: 'bg-bad-soft text-bad',
+      processing: 'bg-warn-soft text-warn',
+      fetched: 'bg-accent-soft text-accent'
     }
-    return statusMap[status] || 'bg-gray-100 text-gray-800'
+    return statusMap[status] || 'bg-chip text-ink'
   }
 
   // Load threadline

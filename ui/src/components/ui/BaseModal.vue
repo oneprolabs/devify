@@ -14,7 +14,7 @@
     >
       <div class="flex min-h-full items-center justify-center p-4">
         <div
-          class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          class="fixed inset-0 bg-ink-3 bg-opacity-75 transition-opacity"
           aria-hidden="true"
         />
 
@@ -28,16 +28,16 @@
         >
           <div
             v-if="show"
-            class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all w-full max-w-lg max-h-[90vh] sm:max-h-[90vh] flex flex-col my-4 sm:my-8"
+            class="relative transform overflow-hidden rounded-lg bg-panel text-left shadow-xl transition-all w-full max-w-lg max-h-[90vh] sm:max-h-[90vh] flex flex-col my-4 sm:my-8"
             @click.stop
           >
             <!-- Header -->
             <div
-              class="flex-shrink-0 bg-white px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b border-gray-200"
+              class="flex-shrink-0 bg-panel px-4 pt-5 pb-3 sm:px-6 sm:pt-6 sm:pb-4 border-b border-line"
             >
               <h3
                 v-if="title"
-                class="text-base font-semibold leading-6 text-gray-900 text-left"
+                class="text-base font-semibold leading-6 text-ink text-left"
               >
                 {{ title }}
               </h3>
@@ -47,7 +47,7 @@
             <div
               class="flex-1 overflow-y-auto -webkit-overflow-scrolling-touch min-h-0"
             >
-              <div class="bg-white px-4 py-4 sm:px-6 sm:py-4">
+              <div class="bg-panel px-4 py-4 sm:px-6 sm:py-4">
                 <div v-if="icon" class="sm:flex sm:items-start">
                   <div
                     class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full sm:mx-0 sm:h-10 sm:w-10"
@@ -69,7 +69,7 @@
             <!-- Footer (fixed at bottom) -->
             <div
               v-if="$slots.footer"
-              class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 flex-shrink-0 border-t border-gray-200"
+              class="bg-app-sub px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 flex-shrink-0 border-t border-line"
             >
               <slot name="footer" />
             </div>
@@ -112,10 +112,10 @@ const emit = defineEmits(['close'])
 
 const iconClasses = computed(() => {
   const typeClasses = {
-    info: 'bg-blue-100 text-blue-600',
-    success: 'bg-green-100 text-green-600',
-    warning: 'bg-yellow-100 text-yellow-600',
-    error: 'bg-red-100 text-red-600'
+    info: 'bg-accent-soft text-accent',
+    success: 'bg-ok-soft text-ok',
+    warning: 'bg-warn-soft text-warn',
+    error: 'bg-bad-soft text-bad'
   }
 
   return typeClasses[props.iconType]

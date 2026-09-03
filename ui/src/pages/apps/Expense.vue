@@ -2,15 +2,15 @@
   <AppLayout>
     <div class="space-y-6">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-900">
+        <h1 class="text-2xl font-semibold text-ink">
           {{ t('expense.pageTitle') }}
         </h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="mt-1 text-sm text-ink-3">
           {{ t('expense.pageSubtitle') }}
         </p>
       </div>
 
-      <div class="border-b border-gray-200">
+      <div class="border-b border-line">
         <div class="flex gap-6" role="tablist">
           <button
             v-for="tab in tabs"
@@ -21,8 +21,8 @@
             :aria-selected="activeTab === tab.value"
             :class="
               activeTab === tab.value
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-ink-3 hover:border-line hover:text-ink-2'
             "
             @click="activeTab = tab.value"
           >
@@ -33,21 +33,21 @@
 
       <BaseCard v-if="loading">
         <div class="space-y-4 animate-pulse">
-          <div class="h-5 w-40 rounded bg-gray-200"></div>
-          <div class="h-20 rounded bg-gray-100"></div>
+          <div class="h-5 w-40 rounded bg-chip"></div>
+          <div class="h-20 rounded bg-chip"></div>
         </div>
       </BaseCard>
 
       <template v-else>
         <p
           v-if="error"
-          class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          class="rounded-lg border border-bad bg-bad-soft p-4 text-sm text-bad"
         >
           {{ error }}
         </p>
 
         <BaseCard v-if="activeTab !== 'settings' && !config?.enabled">
-          <p class="py-8 text-center text-sm text-gray-500">
+          <p class="py-8 text-center text-sm text-ink-3">
             {{ t('expense.disabledHint') }}
           </p>
         </BaseCard>

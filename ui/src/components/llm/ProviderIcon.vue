@@ -1,7 +1,7 @@
 <template>
   <span class="inline-flex items-center gap-2">
     <span
-      class="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-md text-white"
+      class="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-md text-accent-on"
       :style="fallbackStyle"
       :class="sizeClass"
     >

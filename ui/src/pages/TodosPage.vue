@@ -3,19 +3,19 @@
     <div class="space-y-6">
       <!-- Header -->
       <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-900">
+        <h1 class="text-2xl font-bold text-ink">
           {{ t('todos.title') }}
         </h1>
         <!-- View Toggle (Web only) -->
         <div class="hidden md:flex items-center gap-2">
-          <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <div class="flex items-center gap-1 bg-chip rounded-lg p-1">
             <button
               @click="viewMode = 'list'"
               :class="[
                 'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                 viewMode === 'list'
-                  ? 'bg-white text-primary-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-panel text-accent shadow-sm'
+                  : 'text-ink-2 hover:text-ink'
               ]"
             >
               {{ t('todos.view.list') }}
@@ -25,8 +25,8 @@
               :class="[
                 'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                 viewMode === 'calendar'
-                  ? 'bg-white text-primary-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-panel text-accent shadow-sm'
+                  : 'text-ink-2 hover:text-ink'
               ]"
             >
               {{ t('todos.view.calendar') }}
@@ -38,12 +38,12 @@
       <!-- Error Message -->
       <div
         v-if="errorMessage"
-        class="rounded-md bg-red-50 border border-red-200 p-3"
+        class="rounded-md bg-bad-soft border border-bad p-3"
       >
         <div class="flex gap-2">
           <div class="flex-shrink-0 pt-0.5">
             <svg
-              class="h-4 w-4 text-red-400"
+              class="h-4 w-4 text-bad"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -55,11 +55,11 @@
             </svg>
           </div>
           <div class="flex-1">
-            <p class="text-sm font-medium text-red-800">{{ errorMessage }}</p>
+            <p class="text-sm font-medium text-bad">{{ errorMessage }}</p>
           </div>
           <button
             @click="errorMessage = ''"
-            class="flex-shrink-0 text-red-400 hover:text-red-600"
+            class="flex-shrink-0 text-bad hover:text-bad"
           >
             <svg
               class="h-4 w-4"
@@ -81,12 +81,12 @@
       <!-- Success Message -->
       <div
         v-if="successMessage"
-        class="rounded-md bg-green-50 border border-green-200 p-3"
+        class="rounded-md bg-ok-soft border border-ok p-3"
       >
         <div class="flex gap-2">
           <div class="flex-shrink-0 pt-0.5">
             <svg
-              class="h-4 w-4 text-green-400"
+              class="h-4 w-4 text-ok"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -98,13 +98,13 @@
             </svg>
           </div>
           <div class="flex-1">
-            <p class="text-sm font-medium text-green-800">
+            <p class="text-sm font-medium text-ok">
               {{ successMessage }}
             </p>
           </div>
           <button
             @click="successMessage = ''"
-            class="flex-shrink-0 text-green-400 hover:text-green-600"
+            class="flex-shrink-0 text-ok hover:text-ok"
           >
             <svg
               class="h-4 w-4"
@@ -132,11 +132,11 @@
           <!-- Loading Overlay -->
           <div
             v-if="loading"
-            class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg"
+            class="absolute inset-0 bg-panel bg-opacity-75 flex items-center justify-center z-10 rounded-lg"
           >
-            <div class="flex items-center gap-2 text-sm text-gray-600">
+            <div class="flex items-center gap-2 text-sm text-ink-2">
               <svg
-                class="animate-spin h-4 w-4 text-primary-600"
+                class="animate-spin h-4 w-4 text-accent"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -167,13 +167,13 @@
             :class="{ 'opacity-50': loading }"
           >
             <div class="flex-1 w-full sm:w-auto">
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label class="block text-sm font-medium text-ink-2 mb-1">
                 {{ t('todos.timeRange.title') }}
               </label>
               <select
                 v-model="timeRange"
                 @change="selectTimeRange(timeRange)"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                class="w-full px-3 py-2 border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
               >
                 <option
                   v-for="range in timeRanges"
@@ -192,7 +192,7 @@
               class="flex-1 w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-end gap-3 sm:gap-2 min-w-0"
             >
               <div class="flex-1 w-full sm:w-auto min-w-0">
-                <label class="block text-xs text-gray-500 mb-1">{{
+                <label class="block text-xs text-ink-3 mb-1">{{
                   t('todos.timeRange.startDate')
                 }}</label>
                 <input
@@ -201,18 +201,16 @@
                   @change="handleCustomDateChange"
                   :readonly="timeRange !== 'custom'"
                   :class="[
-                    'w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500',
-                    timeRange !== 'custom'
-                      ? 'bg-gray-50 cursor-not-allowed'
-                      : ''
+                    'w-full px-3 py-2 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent',
+                    timeRange !== 'custom' ? 'bg-app-sub cursor-not-allowed' : ''
                   ]"
                 />
               </div>
               <div class="flex-shrink-0 hidden sm:block sm:pt-6">
-                <span class="text-sm text-gray-500">-</span>
+                <span class="text-sm text-ink-3">-</span>
               </div>
               <div class="flex-1 w-full sm:w-auto min-w-0">
-                <label class="block text-xs text-gray-500 mb-1">{{
+                <label class="block text-xs text-ink-3 mb-1">{{
                   t('todos.timeRange.endDate')
                 }}</label>
                 <input
@@ -221,10 +219,8 @@
                   @change="handleCustomDateChange"
                   :readonly="timeRange !== 'custom'"
                   :class="[
-                    'w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500',
-                    timeRange !== 'custom'
-                      ? 'bg-gray-50 cursor-not-allowed'
-                      : ''
+                    'w-full px-3 py-2 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent',
+                    timeRange !== 'custom' ? 'bg-app-sub cursor-not-allowed' : ''
                   ]"
                 />
               </div>
@@ -238,13 +234,13 @@
             :class="{ 'opacity-50': loading }"
           >
             <div class="flex-1 w-full sm:w-auto">
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label class="block text-sm font-medium text-ink-2 mb-1">
                 {{ t('todos.calendar.viewMode') }}
               </label>
               <select
                 v-model="calendarViewMode"
                 @change="handleCalendarViewModeChange"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                class="w-full px-3 py-2 border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
               >
                 <option value="month">
                   {{ t('todos.calendar.monthView') }}
@@ -261,12 +257,12 @@
           >
             <!-- Status Filter -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label class="block text-sm font-medium text-ink-2 mb-1">
                 {{ t('todos.filters.status') }}
               </label>
               <select
                 v-model="filters.is_completed"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                class="w-full px-3 py-2 border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
               >
                 <option :value="null">{{ t('todos.filters.all') }}</option>
                 <option :value="false">
@@ -280,12 +276,12 @@
 
             <!-- Priority Filter -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label class="block text-sm font-medium text-ink-2 mb-1">
                 {{ t('todos.filters.priority') }}
               </label>
               <select
                 v-model="filters.priority"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                class="w-full px-3 py-2 border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
               >
                 <option :value="null">{{ t('todos.filters.all') }}</option>
                 <option value="high">{{ t('todos.priority.high') }}</option>
@@ -298,26 +294,26 @@
 
             <!-- Owner Filter -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label class="block text-sm font-medium text-ink-2 mb-1">
                 {{ t('todos.filters.owner') }}
               </label>
               <input
                 v-model="filters.owner"
                 type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                class="w-full px-3 py-2 border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
                 :placeholder="t('todos.filters.owner')"
               />
             </div>
 
             <!-- Search -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
+              <label class="block text-sm font-medium text-ink-2 mb-1">
                 {{ t('common.search') }}
               </label>
               <input
                 v-model="filters.search"
                 type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                class="w-full px-3 py-2 border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
                 :placeholder="t('todos.filters.search')"
               />
             </div>
@@ -326,15 +322,15 @@
           <!-- Active Filters Display -->
           <div
             v-if="hasActiveFilters"
-            class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200"
+            class="flex flex-wrap items-center gap-2 pt-2 border-t border-line"
           >
-            <span class="text-xs font-medium text-gray-500">
+            <span class="text-xs font-medium text-ink-3">
               {{ t('todos.filters.activeFilters') }}:
             </span>
             <span
               v-for="(filter, key) in activeFilters"
               :key="key"
-              class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded-md text-xs font-medium cursor-pointer hover:bg-primary-200 transition-colors"
+              class="inline-flex items-center gap-1 px-2 py-1 bg-accent-soft text-accent rounded-md text-xs font-medium cursor-pointer hover:bg-accent transition-colors"
               @click="removeFilter(key)"
             >
               {{ filter.label }}: {{ filter.value }}
@@ -355,7 +351,7 @@
             <button
               v-if="hasActiveFilters"
               @click="clearFilters"
-              class="text-xs text-gray-500 hover:text-gray-700 underline"
+              class="text-xs text-ink-3 hover:text-ink-2 underline"
             >
               {{ t('todos.filters.clearAll') }}
             </button>
@@ -370,7 +366,7 @@
             <div class="flex items-center gap-4">
               <button
                 @click="previousPeriod"
-                class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                class="p-2 text-ink-2 hover:text-ink hover:bg-chip rounded"
               >
                 <svg
                   class="w-5 h-5"
@@ -386,7 +382,7 @@
                   />
                 </svg>
               </button>
-              <h2 class="text-lg font-semibold text-gray-900">
+              <h2 class="text-lg font-semibold text-ink">
                 {{
                   calendarViewMode === 'week'
                     ? currentWeekLabel
@@ -395,7 +391,7 @@
               </h2>
               <button
                 @click="nextPeriod"
-                class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
+                class="p-2 text-ink-2 hover:text-ink hover:bg-chip rounded"
               >
                 <svg
                   class="w-5 h-5"
@@ -421,7 +417,7 @@
             <div
               v-for="day in weekDays"
               :key="day"
-              class="text-center text-sm font-medium text-gray-700 py-2"
+              class="text-center text-sm font-medium text-ink-2 py-2"
             >
               {{ day }}
             </div>
@@ -434,11 +430,11 @@
               :class="[
                 'min-h-[80px] p-2 border rounded cursor-pointer transition-colors',
                 date.isCurrentMonth
-                  ? 'bg-white border-gray-200 hover:border-primary-500 hover:bg-primary-50'
-                  : 'bg-gray-50 border-gray-100 text-gray-400',
-                date.isToday ? 'ring-2 ring-primary-500' : '',
+                  ? 'bg-panel border-line hover:border-accent hover:bg-accent-soft'
+                  : 'bg-app-sub border-line-soft text-ink-4',
+                date.isToday ? 'ring-2 ring-accent' : '',
                 selectedDate && isSameDay(date.date, selectedDate)
-                  ? 'bg-primary-100 border-primary-500'
+                  ? 'bg-accent-soft border-accent'
                   : ''
               ]"
               @click="selectDate(date.date)"
@@ -458,12 +454,12 @@
                     :class="[
                       'text-xs px-1 py-0.5 rounded truncate',
                       todo.is_completed
-                        ? 'bg-gray-200 text-gray-600 line-through'
+                        ? 'bg-chip text-ink-2 line-through'
                         : todo.priority === 'high'
-                          ? 'bg-red-100 text-red-700'
+                          ? 'bg-bad-soft text-bad'
                           : todo.priority === 'medium'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-blue-100 text-blue-700'
+                            ? 'bg-warn-soft text-warn'
+                            : 'bg-accent-soft text-accent'
                     ]"
                     @click.stop="handleCalendarTodoClick(todo, date.date)"
                   >
@@ -472,7 +468,7 @@
                 </template>
                 <div
                   v-if="getTodosForDate(date.date).length > 3"
-                  class="text-xs px-1 py-0.5 rounded bg-gray-100 text-gray-600 cursor-pointer hover:bg-gray-200"
+                  class="text-xs px-1 py-0.5 rounded bg-chip text-ink-2 cursor-pointer hover:bg-chip"
                   @click.stop="selectDate(date.date)"
                 >
                   {{
@@ -497,11 +493,11 @@
         <Transition name="fade">
           <div
             v-if="calendarClickLoading"
-            class="absolute inset-0 bg-white bg-opacity-75 z-10 flex items-center justify-center rounded-lg"
+            class="absolute inset-0 bg-panel bg-opacity-75 z-10 flex items-center justify-center rounded-lg"
           >
             <div class="flex flex-col items-center gap-2">
               <svg
-                class="animate-spin h-6 w-6 text-primary-600"
+                class="animate-spin h-6 w-6 text-accent"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -520,7 +516,7 @@
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              <span class="text-sm text-gray-600">{{
+              <span class="text-sm text-ink-2">{{
                 t('common.loading') || 'Loading...'
               }}</span>
             </div>
@@ -539,7 +535,7 @@
               <!-- Group By Selector -->
               <select
                 v-model="groupBy"
-                class="text-xs px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                class="text-xs px-2 py-1 border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
               >
                 <option value="date">{{ t('todos.groupBy.date') }}</option>
                 <option value="email">{{ t('todos.groupBy.subject') }}</option>
@@ -573,13 +569,11 @@
             class="mb-6 last:mb-0"
           >
             <!-- Group Header -->
-            <div
-              class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200"
-            >
+            <div class="flex items-center gap-2 mb-3 pb-2 border-b border-line">
               <!-- Date Icon -->
               <svg
                 v-if="groupBy === 'date'"
-                class="w-4 h-4 text-gray-500"
+                class="w-4 h-4 text-ink-3"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -594,7 +588,7 @@
               <!-- Owner Icon -->
               <svg
                 v-else-if="groupBy === 'owner'"
-                class="w-4 h-4 text-gray-500"
+                class="w-4 h-4 text-ink-3"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -609,7 +603,7 @@
               <!-- Priority Icon -->
               <svg
                 v-else-if="groupBy === 'priority'"
-                class="w-4 h-4 text-gray-500"
+                class="w-4 h-4 text-ink-3"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -624,7 +618,7 @@
               <!-- Category Icon -->
               <svg
                 v-else-if="groupBy === 'category'"
-                class="w-4 h-4 text-gray-500"
+                class="w-4 h-4 text-ink-3"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -639,7 +633,7 @@
               <!-- Location Icon -->
               <svg
                 v-else-if="groupBy === 'location'"
-                class="w-4 h-4 text-gray-500"
+                class="w-4 h-4 text-ink-3"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -660,7 +654,7 @@
               <!-- Email Icon -->
               <svg
                 v-else-if="groupBy === 'email'"
-                class="w-4 h-4 text-gray-500"
+                class="w-4 h-4 text-ink-3"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -672,14 +666,14 @@
                   d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                 />
               </svg>
-              <h4 class="text-sm font-semibold text-gray-700">
+              <h4 class="text-sm font-semibold text-ink-2">
                 {{ getGroupLabel(key, groupBy) }}
               </h4>
-              <span class="text-xs text-gray-500">({{ group.length }})</span>
+              <span class="text-xs text-ink-3">({{ group.length }})</span>
             </div>
 
             <!-- Timeline Container -->
-            <div class="relative pl-4 sm:pl-6 border-l-2 border-gray-200">
+            <div class="relative pl-4 sm:pl-6 border-l-2 border-line">
               <TransitionGroup
                 name="todo-list"
                 tag="div"
@@ -709,7 +703,7 @@
 
           <div
             v-if="selectedDateTodos.length === 0 && !tempNewTodo"
-            class="text-gray-500 italic text-center py-8"
+            class="text-ink-3 italic text-center py-8"
           >
             <p>
               {{
@@ -727,16 +721,16 @@
         @click.self="closeTodoEditor"
       >
         <div
-          class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+          class="bg-panel rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
         >
           <div class="p-6">
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold text-gray-900">
+              <h3 class="text-lg font-semibold text-ink">
                 {{ editingTodo ? t('todos.editTodo') : t('todos.addTodo') }}
               </h3>
               <button
                 @click="closeTodoEditor"
-                class="text-gray-400 hover:text-gray-600"
+                class="text-ink-4 hover:text-ink-2"
               >
                 <svg
                   class="w-6 h-6"

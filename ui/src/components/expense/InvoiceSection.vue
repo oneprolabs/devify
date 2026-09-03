@@ -8,7 +8,7 @@
 
         <p
           v-if="error"
-          class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
         >
           {{ error }}
         </p>
@@ -18,15 +18,15 @@
              back, so the action never feels like a deletion. -->
         <div
           v-if="filedNotice"
-          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ok bg-ok-soft p-3"
         >
           <div>
-            <p class="text-sm font-medium text-emerald-800">
+            <p class="text-sm font-medium text-ok">
               {{
                 t('expense.invoices.filedNotice', { count: filedNotice.count })
               }}
             </p>
-            <p class="mt-0.5 text-xs text-emerald-700">
+            <p class="mt-0.5 text-xs text-ok">
               {{ t('expense.invoices.filedNoticeHint') }}
             </p>
           </div>
@@ -42,9 +42,9 @@
 
         <div
           v-if="selectedUuids.length"
-          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary-200 bg-primary-50 p-3"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent bg-accent-soft p-3"
         >
-          <span class="text-sm text-primary-900">
+          <span class="text-sm text-accent">
             {{
               t('expense.invoices.selectedCount', {
                 count: selectedUuids.length

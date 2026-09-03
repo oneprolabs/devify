@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8"
+    class="min-h-screen flex items-center justify-center bg-app-sub py-12 px-4 sm:px-6 lg:px-8"
   >
     <div class="max-w-md w-full space-y-8">
       <!-- Header -->
@@ -12,7 +12,7 @@
               alt="AImyChats Logo"
               class="w-10 h-10"
             />
-            <h2 class="text-2xl font-bold text-gray-900">
+            <h2 class="text-2xl font-bold text-ink">
               {{
                 activeTab === 'login'
                   ? t('auth.loginTitle')
@@ -25,14 +25,14 @@
       </div>
 
       <!-- Tab Navigation -->
-      <div class="flex border-b border-gray-200">
+      <div class="flex border-b border-line">
         <button
           @click="activeTab = 'login'"
           class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors"
           :class="
             activeTab === 'login'
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-ink-3 hover:text-ink-2 hover:border-line'
           "
         >
           {{ t('auth.tabs.login') }}
@@ -42,8 +42,8 @@
           class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors"
           :class="
             activeTab === 'register'
-              ? 'border-primary-600 text-primary-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-ink-3 hover:text-ink-2 hover:border-line'
           "
         >
           {{ t('auth.tabs.register') }}
@@ -51,14 +51,11 @@
       </div>
 
       <!-- Success message (email sent) -->
-      <div
-        v-if="emailSent"
-        class="rounded-md bg-green-50 border border-green-200 p-4"
-      >
+      <div v-if="emailSent" class="rounded-md bg-ok-soft border border-ok p-4">
         <div class="flex">
           <div class="flex-shrink-0">
             <svg
-              class="h-5 w-5 text-green-400"
+              class="h-5 w-5 text-ok"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -70,10 +67,10 @@
             </svg>
           </div>
           <div class="ml-3">
-            <h3 class="text-sm font-medium text-green-800">
+            <h3 class="text-sm font-medium text-ok">
               {{ t('register.emailSent.title') }}
             </h3>
-            <div class="mt-2 text-sm text-green-700">
+            <div class="mt-2 text-sm text-ok">
               <p>
                 {{ t('register.emailSent.message', { email: formData.email }) }}
               </p>
@@ -91,7 +88,7 @@
       <div v-if="!emailSent">
         <a
           :href="googleOAuthUrl"
-          class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          class="w-full flex items-center justify-center px-4 py-3 border border-line rounded-lg shadow-sm bg-panel text-sm font-medium text-ink-2 hover:bg-app-sub transition-colors"
         >
           <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
             <path
@@ -117,10 +114,10 @@
         <!-- Divider -->
         <div class="relative mt-6">
           <div class="absolute inset-0 flex items-center">
-            <div class="w-full border-t border-gray-300" />
+            <div class="w-full border-t border-line" />
           </div>
           <div class="relative flex justify-center text-sm">
-            <span class="px-2 bg-gray-50 text-gray-500">
+            <span class="px-2 bg-app-sub text-ink-3">
               {{ t('auth.divider.or') }}
             </span>
           </div>
@@ -134,7 +131,7 @@
         @submit.prevent="handleLogin"
       >
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
+          <label class="block text-sm font-medium text-ink-2 mb-1">
             {{ t('auth.virtualEmailUsername') }}
           </label>
           <div class="flex rounded-md shadow-sm">
@@ -150,12 +147,12 @@
               :class="{ 'input-error': errors.username }"
             />
             <span
-              class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm"
+              class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-line bg-app-sub text-ink-3 text-sm"
             >
               @{{ emailDomain }}
             </span>
           </div>
-          <p v-if="errors.username" class="mt-1 text-sm text-red-600">
+          <p v-if="errors.username" class="mt-1 text-sm text-bad">
             {{ errors.username }}
           </p>
         </div>
@@ -172,25 +169,12 @@
           :disabled="loading"
         />
 
-        <div class="flex items-center justify-between">
-          <div class="flex items-center">
-            <input
-              id="remember-me"
-              v-model="rememberMe"
-              name="remember-me"
-              type="checkbox"
-              class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-            />
-            <label for="remember-me" class="ml-2 block text-sm text-gray-900">
-              {{ t('auth.rememberMe') }}
-            </label>
-          </div>
-
+        <div class="flex items-center justify-end">
           <div class="text-sm">
             <a
               href="#"
               @click.prevent="showForgotPassword = true"
-              class="font-medium text-primary-600 hover:text-primary-500"
+              class="font-medium text-accent hover:text-accent"
             >
               {{ t('auth.forgotPassword') }}
             </a>
@@ -199,9 +183,9 @@
 
         <div
           v-if="errorMessage"
-          class="rounded-md bg-red-50 border border-red-200 p-4"
+          class="rounded-md bg-bad-soft border border-bad p-4"
         >
-          <p class="text-sm text-red-700">
+          <p class="text-sm text-bad">
             {{ errorMessage }}
           </p>
         </div>
@@ -235,15 +219,15 @@
           :disabled="loading"
         />
 
-        <p class="text-sm text-gray-500">
+        <p class="text-sm text-ink-3">
           {{ t('register.emailHint') }}
         </p>
 
         <div
           v-if="errorMessage"
-          class="rounded-md bg-red-50 border border-red-200 p-4"
+          class="rounded-md bg-bad-soft border border-bad p-4"
         >
-          <p class="text-sm text-red-700">
+          <p class="text-sm text-bad">
             {{ errorMessage }}
           </p>
         </div>
@@ -273,7 +257,7 @@
       >
         <!-- Background overlay -->
         <div
-          class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          class="fixed inset-0 bg-ink-3 bg-opacity-75 transition-opacity"
           aria-hidden="true"
           @click="closeForgotPassword"
         ></div>
@@ -287,18 +271,18 @@
 
         <!-- Modal content -->
         <div
-          class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6"
+          class="inline-block align-bottom bg-panel rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6"
         >
           <div>
             <div class="mt-3 text-center sm:mt-5">
               <h3
-                class="text-lg leading-6 font-medium text-gray-900"
+                class="text-lg leading-6 font-medium text-ink"
                 id="modal-title"
               >
                 {{ t('auth.forgotPassword') }}
               </h3>
               <div class="mt-2">
-                <p class="text-sm text-gray-500">
+                <p class="text-sm text-ink-3">
                   {{ t('auth.forgotPasswordDescription') }}
                 </p>
               </div>
@@ -308,12 +292,12 @@
           <!-- Success message -->
           <div
             v-if="resetEmailSent"
-            class="mt-4 rounded-md bg-green-50 border border-green-200 p-4"
+            class="mt-4 rounded-md bg-ok-soft border border-ok p-4"
           >
             <div class="flex">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-5 w-5 text-green-400"
+                  class="h-5 w-5 text-ok"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -325,7 +309,7 @@
                 </svg>
               </div>
               <div class="ml-3">
-                <p class="text-sm font-medium text-green-800">
+                <p class="text-sm font-medium text-ok">
                   {{ t('auth.resetEmailSent') }}
                 </p>
               </div>
@@ -335,12 +319,12 @@
           <!-- Error message -->
           <div
             v-else-if="resetErrorMessage"
-            class="mt-4 rounded-md bg-red-50 border border-red-200 p-4"
+            class="mt-4 rounded-md bg-bad-soft border border-bad p-4"
           >
             <div class="flex">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-5 w-5 text-red-400"
+                  class="h-5 w-5 text-bad"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -352,7 +336,7 @@
                 </svg>
               </div>
               <div class="ml-3">
-                <p class="text-sm text-red-700">
+                <p class="text-sm text-bad">
                   {{ resetErrorMessage }}
                 </p>
               </div>
@@ -368,7 +352,7 @@
             <div>
               <label
                 for="reset-email"
-                class="block text-sm font-medium text-gray-700"
+                class="block text-sm font-medium text-ink-2"
               >
                 {{ t('settings.securityEmail') }}
               </label>
@@ -378,7 +362,7 @@
                   v-model="resetEmail"
                   type="email"
                   required
-                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  class="appearance-none block w-full px-3 py-2 border border-line rounded-md shadow-sm placeholder-line focus:outline-none focus:ring-accent focus:border-accent sm:text-sm"
                   :placeholder="
                     t('auth.securityEmailPlaceholder') ||
                     t('auth.emailPlaceholder')
@@ -394,14 +378,14 @@
               <button
                 type="submit"
                 :disabled="resetLoading || !resetEmail"
-                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:col-start-2 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-accent text-base font-medium text-accent-on hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent sm:col-start-2 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ resetLoading ? t('common.loading') : t('common.submit') }}
               </button>
               <button
                 type="button"
                 @click="closeForgotPassword"
-                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                class="mt-3 w-full inline-flex justify-center rounded-md border border-line shadow-sm px-4 py-2 bg-panel text-base font-medium text-ink-2 hover:bg-app-sub focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent sm:mt-0 sm:col-start-1 sm:text-sm"
               >
                 {{ t('common.cancel') }}
               </button>
@@ -413,7 +397,7 @@
             <button
               type="button"
               @click="closeForgotPassword"
-              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:text-sm"
+              class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-accent text-base font-medium text-accent-on hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent sm:text-sm"
             >
               {{ t('common.close') }}
             </button>
@@ -460,7 +444,6 @@ const errors = reactive({
 const loading = ref(false)
 const errorMessage = ref('')
 const emailSent = ref(false)
-const rememberMe = ref(false)
 
 const showForgotPassword = ref(false)
 const resetEmail = ref('')

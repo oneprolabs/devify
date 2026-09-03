@@ -35,14 +35,14 @@
     >
       <div
         v-if="showDropdown"
-        class="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200"
+        class="absolute right-0 mt-2 w-32 bg-panel rounded-md shadow-lg py-1 z-50 border border-line"
       >
         <button
           v-for="lang in languages"
           :key="lang.value"
           @click="selectLanguage(lang.value)"
-          class="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-          :class="{ 'bg-gray-50 font-medium': locale === lang.value }"
+          class="flex items-center w-full px-3 py-2 text-sm text-ink-2 hover:bg-chip transition-colors"
+          :class="{ 'bg-app-sub font-medium': locale === lang.value }"
         >
           <span class="mr-2 text-sm">{{ lang.flag }}</span>
           {{ lang.label }}
@@ -82,8 +82,8 @@ const currentLanguageDisplay = computed(() => {
 
 const triggerClass = computed(() => {
   return props.variant === 'dark'
-    ? 'flex items-center space-x-1 rounded-lg px-2 py-1 text-sm text-slate-300 transition-colors hover:bg-white/10 hover:text-white'
-    : 'flex items-center space-x-1 rounded-md px-2 py-1 text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900'
+    ? 'flex items-center space-x-1 rounded-lg px-2 py-1 text-sm text-ink-4 transition-colors hover:bg-panel/10 hover:text-accent-on'
+    : 'flex items-center space-x-1 rounded-md px-2 py-1 text-sm text-ink-2 transition-colors hover:bg-chip hover:text-ink'
 })
 
 const toggleDropdown = () => {

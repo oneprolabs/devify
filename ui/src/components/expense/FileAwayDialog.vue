@@ -2,10 +2,10 @@
   <BaseModal :show="true" @close="$emit('close')">
     <div class="space-y-5">
       <div>
-        <h3 class="text-lg font-semibold text-gray-900">
+        <h3 class="text-lg font-semibold text-ink">
           {{ t('expense.invoices.fileAwayTitle') }}
         </h3>
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="mt-1 text-sm text-ink-3">
           {{ t('expense.invoices.fileAwaySubtitle', { count }) }}
         </p>
       </div>
@@ -17,23 +17,23 @@
           class="flex cursor-pointer items-center gap-3 rounded-lg border p-3"
           :class="
             reason === option
-              ? 'border-primary-500 bg-primary-50'
-              : 'border-gray-200 hover:border-gray-300'
+              ? 'border-accent bg-accent-soft'
+              : 'border-line hover:border-line'
           "
         >
           <input
             v-model="reason"
             type="radio"
             :value="option"
-            class="text-primary-600 focus:ring-primary-500"
+            class="text-accent focus:ring-accent"
           />
-          <span class="text-sm text-gray-900">
+          <span class="text-sm text-ink">
             {{ t(`expense.invoices.filedReasons.${option}`) }}
           </span>
         </label>
       </div>
 
-      <p class="text-xs leading-relaxed text-gray-500">
+      <p class="text-xs leading-relaxed text-ink-3">
         {{ t('expense.invoices.fileAwayNote') }}
       </p>
 

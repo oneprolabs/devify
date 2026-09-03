@@ -1,13 +1,13 @@
 <template>
   <div
     v-if="virtualEmail"
-    class="bg-blue-50 border border-blue-200 rounded-lg p-2.5 sm:p-3 mb-4"
+    class="bg-accent-soft border border-accent rounded-lg p-2.5 sm:p-3 mb-4"
   >
     <div class="flex items-center justify-between gap-2 sm:gap-3">
       <div class="flex items-center gap-2 min-w-0 flex-1">
         <div class="flex-shrink-0">
           <svg
-            class="h-4 w-4 sm:h-5 sm:w-5 text-blue-600"
+            class="h-4 w-4 sm:h-5 sm:w-5 text-accent"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -25,11 +25,11 @@
           <div
             class="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5"
           >
-            <span class="text-xs font-medium text-blue-800 shrink-0">
+            <span class="text-xs font-medium text-accent shrink-0">
               {{ label }}:
             </span>
             <code
-              class="text-xs sm:text-sm font-mono font-medium text-blue-900 truncate block"
+              class="text-xs sm:text-sm font-mono font-medium text-accent truncate block"
               :title="virtualEmail"
             >
               {{ virtualEmail }}
@@ -40,7 +40,7 @@
 
       <button
         @click="copyEmail"
-        class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors"
+        class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent bg-accent-soft hover:bg-accent px-2 py-1 rounded transition-colors"
         :title="t('settings.copyEmail')"
       >
         <svg
@@ -59,7 +59,7 @@
         </svg>
         <svg
           v-else
-          class="h-3.5 w-3.5 text-green-600"
+          class="h-3.5 w-3.5 text-ok"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

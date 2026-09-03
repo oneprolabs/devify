@@ -2,16 +2,16 @@
   <div>
     <BaseLoading v-if="loading" />
     <template v-else>
-      <h2 class="text-base font-semibold text-gray-900 mb-6">
+      <h2 class="text-base font-semibold text-ink mb-6">
         {{ t('taskManagement.settings.taskManagementSection') }}
       </h2>
 
       <section class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pb-6">
         <div class="md:col-span-2">
-          <h3 class="text-sm font-semibold text-gray-900 mb-1">
+          <h3 class="text-sm font-semibold text-ink mb-1">
             {{ t('taskManagement.settings.timeoutTitle') }}
           </h3>
-          <p class="text-sm text-gray-600">
+          <p class="text-sm text-ink-2">
             {{ t('taskManagement.settings.timeoutDesc') }}
           </p>
         </div>
@@ -25,9 +25,9 @@
               :placeholder="
                 t('taskManagement.settings.timeoutMinutesPlaceholder')
               "
-              class="rounded-md border border-gray-300 px-3 py-2 text-sm w-24 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              class="rounded-md border border-line px-3 py-2 text-sm w-24 focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
             />
-            <span class="text-sm text-gray-500 w-14">{{
+            <span class="text-sm text-ink-3 w-14">{{
               t('taskManagement.settings.minutesUnit')
             }}</span>
           </div>
@@ -35,13 +35,13 @@
       </section>
 
       <section
-        class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-6 pb-6 border-t border-gray-200"
+        class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-6 pb-6 border-t border-line"
       >
         <div class="md:col-span-2">
-          <h3 class="text-sm font-semibold text-gray-900 mb-1">
+          <h3 class="text-sm font-semibold text-ink mb-1">
             {{ t('taskManagement.settings.retentionTitle') }}
           </h3>
-          <p class="text-sm text-gray-600">
+          <p class="text-sm text-ink-2">
             {{ t('taskManagement.settings.retentionDesc') }}
           </p>
         </div>
@@ -55,32 +55,32 @@
               :placeholder="
                 t('taskManagement.settings.retentionDaysPlaceholder')
               "
-              class="rounded-md border border-gray-300 px-3 py-2 text-sm w-24 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              class="rounded-md border border-line px-3 py-2 text-sm w-24 focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
             />
-            <span class="text-sm text-gray-500 w-14">{{
+            <span class="text-sm text-ink-3 w-14">{{
               t('taskManagement.settings.daysUnit')
             }}</span>
           </div>
         </div>
       </section>
 
-      <section class="pt-6 pb-6 border-t border-gray-200">
+      <section class="pt-6 pb-6 border-t border-line">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           <div class="md:col-span-2">
-            <h3 class="text-sm font-semibold text-gray-900 mb-1">
+            <h3 class="text-sm font-semibold text-ink mb-1">
               {{ t('taskManagement.settings.cleanupTitle') }}
             </h3>
-            <p class="text-sm text-gray-600">
+            <p class="text-sm text-ink-2">
               {{ t('taskManagement.settings.cleanupDesc') }}
             </p>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mt-4">
           <div class="md:col-span-2">
-            <label class="text-sm font-medium text-gray-700">{{
+            <label class="text-sm font-medium text-ink-2">{{
               t('taskManagement.settings.cleanupCrontab')
             }}</label>
-            <p class="text-xs text-gray-500 mt-0.5">
+            <p class="text-xs text-ink-3 mt-0.5">
               {{ t('taskManagement.settings.crontabHelp') }}
             </p>
           </div>
@@ -92,27 +92,27 @@
                 :placeholder="
                   t('taskManagement.settings.cleanupCrontabPlaceholder')
                 "
-                class="rounded-md border border-gray-300 px-3 py-2 text-sm w-full font-mono focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                class="rounded-md border border-line px-3 py-2 text-sm w-full font-mono focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent disabled:bg-chip disabled:text-ink-3 disabled:cursor-not-allowed"
               />
             </div>
           </div>
         </div>
       </section>
 
-      <section class="pt-6 pb-6 border-t border-gray-200">
+      <section class="pt-6 pb-6 border-t border-line">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           <div class="md:col-span-2">
-            <h3 class="text-sm font-semibold text-gray-900 mb-1">
+            <h3 class="text-sm font-semibold text-ink mb-1">
               {{ t('taskManagement.settings.markTimeoutTitle') }}
             </h3>
-            <p class="text-sm text-gray-600">
+            <p class="text-sm text-ink-2">
               {{ t('taskManagement.settings.markTimeoutDesc') }}
             </p>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mt-4">
           <div class="md:col-span-2">
-            <label class="text-sm font-medium text-gray-700">{{
+            <label class="text-sm font-medium text-ink-2">{{
               t('taskManagement.settings.markTimeoutCrontab')
             }}</label>
           </div>
@@ -124,7 +124,7 @@
                 :placeholder="
                   t('taskManagement.settings.markTimeoutCrontabPlaceholder')
                 "
-                class="rounded-md border border-gray-300 px-3 py-2 text-sm w-full font-mono focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                class="rounded-md border border-line px-3 py-2 text-sm w-full font-mono focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent disabled:bg-chip disabled:text-ink-3 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -132,7 +132,7 @@
       </section>
 
       <div
-        class="flex items-center justify-end gap-3 border-t border-gray-200 pt-6"
+        class="flex items-center justify-end gap-3 border-t border-line pt-6"
       >
         <BaseButton
           variant="secondary"

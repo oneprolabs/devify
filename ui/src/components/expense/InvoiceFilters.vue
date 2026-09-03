@@ -1,25 +1,25 @@
 <template>
   <div class="flex flex-wrap items-end gap-3">
     <div class="min-w-[180px] flex-1">
-      <label class="mb-1 block text-xs text-gray-500">
+      <label class="mb-1 block text-xs text-ink-3">
         {{ t('expense.invoices.search') }}
       </label>
       <input
         :value="modelValue.q"
         type="search"
-        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         :placeholder="t('expense.invoices.searchPlaceholder')"
         @input="update('q', $event.target.value)"
       />
     </div>
 
     <div v-if="buyers.length">
-      <label class="mb-1 block text-xs text-gray-500">
+      <label class="mb-1 block text-xs text-ink-3">
         {{ t('expense.invoices.buyer') }}
       </label>
       <select
         :value="modelValue.buyer"
-        class="max-w-[16rem] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+        class="max-w-[16rem] rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
         @change="update('buyer', $event.target.value)"
       >
         <option value="">{{ t('expense.invoices.allBuyers') }}</option>
@@ -30,12 +30,12 @@
     </div>
 
     <div>
-      <label class="mb-1 block text-xs text-gray-500">
+      <label class="mb-1 block text-xs text-ink-3">
         {{ t('expense.invoices.category') }}
       </label>
       <select
         :value="modelValue.category"
-        class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+        class="rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
         @change="update('category', $event.target.value)"
       >
         <option value="">{{ t('expense.invoices.allCategories') }}</option>
@@ -45,11 +45,11 @@
       </select>
     </div>
 
-    <label class="flex items-center gap-2 pb-2 text-sm text-gray-700">
+    <label class="flex items-center gap-2 pb-2 text-sm text-ink-2">
       <input
         :checked="modelValue.needsReview"
         type="checkbox"
-        class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+        class="rounded border-line text-accent focus:ring-accent"
         @change="update('needsReview', $event.target.checked)"
       />
       {{ t('expense.invoices.needsReviewOnly') }}

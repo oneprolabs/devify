@@ -48,7 +48,6 @@
     "confirmPassword": "Confirmar contraseña",
     "passwordHelp": "La contraseña debe tener al menos 8 caracteres",
     "passwordHelpComplex": "8-32 caracteres, debe contener letras y números",
-    "rememberMe": "Recordarme",
     "forgotPassword": "¿Olvidaste tu contraseña?",
     "forgotPasswordDescription": "Por favor ingresa el correo de seguridad que usaste durante el registro. Te enviaremos un enlace de restablecimiento a ese correo.",
     "securityEmailPlaceholder": "Ingresa tu correo de seguridad",

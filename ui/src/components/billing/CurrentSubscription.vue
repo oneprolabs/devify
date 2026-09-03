@@ -1,15 +1,15 @@
 <template>
   <div
-    class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 h-full flex flex-col"
+    class="bg-panel rounded-lg shadow-sm border border-line p-4 h-full flex flex-col"
   >
-    <h3 class="text-base font-semibold text-gray-900 mb-3">
+    <h3 class="text-base font-semibold text-ink mb-3">
       {{ t('billing.currentSubscription.title') }}
     </h3>
 
     <div v-if="subscription || credits" class="flex-1 flex flex-col space-y-3">
       <div>
         <div class="flex items-center justify-between mb-1.5">
-          <h4 class="text-lg font-semibold text-gray-900">
+          <h4 class="text-lg font-semibold text-ink">
             {{
               subscription
                 ? subscription.plan_name
@@ -62,7 +62,7 @@
           </span>
           <span
             v-else
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-ok-soft text-ok"
           >
             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
               <path
@@ -75,21 +75,21 @@
           </span>
         </div>
 
-        <p v-if="subscription" class="text-xs text-gray-600">
+        <p v-if="subscription" class="text-xs text-ink-2">
           {{ t('billing.currentSubscription.provider') }}:
           {{ subscription.provider_name }}
         </p>
-        <p v-else class="text-xs text-gray-600">
+        <p v-else class="text-xs text-ink-2">
           {{ t('billing.currentSubscription.freePlanDesc') }}
         </p>
       </div>
 
       <div class="space-y-1.5 flex-grow">
         <div class="flex justify-between items-center">
-          <span class="text-xs text-gray-600">
+          <span class="text-xs text-ink-2">
             {{ t('billing.currentSubscription.periodStart') }}
           </span>
-          <span class="text-xs font-medium text-gray-900">
+          <span class="text-xs font-medium text-ink">
             {{
               subscription ? formatDate(subscription.current_period_start) : '-'
             }}
@@ -97,10 +97,10 @@
         </div>
 
         <div class="flex justify-between items-center">
-          <span class="text-xs text-gray-600">
+          <span class="text-xs text-ink-2">
             {{ t('billing.currentSubscription.periodEnd') }}
           </span>
-          <span class="text-xs font-medium text-gray-900">
+          <span class="text-xs font-medium text-ink">
             {{
               subscription ? formatDate(subscription.current_period_end) : '-'
             }}
@@ -108,10 +108,10 @@
         </div>
 
         <div class="flex justify-between items-center">
-          <span class="text-xs text-gray-600">
+          <span class="text-xs text-ink-2">
             {{ t('billing.currentSubscription.remaining') }}
           </span>
-          <span class="text-xs font-medium text-primary-600">
+          <span class="text-xs font-medium text-accent">
             {{
               subscription && daysRemaining !== null
                 ? t('billing.currentSubscription.daysRemainingValue', {
@@ -123,15 +123,13 @@
         </div>
 
         <div class="flex justify-between items-center">
-          <span class="text-xs text-gray-600">
+          <span class="text-xs text-ink-2">
             {{ t('billing.currentSubscription.autoRenew') }}
           </span>
           <span
             :class="[
               'text-xs font-medium',
-              subscription && subscription.auto_renew
-                ? 'text-green-600'
-                : 'text-gray-600'
+              subscription && subscription.auto_renew ? 'text-ok' : 'text-ink-2'
             ]"
           >
             {{
@@ -147,28 +145,28 @@
 
       <div v-if="credits" class="pt-3">
         <div
-          class="bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg p-2.5"
+          class="bg-gradient-to-r from-accent-soft to-accent-soft rounded-lg p-2.5"
         >
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-gray-700">
+            <span class="text-xs font-medium text-ink-2">
               {{ t('billing.currentSubscription.creditsUsage') }}
             </span>
-            <span class="text-sm font-semibold text-primary-700">
+            <span class="text-sm font-semibold text-accent">
               {{ credits.available_credits }} / {{ credits.total_credits }}
             </span>
           </div>
 
-          <div class="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+          <div class="w-full bg-chip rounded-full h-1.5 mb-2">
             <div
-              class="bg-primary-600 h-1.5 rounded-full transition-all"
+              class="bg-accent h-1.5 rounded-full transition-all"
               :style="{ width: `${creditsPercentage}%` }"
             />
           </div>
 
-          <div class="p-2 bg-white rounded-lg border border-gray-200 text-xs">
+          <div class="p-2 bg-panel rounded-lg border border-line text-xs">
             <div class="flex items-center gap-1.5 p-1 mb-2">
               <svg
-                class="w-3.5 h-3.5 text-primary-600"
+                class="w-3.5 h-3.5 text-accent"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -178,21 +176,21 @@
                   clip-rule="evenodd"
                 />
               </svg>
-              <p class="font-medium text-gray-900">
+              <p class="font-medium text-ink">
                 {{ t('billing.creditsInfo.title') }}
               </p>
             </div>
 
             <div class="space-y-1.5">
-              <p class="text-gray-600 px-1">
+              <p class="text-ink-2 px-1">
                 {{ t('billing.creditsInfo.description') }}
               </p>
-              <div class="border-t border-gray-100 pt-2 space-y-1.5">
+              <div class="border-t border-line-soft pt-2 space-y-1.5">
                 <div class="flex justify-between">
-                  <span class="text-gray-600">{{
+                  <span class="text-ink-2">{{
                     t('billing.creditsInfo.emailLimit')
                   }}</span>
-                  <span class="font-medium text-gray-900"
+                  <span class="font-medium text-ink"
                     >{{
                       planMetadata?.max_emails_per_period ||
                       planMetadata?.credits_per_period ||
@@ -202,27 +200,27 @@
                   >
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-600">{{
+                  <span class="text-ink-2">{{
                     t('billing.creditsInfo.attachmentLimit')
                   }}</span>
-                  <span class="font-medium text-gray-900"
+                  <span class="font-medium text-ink"
                     >{{ planMetadata?.max_attachment_count || '-' }}
                     {{ t('billing.creditsInfo.attachments') }}</span
                   >
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-600">{{
+                  <span class="text-ink-2">{{
                     t('billing.creditsInfo.storageQuota')
                   }}</span>
-                  <span class="font-medium text-gray-900">{{
+                  <span class="font-medium text-ink">{{
                     formatStorage(planMetadata?.storage_quota_mb)
                   }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-600">{{
+                  <span class="text-ink-2">{{
                     t('billing.creditsInfo.retentionPeriod')
                   }}</span>
-                  <span class="font-medium text-gray-900">{{
+                  <span class="font-medium text-ink">{{
                     formatRetention(planMetadata?.retention_days)
                   }}</span>
                 </div>
@@ -235,7 +233,7 @@
 
     <div v-else class="text-center py-4">
       <svg
-        class="mx-auto h-10 w-10 text-gray-400"
+        class="mx-auto h-10 w-10 text-ink-4"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -247,7 +245,7 @@
           d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
         />
       </svg>
-      <p class="mt-2 text-sm text-gray-500">
+      <p class="mt-2 text-sm text-ink-3">
         {{ t('common.loading') }}
       </p>
     </div>
@@ -291,12 +289,12 @@ const creditsPercentage = computed(() => {
 
 function getStatusIconClass(status) {
   const classes = {
-    active: 'bg-green-100 text-green-700',
-    canceled: 'bg-gray-100 text-gray-600',
-    trialing: 'bg-blue-100 text-blue-700',
-    past_due: 'bg-red-100 text-red-700'
+    active: 'bg-ok-soft text-ok',
+    canceled: 'bg-chip text-ink-2',
+    trialing: 'bg-accent-soft text-accent',
+    past_due: 'bg-bad-soft text-bad'
   }
-  return classes[status] || 'bg-gray-100 text-gray-600'
+  return classes[status] || 'bg-chip text-ink-2'
 }
 
 function getStatusText(status) {

@@ -3,7 +3,7 @@
     <template v-for="option in options" :key="option.value">
       <span
         v-if="option.divider"
-        class="mx-1 h-4 w-px bg-gray-200"
+        class="mx-1 h-4 w-px bg-chip"
         aria-hidden="true"
       ></span>
       <button
@@ -13,8 +13,8 @@
         class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors"
         :class="
           modelValue === option.value
-            ? 'border-primary-600 bg-primary-600 text-white'
-            : 'border-gray-200 bg-white text-gray-700 hover:border-primary-400 hover:text-primary-600'
+            ? 'border-accent bg-accent text-accent-on'
+            : 'border-line bg-panel text-ink-2 hover:border-accent hover:text-accent'
         "
         @click="$emit('update:modelValue', option.value)"
       >
@@ -22,9 +22,7 @@
         <span
           v-if="option.count !== undefined"
           class="tabular-nums text-xs"
-          :class="
-            modelValue === option.value ? 'text-primary-100' : 'text-gray-400'
-          "
+          :class="modelValue === option.value ? 'text-accent-on' : 'text-ink-4'"
         >
           {{ option.count }}
         </span>

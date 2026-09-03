@@ -1,15 +1,15 @@
 <template>
   <div>
-    <p v-if="!invoices.length" class="py-10 text-center text-sm text-gray-500">
+    <p v-if="!invoices.length" class="py-10 text-center text-sm text-ink-3">
       {{ t('expense.invoices.empty') }}
     </p>
 
     <div v-for="month in months" :key="month.key" class="mb-2 last:mb-0">
       <div
-        class="flex items-baseline justify-between border-b border-gray-100 px-1 py-2"
+        class="flex items-baseline justify-between border-b border-line-soft px-1 py-2"
       >
-        <strong class="text-sm text-gray-900">{{ month.label }}</strong>
-        <span class="text-xs tabular-nums text-gray-500">
+        <strong class="text-sm text-ink">{{ month.label }}</strong>
+        <span class="text-xs tabular-nums text-ink-3">
           {{
             t('expense.invoices.monthSummary', {
               count: month.invoices.length,
@@ -22,13 +22,13 @@
       <div
         v-for="invoice in month.invoices"
         :key="invoice.uuid"
-        class="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 border-b border-gray-50 px-1 py-3 last:border-0 hover:bg-gray-50"
+        class="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 border-b border-line-soft px-1 py-3 last:border-0 hover:bg-app-sub"
         @click="$emit('select', invoice)"
       >
         <input
           v-if="selectable"
           type="checkbox"
-          class="mt-1 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-40"
+          class="mt-1 rounded border-line text-accent focus:ring-accent disabled:opacity-40"
           :checked="modelValue.includes(invoice.uuid)"
           :disabled="!isClaimable(invoice)"
           :title="
@@ -41,19 +41,19 @@
         <span v-else></span>
 
         <div class="min-w-0">
-          <p class="truncate text-sm font-medium text-gray-900">
+          <p class="truncate text-sm font-medium text-ink">
             {{ invoice.seller_name || t('expense.invoices.untitled') }}
           </p>
           <p
             v-if="invoice.buyer_name"
-            class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500"
+            class="mt-0.5 flex items-center gap-1.5 text-xs text-ink-3"
           >
             <span
               class="rounded px-1.5 py-0.5 text-[11px]"
               :class="
                 invoice.buyer_tax_id
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'bg-gray-100 text-gray-600'
+                  ? 'bg-accent-soft text-accent'
+                  : 'bg-chip text-ink-2'
               "
             >
               {{
@@ -66,37 +66,37 @@
           </p>
           <p
             v-if="invoice.summary_line"
-            class="mt-0.5 truncate text-xs text-gray-500"
+            class="mt-0.5 truncate text-xs text-ink-3"
           >
             {{ invoice.summary_line }}
           </p>
           <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span
-              class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700"
+              class="rounded-full bg-chip px-2 py-0.5 text-[11px] text-ink-2"
             >
               {{ t(`expense.categories.${invoice.category || 'other'}`) }}
             </span>
             <span
               v-if="invoice.status === 'duplicate'"
-              class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
+              class="rounded-full bg-chip px-2 py-0.5 text-[11px] text-ink-2"
             >
               {{ t('expense.invoices.duplicate') }}
             </span>
             <span
               v-if="invoice.needs_review"
-              class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800"
+              class="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] text-warn"
             >
               {{ t('expense.invoices.needsReview') }}
             </span>
             <span
               v-if="invoice.status === 'failed'"
-              class="rounded-full bg-red-100 px-2 py-0.5 text-[11px] text-red-800"
+              class="rounded-full bg-bad-soft px-2 py-0.5 text-[11px] text-bad"
             >
               {{ t('expense.invoices.failed') }}
             </span>
             <span
               v-if="invoice.disposition === 'filed'"
-              class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700"
+              class="rounded-full bg-ok-soft px-2 py-0.5 text-[11px] text-ok"
             >
               {{
                 t(
@@ -108,12 +108,12 @@
         </div>
 
         <div class="text-right">
-          <p class="text-sm font-medium tabular-nums text-gray-900">
+          <p class="text-sm font-medium tabular-nums text-ink">
             {{ formatAmount(invoice) }}
           </p>
-          <p class="mt-0.5 text-xs tabular-nums text-gray-500">
+          <p class="mt-0.5 text-xs tabular-nums text-ink-3">
             {{ t('expense.invoices.spentOn') }}
-            <b class="text-gray-700">{{ shortDate(effectiveDate(invoice)) }}</b>
+            <b class="text-ink-2">{{ shortDate(effectiveDate(invoice)) }}</b>
             <template v-if="showsBothDates(invoice)">
               · {{ t('expense.invoices.issuedOn') }}
               {{ shortDate(invoice.issue_date) }}

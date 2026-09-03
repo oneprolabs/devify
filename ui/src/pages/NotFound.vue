@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
     <div
-      class="not-found-wrapper min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-12"
+      class="not-found-wrapper min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-app-sub via-accent-soft to-accent-soft -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-12"
     >
       <div class="max-w-2xl mx-auto px-6 py-12 text-center relative">
         <!-- Floating particles animation -->
@@ -19,7 +19,7 @@
           <!-- 404 Number with style -->
           <div class="mb-8">
             <h1
-              class="text-8xl md:text-9xl font-light text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 tracking-tight"
+              class="text-8xl md:text-9xl font-light text-transparent bg-clip-text bg-gradient-to-r from-accent via-accent to-pink-600 tracking-tight"
             >
               {{ t('notFound.title') }}
             </h1>
@@ -28,12 +28,12 @@
           <!-- Philosophical quote -->
           <div class="mb-8 space-y-6">
             <div
-              class="text-2xl md:text-3xl font-light text-gray-700 italic leading-relaxed"
+              class="text-2xl md:text-3xl font-light text-ink-2 italic leading-relaxed"
             >
               <p class="mb-4">"{{ t('notFound.quote') }}"</p>
             </div>
 
-            <div class="text-lg md:text-xl text-gray-500 font-light">
+            <div class="text-lg md:text-xl text-ink-3 font-light">
               <p>
                 {{ t('notFound.description') }}
               </p>
@@ -43,11 +43,11 @@
           <!-- Decorative line -->
           <div class="flex items-center justify-center gap-4 mb-8">
             <div
-              class="h-px w-16 bg-gradient-to-r from-transparent via-blue-400 to-transparent"
+              class="h-px w-16 bg-gradient-to-r from-transparent via-accent to-transparent"
             ></div>
-            <div class="w-2 h-2 rounded-full bg-blue-400"></div>
+            <div class="w-2 h-2 rounded-full bg-accent"></div>
             <div
-              class="h-px w-16 bg-gradient-to-r from-transparent via-purple-400 to-transparent"
+              class="h-px w-16 bg-gradient-to-r from-transparent via-accent to-transparent"
             ></div>
           </div>
 
@@ -58,7 +58,7 @@
             <BaseButton
               @click="goHome"
               variant="primary"
-              class="group relative px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full font-medium transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 transform"
+              class="group relative px-8 py-3 bg-gradient-to-r from-accent to-accent text-accent-on rounded-full font-medium transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 transform"
             >
               {{ t('notFound.returnHome') }}
               <svg
@@ -79,15 +79,15 @@
             <BaseButton
               @click="goBack"
               variant="outline"
-              class="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-full font-medium transition-all duration-300 hover:bg-gray-100 hover:border-gray-400"
+              class="px-8 py-3 border-2 border-line text-ink-2 rounded-full font-medium transition-all duration-300 hover:bg-chip hover:border-line"
             >
               {{ t('notFound.goBack') }}
             </BaseButton>
           </div>
 
           <!-- Additional philosophical note -->
-          <div class="mt-12 pt-8 border-t border-gray-200">
-            <p class="text-sm text-gray-400 italic">
+          <div class="mt-12 pt-8 border-t border-line">
+            <p class="text-sm text-ink-4 italic">
               {{ t('notFound.philosophy') }}
             </p>
           </div>

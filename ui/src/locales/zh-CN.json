@@ -254,7 +254,6 @@
     "confirmPassword": "确认密码",
     "passwordHelp": "密码长度至少为8个字符",
     "passwordHelpComplex": "8-32个字符，必须包含字母和数字",
-    "rememberMe": "记住我",
     "forgotPassword": "忘记密码？",
     "forgotPasswordDescription": "请输入您注册时提供的安全邮箱，我们将向该邮箱发送重置密码的链接。",
     "securityEmailPlaceholder": "请输入安全邮箱",

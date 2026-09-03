@@ -1,24 +1,24 @@
 <template>
   <div class="fixed inset-0 z-40 flex justify-end" @click.self="$emit('close')">
-    <div class="absolute inset-0 bg-gray-500 bg-opacity-50"></div>
+    <div class="absolute inset-0 bg-ink-3 bg-opacity-50"></div>
 
     <aside
-      class="relative z-10 flex h-full w-full max-w-xl flex-col overflow-y-auto bg-white shadow-xl"
+      class="relative z-10 flex h-full w-full max-w-xl flex-col overflow-y-auto bg-panel shadow-xl"
     >
       <header
-        class="flex items-start justify-between gap-4 border-b border-gray-200 p-5"
+        class="flex items-start justify-between gap-4 border-b border-line p-5"
       >
         <div class="min-w-0">
-          <h2 class="truncate text-lg font-semibold text-gray-900">
+          <h2 class="truncate text-lg font-semibold text-ink">
             {{ form.seller_name || t('expense.invoices.untitled') }}
           </h2>
-          <p class="mt-1 truncate text-xs text-gray-500">
+          <p class="mt-1 truncate text-xs text-ink-3">
             {{ invoice.email_subject }}
           </p>
         </div>
         <button
           type="button"
-          class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          class="rounded-lg p-1 text-ink-4 hover:bg-chip hover:text-ink-2"
           :aria-label="t('common.close')"
           @click="$emit('close')"
         >
@@ -41,43 +41,43 @@
       <div class="flex-1 space-y-5 p-5">
         <p
           v-if="invoice.needs_review"
-          class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"
+          class="rounded-lg border border-warn bg-warn-soft p-3 text-xs text-warn"
         >
           {{ t('expense.invoices.reviewHint') }}
         </p>
 
         <p
           v-if="error"
-          class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
         >
           {{ error }}
         </p>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label v-for="field in textFields" :key="field.key" class="block">
-            <span class="mb-1 block text-xs text-gray-500">
+            <span class="mb-1 block text-xs text-ink-3">
               {{ t(`expense.invoices.fields.${field.key}`) }}
             </span>
             <input
               v-model="form[field.key]"
               :type="field.type || 'text'"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-xs text-gray-500">
+            <span class="mb-1 block text-xs text-ink-3">
               {{ t('expense.invoices.category') }}
             </span>
             <select
               v-model="form.category"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+              class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
             >
               <option v-for="key in categories" :key="key" :value="key">
                 {{ t(`expense.categories.${key}`) }}
               </option>
             </select>
-            <span class="mt-1 block text-xs text-gray-400">
+            <span class="mt-1 block text-xs text-ink-4">
               {{
                 t(
                   `expense.invoices.sources.${invoice.category_source || 'model'}`
@@ -87,45 +87,45 @@
           </label>
         </div>
 
-        <p class="text-xs leading-relaxed text-gray-500">
+        <p class="text-xs leading-relaxed text-ink-3">
           {{ t('expense.invoices.learnHint') }}
         </p>
 
         <div
           v-if="invoice.status === 'failed' && invoice.error_message"
-          class="space-y-1 rounded-lg border border-red-200 bg-red-50 p-3"
+          class="space-y-1 rounded-lg border border-bad bg-bad-soft p-3"
         >
-          <p class="text-xs font-medium text-red-800">
+          <p class="text-xs font-medium text-bad">
             {{ t('expense.invoices.failedTitle') }}
           </p>
-          <p class="text-xs leading-relaxed text-red-700">
+          <p class="text-xs leading-relaxed text-bad">
             {{ invoice.error_message }}
           </p>
-          <p class="text-xs leading-relaxed text-red-600">
+          <p class="text-xs leading-relaxed text-bad">
             {{ t('expense.invoices.failedHint') }}
           </p>
         </div>
 
         <div class="space-y-2">
-          <h3 class="text-sm font-medium text-gray-900">
+          <h3 class="text-sm font-medium text-ink">
             {{ t('expense.invoices.original') }}
           </h3>
 
           <p
             v-if="!invoice.has_file"
-            class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-500"
+            class="rounded-lg border border-line bg-app-sub p-3 text-xs text-ink-3"
           >
             {{ t('expense.invoices.originalMissing') }}
           </p>
 
           <div
             v-else-if="fileLoading"
-            class="h-64 animate-pulse rounded-lg bg-gray-100"
+            class="h-64 animate-pulse rounded-lg bg-chip"
           ></div>
 
           <p
             v-else-if="fileError"
-            class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+            class="rounded-lg border border-bad bg-bad-soft p-3 text-xs text-bad"
           >
             {{ fileError }}
           </p>
@@ -134,28 +134,28 @@
             v-else-if="fileUrl && previewKind === 'image'"
             :src="fileUrl"
             :alt="t('expense.invoices.original')"
-            class="w-full rounded-lg border border-gray-200"
+            class="w-full rounded-lg border border-line"
           />
 
           <iframe
             v-else-if="fileUrl && previewKind === 'pdf'"
             :src="fileUrl"
-            class="h-[32rem] w-full rounded-lg border border-gray-200"
+            class="h-[32rem] w-full rounded-lg border border-line"
             :title="t('expense.invoices.original')"
           ></iframe>
 
           <div
             v-else
-            class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
+            class="space-y-2 rounded-lg border border-line bg-app-sub p-3"
           >
-            <p class="text-xs text-gray-500">
+            <p class="text-xs text-ink-3">
               {{ t('expense.invoices.originalNotViewable') }}
             </p>
             <a
               v-if="fileUrl"
               :href="fileUrl"
               :download="invoice.filename || 'invoice'"
-              class="text-xs text-primary-600 hover:underline"
+              class="text-xs text-accent hover:underline"
             >
               {{ t('expense.invoices.originalDownload') }}
             </a>
@@ -166,20 +166,20 @@
           v-if="invoice.ticket_details && hasTicketDetails"
           class="space-y-2"
         >
-          <h3 class="text-sm font-medium text-gray-900">
+          <h3 class="text-sm font-medium text-ink">
             {{ t('expense.invoices.ticketDetails') }}
           </h3>
-          <dl class="grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-3 text-xs">
+          <dl class="grid grid-cols-2 gap-2 rounded-lg bg-app-sub p-3 text-xs">
             <template v-for="(value, key) in invoice.ticket_details" :key="key">
-              <dt class="text-gray-500">{{ key }}</dt>
-              <dd class="text-gray-900">{{ value }}</dd>
+              <dt class="text-ink-3">{{ key }}</dt>
+              <dd class="text-ink">{{ value }}</dd>
             </template>
           </dl>
         </div>
       </div>
 
       <footer
-        class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 p-5"
+        class="flex flex-wrap items-center justify-between gap-3 border-t border-line p-5"
       >
         <BaseButton
           size="sm"

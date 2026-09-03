@@ -67,27 +67,33 @@
   }
 
   .btn-primary {
-    @apply btn bg-primary-600 text-white border-primary-600 hover:bg-primary-700 hover:border-primary-700 focus:ring-primary-500;
+    @apply btn bg-accent text-accent-on border-accent hover:bg-accent hover:border-accent focus:ring-accent;
   }
 
   .btn-secondary {
-    @apply btn bg-panel text-ink-2 border-line hover:bg-panel-sub focus:ring-primary-500;
+    @apply btn bg-panel text-ink-2 border-line hover:bg-panel-sub focus:ring-accent;
   }
 
   .btn-danger {
-    @apply btn bg-red-600 text-white border-red-600 hover:bg-red-700 hover:border-red-700 focus:ring-red-500;
+    @apply btn bg-bad text-accent-on border-bad hover:bg-bad hover:border-bad focus:ring-bad;
   }
 
   .btn-warning {
-    @apply btn bg-amber-500 text-white border-amber-500 hover:bg-amber-600 hover:border-amber-600 focus:ring-amber-500;
+    @apply btn bg-warn text-accent-on border-warn hover:bg-warn hover:border-warn focus:ring-warn;
+  }
+
+  /* Declared by BaseButton since it existed, but never defined here, so
+     every outline button rendered with no styling at all. */
+  .btn-outline {
+    @apply btn bg-transparent text-ink-2 border-line hover:bg-chip hover:text-ink focus:ring-accent;
   }
 
   .input {
-    @apply block w-full px-3 py-2 text-sm border border-line rounded-lg shadow-sm placeholder-ink-4 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply block w-full px-3 py-2 text-sm border border-line rounded-lg shadow-sm placeholder-ink-4 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .input-error {
-    @apply input border-red-300 focus:ring-red-500 focus:border-red-500;
+    @apply input border-bad focus:ring-bad focus:border-bad;
   }
 
   .card {
@@ -123,7 +129,7 @@
 @layer utilities {
   /* Pages not yet redesigned paint their cards with `bg-white`. Point that at
    * the panel token so they stop punching a white hole in dark mode. Literal
-   * white stays available through `text-white`, which colored buttons need. */
+   * white stays available through `text-accent-on`, which colored buttons need. */
   .bg-white {
     background-color: rgb(var(--c-panel) / var(--tw-bg-opacity, 1));
   }

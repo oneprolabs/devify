@@ -1,5 +1,5 @@
 <template>
-  <header class="bg-white shadow-sm border-b border-gray-200">
+  <header class="bg-panel shadow-sm border-b border-line">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between items-center h-16">
         <!-- Logo and title -->
@@ -10,7 +10,7 @@
               alt="AImyChats Logo"
               class="w-8 h-8"
             />
-            <span class="text-xl font-semibold text-gray-900">{{
+            <span class="text-xl font-semibold text-ink">{{
               t('common.appName')
             }}</span>
           </router-link>

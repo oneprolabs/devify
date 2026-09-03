@@ -15,7 +15,7 @@
             <span class="flex items-center gap-1">
               <svg
                 v-if="loading"
-                class="w-3.5 h-3.5 animate-spin text-gray-500"
+                class="w-3.5 h-3.5 animate-spin text-ink-3"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -43,7 +43,7 @@
               />
               <button
                 @mousedown.prevent="commitEdit(chipIndex)"
-                class="text-green-600 hover:text-green-800"
+                class="text-ok hover:text-ok"
                 aria-label="Confirm"
                 title="Confirm"
               >
@@ -63,7 +63,7 @@
               </button>
               <button
                 @mousedown.prevent="cancelEdit"
-                class="text-red-600 hover:text-red-800"
+                class="text-bad hover:text-bad"
                 aria-label="Cancel"
                 title="Cancel"
               >
@@ -90,7 +90,7 @@
               >{{ chips[chipIndex] }}</span
             >
             <button
-              class="ml-1 hover:text-red-600 inline-flex items-center disabled:opacity-50"
+              class="ml-1 hover:text-bad inline-flex items-center disabled:opacity-50"
               @click.stop="removeChip(chipIndex)"
               :disabled="loading"
               aria-label="Remove"
@@ -123,7 +123,7 @@
       <div class="flex items-center gap-1">
         <button
           v-if="shouldLimit && chips.length > 0"
-          class="inline-flex items-center justify-center h-6 px-2 rounded border text-xs text-gray-600 hover:text-gray-800 hover:border-gray-400"
+          class="inline-flex items-center justify-center h-6 px-2 rounded border text-xs text-ink-2 hover:text-ink hover:border-line"
           @click="showAll = !showAll"
         >
           <template v-if="!showAll">+{{ remainingCount }}</template>
@@ -233,7 +233,7 @@
           <span class="flex items-center gap-1">
             <svg
               v-if="loading"
-              class="w-3.5 h-3.5 animate-spin text-gray-500"
+              class="w-3.5 h-3.5 animate-spin text-ink-3"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -257,7 +257,7 @@
             />
             <button
               @mousedown.prevent="commitEdit(0)"
-              class="text-green-600 hover:text-green-800"
+              class="text-ok hover:text-ok"
               aria-label="Confirm"
               title="Confirm"
             >
@@ -277,7 +277,7 @@
             </button>
             <button
               @mousedown.prevent="cancelEdit"
-              class="text-red-600 hover:text-red-800"
+              class="text-bad hover:text-bad"
               aria-label="Cancel"
               title="Cancel"
             >
@@ -306,7 +306,7 @@
           </span>
           <button
             v-if="canClear"
-            class="ml-1 hover:text-red-600 inline-flex items-center disabled:opacity-50"
+            class="ml-1 hover:text-bad inline-flex items-center disabled:opacity-50"
             @click="clearSingle"
             :disabled="loading"
             aria-label="Clear"
@@ -563,12 +563,12 @@ const chipClasses = computed(() => {
     'inline-flex items-center gap-1 px-2 h-6 rounded-md ' +
     'text-xs font-medium select-none'
   const map = {
-    blue: 'bg-blue-100 text-blue-800',
-    green: 'bg-green-100 text-green-800',
-    purple: 'bg-purple-100 text-purple-800',
-    rose: 'bg-rose-100 text-rose-800',
-    amber: 'bg-amber-100 text-amber-800',
-    gray: 'bg-gray-100 text-gray-800'
+    blue: 'bg-accent-soft text-accent',
+    green: 'bg-ok-soft text-ok',
+    purple: 'bg-accent-soft text-accent',
+    rose: 'bg-bad-soft text-bad',
+    amber: 'bg-warn-soft text-warn',
+    gray: 'bg-chip text-ink'
   }
   return `${base} ${map[props.variant] || map.gray}`
 })
@@ -576,12 +576,12 @@ const chipClasses = computed(() => {
 const inputClasses = computed(() => {
   const base = 'px-1 py-0.5 rounded border focus:ring-0 focus:outline-none '
   const map = {
-    blue: 'border-blue-300 focus:border-blue-500',
-    green: 'border-green-300 focus:border-green-500',
-    purple: 'border-purple-300 focus:border-purple-500',
-    rose: 'border-rose-300 focus:border-rose-500',
-    amber: 'border-amber-300 focus:border-amber-500',
-    gray: 'border-gray-300 focus:border-gray-500'
+    blue: 'border-accent focus:border-accent',
+    green: 'border-ok focus:border-ok',
+    purple: 'border-accent focus:border-accent',
+    rose: 'border-bad focus:border-bad',
+    amber: 'border-warn focus:border-warn',
+    gray: 'border-line focus:border-line'
   }
   return `${base} ${map[props.variant] || map.gray}`
 })
@@ -589,14 +589,14 @@ const inputClasses = computed(() => {
 const addBtnClasses = computed(() => {
   const base =
     'inline-flex items-center justify-center h-6 w-6 rounded ' +
-    'border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
+    'border hover:bg-app-sub disabled:opacity-50 disabled:cursor-not-allowed'
   const map = {
-    blue: 'text-blue-700 border-blue-200',
-    green: 'text-green-700 border-green-200',
-    purple: 'text-purple-700 border-purple-200',
-    rose: 'text-rose-700 border-rose-200',
-    amber: 'text-amber-700 border-amber-200',
-    gray: 'text-gray-700 border-gray-200'
+    blue: 'text-accent border-accent',
+    green: 'text-ok border-ok',
+    purple: 'text-accent border-accent',
+    rose: 'text-bad border-bad',
+    amber: 'text-warn border-warn',
+    gray: 'text-ink-2 border-line'
   }
   return `${base} ${map[props.variant] || map.gray}`
 })

@@ -2,22 +2,22 @@
   <AppLayout>
     <div class="max-w-5xl mx-auto space-y-6">
       <div class="space-y-1">
-        <h2 class="text-xl font-bold leading-7 text-gray-900 sm:text-2xl">
+        <h2 class="text-xl font-bold leading-7 text-ink sm:text-2xl">
           {{ t('settings.title') }}
         </h2>
-        <p class="text-sm text-gray-500">
+        <p class="text-sm text-ink-3">
           {{ t('settings.subtitle') }}
         </p>
       </div>
 
       <div
         v-if="loadingSettings"
-        class="rounded-md bg-gray-50 border border-gray-200 p-4 text-sm text-gray-600"
+        class="rounded-md bg-app-sub border border-line p-4 text-sm text-ink-2"
       >
         {{ t('settings.loadingSettings') }}
       </div>
 
-      <div class="border-b border-gray-200">
+      <div class="border-b border-line">
         <div
           class="flex gap-6 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
@@ -32,8 +32,8 @@
             :aria-selected="activeSettingsTab === tab.value"
             :class="
               activeSettingsTab === tab.value
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-ink-3 hover:border-line hover:text-ink-2'
             "
             @click="activeSettingsTab = tab.value"
           >
@@ -43,21 +43,21 @@
       </div>
 
       <div v-if="activeSettingsTab === 'account'" class="space-y-6">
-        <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-5">
+        <div class="bg-panel rounded-lg border border-line p-4 sm:p-5">
           <div class="flex items-center gap-3">
             <div
               :class="avatarBgColor"
               class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
             >
-              <span class="text-white font-medium text-lg">
+              <span class="text-accent-on font-medium text-lg">
                 {{ userInitials }}
               </span>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="text-lg font-semibold text-gray-900 truncate">
+              <div class="text-lg font-semibold text-ink truncate">
                 {{ displayName }}
               </div>
-              <div class="text-sm text-gray-500 truncate">
+              <div class="text-sm text-ink-3 truncate">
                 {{ userStore.userInfo?.email || '' }}
               </div>
             </div>
@@ -66,7 +66,7 @@
 
         <BaseCard :header-muted="true">
           <template #header>
-            <div class="flex items-center gap-2 text-gray-800">
+            <div class="flex items-center gap-2 text-ink">
               <svg
                 class="w-5 h-5 -mt-px flex-none"
                 fill="none"
@@ -88,52 +88,49 @@
 
           <div class="space-y-4">
             <div>
-              <h4 class="text-sm font-medium text-gray-900 mb-2">
+              <h4 class="text-sm font-medium text-ink mb-2">
                 {{ t('settings.aiEmail') }}
               </h4>
               <div
                 v-if="loadingSettings"
-                class="rounded-lg border border-gray-200 bg-gray-50 p-3 animate-pulse"
+                class="rounded-lg border border-line bg-app-sub p-3 animate-pulse"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0 flex-1 space-y-3">
-                    <div class="h-3 w-20 rounded bg-gray-200"></div>
-                    <div class="h-4 w-56 max-w-full rounded bg-gray-200"></div>
-                    <div class="h-3 w-72 max-w-full rounded bg-gray-200"></div>
+                    <div class="h-3 w-20 rounded bg-chip"></div>
+                    <div class="h-4 w-56 max-w-full rounded bg-chip"></div>
+                    <div class="h-3 w-72 max-w-full rounded bg-chip"></div>
                   </div>
-                  <div class="h-8 w-24 rounded-md bg-gray-200"></div>
+                  <div class="h-8 w-24 rounded-md bg-chip"></div>
                 </div>
               </div>
               <div
                 v-else-if="hasDisplayedAiEmail"
                 class="rounded-lg border p-3 transition-colors"
-                :class="'border-blue-200 bg-blue-50'"
+                :class="'border-accent bg-accent-soft'"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0 flex-1">
                     <div
                       class="text-xs font-medium tracking-wide"
-                      :class="'text-blue-700'"
+                      :class="'text-accent'"
                     >
                       {{ t('settings.aiEmail') }}
                     </div>
                     <div
                       class="mt-1 text-sm font-mono truncate"
-                      :class="'text-blue-900'"
+                      :class="'text-accent'"
                     >
                       {{ displayedAiEmail }}
                     </div>
-                    <div
-                      class="mt-2 text-xs leading-5"
-                      :class="'text-blue-700'"
-                    >
+                    <div class="mt-2 text-xs leading-5" :class="'text-accent'">
                       {{ t('settings.aiEmailDesc') }}
                     </div>
                   </div>
                   <button
                     type="button"
                     class="flex-shrink-0 inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-md transition-colors"
-                    :class="'text-blue-700 hover:text-blue-900 bg-blue-100 hover:bg-blue-200'"
+                    :class="'text-accent hover:text-accent bg-accent-soft hover:bg-accent'"
                     @click="goToEmailSettings"
                   >
                     {{ t('settings.goToEmailSettings') }}
@@ -142,11 +139,11 @@
               </div>
               <div
                 v-else
-                class="rounded-lg border border-amber-200 bg-amber-50 p-3"
+                class="rounded-lg border border-warn bg-warn-soft p-3"
               >
                 <div class="flex items-start gap-2">
                   <svg
-                    class="mt-0.5 h-4 w-4 flex-none text-amber-500"
+                    class="mt-0.5 h-4 w-4 flex-none text-warn"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -159,15 +156,15 @@
                     />
                   </svg>
                   <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium text-amber-900">
+                    <p class="text-sm font-medium text-warn">
                       {{ t('settings.noAiEmailConfigured') }}
                     </p>
-                    <p class="mt-1 text-xs leading-5 text-amber-800">
+                    <p class="mt-1 text-xs leading-5 text-warn">
                       {{ t('settings.noAiEmailHint') }}
                     </p>
                     <button
                       type="button"
-                      class="mt-2 inline-flex items-center text-xs font-medium text-amber-700 hover:text-amber-900"
+                      class="mt-2 inline-flex items-center text-xs font-medium text-warn hover:text-warn"
                       @click="goToEmailSettings"
                     >
                       {{ t('settings.goToEmailSettings') }}
@@ -191,16 +188,16 @@
             </div>
 
             <div>
-              <h4 class="text-sm font-medium text-gray-900 mb-2">
+              <h4 class="text-sm font-medium text-ink mb-2">
                 {{ t('settings.authMethod') }}
               </h4>
-              <p class="text-sm text-gray-600">
+              <p class="text-sm text-ink-2">
                 <span
                   v-if="authInfo && authInfo.method === 'email'"
                   class="inline-flex items-center"
                 >
                   <svg
-                    class="h-4 w-4 mr-1.5 text-blue-600"
+                    class="h-4 w-4 mr-1.5 text-accent"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -219,7 +216,7 @@
                   class="inline-flex items-center"
                 >
                   <svg
-                    class="h-4 w-4 mr-1.5 text-green-600"
+                    class="h-4 w-4 mr-1.5 text-ok"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -240,10 +237,10 @@
             </div>
 
             <div v-if="authInfo && authInfo.method === 'oauth'">
-              <div class="bg-green-50 rounded-lg p-3">
+              <div class="bg-ok-soft rounded-lg p-3">
                 <div class="flex items-center gap-2 mb-1">
                   <svg
-                    class="w-4 h-4 text-green-600"
+                    class="w-4 h-4 text-ok"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -255,11 +252,11 @@
                       d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                     />
                   </svg>
-                  <span class="text-xs font-medium text-green-800">
+                  <span class="text-xs font-medium text-ok">
                     {{ authInfo.provider || 'OAuth' }}
                   </span>
                 </div>
-                <div class="text-sm text-green-900">
+                <div class="text-sm text-ok">
                   {{ authInfo.login_identifier || '' }}
                 </div>
               </div>
@@ -267,9 +264,9 @@
 
             <div
               v-if="authInfo?.method === 'oauth' && authInfo?.provider_email"
-              class="bg-gray-50 rounded-lg p-3"
+              class="bg-app-sub rounded-lg p-3"
             >
-              <div class="text-xs text-gray-500 space-y-1">
+              <div class="text-xs text-ink-3 space-y-1">
                 <p>
                   <span class="font-medium"
                     >{{ t('settings.oauthProvider') }}:</span
@@ -297,12 +294,12 @@
 
             <div
               v-if="!authInfo?.can_change_password"
-              class="bg-yellow-50 border border-yellow-200 rounded-lg p-3"
+              class="bg-warn-soft border border-warn rounded-lg p-3"
             >
               <div class="flex gap-2">
                 <div class="flex-shrink-0 pt-0.5">
                   <svg
-                    class="h-5 w-5 text-yellow-400"
+                    class="h-5 w-5 text-warn"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -314,7 +311,7 @@
                   </svg>
                 </div>
                 <div class="ml-1">
-                  <p class="text-sm text-yellow-700">
+                  <p class="text-sm text-warn">
                     {{ t('settings.oauthPasswordChangeInfo') }}
                   </p>
                 </div>
@@ -324,11 +321,11 @@
         </BaseCard>
 
         <div v-if="resetEmailSent || resetEmailError" class="space-y-4">
-          <div v-if="resetEmailSent" class="rounded-md bg-green-50 p-4">
+          <div v-if="resetEmailSent" class="rounded-md bg-ok-soft p-4">
             <div class="flex">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-5 w-5 text-green-400"
+                  class="h-5 w-5 text-ok"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -340,21 +337,21 @@
                 </svg>
               </div>
               <div class="ml-3">
-                <p class="text-sm font-medium text-green-800">
+                <p class="text-sm font-medium text-ok">
                   {{ t('settings.passwordResetEmailSent') }}
                 </p>
-                <p class="text-xs text-green-700 mt-1">
+                <p class="text-xs text-ok mt-1">
                   {{ t('settings.passwordResetEmailSentDesc') }}
                 </p>
               </div>
             </div>
           </div>
 
-          <div v-if="resetEmailError" class="rounded-md bg-red-50 p-4">
+          <div v-if="resetEmailError" class="rounded-md bg-bad-soft p-4">
             <div class="flex">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-5 w-5 text-red-400"
+                  class="h-5 w-5 text-bad"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -366,7 +363,7 @@
                 </svg>
               </div>
               <div class="ml-3">
-                <p class="text-sm font-medium text-red-800">
+                <p class="text-sm font-medium text-bad">
                   {{ resetEmailError }}
                 </p>
               </div>
@@ -378,7 +375,7 @@
       <div v-else-if="activeSettingsTab === 'message'" class="space-y-6">
         <BaseCard :header-muted="true">
           <template #header>
-            <div class="flex items-center gap-2 text-gray-800">
+            <div class="flex items-center gap-2 text-ink">
               <svg
                 class="w-5 h-5 -mt-px flex-none"
                 fill="none"
@@ -409,17 +406,17 @@
               class="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-4 md:items-start"
             >
               <div class="md:col-span-1">
-                <label class="block text-sm font-medium text-gray-700 mb-1">
+                <label class="block text-sm font-medium text-ink-2 mb-1">
                   {{ t('settings.language') }}
                 </label>
-                <p class="text-xs text-gray-500">
+                <p class="text-xs text-ink-3">
                   {{ t('settings.languageDesc') }}
                 </p>
               </div>
               <div class="md:col-span-2">
                 <select
                   v-model="preferenceForm.language"
-                  class="block w-full pl-3 pr-10 py-2 text-sm border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 rounded-md shadow-sm appearance-none cursor-pointer hover:border-gray-400 transition-colors"
+                  class="block w-full pl-3 pr-10 py-2 text-sm border-line bg-panel focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent rounded-md shadow-sm appearance-none cursor-pointer hover:border-line transition-colors"
                 >
                   <option value="en">{{ t('settings.languages.en') }}</option>
                   <option value="zh-CN">
@@ -434,19 +431,19 @@
               class="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-4 md:items-start"
             >
               <div class="md:col-span-1">
-                <label class="block text-sm font-medium text-gray-700 mb-1">
+                <label class="block text-sm font-medium text-ink-2 mb-1">
                   {{ t('settings.timezone') }}
                 </label>
-                <p class="text-xs text-gray-500">
+                <p class="text-xs text-ink-3">
                   {{ t('settings.timezoneDesc') }}
                 </p>
               </div>
               <div class="md:col-span-2">
-                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <div class="text-sm font-medium text-gray-900">
+                <div class="rounded-lg border border-line bg-app-sub p-3">
+                  <div class="text-sm font-medium text-ink">
                     {{ matchedTimezoneLabel }}
                   </div>
-                  <div class="mt-1 text-xs text-gray-500">
+                  <div class="mt-1 text-xs text-ink-3">
                     {{ t('settings.detectedTimezone') }}:
                     {{ detectedTimezoneLabel }}
                   </div>
@@ -458,10 +455,10 @@
               class="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-4 md:items-start"
             >
               <div class="md:col-span-1">
-                <label class="block text-sm font-medium text-gray-700 mb-1">
+                <label class="block text-sm font-medium text-ink-2 mb-1">
                   {{ t('settings.scene') }}
                 </label>
-                <p class="text-xs text-gray-500">
+                <p class="text-xs text-ink-3">
                   {{ t('settings.sceneDesc') }}
                 </p>
               </div>
@@ -474,18 +471,18 @@
               </div>
             </div>
 
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p class="text-xs leading-relaxed text-blue-700">
+            <div class="bg-accent-soft border border-accent rounded-lg p-3">
+              <p class="text-xs leading-relaxed text-accent">
                 {{ t('settings.preferenceChangeWarning') }}
               </p>
             </div>
 
-            <div v-if="preferenceError" class="rounded-md bg-red-50 p-3">
-              <p class="text-sm text-red-700">{{ preferenceError }}</p>
+            <div v-if="preferenceError" class="rounded-md bg-bad-soft p-3">
+              <p class="text-sm text-bad">{{ preferenceError }}</p>
             </div>
 
-            <div v-if="preferenceSuccess" class="rounded-md bg-green-50 p-3">
-              <p class="text-sm font-medium text-green-800">
+            <div v-if="preferenceSuccess" class="rounded-md bg-ok-soft p-3">
+              <p class="text-sm font-medium text-ok">
                 {{ preferenceSuccess }}
               </p>
             </div>
@@ -509,7 +506,7 @@
       <div v-else-if="activeSettingsTab === 'email'" class="space-y-6">
         <BaseCard :header-muted="true">
           <template #header>
-            <div class="flex items-center gap-2 text-gray-800">
+            <div class="flex items-center gap-2 text-ink">
               <svg
                 class="w-5 h-5 -mt-px flex-none"
                 fill="none"
@@ -536,15 +533,15 @@
               class="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between"
               :class="
                 emailForm.processingPaused
-                  ? 'border-amber-200 bg-amber-50'
-                  : 'border-gray-200 bg-gray-50'
+                  ? 'border-warn bg-warn-soft'
+                  : 'border-line bg-app-sub'
               "
             >
               <div>
-                <p class="text-sm font-medium text-gray-900">
+                <p class="text-sm font-medium text-ink">
                   {{ t('settings.pauseProcessing') }}
                 </p>
-                <p class="mt-1 max-w-xl text-xs leading-relaxed text-gray-600">
+                <p class="mt-1 max-w-xl text-xs leading-relaxed text-ink-2">
                   {{ t('settings.pauseProcessingHelp') }}
                 </p>
               </div>
@@ -552,24 +549,24 @@
                 <input
                   v-model="emailForm.processingPaused"
                   type="checkbox"
-                  class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  class="rounded border-line text-accent focus:ring-accent"
                 />
                 {{ t('settings.pauseProcessingLabel') }}
               </label>
             </div>
 
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p class="text-xs leading-relaxed text-blue-700">
+            <div class="bg-accent-soft border border-accent rounded-lg p-3">
+              <p class="text-xs leading-relaxed text-accent">
                 {{ t('settings.emailConfigHint') }}
               </p>
             </div>
 
-            <div v-if="emailError" class="rounded-md bg-red-50 p-3">
-              <p class="text-sm text-red-700">{{ emailError }}</p>
+            <div v-if="emailError" class="rounded-md bg-bad-soft p-3">
+              <p class="text-sm text-bad">{{ emailError }}</p>
             </div>
 
-            <div v-if="emailSuccess" class="rounded-md bg-green-50 p-3">
-              <p class="text-sm font-medium text-green-800">
+            <div v-if="emailSuccess" class="rounded-md bg-ok-soft p-3">
+              <p class="text-sm font-medium text-ok">
                 {{ emailSuccess }}
               </p>
             </div>
@@ -594,19 +591,19 @@
 
     <div
       v-if="showPasswordResetConfirm"
-      class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+      class="fixed inset-0 bg-ink-2 bg-opacity-50 overflow-y-auto h-full w-full z-50"
       @click.self="showPasswordResetConfirm = false"
     >
       <div
-        class="relative top-20 mx-auto p-6 border max-w-sm w-full shadow-lg rounded-md bg-white"
+        class="relative top-20 mx-auto p-6 border max-w-sm w-full shadow-lg rounded-md bg-panel"
       >
         <div class="mt-3">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-medium text-gray-900">
+            <h3 class="text-lg font-medium text-ink">
               {{ t('settings.confirmPasswordReset') }}
             </h3>
             <button
-              class="text-gray-400 hover:text-gray-600"
+              class="text-ink-4 hover:text-ink-2"
               @click="showPasswordResetConfirm = false"
             >
               <svg
@@ -629,7 +626,7 @@
             <div class="flex items-start gap-3">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-6 w-6 text-blue-600"
+                  class="h-6 w-6 text-accent"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -643,14 +640,14 @@
                 </svg>
               </div>
               <div>
-                <p class="text-sm text-gray-700 mb-2">
+                <p class="text-sm text-ink-2 mb-2">
                   {{ t('settings.passwordResetConfirmDesc') }}
                 </p>
-                <div class="bg-gray-50 rounded-lg p-3">
-                  <div class="text-sm font-medium text-gray-900 mb-1">
+                <div class="bg-app-sub rounded-lg p-3">
+                  <div class="text-sm font-medium text-ink mb-1">
                     {{ t('settings.securityEmail') }}
                   </div>
-                  <div class="text-sm text-gray-700">
+                  <div class="text-sm text-ink-2">
                     {{ userStore.userInfo?.email || '' }}
                   </div>
                 </div>
@@ -784,21 +781,21 @@ const userInitials = computed(() => {
 
 const avatarBgColor = computed(() => {
   const colors = [
-    'bg-blue-500',
-    'bg-indigo-500',
-    'bg-purple-500',
+    'bg-accent',
+    'bg-accent',
+    'bg-accent',
     'bg-pink-500',
-    'bg-rose-500',
-    'bg-red-500',
-    'bg-orange-500',
-    'bg-amber-500',
-    'bg-yellow-500',
-    'bg-lime-500',
-    'bg-green-500',
-    'bg-emerald-500',
-    'bg-teal-500',
-    'bg-cyan-500',
-    'bg-sky-500'
+    'bg-bad',
+    'bg-bad',
+    'bg-warn',
+    'bg-warn',
+    'bg-warn',
+    'bg-ok',
+    'bg-ok',
+    'bg-ok',
+    'bg-accent',
+    'bg-accent',
+    'bg-accent'
   ]
   return colors[userInitials.value.charCodeAt(0) % colors.length]
 })

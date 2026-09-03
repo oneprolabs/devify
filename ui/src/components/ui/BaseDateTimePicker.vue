@@ -98,7 +98,7 @@ const wrapperClassMap = {
 }
 
 const commonInput =
-  'w-full border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed'
+  'w-full border border-line rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed'
 const sizeMap = {
   default: {
     input: `${commonInput} px-2.5 py-1.5 text-sm h-10`,

@@ -4,7 +4,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <svg
-            class="w-5 h-5 text-gray-700"
+            class="w-5 h-5 text-ink-2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -16,7 +16,7 @@
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
             />
           </svg>
-          <h3 class="text-base font-semibold text-gray-800">
+          <h3 class="text-base font-semibold text-ink">
             {{ t('billing.creditUsage.title') }}
           </h3>
         </div>
@@ -24,7 +24,7 @@
         <select
           v-model="selectedRange"
           @change="fetchUsageList"
-          class="text-xs border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+          class="text-xs border-line rounded-md focus:ring-accent focus:border-accent"
         >
           <option value="7">{{ t('billing.creditUsage.last7Days') }}</option>
           <option value="30">{{ t('billing.creditUsage.last30Days') }}</option>
@@ -35,14 +35,14 @@
 
     <div v-if="loading" class="flex items-center justify-center py-8">
       <div
-        class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"
+        class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-accent"
       ></div>
-      <p class="ml-3 text-sm text-gray-500">{{ t('common.loading') }}</p>
+      <p class="ml-3 text-sm text-ink-3">{{ t('common.loading') }}</p>
     </div>
 
     <div v-else-if="usageList.length === 0" class="text-center py-8">
       <svg
-        class="mx-auto h-12 w-12 text-gray-400"
+        class="mx-auto h-12 w-12 text-ink-4"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -54,27 +54,27 @@
           d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
         />
       </svg>
-      <p class="mt-2 text-sm text-gray-500">
+      <p class="mt-2 text-sm text-ink-3">
         {{ t('billing.creditUsage.noData') }}
       </p>
     </div>
 
-    <div v-else class="divide-y divide-gray-200">
+    <div v-else class="divide-y divide-line">
       <!-- List item -->
       <div
         v-for="item in usageList"
         :key="item.id"
-        class="flex items-center justify-between py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+        class="flex items-center justify-between py-3 hover:bg-app-sub transition-colors cursor-pointer"
         @click="goToChat(item.chat_id)"
       >
         <div class="flex items-center gap-3 flex-1 min-w-0">
           <!-- Icon -->
           <div class="flex-shrink-0">
             <div
-              class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center"
+              class="w-10 h-10 rounded-lg bg-accent-soft flex items-center justify-center"
             >
               <svg
-                class="w-5 h-5 text-primary-600"
+                class="w-5 h-5 text-accent"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -87,12 +87,12 @@
                 />
               </svg>
             </div>
-              </div>
+          </div>
 
           <!-- Chat info -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
-              <p class="text-sm font-medium text-gray-900 truncate">
+              <p class="text-sm font-medium text-ink truncate">
                 {{
                   item.display_title ||
                   item.summary_title ||
@@ -103,7 +103,7 @@
               <!-- Status badge -->
               <StatusBadge v-if="item.status" :status="item.status" />
             </div>
-            <p class="text-xs text-gray-500">
+            <p class="text-xs text-ink-3">
               {{ formatRelativeDate(item.created_at, t) }}
             </p>
           </div>
@@ -111,7 +111,7 @@
           <!-- Credit amount -->
           <div class="flex-shrink-0 text-right">
             <span
-              class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700"
+              class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-bad-soft text-bad"
             >
               -{{ item.amount }}
               <svg
@@ -136,12 +136,12 @@
     <!-- Pagination -->
     <div
       v-if="totalPages > 1"
-      class="flex items-center justify-between border-t border-gray-200 pt-3 mt-3"
+      class="flex items-center justify-between border-t border-line pt-3 mt-3"
     >
       <button
         @click="prevPage"
         :disabled="currentPage === 1"
-        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ink-2 bg-panel border border-line hover:bg-app-sub"
       >
         <svg
           class="w-4 h-4 mr-1"
@@ -159,14 +159,14 @@
         {{ t('common.previous') }}
       </button>
 
-      <span class="text-xs text-gray-600">
+      <span class="text-xs text-ink-2">
         {{ t('common.pageInfo', { current: currentPage, total: totalPages }) }}
       </span>
 
       <button
         @click="nextPage"
         :disabled="currentPage === totalPages"
-        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ink-2 bg-panel border border-line hover:bg-app-sub"
       >
         {{ t('common.next') }}
         <svg

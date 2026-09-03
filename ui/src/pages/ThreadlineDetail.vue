@@ -3,18 +3,18 @@
     <div v-if="loading" class="flex items-center justify-center py-12">
       <div class="text-center">
         <div
-          class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
+          class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent"
         ></div>
-        <p class="mt-2 text-sm text-gray-500">{{ t('common.loading') }}</p>
+        <p class="mt-2 text-sm text-ink-3">{{ t('common.loading') }}</p>
       </div>
     </div>
 
     <div v-else-if="error" class="text-center py-12">
       <div
-        class="mx-auto h-12 w-12 bg-red-100 rounded-full flex items-center justify-center"
+        class="mx-auto h-12 w-12 bg-bad-soft rounded-full flex items-center justify-center"
       >
         <svg
-          class="h-6 w-6 text-red-600"
+          class="h-6 w-6 text-bad"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -27,10 +27,10 @@
           />
         </svg>
       </div>
-      <h3 class="mt-2 text-sm font-medium text-gray-900">
+      <h3 class="mt-2 text-sm font-medium text-ink">
         {{ t('chats.errorLoading') }}
       </h3>
-      <p class="mt-1 text-sm text-gray-500">{{ error }}</p>
+      <p class="mt-1 text-sm text-ink-3">{{ error }}</p>
       <div class="mt-6">
         <BaseButton @click="loadThreadline" variant="primary">
           {{ t('common.tryAgain') }}
@@ -42,12 +42,12 @@
       <!-- Todo Error Message -->
       <div
         v-if="todoErrorMessage"
-        class="rounded-md bg-red-50 border border-red-200 p-3"
+        class="rounded-md bg-bad-soft border border-bad p-3"
       >
         <div class="flex gap-2">
           <div class="flex-shrink-0 pt-0.5">
             <svg
-              class="h-4 w-4 text-red-400"
+              class="h-4 w-4 text-bad"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -59,13 +59,13 @@
             </svg>
           </div>
           <div class="flex-1">
-            <p class="text-sm font-medium text-red-800">
+            <p class="text-sm font-medium text-bad">
               {{ todoErrorMessage }}
             </p>
           </div>
           <button
             @click="todoErrorMessage = ''"
-            class="flex-shrink-0 text-red-400 hover:text-red-600"
+            class="flex-shrink-0 text-bad hover:text-bad"
           >
             <svg
               class="h-4 w-4"
@@ -87,12 +87,12 @@
       <!-- Todo Success Message -->
       <div
         v-if="todoSuccessMessage"
-        class="rounded-md bg-green-50 border border-green-200 p-3"
+        class="rounded-md bg-ok-soft border border-ok p-3"
       >
         <div class="flex gap-2">
           <div class="flex-shrink-0 pt-0.5">
             <svg
-              class="h-4 w-4 text-green-400"
+              class="h-4 w-4 text-ok"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -104,13 +104,13 @@
             </svg>
           </div>
           <div class="flex-1">
-            <p class="text-sm font-medium text-green-800">
+            <p class="text-sm font-medium text-ok">
               {{ todoSuccessMessage }}
             </p>
           </div>
           <button
             @click="todoSuccessMessage = ''"
-            class="flex-shrink-0 text-green-400 hover:text-green-600"
+            class="flex-shrink-0 text-ok hover:text-ok"
           >
             <svg
               class="h-4 w-4"
@@ -135,11 +135,11 @@
           <!-- Back Button -->
           <button
             @click="goBack"
-            class="flex-shrink-0 w-9 h-9 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 flex items-center justify-center transition-all shadow-sm"
+            class="flex-shrink-0 w-9 h-9 rounded-lg bg-panel border border-line hover:bg-app-sub hover:border-line flex items-center justify-center transition-all shadow-sm"
             :title="t('common.back')"
           >
             <svg
-              class="w-4 h-4 text-gray-600"
+              class="w-4 h-4 text-ink-2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -158,13 +158,13 @@
             <!-- Refresh Button -->
             <button
               @click="loadThreadline"
-              class="flex-shrink-0 w-9 h-9 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+              class="flex-shrink-0 w-9 h-9 rounded-lg bg-panel border border-line hover:bg-app-sub hover:border-line flex items-center justify-center transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               :disabled="loading || deleting || retrying || isProcessing"
               :title="t('common.refresh')"
             >
               <svg
                 v-if="!loading"
-                class="w-4 h-4 text-gray-600"
+                class="w-4 h-4 text-ink-2"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -178,7 +178,7 @@
               </svg>
               <svg
                 v-else
-                class="w-4 h-4 text-gray-600 animate-spin"
+                class="w-4 h-4 text-ink-2 animate-spin"
                 fill="none"
                 viewBox="0 0 24 24"
               >
@@ -281,11 +281,11 @@
             <div class="relative" ref="actionMenuRef">
               <button
                 @click="showActionMenu = !showActionMenu"
-                class="w-9 h-9 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 flex items-center justify-center transition-all shadow-sm"
+                class="w-9 h-9 rounded-lg bg-panel border border-line hover:bg-app-sub hover:border-line flex items-center justify-center transition-all shadow-sm"
                 :title="t('common.moreActions')"
               >
                 <svg
-                  class="w-4 h-4 text-gray-600"
+                  class="w-4 h-4 text-ink-2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -310,7 +310,7 @@
               >
                 <div
                   v-if="showActionMenu"
-                  class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+                  class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-panel ring-1 ring-black ring-opacity-5 z-50"
                 >
                   <div class="py-1">
                     <button
@@ -320,7 +320,7 @@
                           showActionMenu = false
                         }
                       "
-                      class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="w-full flex items-center gap-2 px-4 py-2 text-sm text-bad hover:bg-bad-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       :disabled="retrying || isProcessing || deleting"
                     >
                       <svg
@@ -374,23 +374,23 @@
       <Transition name="progress-fade">
         <div
           v-if="threadlineProgressSnapshot.visible"
-          class="flex items-center gap-3 rounded-md border border-blue-100 bg-blue-50/60 px-3 py-2"
+          class="flex items-center gap-3 rounded-md border border-accent bg-accent-soft/60 px-3 py-2"
         >
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
-              <p class="text-xs font-medium text-blue-700">
+              <p class="text-xs font-medium text-accent">
                 {{ t('common.currentProgress') }}
               </p>
-              <p class="text-xs font-semibold tabular-nums text-blue-900">
+              <p class="text-xs font-semibold tabular-nums text-accent">
                 {{ threadlineProgressSnapshot.percentText }}
               </p>
             </div>
             <div
-              class="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-100"
+              class="mt-2 h-1.5 overflow-hidden rounded-full bg-accent-soft"
               aria-hidden="true"
             >
               <div
-                class="h-full rounded-full bg-blue-500"
+                class="h-full rounded-full bg-accent"
                 :style="{ width: threadlineProgressSnapshot.percentWidth }"
               />
             </div>
@@ -412,7 +412,7 @@
                 :disabled="isProcessing"
               >
                 <h2
-                  class="text-lg font-bold leading-7 text-gray-900 sm:text-xl flex-1 pr-6 line-clamp-5"
+                  class="text-lg font-bold leading-7 text-ink sm:text-xl flex-1 pr-6 line-clamp-5"
                 >
                   <MergeStateBadge
                     v-if="threadlineMergeState !== 'original'"
@@ -424,8 +424,8 @@
                     class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium mr-2 align-middle"
                     :class="
                       shareStatus.is_expired
-                        ? 'border-red-200 bg-red-50 text-red-600'
-                        : 'border-green-200 bg-green-50 text-green-700'
+                        ? 'border-bad bg-bad-soft text-bad'
+                        : 'border-ok bg-ok-soft text-ok'
                     "
                   >
                     <svg
@@ -453,7 +453,7 @@
                     t('common.noSubject')
                   }}
                   <svg
-                    class="hidden sm:inline-block w-3.5 h-3.5 ml-1.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity align-text-bottom"
+                    class="hidden sm:inline-block w-3.5 h-3.5 ml-1.5 text-ink-4 opacity-0 group-hover:opacity-100 transition-opacity align-text-bottom"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -484,10 +484,10 @@
                       delivery.external_url ? 'noopener noreferrer' : undefined
                     "
                     :title="delivery.external_url || delivery.external_id"
-                    class="inline-flex shrink-0 items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-200 transition-colors"
+                    class="inline-flex shrink-0 items-center rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent ring-1 ring-accent transition-colors"
                     :class="
                       delivery.external_url
-                        ? 'cursor-pointer hover:bg-blue-100'
+                        ? 'cursor-pointer hover:bg-accent-soft'
                         : ''
                     "
                   >
@@ -498,14 +498,14 @@
               <!-- Share Info Area -->
               <div v-if="shareStatus?.is_active" class="mt-4">
                 <!-- Divider -->
-                <div class="border-t border-gray-200"></div>
+                <div class="border-t border-line"></div>
                 <div class="pt-4">
                   <div class="space-y-3">
                     <!-- Expiration Row -->
                     <div
                       class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-2 text-xs sm:text-sm"
                     >
-                      <div class="flex items-center gap-1 text-gray-500">
+                      <div class="flex items-center gap-1 text-ink-3">
                         <svg
                           class="w-3.5 h-3.5"
                           fill="none"
@@ -527,11 +527,11 @@
                             class="flex items-center gap-2 group cursor-pointer"
                             @click="startEditingExpiration"
                           >
-                            <span class="text-gray-700 truncate">
+                            <span class="text-ink-2 truncate">
                               {{ shareExpirationDisplay }}
                             </span>
                             <svg
-                              class="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                              class="w-3.5 h-3.5 text-ink-4 opacity-0 group-hover:opacity-100 transition-opacity"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -555,8 +555,8 @@
                                 class="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                                 :class="
                                   tempExpiration === option.value
-                                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                                    ? 'border-accent bg-accent-soft text-accent'
+                                    : 'border-line text-ink-2 hover:bg-app-sub'
                                 "
                                 :disabled="expirationSaving"
                                 @click="tempExpiration = option.value"
@@ -567,7 +567,7 @@
                             <div class="flex items-center gap-1">
                               <button
                                 type="button"
-                                class="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                                class="p-1 text-ok hover:bg-ok-soft rounded transition-colors disabled:opacity-50"
                                 :disabled="expirationSaving"
                                 @click="saveExpiration"
                               >
@@ -608,7 +608,7 @@
                               </button>
                               <button
                                 type="button"
-                                class="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                class="p-1 text-bad hover:bg-bad-soft rounded transition-colors"
                                 :disabled="expirationSaving"
                                 @click="cancelEditingExpiration"
                               >
@@ -636,7 +636,7 @@
                     <div
                       class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-2 text-xs sm:text-sm"
                     >
-                      <div class="flex items-center gap-1 text-gray-500">
+                      <div class="flex items-center gap-1 text-ink-3">
                         <svg
                           class="w-3.5 h-3.5"
                           fill="none"
@@ -657,7 +657,7 @@
                           v-if="!showShareLink.main"
                           :href="shareStatus.share_url"
                           target="_blank"
-                          class="text-gray-700 hover:text-primary-600 transition-colors"
+                          class="text-ink-2 hover:text-accent transition-colors"
                         >
                           <span>{{ t('share.openLink') }}</span>
                         </a>
@@ -665,13 +665,13 @@
                           v-else
                           :href="shareStatus.share_url"
                           target="_blank"
-                          class="text-gray-700 truncate font-mono hover:text-primary-600 hover:underline flex-1 min-w-0"
+                          class="text-ink-2 truncate font-mono hover:text-accent hover:underline flex-1 min-w-0"
                         >
                           {{ shareStatus.share_url }}
                         </a>
                         <button
                           type="button"
-                          class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                          class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
                           :title="
                             showShareLink.main
                               ? t('share.hideLink')
@@ -716,7 +716,7 @@
                         </button>
                         <button
                           type="button"
-                          class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                          class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
                           :title="
                             shareCopyState.link
                               ? t('share.copied')
@@ -741,7 +741,7 @@
                           </svg>
                           <svg
                             v-else
-                            class="w-4 h-4 text-green-600"
+                            class="w-4 h-4 text-ok"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -761,7 +761,7 @@
                     <div
                       class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-2 text-xs sm:text-sm"
                     >
-                      <div class="flex items-center gap-1 text-gray-500">
+                      <div class="flex items-center gap-1 text-ink-3">
                         <svg
                           class="w-3.5 h-3.5"
                           fill="none"
@@ -789,14 +789,14 @@
                                 maxlength="6"
                                 minlength="6"
                                 pattern="[0-9]*"
-                                class="flex-1 min-w-0 font-mono text-sm rounded-md border border-gray-300 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                class="flex-1 min-w-0 font-mono text-sm rounded-md border border-line px-2 py-1 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                                 :placeholder="t('share.passwordPlaceholder')"
                                 @keyup.enter="savePassword"
                                 @keyup.esc="cancelEditingPassword"
                               />
                               <button
                                 type="button"
-                                class="p-1 text-green-600 hover:text-green-700 rounded hover:bg-green-50 transition-colors flex-shrink-0"
+                                class="p-1 text-ok hover:text-ok rounded hover:bg-ok-soft transition-colors flex-shrink-0"
                                 :title="t('common.save')"
                                 :disabled="
                                   passwordSaving ||
@@ -842,7 +842,7 @@
                               </button>
                               <button
                                 type="button"
-                                class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                                class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
                                 :title="t('common.cancel')"
                                 :disabled="passwordSaving"
                                 @click="cancelEditingPassword"
@@ -867,18 +867,18 @@
                           <template v-else>
                             <span
                               v-if="!showPassword"
-                              class="font-mono text-gray-900"
+                              class="font-mono text-ink"
                             >
                               ••••••
                             </span>
-                            <span v-else class="font-mono text-gray-900">
+                            <span v-else class="font-mono text-ink">
                               {{ inlinePassword || shareStatus.password }}
                             </span>
 
                             <div class="flex items-center gap-1">
                               <button
                                 type="button"
-                                class="p-1 text-gray-400 hover:text-primary-600 rounded hover:bg-gray-100 transition-colors"
+                                class="p-1 text-ink-4 hover:text-accent rounded hover:bg-chip transition-colors"
                                 :title="t('share.editPassword')"
                                 :disabled="passwordSaving || isProcessing"
                                 @click="startEditingPassword"
@@ -899,7 +899,7 @@
                               </button>
                               <button
                                 type="button"
-                                class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors"
+                                class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors"
                                 :title="
                                   showPassword
                                     ? t('share.hidePassword')
@@ -944,7 +944,7 @@
                               </button>
                               <button
                                 type="button"
-                                class="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-gray-100 transition-colors"
+                                class="p-1 text-ink-4 hover:text-bad rounded hover:bg-chip transition-colors"
                                 :title="t('common.delete')"
                                 :disabled="passwordSaving"
                                 @click="removePassword"
@@ -987,7 +987,7 @@
                             </div>
                             <button
                               type="button"
-                              class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                              class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
                               :title="
                                 shareCopyState.password
                                   ? t('share.copied')
@@ -1011,7 +1011,7 @@
                               </svg>
                               <svg
                                 v-else
-                                class="w-4 h-4 text-green-600"
+                                class="w-4 h-4 text-ok"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -1027,12 +1027,12 @@
                           </template>
                         </template>
                         <template v-else>
-                          <span class="text-gray-500">
+                          <span class="text-ink-3">
                             {{ t('share.noPassword') }}
                           </span>
                           <button
                             type="button"
-                            class="p-1 text-gray-400 hover:text-primary-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                            class="p-1 text-ink-4 hover:text-accent rounded hover:bg-chip transition-colors flex-shrink-0"
                             :title="t('share.addPassword')"
                             :disabled="passwordSaving"
                             @click="createRandomPassword"
@@ -1082,15 +1082,15 @@
             <!-- Edit Mode -->
             <div v-else class="space-y-1">
               <div
-                class="relative bg-blue-50 border-2 border-blue-200 rounded-md"
+                class="relative bg-accent-soft border-2 border-accent rounded-md"
                 style="padding: 0.75rem 1rem"
               >
                 <textarea
                   ref="titleInputRef"
                   v-model="editingTitleValue"
                   rows="2"
-                  class="w-full px-0 py-0 text-lg font-bold leading-7 text-gray-900 sm:text-xl border-0 focus:outline-none bg-transparent resize-none overflow-hidden"
-                  :class="{ 'border-red-300': titleError }"
+                  class="w-full px-0 py-0 text-lg font-bold leading-7 text-ink sm:text-xl border-0 focus:outline-none bg-transparent resize-none overflow-hidden"
+                  :class="{ 'border-bad': titleError }"
                   :disabled="savingTitle"
                   style="
                     line-height: 1.75rem;
@@ -1098,20 +1098,20 @@
                     height: 3.5rem;
                   "
                 ></textarea>
-                <p v-if="titleError" class="mt-2 text-xs text-red-600">
+                <p v-if="titleError" class="mt-2 text-xs text-bad">
                   {{ titleError }}
                 </p>
               </div>
               <!-- Save/Cancel Icons - Right bottom below input -->
               <div class="flex items-center justify-end gap-1">
                 <div
-                  class="flex items-center bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden"
+                  class="flex items-center bg-panel rounded-md shadow-sm border border-line overflow-hidden"
                 >
                   <button
                     @click="saveTitle"
                     type="button"
                     :disabled="savingTitle"
-                    class="p-1.5 pr-2 text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+                    class="p-1.5 pr-2 text-ok hover:bg-ok-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
                     :title="t('common.save')"
                   >
                     <svg
@@ -1149,14 +1149,14 @@
                       ></path>
                     </svg>
                     <div
-                      class="absolute right-0 top-0 bottom-0 w-px bg-gray-200"
+                      class="absolute right-0 top-0 bottom-0 w-px bg-chip"
                     ></div>
                   </button>
                   <button
                     @click="cancelEditingTitle"
                     type="button"
                     :disabled="savingTitle"
-                    class="p-1.5 pl-2 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="p-1.5 pl-2 text-bad hover:bg-bad-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="t('common.cancel')"
                   >
                     <svg
@@ -1181,16 +1181,16 @@
           <!-- Date/Time and Metadata -->
           <div class="mt-4">
             <!-- Divider -->
-            <div class="border-t border-gray-200"></div>
+            <div class="border-t border-line"></div>
             <div class="pt-4">
               <div class="space-y-3">
                 <!-- Created Time -->
                 <div
                   class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5 text-xs sm:text-sm"
                 >
-                  <div class="flex items-center gap-1 text-gray-500">
+                  <div class="flex items-center gap-1 text-ink-3">
                     <svg
-                      class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                      class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1205,7 +1205,7 @@
                     <span>{{ t('metadata.createdAt.title') }}</span>
                   </div>
                   <div class="flex items-center gap-2 min-w-0">
-                    <span class="text-gray-700">{{
+                    <span class="text-ink-2">{{
                       formatDate(
                         threadline.received_at || threadline.created_at
                       )
@@ -1218,9 +1218,9 @@
                   v-if="threadline.metadata"
                   class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5 text-xs sm:text-sm"
                 >
-                  <div class="flex items-center gap-1 text-gray-500">
+                  <div class="flex items-center gap-1 text-ink-3">
                     <svg
-                      class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                      class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1251,9 +1251,9 @@
                   v-if="threadline.metadata"
                   class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5 text-xs sm:text-sm"
                 >
-                  <div class="flex items-center gap-1 text-gray-500">
+                  <div class="flex items-center gap-1 text-ink-3">
                     <svg
-                      class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                      class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1287,9 +1287,9 @@
                   v-if="threadline.metadata"
                   class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5 text-xs sm:text-sm"
                 >
-                  <div class="flex items-center gap-1 text-gray-500">
+                  <div class="flex items-center gap-1 text-ink-3">
                     <svg
-                      class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                      class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1318,12 +1318,12 @@
 
                 <div
                   v-if="threadline.merged_into_uuid"
-                  class="border-t border-gray-200 pt-4"
+                  class="border-t border-line pt-4"
                 >
                   <div class="flex items-center justify-between gap-3">
-                    <span class="flex items-center gap-1 text-gray-500">
+                    <span class="flex items-center gap-1 text-ink-3">
                       <svg
-                        class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                        class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1338,20 +1338,20 @@
                         <circle cx="17" cy="7" r="1.5" fill="currentColor" />
                         <circle cx="12" cy="17" r="1.5" fill="currentColor" />
                       </svg>
-                      <span class="font-medium text-gray-700">
+                      <span class="font-medium text-ink-2">
                         {{ t('chats.merge.mergedInto') }}
                       </span>
                     </span>
-                    <span class="text-xs text-gray-500">
+                    <span class="text-xs text-ink-3">
                       {{ t('chats.merge.sourceCount', { count: 1 }) }}
                     </span>
                   </div>
                   <router-link
                     :to="`/chats/${threadline.merged_into_uuid}`"
-                    class="mt-3 flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:border-slate-300 hover:bg-slate-100"
+                    class="mt-3 flex items-start justify-between gap-3 rounded-lg border border-line bg-app-sub px-3 py-3 transition-colors hover:border-line hover:bg-chip"
                   >
                     <div class="min-w-0 flex-1">
-                      <div class="truncate text-sm font-medium text-slate-900">
+                      <div class="truncate text-sm font-medium text-ink">
                         {{
                           threadline.merged_into_summary_title ||
                           threadline.merged_into_subject ||
@@ -1359,7 +1359,7 @@
                           threadline.merged_into_uuid
                         }}
                       </div>
-                      <div class="mt-1 text-xs text-slate-500">
+                      <div class="mt-1 text-xs text-ink-3">
                         {{ t('chats.merge.sourceDate') }}:
                         {{
                           formatDate(
@@ -1374,12 +1374,12 @@
                 </div>
                 <div
                   v-if="threadline.merged_children?.length"
-                  class="border-t border-gray-200 pt-4"
+                  class="border-t border-line pt-4"
                 >
                   <div class="flex items-center justify-between gap-3">
-                    <span class="flex items-center gap-1 text-gray-500">
+                    <span class="flex items-center gap-1 text-ink-3">
                       <svg
-                        class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                        class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1394,11 +1394,11 @@
                         <circle cx="17" cy="7" r="1.5" fill="currentColor" />
                         <circle cx="12" cy="17" r="1.5" fill="currentColor" />
                       </svg>
-                      <span class="font-medium text-gray-700">
+                      <span class="font-medium text-ink-2">
                         {{ t('chats.merge.sources') }}
                       </span>
                     </span>
-                    <span class="text-xs text-gray-500">
+                    <span class="text-xs text-ink-3">
                       {{
                         t('chats.merge.sourceCount', {
                           count: threadline.merged_children.length
@@ -1411,11 +1411,11 @@
                       v-for="child in threadline.merged_children"
                       :key="child.uuid"
                       :to="`/chats/${child.uuid}`"
-                      class="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:border-slate-300 hover:bg-slate-100"
+                      class="flex items-start justify-between gap-3 rounded-lg border border-line bg-app-sub px-3 py-3 transition-colors hover:border-line hover:bg-chip"
                     >
                       <div class="min-w-0 flex-1">
                         <div
-                          class="truncate text-sm font-medium text-slate-900"
+                          class="truncate text-sm font-medium text-ink"
                         >
                           {{
                             child.summary_title ||
@@ -1424,18 +1424,18 @@
                             child.uuid
                           }}
                         </div>
-                        <div class="mt-1 text-xs text-slate-500">
+                        <div class="mt-1 text-xs text-ink-3">
                           {{ t('chats.merge.sourceDate') }}:
                           {{ formatDate(child.received_at) }}
                         </div>
                         <div
                           v-if="child.merge_reason"
-                          class="mt-1 flex items-center gap-1 text-xs text-slate-500"
+                          class="mt-1 flex items-center gap-1 text-xs text-ink-3"
                           :title="mergeEvidenceHint(child)"
                         >
                           <span>{{ t('chats.merge.reasonLabel') }}:</span>
                           <span
-                            class="inline-flex items-center rounded bg-slate-200 px-1.5 py-0.5 font-medium text-slate-700"
+                            class="inline-flex items-center rounded bg-chip px-1.5 py-0.5 font-medium text-ink-2"
                           >
                             {{ mergeReasonLabel(child.merge_reason) }}
                           </span>
@@ -1452,7 +1452,7 @@
                     fieldError('category') ||
                     fieldError('participants')
                   "
-                  class="text-xs sm:text-sm text-red-600"
+                  class="text-xs sm:text-sm text-bad"
                 >
                   {{
                     fieldError('keywords') ||
@@ -1470,7 +1470,7 @@
       <BaseCard v-if="showOriginalEmailCard" :header-muted="true">
         <template #header>
           <div class="flex items-center justify-between w-full">
-            <div class="flex items-center gap-2 text-gray-800">
+            <div class="flex items-center gap-2 text-ink">
               <svg
                 class="w-5 h-5 -mt-px flex-none"
                 fill="none"
@@ -1491,7 +1491,7 @@
             <button
               v-if="originalEmailContent"
               @click="copyOriginalEmail"
-              class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+              class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink bg-chip hover:bg-chip px-2 py-1 rounded transition-colors"
               :title="t('common.copy')"
             >
               <svg
@@ -1510,7 +1510,7 @@
               </svg>
               <svg
                 v-else
-                class="h-3.5 w-3.5 text-green-600"
+                class="h-3.5 w-3.5 text-ok"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -1531,17 +1531,17 @@
           </div>
         </template>
         <div v-if="originalEmailContent" class="space-y-3">
-          <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+          <div class="rounded-lg border border-line bg-app-sub px-4 py-3">
             <div
-              class="whitespace-pre-wrap break-words text-sm leading-6 text-gray-800"
+              class="whitespace-pre-wrap break-words text-sm leading-6 text-ink"
             >
               {{ originalEmailContent }}
             </div>
           </div>
         </div>
-        <div v-else class="text-gray-500 italic text-center py-8">
+        <div v-else class="text-ink-3 italic text-center py-8">
           <svg
-            class="mx-auto h-12 w-12 text-gray-400 mb-4"
+            class="mx-auto h-12 w-12 text-ink-4 mb-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -1563,7 +1563,7 @@
         <BaseCard :header-muted="true">
           <template #header>
             <div class="flex items-center justify-between w-full">
-              <div class="flex items-center gap-2 text-gray-800">
+              <div class="flex items-center gap-2 text-ink">
                 <svg
                   class="w-5 h-5 -mt-px flex-none"
                   fill="none"
@@ -1606,7 +1606,7 @@
                 <button
                   v-if="summaryData.details"
                   @click="copyContent(summaryData.details, 'details')"
-                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
+                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink bg-app-sub hover:bg-chip border border-line hover:border-line px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
                   :title="t('common.copy')"
                 >
                   <svg
@@ -1625,7 +1625,7 @@
                   </svg>
                   <svg
                     v-else
-                    class="h-3.5 w-3.5 text-green-600"
+                    class="h-3.5 w-3.5 text-ok"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1671,7 +1671,7 @@
         <BaseCard :header-muted="true">
           <template #header>
             <div class="flex items-center justify-between w-full">
-              <div class="flex items-center gap-2 text-gray-800">
+              <div class="flex items-center gap-2 text-ink">
                 <svg
                   class="w-5 h-5 -mt-px flex-none"
                   fill="none"
@@ -1749,7 +1749,7 @@
           </TransitionGroup>
           <div
             v-if="threadlineTodos.length === 0 && !tempNewTodo"
-            class="text-gray-500 italic text-center py-8"
+            class="text-ink-3 italic text-center py-8"
           >
             <p>{{ t('todos.noTodos') }}</p>
           </div>
@@ -1759,7 +1759,7 @@
         <BaseCard :header-muted="true">
           <template #header>
             <div class="flex items-center justify-between w-full">
-              <div class="flex items-center gap-2 text-gray-800">
+              <div class="flex items-center gap-2 text-ink">
                 <svg
                   class="w-5 h-5 -mt-px flex-none"
                   fill="none"
@@ -1805,7 +1805,7 @@
                     summaryData.key_process.length > 0
                   "
                   @click="copyKeyProcess"
-                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
+                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink bg-app-sub hover:bg-chip border border-line hover:border-line px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
                   :title="t('common.copy')"
                 >
                   <svg
@@ -1824,7 +1824,7 @@
                   </svg>
                   <svg
                     v-else
-                    class="h-3.5 w-3.5 text-green-600"
+                    class="h-3.5 w-3.5 text-ok"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1867,7 +1867,7 @@
       <BaseCard v-else :header-muted="true">
         <template #header>
           <div class="flex items-center justify-between w-full">
-            <div class="flex items-center gap-2 text-gray-800">
+            <div class="flex items-center gap-2 text-ink">
               <svg
                 class="w-5 h-5 -mt-px flex-none"
                 fill="none"
@@ -1888,7 +1888,7 @@
             <button
               v-if="threadline.summary_content"
               @click="copyContent(threadline.summary_content, 'summary')"
-              class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+              class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink bg-chip hover:bg-chip px-2 py-1 rounded transition-colors"
               :title="t('common.copy')"
             >
               <svg
@@ -1907,7 +1907,7 @@
               </svg>
               <svg
                 v-else
-                class="h-3.5 w-3.5 text-green-600"
+                class="h-3.5 w-3.5 text-ok"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -1932,7 +1932,7 @@
           class="space-y-4"
         >
           <div v-if="threadline.summary_title">
-            <h3 class="text-lg font-medium text-gray-900 mb-2">
+            <h3 class="text-lg font-medium text-ink mb-2">
               {{ threadline.summary_title }}
             </h3>
           </div>
@@ -1940,9 +1940,9 @@
             <MarkdownRenderer :content="threadline.summary_content" />
           </div>
         </div>
-        <div v-else class="text-gray-500 italic text-center py-8">
+        <div v-else class="text-ink-3 italic text-center py-8">
           <svg
-            class="mx-auto h-12 w-12 text-gray-400 mb-4"
+            class="mx-auto h-12 w-12 text-ink-4 mb-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -1966,7 +1966,7 @@
       <BaseCard :header-muted="true">
         <template #header>
           <div class="flex items-center justify-between w-full">
-            <div class="flex items-center gap-2 text-gray-800">
+            <div class="flex items-center gap-2 text-ink">
               <svg
                 class="w-5 h-5 -mt-px flex-none"
                 fill="none"
@@ -1987,7 +1987,7 @@
             <button
               v-if="threadline.llm_content"
               @click="copyContent(threadline.llm_content, 'llm')"
-              class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+              class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink bg-chip hover:bg-chip px-2 py-1 rounded transition-colors"
               :title="t('common.copy')"
             >
               <svg
@@ -2006,7 +2006,7 @@
               </svg>
               <svg
                 v-else
-                class="h-3.5 w-3.5 text-green-600"
+                class="h-3.5 w-3.5 text-ok"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -2027,9 +2027,9 @@
         <div v-if="threadline.llm_content">
           <MarkdownRenderer :content="threadline.llm_content" />
         </div>
-        <div v-else class="text-gray-500 italic text-center py-8">
+        <div v-else class="text-ink-3 italic text-center py-8">
           <svg
-            class="mx-auto h-12 w-12 text-gray-400 mb-4"
+            class="mx-auto h-12 w-12 text-ink-4 mb-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -2078,16 +2078,16 @@
       :title="t('share.modalTitle')"
       @close="closeShareModal"
     >
-      <div class="space-y-4 text-sm text-gray-700">
-        <p class="text-gray-600">
+      <div class="space-y-4 text-sm text-ink-2">
+        <p class="text-ink-2">
           {{ t('share.modalDescription') }}
         </p>
 
         <div
           v-if="shareStatus?.is_active"
-          class="rounded-md border border-gray-200 bg-gray-50 p-3 space-y-2"
+          class="rounded-md border border-line bg-app-sub p-3 space-y-2"
         >
-          <div class="text-xs font-medium text-gray-500">
+          <div class="text-xs font-medium text-ink-3">
             {{ t('share.currentShare') }}
           </div>
           <div class="flex items-center gap-2 min-w-0">
@@ -2095,7 +2095,7 @@
               v-if="!showShareLink.modal"
               :href="shareStatus.share_url"
               target="_blank"
-              class="text-sm text-gray-700 hover:text-primary-600 transition-colors"
+              class="text-sm text-ink-2 hover:text-accent transition-colors"
             >
               <span>{{ t('share.openLink') }}</span>
             </a>
@@ -2103,13 +2103,13 @@
               v-else
               :href="shareStatus.share_url"
               target="_blank"
-              class="text-sm text-gray-700 truncate font-mono hover:text-primary-600 hover:underline flex-1 min-w-0"
+              class="text-sm text-ink-2 truncate font-mono hover:text-accent hover:underline flex-1 min-w-0"
             >
               {{ shareStatus.share_url }}
             </a>
             <button
               type="button"
-              class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+              class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
               :title="
                 showShareLink.modal ? t('share.hideLink') : t('share.openLink')
               "
@@ -2152,7 +2152,7 @@
             </button>
             <button
               type="button"
-              class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+              class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
               :title="shareCopyState.link ? t('share.copied') : t('share.copy')"
               @click="copyShareLink"
             >
@@ -2172,7 +2172,7 @@
               </svg>
               <svg
                 v-else
-                class="w-4 h-4 text-green-600"
+                class="w-4 h-4 text-ok"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -2189,7 +2189,7 @@
         </div>
 
         <div class="space-y-2">
-          <span class="text-xs font-medium text-gray-700">{{
+          <span class="text-xs font-medium text-ink-2">{{
             t('share.expirationLabel')
           }}</span>
           <div class="flex flex-wrap gap-2">
@@ -2200,8 +2200,8 @@
               class="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
               :class="
                 shareForm.expiration === option.value
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-300 text-gray-600'
+                  ? 'border-accent bg-accent-soft text-accent'
+                  : 'border-line text-ink-2'
               "
               @click="shareForm.expiration = option.value"
             >
@@ -2211,17 +2211,15 @@
         </div>
 
         <div class="space-y-2">
-          <label
-            class="flex items-center gap-2 text-xs font-medium text-gray-700"
-          >
+          <label class="flex items-center gap-2 text-xs font-medium text-ink-2">
             <input
               type="checkbox"
               v-model="shareForm.requirePassword"
-              class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              class="rounded border-line text-accent focus:ring-accent"
             />
             {{ t('share.passwordToggleLabel') }}
           </label>
-          <p class="text-xs text-gray-500">
+          <p class="text-xs text-ink-3">
             {{ t('share.passwordHint') }}
           </p>
           <div
@@ -2234,7 +2232,7 @@
               maxlength="6"
               minlength="6"
               pattern="[0-9]*"
-              class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              class="flex-1 rounded-md border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
               :placeholder="t('share.passwordPlaceholder')"
             />
             <BaseButton
@@ -2249,17 +2247,17 @@
 
         <div
           v-if="sharePasswordDisplay"
-          class="rounded-md border border-green-200 bg-green-50 p-3 space-y-2"
+          class="rounded-md border border-ok bg-ok-soft p-3 space-y-2"
         >
-          <div class="text-xs font-medium text-green-700">
+          <div class="text-xs font-medium text-ok">
             {{ t('share.generatedPasswordLabel') }}
           </div>
           <div class="flex items-center justify-between">
-            <span class="text-lg font-mono text-gray-900">
+            <span class="text-lg font-mono text-ink">
               {{ sharePasswordDisplay }}
             </span>
             <button
-              class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+              class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
               :title="
                 shareCopyState.password ? t('share.copied') : t('share.copy')
               "
@@ -2282,7 +2280,7 @@
               </svg>
               <svg
                 v-else
-                class="w-4 h-4 text-green-600"
+                class="w-4 h-4 text-ok"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -2298,10 +2296,10 @@
           </div>
         </div>
 
-        <p v-if="shareError" class="text-sm text-red-600">
+        <p v-if="shareError" class="text-sm text-bad">
           {{ shareError }}
         </p>
-        <p v-if="shareSuccessMessage" class="text-sm text-green-600">
+        <p v-if="shareSuccessMessage" class="text-sm text-ok">
           {{ shareSuccessMessage }}
         </p>
       </div>

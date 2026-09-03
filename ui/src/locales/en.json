@@ -244,7 +244,6 @@
     "confirmPassword": "Confirm Password",
     "passwordHelp": "Password must be at least 8 characters",
     "passwordHelpComplex": "8-32 characters, must contain letters and numbers",
-    "rememberMe": "Remember me",
     "forgotPassword": "Forgot password?",
     "forgotPasswordDescription": "Please enter the security email you used during registration. We'll send a reset link to that email.",
     "securityEmailPlaceholder": "Enter your security email",

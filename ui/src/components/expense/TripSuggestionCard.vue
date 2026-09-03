@@ -3,10 +3,10 @@
     <div class="space-y-3">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">
+          <h2 class="text-lg font-semibold text-ink">
             {{ t('expense.trips.title', { count: trips.length }) }}
           </h2>
-          <p class="mt-1 text-sm text-gray-500">
+          <p class="mt-1 text-sm text-ink-3">
             {{ t('expense.trips.subtitle') }}
           </p>
         </div>
@@ -20,7 +20,7 @@
            exactly as they were. -->
       <div
         v-if="open"
-        class="divide-y divide-gray-100 border-t border-gray-100"
+        class="divide-y divide-line-soft border-t border-line-soft"
       >
         <div
           v-for="trip in trips"
@@ -28,14 +28,14 @@
           class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="min-w-0">
-            <p class="text-sm font-medium text-gray-900">
+            <p class="text-sm font-medium text-ink">
               {{ trip.destination_city }}
-              <span class="ml-2 text-xs tabular-nums text-gray-500">
+              <span class="ml-2 text-xs tabular-nums text-ink-3">
                 {{ shortDate(trip.start_date) }} →
                 {{ shortDate(trip.end_date) }}
               </span>
             </p>
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs text-ink-3">
               {{
                 t('expense.trips.detail', {
                   count: trip.invoice_ids.length,
@@ -43,9 +43,7 @@
                 })
               }}
               ·
-              <span
-                :class="isSure(trip) ? 'text-emerald-600' : 'text-amber-600'"
-              >
+              <span :class="isSure(trip) ? 'text-ok' : 'text-warn'">
                 {{
                   isSure(trip)
                     ? t('expense.trips.confident')
@@ -74,7 +72,7 @@
         </div>
       </div>
 
-      <p v-if="open" class="text-xs text-gray-500">
+      <p v-if="open" class="text-xs text-ink-3">
         {{ t('expense.trips.freeNote') }}
       </p>
     </div>

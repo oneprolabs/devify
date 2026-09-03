@@ -1,6 +1,6 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 h-full">
-    <h3 class="text-base font-semibold text-gray-900 mb-3">
+  <div class="bg-panel rounded-lg shadow-sm border border-line p-4 h-full">
+    <h3 class="text-base font-semibold text-ink mb-3">
       {{ t('billing.plans.title') }}
     </h3>
 
@@ -8,7 +8,7 @@
       <div
         v-for="plan in plans"
         :key="plan.id"
-        class="bg-gray-50 rounded-lg border border-gray-200 p-3 hover:border-primary-300 hover:shadow-sm transition-all"
+        class="bg-app-sub rounded-lg border border-line p-3 hover:border-accent hover:shadow-sm transition-all"
       >
         <div
           class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5"
@@ -18,10 +18,10 @@
           >
             <div :class="['flex-shrink-0', PRICE_WIDTH_CLASS]">
               <div class="flex items-baseline justify-start sm:justify-end">
-                <span class="text-xl font-bold text-gray-900">
+                <span class="text-xl font-bold text-ink">
                   {{ plan.monthly_price }}
                 </span>
-                <span class="text-sm text-gray-500 ml-1">
+                <span class="text-sm text-ink-3 ml-1">
                   {{ t('billing.plans.perMonth') }}
                 </span>
               </div>
@@ -29,17 +29,17 @@
 
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <h4 class="text-base font-semibold text-gray-900">
+                <h4 class="text-base font-semibold text-ink">
                   {{ plan.name }}
                 </h4>
                 <span
                   v-if="isCurrentPlan(plan)"
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-soft text-accent"
                 >
                   {{ t('billing.plans.current') }}
                 </span>
               </div>
-              <div class="text-xs text-gray-600 mt-1 space-y-0.5">
+              <div class="text-xs text-ink-2 mt-1 space-y-0.5">
                 <p
                   v-if="plan.metadata"
                   class="flex items-center gap-1 flex-wrap"
@@ -52,7 +52,7 @@
                     }}
                     {{ t('billing.creditsInfo.emails') }}</span
                   >
-                  <span class="text-gray-400">·</span>
+                  <span class="text-ink-4">·</span>
                   <span class="whitespace-nowrap"
                     >{{ t('billing.creditsInfo.attachmentLimit') }}:
                     {{ plan.metadata.max_attachment_count }}
@@ -69,7 +69,7 @@
                       formatPlanStorage(plan.metadata.storage_quota_mb)
                     }}</span
                   >
-                  <span class="text-gray-400">·</span>
+                  <span class="text-ink-4">·</span>
                   <span class="whitespace-nowrap"
                     >{{ t('billing.creditsInfo.retentionPeriod') }}:
                     {{
@@ -150,19 +150,19 @@
 
     <div
       v-if="showCancelDialog"
-      class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-start justify-center pt-20"
+      class="fixed inset-0 bg-ink-2 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-start justify-center pt-20"
       @click.self="showCancelDialog = false"
     >
       <div
-        class="relative mx-auto p-6 border max-w-md w-full shadow-lg rounded-lg bg-white"
+        class="relative mx-auto p-6 border max-w-md w-full shadow-lg rounded-lg bg-panel"
       >
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">
+          <h3 class="text-lg font-semibold text-ink">
             {{ t('billing.cancel.title') }}
           </h3>
           <button
             @click="showCancelDialog = false"
-            class="text-gray-400 hover:text-gray-600"
+            class="text-ink-4 hover:text-ink-2"
           >
             <svg
               class="w-6 h-6"
@@ -181,14 +181,14 @@
         </div>
 
         <div class="mb-6">
-          <p class="text-sm text-gray-700 mb-4">
+          <p class="text-sm text-ink-2 mb-4">
             {{ t('billing.cancel.confirmMessage') }}
           </p>
-          <div class="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+          <div class="bg-warn-soft rounded-lg p-4 border border-warn">
             <div class="flex gap-3">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-5 w-5 text-yellow-600"
+                  class="h-5 w-5 text-warn"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -202,12 +202,12 @@
                 </svg>
               </div>
               <div class="flex-1 space-y-2">
-                <p class="text-sm text-yellow-800">
+                <p class="text-sm text-warn">
                   {{ t('billing.cancel.effectiveNote') }}
                 </p>
                 <p
                   v-if="formattedPeriodEnd"
-                  class="text-sm font-medium text-yellow-900"
+                  class="text-sm font-medium text-warn"
                 >
                   {{
                     t('billing.cancel.availableUntil', {
@@ -224,14 +224,14 @@
           <button
             type="button"
             @click="showCancelDialog = false"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            class="px-4 py-2 text-sm font-medium text-ink-2 bg-chip hover:bg-chip rounded-md"
           >
             {{ t('common.cancel') }}
           </button>
           <button
             @click="confirmCancelSubscription"
             :disabled="canceling"
-            class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50"
+            class="px-4 py-2 text-sm font-medium text-accent-on bg-bad hover:bg-bad rounded-md disabled:opacity-50"
           >
             {{ canceling ? t('common.loading') : t('billing.cancel.confirm') }}
           </button>
@@ -241,19 +241,19 @@
 
     <div
       v-if="showDowngradeDialog"
-      class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-start justify-center pt-20"
+      class="fixed inset-0 bg-ink-2 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-start justify-center pt-20"
       @click.self="showDowngradeDialog = false"
     >
       <div
-        class="relative mx-auto p-6 border max-w-md w-full shadow-lg rounded-lg bg-white"
+        class="relative mx-auto p-6 border max-w-md w-full shadow-lg rounded-lg bg-panel"
       >
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">
+          <h3 class="text-lg font-semibold text-ink">
             {{ t('billing.downgrade.title') }}
           </h3>
           <button
             @click="showDowngradeDialog = false"
-            class="text-gray-400 hover:text-gray-600"
+            class="text-ink-4 hover:text-ink-2"
           >
             <svg
               class="w-6 h-6"
@@ -272,18 +272,18 @@
         </div>
 
         <div class="mb-6">
-          <p class="text-sm text-gray-700 mb-4">
+          <p class="text-sm text-ink-2 mb-4">
             {{
               t('billing.downgrade.confirmMessage', {
                 plan: selectedDowngradePlan?.name || ''
               })
             }}
           </p>
-          <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+          <div class="bg-accent-soft rounded-lg p-4 border border-accent">
             <div class="flex gap-3">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-5 w-5 text-blue-600"
+                  class="h-5 w-5 text-accent"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -297,12 +297,12 @@
                 </svg>
               </div>
               <div class="flex-1 space-y-2">
-                <p class="text-sm text-blue-800">
+                <p class="text-sm text-accent">
                   {{ t('billing.downgrade.effectiveNote') }}
                 </p>
                 <p
                   v-if="formattedPeriodEnd"
-                  class="text-sm font-medium text-blue-900"
+                  class="text-sm font-medium text-accent"
                 >
                   {{
                     t('billing.downgrade.availableUntil', {
@@ -319,14 +319,14 @@
           <button
             type="button"
             @click="showDowngradeDialog = false"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            class="px-4 py-2 text-sm font-medium text-ink-2 bg-chip hover:bg-chip rounded-md"
           >
             {{ t('common.cancel') }}
           </button>
           <button
             @click="confirmDowngrade"
             :disabled="downgrading"
-            class="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-md disabled:opacity-50"
+            class="px-4 py-2 text-sm font-medium text-accent-on bg-warn hover:bg-warn rounded-md disabled:opacity-50"
           >
             {{
               downgrading ? t('common.loading') : t('billing.downgrade.confirm')
@@ -338,19 +338,19 @@
 
     <div
       v-if="showResumeDialog"
-      class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-start justify-center pt-20"
+      class="fixed inset-0 bg-ink-2 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-start justify-center pt-20"
       @click.self="showResumeDialog = false"
     >
       <div
-        class="relative mx-auto p-6 border max-w-md w-full shadow-lg rounded-lg bg-white"
+        class="relative mx-auto p-6 border max-w-md w-full shadow-lg rounded-lg bg-panel"
       >
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">
+          <h3 class="text-lg font-semibold text-ink">
             {{ t('billing.resume.title') }}
           </h3>
           <button
             @click="showResumeDialog = false"
-            class="text-gray-400 hover:text-gray-600"
+            class="text-ink-4 hover:text-ink-2"
           >
             <svg
               class="w-6 h-6"
@@ -369,14 +369,14 @@
         </div>
 
         <div class="mb-6">
-          <p class="text-sm text-gray-700 mb-4">
+          <p class="text-sm text-ink-2 mb-4">
             {{ t('billing.resume.confirmMessage') }}
           </p>
-          <div class="bg-green-50 rounded-lg p-4 border border-green-200">
+          <div class="bg-ok-soft rounded-lg p-4 border border-ok">
             <div class="flex gap-3">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-5 w-5 text-green-600"
+                  class="h-5 w-5 text-ok"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -390,12 +390,12 @@
                 </svg>
               </div>
               <div class="flex-1 space-y-2">
-                <p class="text-sm text-green-800">
+                <p class="text-sm text-ok">
                   {{ t('billing.resume.effectiveNote') }}
                 </p>
                 <p
                   v-if="formattedPeriodEnd"
-                  class="text-sm font-medium text-green-900"
+                  class="text-sm font-medium text-ok"
                 >
                   {{
                     t('billing.resume.nextBillingDate', {
@@ -412,14 +412,14 @@
           <button
             type="button"
             @click="showResumeDialog = false"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            class="px-4 py-2 text-sm font-medium text-ink-2 bg-chip hover:bg-chip rounded-md"
           >
             {{ t('common.cancel') }}
           </button>
           <button
             @click="confirmResumeSubscription"
             :disabled="resuming"
-            class="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50"
+            class="px-4 py-2 text-sm font-medium text-accent-on bg-ok hover:bg-ok rounded-md disabled:opacity-50"
           >
             {{ resuming ? t('common.loading') : t('billing.resume.confirm') }}
           </button>
@@ -534,15 +534,15 @@ const BASE_BUTTON_CLASS =
 
 const BUTTON_STYLES = {
   resume:
-    'text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed',
+    'text-ok bg-ok-soft border border-ok hover:bg-ok-soft disabled:opacity-50 disabled:cursor-not-allowed',
   cancel:
-    'text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed',
-  current: 'text-gray-600 bg-gray-100 cursor-not-allowed',
+    'text-bad bg-bad-soft border border-bad hover:bg-bad-soft disabled:opacity-50 disabled:cursor-not-allowed',
+  current: 'text-ink-2 bg-chip cursor-not-allowed',
   upgrade:
-    'text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed',
+    'text-accent-on bg-accent hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed',
   downgrade:
-    'text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed',
-  unavailable: 'text-gray-400 bg-gray-100 cursor-not-allowed'
+    'text-warn bg-warn-soft border border-warn hover:bg-warn-soft disabled:opacity-50 disabled:cursor-not-allowed',
+  unavailable: 'text-ink-4 bg-chip cursor-not-allowed'
 }
 
 const isCanceledButActive = computed(() => {

@@ -1,16 +1,16 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-app-sub">
     <ShareHeader />
     <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
       <div class="mx-auto max-w-4xl space-y-6">
         <BaseCard
           v-if="loading"
-          class="bg-gradient-to-b from-white via-white to-primary-50/40 border border-primary-100 shadow-sm"
+          class="bg-gradient-to-b from-white via-white to-accent-soft/40 border border-accent shadow-sm"
         >
           <div class="flex flex-col items-center gap-4 py-8 text-center">
             <div class="relative">
               <div
-                class="h-12 w-12 rounded-full bg-primary-50 flex items-center justify-center text-primary-600 shadow-inner"
+                class="h-12 w-12 rounded-full bg-accent-soft flex items-center justify-center text-accent shadow-inner"
               >
                 <svg
                   class="w-6 h-6 animate-spin"
@@ -28,10 +28,10 @@
               </div>
             </div>
             <div class="space-y-1">
-              <p class="text-base font-semibold text-gray-900">
+              <p class="text-base font-semibold text-ink">
                 {{ t('share.viewLoading') }}
               </p>
-              <p class="text-sm text-gray-500">
+              <p class="text-sm text-ink-3">
                 {{ t('share.viewLoadingDescription') }}
               </p>
             </div>
@@ -41,10 +41,10 @@
         <BaseCard v-else-if="error" class="max-w-md mx-auto">
           <div class="space-y-6 py-6 text-center">
             <div
-              class="mx-auto w-16 h-16 bg-red-50 rounded-full flex items-center justify-center shadow-inner"
+              class="mx-auto w-16 h-16 bg-bad-soft rounded-full flex items-center justify-center shadow-inner"
             >
               <svg
-                class="w-7 h-7 text-red-600"
+                class="w-7 h-7 text-bad"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -59,10 +59,10 @@
             </div>
 
             <div class="space-y-2 px-4">
-              <h2 class="text-lg font-semibold text-gray-900">
+              <h2 class="text-lg font-semibold text-ink">
                 {{ t('share.linkExpired') }}
               </h2>
-              <p class="text-sm text-gray-500 leading-relaxed">
+              <p class="text-sm text-ink-3 leading-relaxed">
                 {{ error || t('share.viewExpired') }}
               </p>
             </div>
@@ -83,10 +83,10 @@
             <!-- Icon and Title -->
             <div class="text-center space-y-2">
               <div
-                class="mx-auto w-12 h-12 bg-primary-50 rounded-full flex items-center justify-center"
+                class="mx-auto w-12 h-12 bg-accent-soft rounded-full flex items-center justify-center"
               >
                 <svg
-                  class="w-6 h-6 text-primary-600"
+                  class="w-6 h-6 text-accent"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -100,10 +100,10 @@
                 </svg>
               </div>
               <div class="space-y-1">
-                <h2 class="text-lg font-semibold text-gray-900">
+                <h2 class="text-lg font-semibold text-ink">
                   {{ t('share.requiresPassword') }}
                 </h2>
-                <p class="text-xs text-gray-500">
+                <p class="text-xs text-ink-3">
                   {{ t('share.passwordPrompt') }}
                 </p>
               </div>
@@ -119,11 +119,11 @@
                 inputmode="numeric"
                 pattern="[0-9]*"
                 autocomplete="off"
-                class="w-full rounded-xl border px-4 py-3 text-center text-lg font-medium tracking-[0.15em] bg-white text-gray-900 shadow-sm transition-all focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none placeholder:text-gray-400 placeholder:font-normal"
+                class="w-full rounded-xl border px-4 py-3 text-center text-lg font-medium tracking-[0.15em] bg-panel text-ink shadow-sm transition-all focus:border-accent focus:ring-2 focus:ring-accent focus:outline-none placeholder:text-ink-4 placeholder:font-normal"
                 :class="
                   passwordError
-                    ? 'border-red-300 ring-1 ring-red-100'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-bad ring-1 ring-bad'
+                    : 'border-line hover:border-line'
                 "
                 :placeholder="t('share.passwordPlaceholder')"
                 @keyup.enter="submitPassword"
@@ -132,7 +132,7 @@
               />
               <p
                 v-if="passwordError"
-                class="text-xs text-red-600 text-center flex items-center justify-center gap-1"
+                class="text-xs text-bad text-center flex items-center justify-center gap-1"
               >
                 <svg
                   class="w-3.5 h-3.5"
@@ -171,7 +171,7 @@
           <!-- Core Topic (Summary Title) -->
           <BaseCard>
             <div class="space-y-2">
-              <h1 class="text-xl font-semibold text-gray-900">
+              <h1 class="text-xl font-semibold text-ink">
                 {{
                   threadline.summary_title ||
                   threadline.subject ||
@@ -179,11 +179,11 @@
                 }}
               </h1>
               <div
-                class="flex items-center gap-2 text-sm text-gray-500"
+                class="flex items-center gap-2 text-sm text-ink-3"
                 v-if="threadline.received_at || threadline.created_at"
               >
                 <svg
-                  class="w-4 h-4 text-gray-400 flex-shrink-0"
+                  class="w-4 h-4 text-ink-4 flex-shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -206,7 +206,7 @@
 
           <BaseCard v-if="hasMetadataInfo" :header-muted="true">
             <template #header>
-              <div class="flex items-center gap-2 text-gray-800">
+              <div class="flex items-center gap-2 text-ink">
                 <svg
                   class="w-5 h-5 -mt-px flex-none"
                   fill="none"
@@ -225,13 +225,13 @@
                 </h3>
               </div>
             </template>
-            <div class="space-y-3 text-xs sm:text-sm text-gray-700">
+            <div class="space-y-3 text-xs sm:text-sm text-ink-2">
               <div
                 class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5"
               >
-                <div class="flex items-center gap-1 text-gray-500">
+                <div class="flex items-center gap-1 text-ink-3">
                   <svg
-                    class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                    class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -248,11 +248,11 @@
                 <div class="flex items-center gap-2 min-w-0">
                   <span
                     v-if="metadataCategory"
-                    class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-blue-100 text-blue-800"
+                    class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-accent-soft text-accent"
                   >
                     {{ metadataCategory }}
                   </span>
-                  <span v-else class="text-gray-400">
+                  <span v-else class="text-ink-4">
                     {{ t('todos.notSet') }}
                   </span>
                 </div>
@@ -261,9 +261,9 @@
               <div
                 class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5"
               >
-                <div class="flex items-center gap-1 text-gray-500">
+                <div class="flex items-center gap-1 text-ink-3">
                   <svg
-                    class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                    class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -285,12 +285,12 @@
                     <span
                       v-for="(participant, index) in metadataParticipants"
                       :key="`participant-${index}`"
-                      class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-green-100 text-green-800"
+                      class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-ok-soft text-ok"
                     >
                       {{ participant }}
                     </span>
                   </div>
-                  <span v-else class="text-gray-400">
+                  <span v-else class="text-ink-4">
                     {{ t('todos.notSet') }}
                   </span>
                 </div>
@@ -299,9 +299,9 @@
               <div
                 class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5"
               >
-                <div class="flex items-center gap-1 text-gray-500">
+                <div class="flex items-center gap-1 text-ink-3">
                   <svg
-                    class="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                    class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -323,12 +323,12 @@
                     <span
                       v-for="(tag, index) in metadataTags"
                       :key="`tag-${index}`"
-                      class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-rose-100 text-rose-800"
+                      class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-bad-soft text-bad"
                     >
                       {{ tag }}
                     </span>
                   </div>
-                  <span v-else class="text-gray-400">
+                  <span v-else class="text-ink-4">
                     {{ t('todos.notSet') }}
                   </span>
                 </div>
@@ -343,7 +343,7 @@
           >
             <template #header>
               <div class="flex items-center justify-between w-full">
-                <div class="flex items-center gap-2 text-gray-800">
+                <div class="flex items-center gap-2 text-ink">
                   <svg
                     class="w-5 h-5 -mt-px flex-none"
                     fill="none"
@@ -363,7 +363,7 @@
                 </div>
                 <button
                   @click="copyContent(summaryData.details, 'details')"
-                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
+                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink bg-app-sub hover:bg-chip border border-line hover:border-line px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
                   :title="t('common.copy')"
                 >
                   <svg
@@ -382,7 +382,7 @@
                   </svg>
                   <svg
                     v-else
-                    class="h-3.5 w-3.5 text-green-600"
+                    class="h-3.5 w-3.5 text-ok"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -410,7 +410,7 @@
           <!-- TODOs Section -->
           <BaseCard v-if="threadlineTodos.length > 0" :header-muted="true">
             <template #header>
-              <div class="flex items-center gap-2 text-gray-800">
+              <div class="flex items-center gap-2 text-ink">
                 <svg
                   class="w-5 h-5 -mt-px flex-none"
                   fill="none"
@@ -456,7 +456,7 @@
           >
             <template #header>
               <div class="flex items-center justify-between w-full">
-                <div class="flex items-center gap-2 text-gray-800">
+                <div class="flex items-center gap-2 text-ink">
                   <svg
                     class="w-5 h-5 -mt-px flex-none"
                     fill="none"
@@ -476,7 +476,7 @@
                 </div>
                 <button
                   @click="copyKeyProcess"
-                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
+                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink bg-app-sub hover:bg-chip border border-line hover:border-line px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
                   :title="t('common.copy')"
                 >
                   <svg
@@ -495,7 +495,7 @@
                   </svg>
                   <svg
                     v-else
-                    class="h-3.5 w-3.5 text-green-600"
+                    class="h-3.5 w-3.5 text-ok"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -521,9 +521,9 @@
               <li
                 v-for="(item, index) in summaryData.key_process"
                 :key="index"
-                class="flex items-start gap-2 text-sm text-gray-700"
+                class="flex items-start gap-2 text-sm text-ink-2"
               >
-                <span class="text-primary-600 mt-0.5">•</span>
+                <span class="text-accent mt-0.5">•</span>
                 <span>{{ item }}</span>
               </li>
             </ul>
@@ -539,7 +539,7 @@
           >
             <template #header>
               <div class="flex items-center justify-between w-full">
-                <div class="flex items-center gap-2 text-gray-800">
+                <div class="flex items-center gap-2 text-ink">
                   <svg
                     class="w-5 h-5 -mt-px flex-none"
                     fill="none"
@@ -564,7 +564,7 @@
                       threadline.llm_content ? 'llm' : 'summary'
                     )
                   "
-                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
+                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink bg-app-sub hover:bg-chip border border-line hover:border-line px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
                   :title="t('common.copy')"
                 >
                   <svg
@@ -583,7 +583,7 @@
                   </svg>
                   <svg
                     v-else
-                    class="h-3.5 w-3.5 text-green-600"
+                    class="h-3.5 w-3.5 text-ok"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

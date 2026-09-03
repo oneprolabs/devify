@@ -4,9 +4,9 @@
       'relative flex gap-3 sm:gap-3 p-4 sm:p-3 rounded-lg border transition-colors',
       shouldAlignTop ? 'items-start' : 'items-center',
       todo.is_completed
-        ? 'bg-gray-50 border-gray-200'
-        : 'bg-white border-gray-200 hover:border-gray-300',
-      isAnyEditing ? 'border-primary-400 bg-primary-50' : '',
+        ? 'bg-app-sub border-line'
+        : 'bg-panel border-line hover:border-line',
+      isAnyEditing ? 'border-accent bg-accent-soft' : '',
       todo.is_completed ? 'opacity-75' : ''
     ]"
   >
@@ -20,7 +20,7 @@
         :checked="todo.is_completed"
         @change="handleToggle"
         :disabled="loading || isAnyEditing"
-        class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+        class="h-4 w-4 text-accent focus:ring-accent border-line rounded"
       />
     </div>
 
@@ -30,21 +30,21 @@
         <!-- Validation Error -->
         <div
           v-if="validationError"
-          class="rounded-md bg-red-50 border border-red-200 p-2"
+          class="rounded-md bg-bad-soft border border-bad p-2"
         >
-          <p class="text-xs font-medium text-red-800">{{ validationError }}</p>
+          <p class="text-xs font-medium text-bad">{{ validationError }}</p>
         </div>
 
         <!-- Content -->
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">
-            {{ t('todos.content') }} <span class="text-red-500">*</span>
+          <label class="block text-xs font-medium text-ink-2 mb-1">
+            {{ t('todos.content') }} <span class="text-bad">*</span>
           </label>
           <textarea
             v-model="editForm.content"
             rows="2"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-            :class="{ 'border-red-300': validationError }"
+            class="w-full px-2 py-1.5 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
+            :class="{ 'border-bad': validationError }"
             :placeholder="t('todos.content')"
           ></textarea>
         </div>
@@ -53,12 +53,12 @@
         <div class="grid grid-cols-2 gap-2">
           <!-- Priority -->
           <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">
+            <label class="block text-xs font-medium text-ink-2 mb-1">
               {{ t('todos.priority.label') }}
             </label>
             <select
               v-model="editForm.priority"
-              class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+              class="w-full px-2 py-1.5 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
             >
               <option :value="null">{{ t('todos.notSet') }}</option>
               <option value="high">{{ t('todos.priority.high') }}</option>
@@ -69,20 +69,20 @@
 
           <!-- Owner -->
           <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">
+            <label class="block text-xs font-medium text-ink-2 mb-1">
               {{ t('todos.owner') }}
             </label>
             <input
               v-model="editForm.owner"
               type="text"
-              class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+              class="w-full px-2 py-1.5 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
               :placeholder="t('todos.owner')"
             />
           </div>
 
           <!-- Deadline -->
           <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">
+            <label class="block text-xs font-medium text-ink-2 mb-1">
               {{ t('todos.deadline') }}
             </label>
             <BaseDateTimePicker
@@ -93,13 +93,13 @@
 
           <!-- Location -->
           <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">
+            <label class="block text-xs font-medium text-ink-2 mb-1">
               {{ t('todos.location') }}
             </label>
             <input
               v-model="editForm.location"
               type="text"
-              class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+              class="w-full px-2 py-1.5 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
               :placeholder="t('todos.location')"
             />
           </div>
@@ -110,14 +110,14 @@
           <button
             @click="handleCancelEdit"
             :disabled="saving"
-            class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+            class="px-3 py-1.5 text-xs font-medium text-ink-2 bg-panel border border-line rounded-md hover:bg-app-sub focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50"
           >
             {{ t('common.cancel') }}
           </button>
           <button
             @click="handleSaveEdit"
             :disabled="saving || !editForm.content || !editForm.content.trim()"
-            class="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-3 py-1.5 text-xs font-medium text-accent-on bg-accent border border-transparent rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span v-if="saving">{{ t('common.saving') }}...</span>
             <span v-else>{{ t('common.save') }}</span>
@@ -132,15 +132,15 @@
           <input
             v-model="contentInput"
             type="text"
-            class="flex-1 text-sm px-2 py-1 border border-primary-400 rounded-md focus:ring-primary-500 focus:border-primary-500"
-            :class="todo.is_completed ? 'bg-gray-50' : 'bg-white'"
+            class="flex-1 text-sm px-2 py-1 border border-accent rounded-md focus:ring-accent focus:border-accent"
+            :class="todo.is_completed ? 'bg-app-sub' : 'bg-panel'"
             @keydown.enter.prevent="handleSaveContent"
             @keydown.esc.prevent="handleCancelContentEdit"
             autofocus
           />
           <button
             @mousedown.prevent="handleSaveContent"
-            class="p-1 text-green-600 hover:text-green-800"
+            class="p-1 text-ok hover:text-ok"
             :disabled="saving"
             :title="t('common.save')"
           >
@@ -160,7 +160,7 @@
           </button>
           <button
             @mousedown.prevent="handleCancelContentEdit"
-            class="p-1 text-red-600 hover:text-red-800"
+            class="p-1 text-bad hover:text-bad"
             :disabled="saving"
             :title="t('common.cancel')"
           >
@@ -184,10 +184,10 @@
           :class="[
             'text-sm leading-6 select-text transition-colors',
             todo.is_completed
-              ? 'text-gray-500 line-through cursor-not-allowed'
+              ? 'text-ink-3 line-through cursor-not-allowed'
               : readOnly
-                ? 'text-gray-900 cursor-default'
-                : 'text-gray-900 hover:opacity-80 cursor-pointer'
+                ? 'text-ink cursor-default'
+                : 'text-ink hover:opacity-80 cursor-pointer'
           ]"
           @click.stop="readOnly ? null : handleStartContentEdit()"
           :title="readOnly || todo.is_completed ? '' : t('todos.edit')"
@@ -197,7 +197,7 @@
 
         <div
           v-if="showDetails"
-          class="mt-3 sm:mt-2 flex flex-wrap gap-3 sm:gap-2 text-xs text-gray-500"
+          class="mt-3 sm:mt-2 flex flex-wrap gap-3 sm:gap-2 text-xs text-ink-3"
         >
           <!-- Priority Inline Edit -->
           <div
@@ -206,7 +206,7 @@
           >
             <select
               v-model="priorityInput"
-              class="text-xs px-2 py-0.5 h-5 border border-primary-400 rounded-md focus:ring-primary-500 focus:border-primary-500"
+              class="text-xs px-2 py-0.5 h-5 border border-accent rounded-md focus:ring-accent focus:border-accent"
               @keydown.enter.prevent="handleSavePriority"
               @keydown.esc.prevent="handleCancelPriorityEdit"
               autofocus
@@ -218,7 +218,7 @@
             </select>
             <button
               @mousedown.prevent="handleSavePriority"
-              class="p-0.5 text-green-600 hover:text-green-800"
+              class="p-0.5 text-ok hover:text-ok"
               :title="t('common.save')"
             >
               <svg
@@ -237,7 +237,7 @@
             </button>
             <button
               @mousedown.prevent="handleCancelPriorityEdit"
-              class="p-0.5 text-red-600 hover:text-red-800"
+              class="p-0.5 text-bad hover:text-bad"
               :title="t('common.cancel')"
             >
               <svg
@@ -274,7 +274,7 @@
           <span
             v-else
             :class="[
-              'text-gray-400 italic self-center',
+              'text-ink-4 italic self-center',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly
@@ -290,7 +290,7 @@
           <!-- Owner Inline Edit -->
           <div v-if="editingOwner" class="flex items-center gap-1 self-center">
             <svg
-              class="w-3 h-3 text-gray-500"
+              class="w-3 h-3 text-ink-3"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -305,14 +305,14 @@
             <input
               v-model="ownerInput"
               type="text"
-              class="text-xs px-2 py-0.5 h-5 border border-primary-400 rounded-md focus:ring-primary-500 focus:border-primary-500 w-24"
+              class="text-xs px-2 py-0.5 h-5 border border-accent rounded-md focus:ring-accent focus:border-accent w-24"
               @keydown.enter.prevent="handleSaveOwner"
               @keydown.esc.prevent="handleCancelOwnerEdit"
               autofocus
             />
             <button
               @mousedown.prevent="handleSaveOwner"
-              class="p-0.5 text-green-600 hover:text-green-800"
+              class="p-0.5 text-ok hover:text-ok"
               :title="t('common.save')"
             >
               <svg
@@ -331,7 +331,7 @@
             </button>
             <button
               @mousedown.prevent="handleCancelOwnerEdit"
-              class="p-0.5 text-red-600 hover:text-red-800"
+              class="p-0.5 text-bad hover:text-bad"
               :title="t('common.cancel')"
             >
               <svg
@@ -380,7 +380,7 @@
           <span
             v-else
             :class="[
-              'flex items-center gap-1 text-gray-400 italic self-center',
+              'flex items-center gap-1 text-ink-4 italic self-center',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : 'cursor-pointer hover:opacity-80'
@@ -411,7 +411,7 @@
           >
             <div class="w-48 min-w-[12rem] flex items-center gap-1">
               <svg
-                class="w-3 h-3 text-gray-500 flex-shrink-0"
+                class="w-3 h-3 text-ink-3 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -432,7 +432,7 @@
             </div>
             <button
               @mousedown.prevent="handleSaveDeadline"
-              class="p-0.5 text-green-600 hover:text-green-800"
+              class="p-0.5 text-ok hover:text-ok"
               :title="t('common.save')"
             >
               <svg
@@ -451,7 +451,7 @@
             </button>
             <button
               @mousedown.prevent="handleCancelDeadlineEdit"
-              class="p-0.5 text-red-600 hover:text-red-800"
+              class="p-0.5 text-bad hover:text-bad"
               :title="t('common.cancel')"
             >
               <svg
@@ -500,7 +500,7 @@
           <span
             v-else
             :class="[
-              'flex items-center gap-1 text-gray-400 italic self-center',
+              'flex items-center gap-1 text-ink-4 italic self-center',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly
@@ -532,7 +532,7 @@
             class="flex items-center gap-1 self-center"
           >
             <svg
-              class="w-3 h-3 text-gray-500"
+              class="w-3 h-3 text-ink-3"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -553,14 +553,14 @@
             <input
               v-model="locationInput"
               type="text"
-              class="text-xs px-2 py-0.5 h-5 border border-primary-400 rounded-md focus:ring-primary-500 focus:border-primary-500 w-24"
+              class="text-xs px-2 py-0.5 h-5 border border-accent rounded-md focus:ring-accent focus:border-accent w-24"
               @keydown.enter.prevent="handleSaveLocation"
               @keydown.esc.prevent="handleCancelLocationEdit"
               autofocus
             />
             <button
               @mousedown.prevent="handleSaveLocation"
-              class="p-0.5 text-green-600 hover:text-green-800"
+              class="p-0.5 text-ok hover:text-ok"
               :title="t('common.save')"
             >
               <svg
@@ -579,7 +579,7 @@
             </button>
             <button
               @mousedown.prevent="handleCancelLocationEdit"
-              class="p-0.5 text-red-600 hover:text-red-800"
+              class="p-0.5 text-bad hover:text-bad"
               :title="t('common.cancel')"
             >
               <svg
@@ -634,7 +634,7 @@
           <span
             v-else
             :class="[
-              'flex items-center gap-1 text-gray-400 italic self-center',
+              'flex items-center gap-1 text-ink-4 italic self-center',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly
@@ -687,7 +687,7 @@
           v-if="!confirmingDelete && !isNew && !readOnly"
           @click="handleDeleteClick"
           :disabled="loading"
-          class="p-1 text-gray-400 hover:text-red-600"
+          class="p-1 text-ink-4 hover:text-bad"
           :title="t('todos.delete')"
         >
           <svg
@@ -706,7 +706,7 @@
         </button>
         <div v-else-if="!readOnly" class="flex items-center gap-1">
           <button
-            class="p-1 text-green-600 hover:text-green-800 focus:outline-none"
+            class="p-1 text-ok hover:text-ok focus:outline-none"
             @click="confirmDelete"
             :aria-label="t('todos.delete')"
           >
@@ -725,7 +725,7 @@
             </svg>
           </button>
           <button
-            class="p-1 text-gray-500 hover:text-gray-700 focus:outline-none"
+            class="p-1 text-ink-3 hover:text-ink-2 focus:outline-none"
             @click="cancelDelete"
             :aria-label="t('common.cancel')"
           >
@@ -752,7 +752,7 @@
       class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
     >
       <div
-        class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600 bg-white/80 rounded-full px-1 py-1"
+        class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-accent bg-panel/80 rounded-full px-1 py-1"
       ></div>
     </div>
   </div>
@@ -893,11 +893,11 @@ watch(
 
 const getPriorityClass = (priority) => {
   const classes = {
-    high: 'px-2 py-0.5 rounded bg-red-100 text-red-700',
-    medium: 'px-2 py-0.5 rounded bg-yellow-100 text-yellow-700',
-    low: 'px-2 py-0.5 rounded bg-blue-100 text-blue-700'
+    high: 'px-2 py-0.5 rounded bg-bad-soft text-bad',
+    medium: 'px-2 py-0.5 rounded bg-warn-soft text-warn',
+    low: 'px-2 py-0.5 rounded bg-accent-soft text-accent'
   }
-  return classes[priority] || 'px-2 py-0.5 rounded bg-gray-100 text-gray-700'
+  return classes[priority] || 'px-2 py-0.5 rounded bg-chip text-ink-2'
 }
 
 const formatDeadline = (dateString) => {
@@ -938,9 +938,9 @@ const deadlineStatus = computed(() => {
 
 const deadlineStatusClass = computed(() => {
   const classes = {
-    overdue: 'bg-red-100 text-red-700',
-    'due-today': 'bg-orange-100 text-orange-700',
-    'due-soon': 'bg-yellow-100 text-yellow-700'
+    overdue: 'bg-bad-soft text-bad',
+    'due-today': 'bg-warn-soft text-warn',
+    'due-soon': 'bg-warn-soft text-warn'
   }
   return classes[deadlineStatus.value] || ''
 })

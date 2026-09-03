@@ -2,14 +2,14 @@
   <BaseModal :show="true" @close="$emit('close')">
     <div class="space-y-5">
       <div>
-        <h3 class="text-lg font-semibold text-gray-900">
+        <h3 class="text-lg font-semibold text-ink">
           {{
             moving
               ? t('expense.groups.moveTitle')
               : t('expense.groups.addTitle')
           }}
         </h3>
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="mt-1 text-sm text-ink-3">
           {{
             moving
               ? t('expense.groups.moveSubtitle', { count })
@@ -20,7 +20,7 @@
 
       <p
         v-if="error"
-        class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
       >
         {{ error }}
       </p>
@@ -32,21 +32,21 @@
           class="flex cursor-pointer items-center gap-3 rounded-lg border p-3"
           :class="
             target === group.uuid
-              ? 'border-primary-500 bg-primary-50'
-              : 'border-gray-200 hover:border-gray-300'
+              ? 'border-accent bg-accent-soft'
+              : 'border-line hover:border-line'
           "
         >
           <input
             v-model="target"
             type="radio"
             :value="group.uuid"
-            class="text-primary-600 focus:ring-primary-500"
+            class="text-accent focus:ring-accent"
           />
           <span class="min-w-0">
-            <span class="block truncate text-sm text-gray-900">
+            <span class="block truncate text-sm text-ink">
               {{ group.name }}
             </span>
-            <span class="block text-xs text-gray-500">
+            <span class="block text-xs text-ink-3">
               {{
                 t('expense.groups.line', {
                   count: group.invoice_count,
@@ -61,24 +61,24 @@
           class="flex cursor-pointer items-center gap-3 rounded-lg border p-3"
           :class="
             target === NEW
-              ? 'border-primary-500 bg-primary-50'
-              : 'border-gray-200 hover:border-gray-300'
+              ? 'border-accent bg-accent-soft'
+              : 'border-line hover:border-line'
           "
         >
           <input
             v-model="target"
             type="radio"
             :value="NEW"
-            class="text-primary-600 focus:ring-primary-500"
+            class="text-accent focus:ring-accent"
           />
           <span class="flex-1">
-            <span class="block text-sm text-gray-900">
+            <span class="block text-sm text-ink">
               {{ t('expense.groups.addToNew') }}
             </span>
             <input
               v-model="newName"
               type="text"
-              class="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+              class="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
               :placeholder="t('expense.groups.namePlaceholder')"
               @focus="target = NEW"
             />
@@ -86,7 +86,7 @@
         </label>
       </div>
 
-      <p class="text-xs leading-relaxed text-gray-500">
+      <p class="text-xs leading-relaxed text-ink-3">
         {{
           moving
             ? t('expense.groups.moveNote')

@@ -2,10 +2,10 @@
   <AppLayout>
     <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-900">
+        <h1 class="text-2xl font-semibold text-ink">
           {{ t('apps.centerTitle') }}
         </h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="mt-1 text-sm text-ink-3">
           {{ t('apps.centerSubtitle') }}
         </p>
       </div>
@@ -17,25 +17,25 @@
           v-for="app in appList"
           :key="app.key"
           type="button"
-          class="rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:border-primary-300 hover:shadow-md"
+          class="rounded-2xl border border-line bg-panel p-5 text-left shadow-sm transition hover:border-accent hover:shadow-md"
           @click="openApp(app)"
         >
           <div class="flex items-start justify-between gap-4">
             <div>
-              <div class="text-lg font-semibold text-gray-900">
+              <div class="text-lg font-semibold text-ink">
                 {{ app.name_zh || app.name }}
               </div>
-              <div class="mt-1 text-sm text-gray-500">
+              <div class="mt-1 text-sm text-ink-3">
                 {{ app.name }}
               </div>
             </div>
             <span
-              class="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700"
+              class="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent"
             >
               {{ t('apps.openApp') }}
             </span>
           </div>
-          <p class="mt-3 text-sm leading-6 text-gray-600">
+          <p class="mt-3 text-sm leading-6 text-ink-2">
             {{ app.description }}
           </p>
         </button>

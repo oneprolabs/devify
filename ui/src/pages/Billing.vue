@@ -2,21 +2,21 @@
   <AppLayout>
     <div class="space-y-4">
       <div>
-        <h2 class="text-lg font-bold leading-7 text-gray-900 sm:text-xl">
+        <h2 class="text-lg font-bold leading-7 text-ink sm:text-xl">
           {{ t('billing.title') }}
         </h2>
-        <p class="mt-0.5 text-xs text-gray-500">
+        <p class="mt-0.5 text-xs text-ink-3">
           {{ t('billing.description') }}
         </p>
       </div>
 
       <div
         v-if="successMessage"
-        class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between"
+        class="mb-6 bg-ok-soft border border-ok rounded-lg p-4 flex items-center justify-between"
       >
         <div class="flex items-center">
           <svg
-            class="w-5 h-5 text-green-600 mr-3"
+            class="w-5 h-5 text-ok mr-3"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -28,12 +28,9 @@
               d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <span class="text-green-800">{{ successMessage }}</span>
+          <span class="text-ok">{{ successMessage }}</span>
         </div>
-        <button
-          @click="successMessage = ''"
-          class="text-green-600 hover:text-green-800"
-        >
+        <button @click="successMessage = ''" class="text-ok hover:text-ok">
           <svg
             class="w-5 h-5"
             fill="none"
@@ -52,11 +49,11 @@
 
       <div
         v-if="errorMessage"
-        class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between"
+        class="mb-6 bg-bad-soft border border-bad rounded-lg p-4 flex items-center justify-between"
       >
         <div class="flex items-center">
           <svg
-            class="w-5 h-5 text-red-600 mr-3"
+            class="w-5 h-5 text-bad mr-3"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -68,12 +65,9 @@
               d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <span class="text-red-800">{{ errorMessage }}</span>
+          <span class="text-bad">{{ errorMessage }}</span>
         </div>
-        <button
-          @click="errorMessage = ''"
-          class="text-red-600 hover:text-red-800"
-        >
+        <button @click="errorMessage = ''" class="text-bad hover:text-bad">
           <svg
             class="w-5 h-5"
             fill="none"
@@ -92,7 +86,7 @@
 
       <div
         v-if="billingStatus && billingStatus.recharge_enabled === false"
-        class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+        class="rounded-lg border border-warn bg-warn-soft p-4 text-sm text-warn"
       >
         <p class="font-medium">
           {{ t('billing.plans.stripeNotConfigured') }}
@@ -104,9 +98,9 @@
 
       <div v-if="loading" class="flex items-center justify-center py-12">
         <div
-          class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
+          class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent"
         ></div>
-        <p class="ml-3 text-sm text-gray-500">{{ t('common.loading') }}</p>
+        <p class="ml-3 text-sm text-ink-3">{{ t('common.loading') }}</p>
       </div>
 
       <div v-else class="space-y-4">

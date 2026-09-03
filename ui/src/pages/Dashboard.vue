@@ -12,10 +12,10 @@
           <div class="flex items-center">
             <div class="flex-shrink-0">
               <div
-                class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center"
+                class="w-8 h-8 bg-accent rounded-md flex items-center justify-center"
               >
                 <svg
-                  class="w-5 h-5 text-white"
+                  class="w-5 h-5 text-accent-on"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -31,12 +31,10 @@
             </div>
             <div class="ml-3 flex-1 min-w-0">
               <dl>
-                <dt
-                  class="text-xs sm:text-sm font-medium text-gray-500 truncate"
-                >
+                <dt class="text-xs sm:text-sm font-medium text-ink-3 truncate">
                   {{ t('dashboard.stats.totalMessages') }}
                 </dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dd class="text-lg font-medium text-ink">
                   {{ stats.totalResults || 0 }}
                 </dd>
               </dl>
@@ -48,10 +46,10 @@
           <div class="flex items-center">
             <div class="flex-shrink-0">
               <div
-                class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center"
+                class="w-8 h-8 bg-ok rounded-md flex items-center justify-center"
               >
                 <svg
-                  class="w-5 h-5 text-white"
+                  class="w-5 h-5 text-accent-on"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -67,12 +65,10 @@
             </div>
             <div class="ml-3 flex-1 min-w-0">
               <dl>
-                <dt
-                  class="text-xs sm:text-sm font-medium text-gray-500 truncate"
-                >
+                <dt class="text-xs sm:text-sm font-medium text-ink-3 truncate">
                   {{ t('dashboard.stats.thisWeek') }}
                 </dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dd class="text-lg font-medium text-ink">
                   {{ stats.thisWeek || 0 }}
                 </dd>
               </dl>
@@ -84,10 +80,10 @@
           <div class="flex items-center">
             <div class="flex-shrink-0">
               <div
-                class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center"
+                class="w-8 h-8 bg-warn rounded-md flex items-center justify-center"
               >
                 <svg
-                  class="w-5 h-5 text-white"
+                  class="w-5 h-5 text-accent-on"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -103,12 +99,10 @@
             </div>
             <div class="ml-3 flex-1 min-w-0">
               <dl>
-                <dt
-                  class="text-xs sm:text-sm font-medium text-gray-500 truncate"
-                >
+                <dt class="text-xs sm:text-sm font-medium text-ink-3 truncate">
                   {{ t('dashboard.stats.pending') }}
                 </dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dd class="text-lg font-medium text-ink">
                   {{ stats.pending || 0 }}
                 </dd>
               </dl>
@@ -120,10 +114,10 @@
           <div class="flex items-center">
             <div class="flex-shrink-0">
               <div
-                class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center"
+                class="w-8 h-8 bg-accent rounded-md flex items-center justify-center"
               >
                 <svg
-                  class="w-5 h-5 text-white"
+                  class="w-5 h-5 text-accent-on"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -139,12 +133,10 @@
             </div>
             <div class="ml-3 flex-1 min-w-0">
               <dl>
-                <dt
-                  class="text-xs sm:text-sm font-medium text-gray-500 truncate"
-                >
+                <dt class="text-xs sm:text-sm font-medium text-ink-3 truncate">
                   {{ t('dashboard.stats.completed') }}
                 </dt>
-                <dd class="text-lg font-medium text-gray-900">
+                <dd class="text-lg font-medium text-ink">
                   {{ stats.completed || 0 }}
                 </dd>
               </dl>
@@ -160,7 +152,7 @@
             <div
               class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
-              <div class="flex items-center gap-2 text-gray-800">
+              <div class="flex items-center gap-2 text-ink">
                 <svg
                   class="w-5 h-5 -mt-px flex-none"
                   fill="none"
@@ -184,10 +176,10 @@
                     v-model="searchQuery"
                     type="text"
                     :placeholder="t('chats.searchPlaceholderDetailed')"
-                    class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                    class="w-full pl-9 pr-3 py-2 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
                   />
                   <svg
-                    class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400"
+                    class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-4"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -281,14 +273,14 @@
         </template>
         <div v-if="loading" class="text-center py-8">
           <div
-            class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
+            class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent"
           ></div>
-          <p class="mt-2 text-sm text-gray-500">{{ t('common.loading') }}</p>
+          <p class="mt-2 text-sm text-ink-3">{{ t('common.loading') }}</p>
         </div>
 
         <div v-else-if="results.length === 0" class="text-center py-8">
           <svg
-            class="mx-auto h-12 w-12 text-gray-400"
+            class="mx-auto h-12 w-12 text-ink-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -300,10 +292,10 @@
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <h3 class="mt-2 text-sm font-medium text-gray-900">
+          <h3 class="mt-2 text-sm font-medium text-ink">
             {{ searchQuery ? t('chats.noResults') : t('chats.noChats') }}
           </h3>
-          <p class="mt-1 text-sm text-gray-500">
+          <p class="mt-1 text-sm text-ink-3">
             {{ searchQuery ? '' : t('chats.noChatsDesc') }}
           </p>
         </div>
@@ -315,8 +307,8 @@
             class="relative border rounded-lg p-4 transition-colors cursor-pointer"
             :class="
               selectedIds.includes(result.uuid)
-                ? 'border-blue-300 bg-blue-50 hover:bg-blue-100'
-                : 'border-gray-200 hover:bg-gray-50'
+                ? 'border-accent bg-accent-soft hover:bg-accent-soft'
+                : 'border-line hover:bg-app-sub'
             "
             @click="
               isMobileSelectionMode
@@ -331,7 +323,7 @@
               >
                 <input
                   type="checkbox"
-                  class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  class="h-4 w-4 rounded border-line text-accent focus:ring-accent"
                   :checked="selectedIds.includes(result.uuid)"
                   :disabled="
                     !selectedIds.includes(result.uuid) && !canSelectMore
@@ -348,7 +340,7 @@
                   <div class="flex items-center gap-2">
                     <MergeStateBadge :state="getThreadlineMergeState(result)" />
                     <h4
-                      class="text-sm font-medium text-gray-900 break-words sm:truncate flex-1 min-w-0"
+                      class="text-sm font-medium text-ink break-words sm:truncate flex-1 min-w-0"
                     >
                       {{
                         result.summary_title ||
@@ -357,11 +349,11 @@
                       }}
                     </h4>
                   </div>
-                  <div class="text-sm text-gray-500 line-clamp-2 break-words">
+                  <div class="text-sm text-ink-3 line-clamp-2 break-words">
                     {{ getPreviewText(result) }}
                   </div>
                   <div
-                    class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400"
+                    class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-4"
                   >
                     <span class="whitespace-nowrap">{{
                       formatDateTime(result.received_at || result.created_at)
@@ -389,7 +381,7 @@
                           target="_blank"
                           rel="noopener noreferrer"
                           @click.stop
-                          class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors"
+                          class="inline-flex items-center gap-1 text-accent hover:text-accent transition-colors"
                           :title="delivery.external_url || delivery.external_id"
                         >
                           <svg
@@ -412,7 +404,7 @@
                         </a>
                         <span
                           v-else
-                          class="inline-flex items-center gap-1 text-gray-500"
+                          class="inline-flex items-center gap-1 text-ink-3"
                         >
                           <svg
                             class="h-3 w-3 flex-shrink-0"
@@ -448,13 +440,13 @@
                         result.metadata.keywords
                       )"
                       :key="index"
-                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-accent-soft text-accent"
                     >
                       {{ tag }}
                     </span>
                     <span
                       v-if="getRemainingTagsCount(result.metadata.keywords) > 0"
-                      class="text-xs text-gray-500"
+                      class="text-xs text-ink-3"
                     >
                       +{{ getRemainingTagsCount(result.metadata.keywords) }}
                     </span>
@@ -473,7 +465,7 @@
                          this the list gives no sign of that. -->
                     <span
                       v-if="result.invoice_count > 0"
-                      class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+                      class="inline-flex items-center gap-1 rounded-full border border-warn bg-warn-soft px-2 py-0.5 text-[10px] font-medium text-warn"
                       :title="
                         t('chats.handledByExpenseHint', {
                           count: result.invoice_count
@@ -507,8 +499,8 @@
                       class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium"
                       :class="
                         result.share_status.is_expired
-                          ? 'border-red-200 bg-red-50 text-red-600'
-                          : 'border-green-200 bg-green-50 text-green-700'
+                          ? 'border-bad bg-bad-soft text-bad'
+                          : 'border-ok bg-ok-soft text-ok'
                       "
                     >
                       <svg
@@ -528,7 +520,7 @@
                     </span>
                   </div>
                   <svg
-                    class="w-5 h-5 flex-shrink-0 text-gray-400"
+                    class="w-5 h-5 flex-shrink-0 text-ink-4"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -581,22 +573,22 @@
     >
       <div
         v-if="selectedMergeItems.length > 0"
-        class="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3"
+        class="mt-4 rounded-xl border border-line bg-app-sub p-3"
       >
-        <div class="mb-2 text-xs font-medium text-gray-500">
+        <div class="mb-2 text-xs font-medium text-ink-3">
           {{ t('chats.bulkMerge.selectedItems') }}
         </div>
         <div class="space-y-2">
           <div
             v-for="item in selectedMergeItems"
             :key="item.uuid"
-            class="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 sm:flex-row sm:items-start sm:justify-between"
+            class="flex flex-col gap-2 rounded-lg border border-line bg-panel px-3 py-2 sm:flex-row sm:items-start sm:justify-between"
           >
             <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium text-gray-900">
+              <div class="truncate text-sm font-medium text-ink">
                 {{ item.summary_title || item.subject || `Email #${item.id}` }}
               </div>
-              <div class="mt-1 text-xs text-gray-500">
+              <div class="mt-1 text-xs text-ink-3">
                 {{ formatDateTime(item.received_at || item.created_at) }}
                 <span class="mx-1">•</span>
                 {{ t('chats.from') }}: {{ getSender(item.sender) }}
@@ -607,17 +599,17 @@
         </div>
       </div>
       <div class="mt-4 space-y-2">
-        <label class="block text-sm font-medium text-gray-700">
+        <label class="block text-sm font-medium text-ink-2">
           {{ t('chats.bulkMerge.noteLabel') }}
         </label>
         <textarea
           v-model="mergeNote"
           rows="3"
           maxlength="100"
-          class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          class="w-full rounded-md border border-line px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
           :placeholder="t('chats.bulkMerge.notePlaceholder')"
         ></textarea>
-        <div class="text-xs text-gray-500">
+        <div class="text-xs text-ink-3">
           {{
             t('chats.bulkMerge.noteHint', {
               count: mergeNote.length,
@@ -648,13 +640,13 @@
         class="fixed inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 flex justify-center pointer-events-none sm:inset-x-4 sm:bottom-4"
       >
         <div
-          class="pointer-events-auto flex w-full max-w-3xl flex-col gap-3 rounded-2xl border border-blue-200 bg-white/95 px-3 py-3 shadow-lg shadow-blue-100 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-4"
+          class="pointer-events-auto flex w-full max-w-3xl flex-col gap-3 rounded-2xl border border-accent bg-panel/95 px-3 py-3 shadow-lg shadow-blue-100 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-4"
         >
           <div class="min-w-0 text-center sm:text-left">
-            <div class="text-sm font-medium text-gray-900">
+            <div class="text-sm font-medium text-ink">
               {{ t('chats.bulkMerge.selectedCount', { count: selectedCount }) }}
             </div>
-            <div class="text-xs text-gray-500">
+            <div class="text-xs text-ink-3">
               {{ t('chats.bulkMerge.selectedHint', { max: 5 }) }}
             </div>
           </div>

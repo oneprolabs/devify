@@ -61,31 +61,31 @@ const { t } = useI18n()
 const { state, hide } = useToast()
 
 const typeClasses = {
-  success: 'bg-green-50 border-green-200',
-  error: 'bg-red-50 border-red-200',
-  warning: 'bg-yellow-50 border-yellow-200',
-  info: 'bg-blue-50 border-blue-200'
+  success: 'bg-ok-soft border-ok',
+  error: 'bg-bad-soft border-bad',
+  warning: 'bg-warn-soft border-warn',
+  info: 'bg-accent-soft border-accent'
 }
 
 const textClasses = {
-  success: 'text-green-800',
-  error: 'text-red-800',
-  warning: 'text-yellow-800',
-  info: 'text-blue-800'
+  success: 'text-ok',
+  error: 'text-bad',
+  warning: 'text-warn',
+  info: 'text-accent'
 }
 
 const iconClasses = {
-  success: 'h-4 w-4 text-green-400',
-  error: 'h-4 w-4 text-red-400',
-  warning: 'h-4 w-4 text-yellow-400',
-  info: 'h-4 w-4 text-blue-400'
+  success: 'h-4 w-4 text-ok',
+  error: 'h-4 w-4 text-bad',
+  warning: 'h-4 w-4 text-warn',
+  info: 'h-4 w-4 text-accent'
 }
 
 const closeButtonClasses = {
-  success: 'text-green-400 hover:text-green-600',
-  error: 'text-red-400 hover:text-red-600',
-  warning: 'text-yellow-400 hover:text-yellow-600',
-  info: 'text-blue-400 hover:text-blue-600'
+  success: 'text-ok hover:text-ok',
+  error: 'text-bad hover:text-bad',
+  warning: 'text-warn hover:text-warn',
+  info: 'text-accent hover:text-accent'
 }
 
 const SuccessIcon = (props) =>

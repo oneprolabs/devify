@@ -1,6 +1,6 @@
 <template>
   <div class="virtual-email-input">
-    <label v-if="label" class="block text-sm font-medium text-gray-700 mb-1">
+    <label v-if="label" class="block text-sm font-medium text-ink-2 mb-1">
       {{ label }}
     </label>
 
@@ -16,7 +16,7 @@
             class="input rounded-r-none pr-10"
             :class="{
               'input-error': error,
-              'border-green-500': isValid && username
+              'border-ok': isValid && username
             }"
             :disabled="disabled"
           />
@@ -25,7 +25,7 @@
           >
             <svg
               v-if="checking"
-              class="animate-spin h-5 w-5 text-gray-400"
+              class="animate-spin h-5 w-5 text-ink-4"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -46,7 +46,7 @@
             </svg>
             <svg
               v-else-if="isValid && username"
-              class="h-5 w-5 text-green-500"
+              class="h-5 w-5 text-ok"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -58,7 +58,7 @@
             </svg>
             <svg
               v-else-if="error"
-              class="h-5 w-5 text-red-500"
+              class="h-5 w-5 text-bad"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -71,18 +71,18 @@
           </div>
         </div>
         <span
-          class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm"
+          class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-line bg-app-sub text-ink-3 text-sm"
         >
           @{{ domain }}
         </span>
       </div>
     </div>
 
-    <p v-if="helpText && !error" class="mt-1 text-sm text-gray-500">
+    <p v-if="helpText && !error" class="mt-1 text-sm text-ink-3">
       {{ helpText }}
     </p>
 
-    <p v-if="error" class="mt-1 text-sm text-red-600">
+    <p v-if="error" class="mt-1 text-sm text-bad">
       {{ error }}
     </p>
   </div>

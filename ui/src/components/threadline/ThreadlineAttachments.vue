@@ -1,106 +1,83 @@
 <template>
-  <BaseCard v-if="attachments.length" :header-muted="true">
-    <template #header>
-      <div class="flex items-center gap-2 text-ink">
-        <svg
-          class="w-5 h-5 -mt-px flex-none"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-          />
-        </svg>
-        <h3 class="text-base font-semibold leading-5">
-          {{ t('chats.files.title') }}
-          <span class="text-ink-4 font-normal">({{ attachments.length }})</span>
-        </h3>
-      </div>
+  <PanelCard
+    v-if="attachments.length"
+    :title="t('chats.files.title')"
+    :meta="String(attachments.length)"
+  >
+    <template #icon>
+      <svg
+        class="h-[15px] w-[15px] text-accent"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.9"
+        aria-hidden="true"
+      >
+        <path
+          d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"
+          stroke-linecap="round"
+        />
+      </svg>
     </template>
 
-    <div
-      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"
-    >
-      <div
+    <!-- One row per file: type badge, name, size. Images swap the badge for
+         their own thumbnail, which is the only preview the row can carry. -->
+    <div class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+      <button
         v-for="att in attachments"
         :key="att.id"
-        class="group relative rounded-lg border border-line bg-panel overflow-hidden hover:shadow-sm transition-shadow"
+        type="button"
+        class="flex items-center gap-[9px] rounded border border-line px-3 py-2.5 text-left transition-colors hover:border-ink-4"
+        :title="att.filename"
+        @click="onTileClick(att)"
       >
-        <!-- Preview / icon area (square) -->
-        <button
-          type="button"
-          class="block w-full aspect-square bg-app-sub overflow-hidden"
-          :title="att.filename"
-          @click="onTileClick(att)"
-        >
-          <img
-            v-if="isImage(att) && att.url"
-            :src="att.url"
-            :alt="att.filename"
-            loading="lazy"
-            class="w-full h-full object-cover transition-transform group-hover:scale-105"
-          />
-          <span
-            v-else
-            class="w-full h-full flex flex-col items-center justify-center gap-2"
-          >
-            <span
-              class="flex h-11 w-11 items-center justify-center rounded-lg"
-              :class="chipClass(att)"
-            >
-              <span class="text-xs font-bold tracking-wide uppercase">
-                {{ extLabel(att) }}
-              </span>
-            </span>
-          </span>
-        </button>
-
-        <!-- Footer: filename + download -->
-        <div
-          class="flex items-center gap-1 px-2 py-1.5 border-t border-line-soft"
-        >
-          <span
-            class="flex-1 min-w-0 truncate text-xs text-ink-2"
-            :title="att.filename"
-          >
-            {{ att.filename }}
-          </span>
-          <a
-            v-if="att.url"
-            :href="att.url"
-            :download="att.filename"
-            class="flex-none text-ink-4 hover:text-accent"
-            :title="t('chats.files.download')"
-            @click.stop
-          >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-          </a>
-        </div>
-
-        <!-- Size badge -->
+        <img
+          v-if="isImage(att) && att.url"
+          :src="att.url"
+          :alt="att.filename"
+          loading="lazy"
+          class="h-[30px] w-[30px] flex-none rounded-md object-cover"
+        />
         <span
-          v-if="att.file_size != null"
-          class="absolute top-1 left-1 rounded bg-black/50 px-1 py-0.5 text-[10px] leading-none text-accent-on"
+          v-else
+          class="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-md font-mono text-[9px] font-medium"
+          :class="chipClass(att)"
         >
-          {{ formatBytes(att.file_size) }}
+          {{ extLabel(att) }}
         </span>
-      </div>
+        <span class="flex min-w-0 flex-col gap-px">
+          <span class="truncate text-xs text-ink">{{ att.filename }}</span>
+          <span
+            v-if="att.file_size != null"
+            class="font-mono text-[10px] text-ink-4"
+          >
+            {{ formatBytes(att.file_size) }}
+          </span>
+        </span>
+        <a
+          v-if="att.url"
+          :href="att.url"
+          :download="att.filename"
+          class="ml-auto flex-none text-ink-4 transition-colors hover:text-accent"
+          :title="t('chats.files.download')"
+          @click.stop
+        >
+          <svg
+            class="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </a>
+      </button>
     </div>
 
     <!-- Preview modal (image or text) -->
@@ -204,13 +181,13 @@
         </button>
       </div>
     </Teleport>
-  </BaseCard>
+  </PanelCard>
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import BaseCard from '@/components/ui/BaseCard.vue'
+import PanelCard from '@/components/ui/PanelCard.vue'
 import { formatBytes } from '@/utils/formatting'
 
 const { t } = useI18n()

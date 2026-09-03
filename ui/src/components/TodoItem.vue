@@ -1,13 +1,9 @@
 <template>
   <div
     :class="[
-      'relative flex gap-3 sm:gap-3 p-4 sm:p-3 rounded-lg border transition-colors',
-      shouldAlignTop ? 'items-start' : 'items-center',
-      todo.is_completed
-        ? 'bg-app-sub border-line'
-        : 'bg-panel border-line hover:border-line',
-      isAnyEditing ? 'border-accent bg-accent-soft' : '',
-      todo.is_completed ? 'opacity-75' : ''
+      'group relative flex gap-[11px] border-b border-line-soft px-4 py-3 transition-colors last:border-b-0',
+      shouldAlignTop ? 'items-start' : 'items-start',
+      isAnyEditing ? 'bg-accent-soft' : ''
     ]"
   >
     <div
@@ -20,7 +16,7 @@
         :checked="todo.is_completed"
         @change="handleToggle"
         :disabled="loading || isAnyEditing"
-        class="h-4 w-4 text-accent focus:ring-accent border-line rounded"
+        class="h-4 w-4 rounded-sm border-line text-ok focus:ring-accent"
       />
     </div>
 
@@ -182,7 +178,7 @@
         <div
           v-else
           :class="[
-            'text-sm leading-6 select-text transition-colors',
+            'select-text text-[13px] leading-[1.5] transition-colors',
             todo.is_completed
               ? 'text-ink-3 line-through cursor-not-allowed'
               : readOnly
@@ -197,7 +193,7 @@
 
         <div
           v-if="showDetails"
-          class="mt-3 sm:mt-2 flex flex-wrap gap-3 sm:gap-2 text-xs text-ink-3"
+          class="mt-[5px] flex flex-wrap items-center gap-2 font-mono text-[10.5px] text-ink-4"
         >
           <!-- Priority Inline Edit -->
           <div
@@ -269,12 +265,12 @@
             @click.stop="readOnly ? null : handleStartPriorityEdit()"
             :title="readOnly || todo.is_completed ? '' : t('todos.edit')"
           >
-            {{ t(`todos.priority.${todo.priority}`) }}
+            {{ t(`todos.priorityShort.${todo.priority}`) }}
           </span>
           <span
             v-else
             :class="[
-              'text-ink-4 italic self-center',
+              'self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly
@@ -362,25 +358,12 @@
             @click.stop="readOnly ? null : handleStartOwnerEdit()"
             :title="readOnly || todo.is_completed ? '' : t('todos.edit')"
           >
-            <svg
-              class="w-3 h-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
             {{ todo.owner }}
           </span>
           <span
             v-else
             :class="[
-              'flex items-center gap-1 text-ink-4 italic self-center',
+              'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : 'cursor-pointer hover:opacity-80'
@@ -482,25 +465,15 @@
             @click.stop="readOnly ? null : handleStartDeadlineEdit()"
             :title="readOnly || todo.is_completed ? '' : t('todos.edit')"
           >
-            <svg
-              class="w-3 h-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
             {{ formatDeadline(todo.deadline) }}
+            <span v-if="deadlineStatusText" :class="deadlineToneClass">
+              · {{ deadlineStatusText }}
+            </span>
           </span>
           <span
             v-else
             :class="[
-              'flex items-center gap-1 text-ink-4 italic self-center',
+              'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly
@@ -634,7 +607,7 @@
           <span
             v-else
             :class="[
-              'flex items-center gap-1 text-ink-4 italic self-center',
+              'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly
@@ -675,19 +648,11 @@
     >
       <template v-if="!isAnyEditing">
         <!-- Deadline Status Badge -->
-        <span
-          v-if="deadlineStatus && !todo.is_completed"
-          :class="deadlineStatusClass"
-          class="px-2 py-0.5 text-xs font-medium rounded"
-        >
-          {{ deadlineStatusText }}
-        </span>
-
         <button
           v-if="!confirmingDelete && !isNew && !readOnly"
           @click="handleDeleteClick"
           :disabled="loading"
-          class="p-1 text-ink-4 hover:text-bad"
+          class="p-1 text-ink-4 opacity-0 transition-opacity hover:text-bad group-hover:opacity-100"
           :title="t('todos.delete')"
         >
           <svg
@@ -893,24 +858,25 @@ watch(
 
 const getPriorityClass = (priority) => {
   const classes = {
-    high: 'px-2 py-0.5 rounded bg-bad-soft text-bad',
-    medium: 'px-2 py-0.5 rounded bg-warn-soft text-warn',
-    low: 'px-2 py-0.5 rounded bg-accent-soft text-accent'
+    high: 'rounded-sm bg-bad-soft px-1.5 py-0.5 font-mono text-[10px] text-bad',
+    medium:
+      'rounded-sm bg-warn-soft px-1.5 py-0.5 font-mono text-[10px] text-warn',
+    low: 'rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[10px] text-ink-3'
   }
-  return classes[priority] || 'px-2 py-0.5 rounded bg-chip text-ink-2'
+  return (
+    classes[priority] ||
+    'rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[10px] text-ink-3'
+  )
 }
 
 const formatDeadline = (dateString) => {
   if (!dateString) return ''
   const currentLang = locale.value || preferencesStore.currentLanguage || 'en'
-  const dateFormat =
-    currentLang === 'zh-CN' ? 'yyyy年MM月dd日 HH:mm' : 'MMM dd, yyyy HH:mm'
-  return formatDateUtil(
-    dateString,
-    preferencesStore.currentTimezone,
-    dateFormat,
-    currentLang
-  )
+  const zone = preferencesStore.currentTimezone
+  const clock = formatDateUtil(dateString, zone, 'HH:mm', currentLang)
+  const day = formatDateUtil(dateString, zone, 'MM-dd', currentLang)
+  // Midnight means "that day", not "that minute", so the clock is noise.
+  return clock === '00:00' ? day : `${day} ${clock}`
 }
 
 // Deadline status computation
@@ -936,25 +902,24 @@ const deadlineStatus = computed(() => {
   return null
 })
 
-const deadlineStatusClass = computed(() => {
-  const classes = {
-    overdue: 'bg-bad-soft text-bad',
-    'due-today': 'bg-warn-soft text-warn',
-    'due-soon': 'bg-warn-soft text-warn'
-  }
-  return classes[deadlineStatus.value] || ''
+const deadlineDaysAway = computed(() => {
+  if (!props.todo.deadline || props.todo.is_completed) return null
+  const diffMs = new Date(props.todo.deadline) - new Date()
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
 })
 
 const deadlineStatusText = computed(() => {
-  if (deadlineStatus.value === 'overdue') {
-    return t('todos.overdue') || '已到期'
-  } else if (deadlineStatus.value === 'due-today') {
-    return t('todos.dueToday') || '今天到期'
-  } else if (deadlineStatus.value === 'due-soon') {
-    return t('todos.dueSoon') || '即将到期'
-  }
+  const days = deadlineDaysAway.value
+  if (days === null) return ''
+  if (days < 0) return t('todos.overdueBy', { days: Math.abs(days) })
+  if (days === 0) return t('todos.dueTodayShort')
+  if (days <= 3) return t('todos.dueIn', { days })
   return ''
 })
+
+const deadlineToneClass = computed(() =>
+  deadlineStatus.value === 'overdue' ? 'text-bad' : 'text-warn'
+)
 
 const handleToggle = () => {
   if (!editing.value) {
@@ -1288,7 +1253,7 @@ const isMounted = ref(false)
 
 watch(
   isAnyEditing,
-  (val, oldVal) => {
+  (val) => {
     if (val) {
       confirmingDelete.value = false
     }

@@ -5,23 +5,27 @@
       <div class="flex items-start gap-2">
         <div class="flex-1 min-w-0">
           <slot name="display">
-            <ul
+            <ol
               v-if="displayValue && displayValue.length > 0"
-              class="space-y-2"
+              class="flex flex-col gap-[11px]"
             >
               <li
                 v-for="(item, index) in displayValue"
                 :key="index"
-                class="flex items-start gap-2 text-sm text-ink-2"
+                class="flex items-start gap-[11px]"
               >
-                <span class="text-accent mt-1 flex-shrink-0">•</span>
+                <span
+                  class="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full border border-line font-mono text-[10px] text-ink-3"
+                >
+                  {{ index + 1 }}
+                </span>
                 <div
-                  class="flex-1 min-w-0 markdown-content prose prose-sm max-w-none"
+                  class="markdown-content prose prose-sm min-w-0 max-w-none flex-1 text-[13px] leading-[1.6] text-ink-2"
                 >
                   <div v-html="renderMarkdown(item)"></div>
                 </div>
               </li>
-            </ul>
+            </ol>
             <span v-else class="text-ink-4 italic">{{ placeholder }}</span>
           </slot>
         </div>

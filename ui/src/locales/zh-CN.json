@@ -474,7 +474,7 @@
       "openInNewWindow": "在新窗口打开"
     },
     "files": {
-      "title": "文件",
+      "title": "附件",
       "download": "下载",
       "previewError": "预览加载失败",
       "file": "文件"
@@ -511,7 +511,29 @@
     "stateCompleted": "已完成",
     "stateProcessing": "处理中",
     "statePending": "待处理",
-    "stateFailed": "失败"
+    "stateFailed": "失败",
+    "detail": {
+      "processingStatus": "处理状态",
+      "stageReceived": "收件",
+      "stageParsed": "解析",
+      "stageSummarised": "总结",
+      "stageDelivered": "投递",
+      "receivedAt": "接收",
+      "deliveries": "投递记录",
+      "mergedSources": "合并来源",
+      "reprocess": "重新处理",
+      "coreTopic": "核心主题",
+      "originalEmails": "对话记录",
+      "aiOutput": "AI 原始输出",
+      "todosMeta": "{total} 项 · 已完成 {done}",
+      "attachmentsTitle": "附件",
+      "deleteConfirm": "确定要删除这条对话吗？此操作不可撤销。",
+      "tabSummary": "摘要",
+      "tabTodos": "待办",
+      "tabFiles": "附件",
+      "tabRaw": "原文",
+      "tabInfo": "信息"
+    }
   },
   "metadata": {
     "sectionTitle": "基本信息",
@@ -1125,7 +1147,15 @@
       "todos": "待办事项",
       "keyProcessPlaceholder": "每行一个流程项",
       "keyProcessHint": "每行输入一个关键流程，支持多行"
-    }
+    },
+    "priorityShort": {
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    },
+    "overdueBy": "逾期 {days} 天",
+    "dueIn": "还剩 {days} 天",
+    "dueTodayShort": "今天"
   },
   "share": {
     "title": "分享",
@@ -1193,7 +1223,8 @@
     "shareCreatedAndCopied": "分享链接已创建并复制",
     "clickToView": "查看链接",
     "openLink": "打开链接",
-    "hideLink": "隐藏链接"
+    "hideLink": "隐藏链接",
+    "shareButton": "分享"
   },
   "expense": {
     "pageTitle": "发票管家",

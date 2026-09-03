@@ -464,7 +464,7 @@
       "openInNewWindow": "Open in new window"
     },
     "files": {
-      "title": "Files",
+      "title": "Attachments",
       "download": "Download",
       "previewError": "Failed to load preview",
       "file": "File"
@@ -501,7 +501,29 @@
     "stateCompleted": "Completed",
     "stateProcessing": "Processing",
     "statePending": "Pending",
-    "stateFailed": "Failed"
+    "stateFailed": "Failed",
+    "detail": {
+      "processingStatus": "Processing",
+      "stageReceived": "Received",
+      "stageParsed": "Parsed",
+      "stageSummarised": "Summarised",
+      "stageDelivered": "Delivered",
+      "receivedAt": "Received",
+      "deliveries": "Deliveries",
+      "mergedSources": "Merged from",
+      "reprocess": "Reprocess",
+      "coreTopic": "Summary",
+      "originalEmails": "Original emails",
+      "aiOutput": "Raw AI output",
+      "todosMeta": "{total} items · {done} done",
+      "attachmentsTitle": "Attachments",
+      "deleteConfirm": "Delete this conversation? This cannot be undone.",
+      "tabSummary": "Summary",
+      "tabTodos": "Todos",
+      "tabFiles": "Files",
+      "tabRaw": "Raw",
+      "tabInfo": "Info"
+    }
   },
   "metadata": {
     "sectionTitle": "Basic Information",
@@ -1116,7 +1138,15 @@
       "todos": "Todos",
       "keyProcessPlaceholder": "One process item per line",
       "keyProcessHint": "Enter one key process per line, supports multiple lines"
-    }
+    },
+    "priorityShort": {
+      "high": "Hi",
+      "medium": "Md",
+      "low": "Lo"
+    },
+    "overdueBy": "{days}d late",
+    "dueIn": "{days}d left",
+    "dueTodayShort": "Today"
   },
   "share": {
     "title": "Share",
@@ -1184,7 +1214,8 @@
     "shareCreatedAndCopied": "Share link created and copied",
     "clickToView": "View link",
     "openLink": "Open link",
-    "hideLink": "Hide link"
+    "hideLink": "Hide link",
+    "shareButton": "Share"
   },
   "expense": {
     "pageTitle": "Expense",

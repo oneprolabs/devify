@@ -559,16 +559,17 @@ const isSingleEmpty = computed(() => {
 })
 
 const chipClasses = computed(() => {
+  // The canvas draws every chip the same size: 10.5px mono on a 4px radius.
   const base =
-    'inline-flex items-center gap-1 px-2 h-6 rounded-md ' +
-    'text-xs font-medium select-none'
+    'inline-flex items-center gap-1 px-2 py-[3px] rounded-sm ' +
+    'font-mono text-[10.5px] select-none'
   const map = {
     blue: 'bg-accent-soft text-accent',
     green: 'bg-ok-soft text-ok',
     purple: 'bg-accent-soft text-accent',
     rose: 'bg-bad-soft text-bad',
     amber: 'bg-warn-soft text-warn',
-    gray: 'bg-chip text-ink'
+    gray: 'bg-chip text-ink-2'
   }
   return `${base} ${map[props.variant] || map.gray}`
 })

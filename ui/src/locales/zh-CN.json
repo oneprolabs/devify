@@ -61,7 +61,9 @@
     },
     "undo": "撤销",
     "collapse": "收起",
-    "expand": "展开"
+    "expand": "展开",
+    "today": "今天",
+    "yesterday": "昨天"
   },
   "virtualEmail": {
     "yourAddress": "您的AI智能邮箱"
@@ -480,7 +482,36 @@
     "errorLoading": "加载对话详情失败",
     "errorLoadingDesc": "无法加载对话详情",
     "handledByExpense": "发票 {count} 张",
-    "handledByExpenseHint": "发票管家从这封邮件里识别出了 {count} 张发票"
+    "handledByExpenseHint": "发票管家从这封邮件里识别出了 {count} 张发票",
+    "mergedBadge": "合并 {count}",
+    "attachmentsShort": "{count} 附件",
+    "rangeAll": "全部时间",
+    "range7": "近 7 天",
+    "range30": "近 30 天",
+    "range90": "近 90 天",
+    "statusAll": "状态：全部",
+    "statusFilter": "状态：{name}",
+    "searchHint": "搜索标题、内容、标签…支持多关键词",
+    "showingRange": "显示第 {from}–{to} 条，共 {total} 条",
+    "prevPage": "上一页",
+    "nextPage": "下一页",
+    "statTotal": "总消息",
+    "statThisWeek": "本周",
+    "statPending": "待处理",
+    "statCompleted": "已完成",
+    "mailboxLabel": "你的 AI 智能邮箱 · 转发即整理",
+    "colStatus": "状态",
+    "colTitle": "标题 / 摘要",
+    "colTags": "标签",
+    "colSource": "来源",
+    "colRelay": "投递",
+    "colTime": "时间",
+    "filterAll": "全部",
+    "countUnit": "{count} 条",
+    "stateCompleted": "已完成",
+    "stateProcessing": "处理中",
+    "statePending": "待处理",
+    "stateFailed": "失败"
   },
   "metadata": {
     "sectionTitle": "基本信息",

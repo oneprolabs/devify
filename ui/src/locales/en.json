@@ -61,7 +61,9 @@
     },
     "undo": "Undo",
     "collapse": "Collapse",
-    "expand": "Expand"
+    "expand": "Expand",
+    "today": "Today",
+    "yesterday": "Yesterday"
   },
   "virtualEmail": {
     "yourAddress": "Your AI Email"
@@ -470,7 +472,36 @@
     "errorLoading": "Error loading threadline",
     "errorLoadingDesc": "Failed to load conversation details",
     "handledByExpense": "{count} invoice | {count} invoices",
-    "handledByExpenseHint": "Expense read {count} invoices out of this email"
+    "handledByExpenseHint": "Expense read {count} invoices out of this email",
+    "mergedBadge": "Merged {count}",
+    "attachmentsShort": "{count} files",
+    "rangeAll": "All time",
+    "range7": "Last 7 days",
+    "range30": "Last 30 days",
+    "range90": "Last 90 days",
+    "statusAll": "Status: all",
+    "statusFilter": "Status: {name}",
+    "searchHint": "Search titles, content, tags… several keywords work",
+    "showingRange": "Showing {from}–{to} of {total}",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "statTotal": "Total",
+    "statThisWeek": "This week",
+    "statPending": "Pending",
+    "statCompleted": "Completed",
+    "mailboxLabel": "Your AI mailbox · forward and it files",
+    "colStatus": "Status",
+    "colTitle": "Title / summary",
+    "colTags": "Tags",
+    "colSource": "From",
+    "colRelay": "Delivery",
+    "colTime": "Time",
+    "filterAll": "All",
+    "countUnit": "{count}",
+    "stateCompleted": "Completed",
+    "stateProcessing": "Processing",
+    "statePending": "Pending",
+    "stateFailed": "Failed"
   },
   "metadata": {
     "sectionTitle": "Basic Information",

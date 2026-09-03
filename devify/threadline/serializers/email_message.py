@@ -623,6 +623,7 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
     )
     is_canonical = serializers.SerializerMethodField()
     has_merged_children = serializers.SerializerMethodField()
+    merged_children_count = serializers.SerializerMethodField()
     merged_into_uuid = serializers.SerializerMethodField()
     merged_into_subject = serializers.SerializerMethodField()
     merged_into_summary_title = serializers.SerializerMethodField()
@@ -654,6 +655,7 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
             "status_display",
             "is_canonical",
             "has_merged_children",
+            "merged_children_count",
             "merged_into",
             "merged_into_uuid",
             "merged_into_subject",
@@ -782,6 +784,19 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
             return bool(cache["merged_children"])
 
         return obj.merged_children.exists()
+
+    def get_merged_children_count(self, obj):
+        """
+        How many rows were folded in, which is what the list badge says.
+        """
+        if obj.merged_into_id is not None:
+            return 0
+
+        cache = getattr(obj, "_prefetched_objects_cache", None)
+        if cache and "merged_children" in cache:
+            return len(cache["merged_children"])
+
+        return obj.merged_children.count()
 
     def get_merged_into_uuid(self, obj):
         """

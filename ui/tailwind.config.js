@@ -91,13 +91,16 @@ export default {
         display: ['Space Grotesk', 'Noto Sans SC', 'system-ui', 'sans-serif'],
         mono: ['IBM Plex Mono', 'ui-monospace', 'Menlo', 'monospace']
       },
+      // The canvas works in three radius tiers — 3/4 on badges, 7/8 on
+      // controls, 9/10/11 on cards — so the named steps carry those rather
+      // than the 16/20/24 the old rounded look was built on.
       borderRadius: {
-        DEFAULT: '16px',
-        sm: '8px',
-        md: '12px',
-        lg: '16px',
-        xl: '20px',
-        '2xl': '24px'
+        DEFAULT: '8px',
+        sm: '4px',
+        md: '7px',
+        lg: '10px',
+        xl: '12px',
+        '2xl': '16px'
       },
       boxShadow: {
         soft: '0 2px 8px rgba(0, 0, 0, 0.08)',

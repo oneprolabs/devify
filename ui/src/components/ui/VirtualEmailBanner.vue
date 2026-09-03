@@ -1,82 +1,54 @@
 <template>
-  <div
+  <button
     v-if="virtualEmail"
-    class="bg-accent-soft border border-accent rounded-lg p-2.5 sm:p-3 mb-4"
+    type="button"
+    class="flex items-center gap-[11px] rounded border border-line border-l-[3px] border-l-accent bg-panel-sub px-3.5 py-[9px] text-left transition-colors hover:bg-chip"
+    :title="t('settings.copyEmail')"
+    @click="copyEmail"
   >
-    <div class="flex items-center justify-between gap-2 sm:gap-3">
-      <div class="flex items-center gap-2 min-w-0 flex-1">
-        <div class="flex-shrink-0">
-          <svg
-            class="h-4 w-4 sm:h-5 sm:w-5 text-accent"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-            />
-          </svg>
-        </div>
+    <svg
+      class="h-4 w-4 flex-none text-accent"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.9"
+      aria-hidden="true"
+    >
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+      <path d="M3 7l9 6 9-6" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
 
-        <div class="min-w-0 flex-1">
-          <div
-            class="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5"
-          >
-            <span class="text-xs font-medium text-accent shrink-0">
-              {{ label }}:
-            </span>
-            <code
-              class="text-xs sm:text-sm font-mono font-medium text-accent truncate block"
-              :title="virtualEmail"
-            >
-              {{ virtualEmail }}
-            </code>
-          </div>
-        </div>
-      </div>
+    <span class="flex min-w-0 flex-col gap-px">
+      <span class="text-[10px] text-ink-3">{{ label }}</span>
+      <span class="truncate font-mono text-[12.5px] text-ink">
+        {{ virtualEmail }}
+      </span>
+    </span>
 
-      <button
-        @click="copyEmail"
-        class="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent bg-accent-soft hover:bg-accent px-2 py-1 rounded transition-colors"
-        :title="t('settings.copyEmail')"
-      >
-        <svg
-          v-if="!copied"
-          class="h-3.5 w-3.5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-          />
-        </svg>
-        <svg
-          v-else
-          class="h-3.5 w-3.5 text-ok"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-        <span class="hidden sm:inline">
-          {{ copied ? t('common.copied') : t('common.copy') }}
-        </span>
-      </button>
-    </div>
-  </div>
+    <svg
+      v-if="!copied"
+      class="ml-auto h-3.5 w-3.5 flex-none text-ink-3"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 012-2h10" stroke-linecap="round" />
+    </svg>
+    <svg
+      v-else
+      class="ml-auto h-3.5 w-3.5 flex-none text-ok"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
 </template>
 
 <script setup>

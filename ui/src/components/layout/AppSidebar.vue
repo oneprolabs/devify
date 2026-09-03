@@ -31,13 +31,19 @@
       <router-link to="/chats" class="nav-item" :class="itemClass(chatsActive)">
         <IconChats class="h-[17px] w-[17px] flex-none" />
         {{ t('chats.title') }}
+        <span
+          v-if="pendingChats"
+          class="ml-auto rounded-full bg-warn-soft px-[7px] py-0.5 font-mono text-[10.5px] text-warn"
+        >
+          {{ pendingChats }}
+        </span>
       </router-link>
     </nav>
 
     <div class="flex flex-col px-3 pt-4">
       <router-link
         to="/apps"
-        class="flex h-8 items-center gap-2.5 rounded-lg px-3 text-ink transition-colors hover:bg-chip"
+        class="flex h-8 items-center gap-2.5 rounded px-3 text-ink-3 transition-colors hover:bg-chip hover:text-ink"
       >
         <IconApps class="h-[15px] w-[15px] flex-none" />
         <span class="font-display text-xs font-semibold tracking-wide">
@@ -55,7 +61,7 @@
           v-for="app in appLinks"
           :key="app.to"
           :to="app.to"
-          class="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors"
+          class="flex h-9 items-center gap-2.5 rounded px-2.5 text-[13px] transition-colors"
           :class="
             isActive(app.match)
               ? 'bg-accent-soft text-accent'
@@ -64,6 +70,12 @@
         >
           <component :is="app.icon" class="h-4 w-4 flex-none" />
           {{ app.label }}
+          <span
+            v-if="app.count"
+            class="ml-auto font-mono text-[10.5px] text-ink-4"
+          >
+            {{ app.count }}
+          </span>
         </router-link>
       </div>
     </div>
@@ -143,6 +155,8 @@ const {
   availableCredits,
   totalCredits,
   creditsPercentage,
+  pendingChats,
+  openTodos,
   ensureLoaded
 } = useAccountSummary()
 
@@ -159,7 +173,13 @@ const appLinks = computed(() => [
     label: t('apps.expenseName'),
     icon: IconExpense
   },
-  { to: '/todos', match: '/todos', label: t('todos.title'), icon: IconTodos }
+  {
+    to: '/todos',
+    match: '/todos',
+    label: t('todos.title'),
+    icon: IconTodos,
+    count: openTodos.value
+  }
 ])
 
 const isActive = (path) => route.path.startsWith(path)
@@ -175,6 +195,6 @@ onMounted(ensureLoaded)
 
 <style scoped>
 .nav-item {
-  @apply flex h-[38px] items-center gap-2.5 rounded-lg px-3 text-[13.5px] transition-colors;
+  @apply flex h-[38px] items-center gap-2.5 rounded px-3 text-[13.5px] transition-colors;
 }
 </style>

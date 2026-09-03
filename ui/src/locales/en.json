@@ -80,7 +80,18 @@
     "relayDesc": "Subscribe to workflow completions and deliver them to Feishu, Jira, or GitHub Issues.",
     "todoDesc": "Collect follow-up tasks and keep post-analysis actions organized in one place.",
     "expenseName": "Expense",
-    "expenseDesc": "Collect invoices from email, classify them and package them for reimbursement."
+    "expenseDesc": "Collect invoices from email, classify them and package them for reimbursement.",
+    "centerHeadline": "Open each module and connect the tools you use",
+    "appCount": "{count} apps",
+    "statChannels": "Channels",
+    "statDeliveriesThisWeek": "This week",
+    "statFailed": "To retry",
+    "statIncomplete": "Open",
+    "statOverdue": "Overdue",
+    "statCompletionRate": "Done",
+    "statInvoices": "Invoices",
+    "statUnfiled": "Unfiled",
+    "statOpenGroups": "Open groups"
   },
   "relay": {
     "pageTitle": "Relay",
@@ -1146,7 +1157,15 @@
     },
     "overdueBy": "{days}d late",
     "dueIn": "{days}d left",
-    "dueTodayShort": "Today"
+    "dueTodayShort": "Today",
+    "searchPlaceholder": "Search todos…",
+    "sourceChat": "From",
+    "groupCount": "{count}",
+    "openCount": "{count} open",
+    "groupByLabel": "Group: ",
+    "openByPriority": "Open · by priority",
+    "overdueGroup": "Overdue",
+    "priorityColumn": "Pri"
   },
   "share": {
     "title": "Share",

@@ -21,3 +21,23 @@ class ThreadlineConfig(AppConfig):
         import threadline.tasks.email_workflow  # noqa: F401
         import threadline.tasks.notifications  # noqa: F401
         import threadline.tasks.scheduler  # noqa: F401
+
+        # Todos are a threadline feature, but the app centre lists them
+        # beside Relay and Expense, so they register the same way.
+        from django.utils.translation import gettext_lazy as _
+
+        from core.app_registry import APP_REGISTRY
+        from threadline.stats import todo_stats
+
+        APP_REGISTRY.register(
+            key="todos",
+            name=_("Todos"),
+            name_zh=_("待办事项"),
+            path="/todos",
+            description=_(
+                "Collect the follow-ups a conversation produced in one "
+                "place."
+            ),
+            order=30,
+            stats=todo_stats,
+        )

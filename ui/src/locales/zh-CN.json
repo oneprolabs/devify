@@ -80,7 +80,18 @@
     "relayDesc": "订阅工作流完成事件，并投递到飞书、Jira 或 GitHub Issue。",
     "todoDesc": "收集后续待办，把分析后的动作统一整理在一个地方。",
     "expenseName": "发票管家",
-    "expenseDesc": "自动识别邮件中的发票，分类归档并按报销组打包下载。"
+    "expenseDesc": "自动识别邮件中的发票，分类归档并按报销组打包下载。",
+    "centerHeadline": "打开各个应用模块并连接外部工具",
+    "appCount": "{count} 个应用",
+    "statChannels": "启用渠道",
+    "statDeliveriesThisWeek": "本周投递",
+    "statFailed": "失败待重试",
+    "statIncomplete": "未完成",
+    "statOverdue": "已逾期",
+    "statCompletionRate": "完成率",
+    "statInvoices": "已识别发票",
+    "statUnfiled": "待归集",
+    "statOpenGroups": "进行中报销组"
   },
   "relay": {
     "pageTitle": "智能投递",
@@ -1155,7 +1166,15 @@
     },
     "overdueBy": "逾期 {days} 天",
     "dueIn": "还剩 {days} 天",
-    "dueTodayShort": "今天"
+    "dueTodayShort": "今天",
+    "searchPlaceholder": "搜索待办事项…",
+    "sourceChat": "来源对话",
+    "groupCount": "{count} 项",
+    "openCount": "{count} 项未完成",
+    "groupByLabel": "分组：",
+    "openByPriority": "未完成 · 按优先级",
+    "overdueGroup": "已逾期",
+    "priorityColumn": "优先"
   },
   "share": {
     "title": "分享",

@@ -1,82 +1,142 @@
 <template>
-  <AppLayout>
-    <div class="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <div>
-        <h1 class="text-2xl font-semibold text-ink">
-          {{ t('apps.centerTitle') }}
-        </h1>
-        <p class="mt-1 text-sm text-ink-3">
-          {{ t('apps.centerSubtitle') }}
-        </p>
-      </div>
+  <AppLayout :padded="false">
+    <PageHeader
+      :title="t('apps.centerTitle')"
+      :count="t('apps.appCount', { count: apps.length })"
+      gutter="lg"
+    />
 
-      <BaseLoading v-if="loading" />
-
-      <div v-else class="grid gap-4 md:grid-cols-2">
-        <button
-          v-for="app in appList"
-          :key="app.key"
-          type="button"
-          class="rounded-2xl border border-line bg-panel p-5 text-left shadow-sm transition hover:border-accent hover:shadow-md"
-          @click="openApp(app)"
-        >
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <div class="text-lg font-semibold text-ink">
-                {{ app.name_zh || app.name }}
-              </div>
-              <div class="mt-1 text-sm text-ink-3">
-                {{ app.name }}
-              </div>
-            </div>
-            <span
-              class="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent"
-            >
-              {{ t('apps.openApp') }}
-            </span>
-          </div>
-          <p class="mt-3 text-sm leading-6 text-ink-2">
-            {{ app.description }}
+    <div class="min-h-0 flex-1 overflow-y-auto p-4 md:p-7">
+      <div class="flex flex-col gap-3.5 md:gap-[22px]">
+        <div class="flex max-w-[720px] flex-col gap-[7px]">
+          <h1
+            class="font-display hidden text-[22px] font-semibold tracking-tight text-ink md:block"
+          >
+            {{ t('apps.centerHeadline') }}
+          </h1>
+          <p class="text-[12.5px] leading-[1.7] text-ink-3 md:text-[13px]">
+            {{ t('apps.panelDescription') }}
           </p>
-        </button>
+        </div>
+
+        <BaseLoading v-if="loading" />
+
+        <div
+          v-else
+          class="grid max-w-[1000px] grid-cols-1 gap-3.5 md:grid-cols-2 md:gap-4"
+        >
+          <AppCard
+            v-for="app in apps"
+            :key="app.key"
+            :name="appName(app)"
+            :description="appDescription(app)"
+            :icon="APP_ICONS[app.key] || IconApps"
+            :stats="appStats(app)"
+            :tags="appTags(app)"
+            @open="openApp(app)"
+          />
+        </div>
       </div>
     </div>
   </AppLayout>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import AppCard from '@/components/apps/AppCard.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
+import {
+  IconApps,
+  IconExpense,
+  IconRelay,
+  IconTodos
+} from '@/components/layout/navIcons'
 import { relayApi } from '@/api/relay'
 import { extractErrorMessage } from '@/utils/api'
 import { useToast } from '@/composables/useToast'
+import { usePreferencesStore } from '@/store/preferences'
 
 const { t } = useI18n()
 const router = useRouter()
 const { showError } = useToast()
+const preferences = usePreferencesStore()
+
+const APP_ICONS = {
+  relay: IconRelay,
+  expense: IconExpense,
+  todos: IconTodos
+}
+
+// What each app connects to. Static because it describes the integration,
+// not this account's data.
+const APP_TAGS = {
+  relay: ['relay.targetFeishu', 'relay.targetJira', 'relay.targetGitHub']
+}
+
+// Which numbers each card shows, in the order the canvas puts them, and
+// which of them is worth colouring.
+const APP_STATS = {
+  relay: [
+    { key: 'channels', label: 'apps.statChannels' },
+    { key: 'deliveries_this_week', label: 'apps.statDeliveriesThisWeek' },
+    { key: 'failed', label: 'apps.statFailed', tone: 'text-bad' }
+  ],
+  expense: [
+    { key: 'invoices', label: 'apps.statInvoices' },
+    { key: 'unfiled', label: 'apps.statUnfiled', tone: 'text-warn' },
+    { key: 'open_groups', label: 'apps.statOpenGroups' }
+  ],
+  todos: [
+    { key: 'incomplete', label: 'apps.statIncomplete', tone: 'text-warn' },
+    { key: 'overdue', label: 'apps.statOverdue', tone: 'text-bad' },
+    {
+      key: 'completion_rate',
+      label: 'apps.statCompletionRate',
+      suffix: '%'
+    }
+  ]
+}
 
 const loading = ref(false)
-const appList = ref([
-  {
-    key: 'relay',
-    name: 'Relay',
-    name_zh: '智能投递',
-    path: '/apps/relay',
-    description: t('apps.relayDesc')
-  }
-])
+const apps = ref([])
+
+const isChinese = computed(() => preferences.currentLanguage === 'zh-CN')
+
+const appName = (app) => (isChinese.value && app.name_zh) || app.name
+
+// The registry ships an English description; the locale files carry the
+// wording the rest of the UI uses, so prefer those when they know the app.
+const DESCRIPTION_KEYS = {
+  relay: 'apps.relayDesc',
+  expense: 'apps.expenseDesc',
+  todos: 'apps.todoDesc'
+}
+const appDescription = (app) =>
+  DESCRIPTION_KEYS[app.key] ? t(DESCRIPTION_KEYS[app.key]) : app.description
+
+const appTags = (app) => (APP_TAGS[app.key] || []).map((key) => t(key))
+
+const appStats = (app) =>
+  (APP_STATS[app.key] || [])
+    .filter((stat) => app.stats?.[stat.key] !== undefined)
+    .map((stat) => ({
+      key: stat.key,
+      value: `${app.stats[stat.key]}${stat.suffix || ''}`,
+      label: t(stat.label),
+      // A zero is not a problem, so it stays in the default ink.
+      tone: app.stats[stat.key] ? stat.tone || '' : ''
+    }))
 
 async function loadApps() {
   loading.value = true
   try {
     const data = await relayApi.getApps()
-    if (Array.isArray(data) && data.length > 0) {
-      appList.value = data
-    }
+    apps.value = Array.isArray(data) ? data : []
   } catch (error) {
     showError(extractErrorMessage(error, t('common.error')))
   } finally {
@@ -85,9 +145,7 @@ async function loadApps() {
 }
 
 function openApp(app) {
-  if (app?.path) {
-    router.push(app.path)
-  }
+  if (app?.path) router.push(app.path)
 }
 
 onMounted(loadApps)

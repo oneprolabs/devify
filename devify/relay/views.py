@@ -82,7 +82,7 @@ class AppsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return _response(APP_REGISTRY.list_apps())
+        return _response(APP_REGISTRY.list_apps(request.user))
 
 
 class RelaySubscriptionListAPIView(APIView):

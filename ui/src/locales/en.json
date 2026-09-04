@@ -985,7 +985,7 @@
       "periodStart": "Period Start",
       "periodEnd": "Period End",
       "remaining": "Remaining",
-      "daysRemaining": "{days} days left",
+      "daysRemaining": "Time left",
       "daysRemainingValue": "{days} days",
       "autoRenew": "Auto Renew",
       "creditsUsage": "Credits Usage",
@@ -993,7 +993,12 @@
       "noSubscription": "No Active Subscription",
       "upgradePrompt": "Upgrade to a paid plan to get more features and credits",
       "freePlanTitle": "Free Plan",
-      "freePlanDesc": "Free Plan - Upgrade for more features"
+      "freePlanDesc": "Free Plan - Upgrade for more features",
+      "creditsSplit": "{used} used ·",
+      "autoRenewOn": "auto-renew on",
+      "autoRenewOff": "ends at period end",
+      "days": "{days} days",
+      "currentPeriod": "Current period"
     },
     "plans": {
       "title": "Subscription Plans",
@@ -1023,7 +1028,8 @@
       "retentionNotSet": "Not Set",
       "retentionPermanent": "Permanent",
       "retentionYears": "{years}-year retention",
-      "retentionDays": "{days}-day retention"
+      "retentionDays": "{days}-day retention",
+      "freePlan": "Free"
     },
     "downgrade": {
       "title": "Downgrade Subscription",
@@ -1053,7 +1059,9 @@
       "totalConsumed": "Total Consumed",
       "available": "Available",
       "totalCredits": "Total Credits",
-      "creditsConsumed": "Credits Consumed"
+      "creditsConsumed": "Credits Consumed",
+      "days": "{days}d",
+      "rangeSummary": "Last {days} days · {credits} credits"
     },
     "creditUsage": {
       "title": "Credit Usage by Chats",
@@ -1061,7 +1069,9 @@
       "last30Days": "Last 30 days",
       "last90Days": "Last 90 days",
       "noData": "No credit usage found in this period",
-      "noSubject": "No Subject"
+      "noSubject": "No Subject",
+      "chat": "Conversation",
+      "credits": "Credits"
     },
     "creditsInfo": {
       "title": "About Credits",

@@ -1,259 +1,91 @@
 <template>
+  <!-- One bar: which plan, the period it runs for, and how much of its
+       credits is left — the three things a subscription page is asked. -->
   <div
-    class="bg-panel rounded-lg shadow-sm border border-line p-4 h-full flex flex-col"
+    v-if="credits || subscription"
+    class="flex flex-col gap-4 rounded-[11px] border border-line bg-panel px-5 py-[18px] xl:flex-row xl:items-center xl:gap-0"
   >
-    <h3 class="text-base font-semibold text-ink mb-3">
-      {{ t('billing.currentSubscription.title') }}
-    </h3>
-
-    <div v-if="subscription || credits" class="flex-1 flex flex-col space-y-3">
-      <div>
-        <div class="flex items-center justify-between mb-1.5">
-          <h4 class="text-lg font-semibold text-ink">
-            {{
-              subscription
-                ? subscription.plan_name
-                : t('billing.currentSubscription.freePlanTitle')
-            }}
-          </h4>
-          <span
-            v-if="subscription"
-            :class="[
-              'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-              getStatusIconClass(subscription.status)
-            ]"
-          >
-            <svg
-              v-if="subscription.status === 'active'"
-              class="w-3 h-3"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <svg
-              v-else-if="subscription.status === 'canceled'"
-              class="w-2 h-2"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <circle cx="10" cy="10" r="10" />
-            </svg>
-            <svg
-              v-else-if="subscription.status === 'past_due'"
-              class="w-3 h-3"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <svg v-else class="w-2 h-2" fill="currentColor" viewBox="0 0 20 20">
-              <circle cx="10" cy="10" r="10" />
-            </svg>
-            <span>{{ getStatusText(subscription.status) }}</span>
-          </span>
-          <span
-            v-else
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-ok-soft text-ok"
-          >
-            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fill-rule="evenodd"
-                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>{{ t('billing.status.active') }}</span>
-          </span>
-        </div>
-
-        <p v-if="subscription" class="text-xs text-ink-2">
-          {{ t('billing.currentSubscription.provider') }}:
-          {{ subscription.provider_name }}
-        </p>
-        <p v-else class="text-xs text-ink-2">
-          {{ t('billing.currentSubscription.freePlanDesc') }}
-        </p>
-      </div>
-
-      <div class="space-y-1.5 flex-grow">
-        <div class="flex justify-between items-center">
-          <span class="text-xs text-ink-2">
-            {{ t('billing.currentSubscription.periodStart') }}
-          </span>
-          <span class="text-xs font-medium text-ink">
-            {{
-              subscription ? formatDate(subscription.current_period_start) : '-'
-            }}
-          </span>
-        </div>
-
-        <div class="flex justify-between items-center">
-          <span class="text-xs text-ink-2">
-            {{ t('billing.currentSubscription.periodEnd') }}
-          </span>
-          <span class="text-xs font-medium text-ink">
-            {{
-              subscription ? formatDate(subscription.current_period_end) : '-'
-            }}
-          </span>
-        </div>
-
-        <div class="flex justify-between items-center">
-          <span class="text-xs text-ink-2">
-            {{ t('billing.currentSubscription.remaining') }}
-          </span>
-          <span class="text-xs font-medium text-accent">
-            {{
-              subscription && daysRemaining !== null
-                ? t('billing.currentSubscription.daysRemainingValue', {
-                    days: daysRemaining
-                  })
-                : '-'
-            }}
-          </span>
-        </div>
-
-        <div class="flex justify-between items-center">
-          <span class="text-xs text-ink-2">
-            {{ t('billing.currentSubscription.autoRenew') }}
-          </span>
-          <span
-            :class="[
-              'text-xs font-medium',
-              subscription && subscription.auto_renew ? 'text-ok' : 'text-ink-2'
-            ]"
-          >
-            {{
-              subscription
-                ? subscription.auto_renew
-                  ? t('common.yes')
-                  : t('common.no')
-                : '-'
-            }}
-          </span>
-        </div>
-      </div>
-
-      <div v-if="credits" class="pt-3">
-        <div
-          class="bg-gradient-to-r from-accent-soft to-accent-soft rounded-lg p-2.5"
+    <div
+      class="flex flex-col gap-[7px] xl:flex-none xl:border-r xl:border-line-soft xl:pr-7"
+    >
+      <div class="flex items-center gap-[9px]">
+        <span class="font-display text-[19px] font-semibold text-ink">
+          {{ planName }}
+        </span>
+        <span
+          v-if="subscription?.status"
+          class="rounded-sm px-[7px] py-0.5 font-mono text-[10.5px]"
+          :class="getStatusIconClass(subscription.status)"
         >
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-medium text-ink-2">
-              {{ t('billing.currentSubscription.creditsUsage') }}
-            </span>
-            <span class="text-sm font-semibold text-accent">
-              {{ credits.available_credits }} / {{ credits.total_credits }}
-            </span>
-          </div>
+          {{ getStatusText(subscription.status) }}
+        </span>
+      </div>
+      <span v-if="providerLine" class="font-mono text-[11px] text-ink-4">
+        {{ providerLine }}
+      </span>
+    </div>
 
-          <div class="w-full bg-chip rounded-full h-1.5 mb-2">
-            <div
-              class="bg-accent h-1.5 rounded-full transition-all"
-              :style="{ width: `${creditsPercentage}%` }"
-            />
-          </div>
+    <div
+      class="flex flex-col gap-[5px] xl:flex-none xl:border-r xl:border-line-soft xl:px-7"
+    >
+      <span class="text-[11px] text-ink-3">
+        {{ t('billing.currentSubscription.currentPeriod') }}
+      </span>
+      <span class="font-mono text-[12.5px] text-ink">
+        {{ formatDate(periodStart) }} → {{ formatDate(periodEnd) }}
+      </span>
+    </div>
 
-          <div class="p-2 bg-panel rounded-lg border border-line text-xs">
-            <div class="flex items-center gap-1.5 p-1 mb-2">
-              <svg
-                class="w-3.5 h-3.5 text-accent"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <p class="font-medium text-ink">
-                {{ t('billing.creditsInfo.title') }}
-              </p>
-            </div>
+    <div
+      v-if="daysRemaining !== null"
+      class="flex flex-col gap-[5px] xl:flex-none xl:border-r xl:border-line-soft xl:px-7"
+    >
+      <span class="text-[11px] text-ink-3">
+        {{ t('billing.currentSubscription.daysRemaining') }}
+      </span>
+      <span class="font-mono text-[12.5px] text-ink">
+        {{ t('billing.currentSubscription.days', { days: daysRemaining }) }}
+      </span>
+    </div>
 
-            <div class="space-y-1.5">
-              <p class="text-ink-2 px-1">
-                {{ t('billing.creditsInfo.description') }}
-              </p>
-              <div class="border-t border-line-soft pt-2 space-y-1.5">
-                <div class="flex justify-between">
-                  <span class="text-ink-2">{{
-                    t('billing.creditsInfo.emailLimit')
-                  }}</span>
-                  <span class="font-medium text-ink"
-                    >{{
-                      planMetadata?.max_emails_per_period ||
-                      planMetadata?.credits_per_period ||
-                      '-'
-                    }}
-                    {{ t('billing.creditsInfo.emails') }}</span
-                  >
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-ink-2">{{
-                    t('billing.creditsInfo.attachmentLimit')
-                  }}</span>
-                  <span class="font-medium text-ink"
-                    >{{ planMetadata?.max_attachment_count || '-' }}
-                    {{ t('billing.creditsInfo.attachments') }}</span
-                  >
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-ink-2">{{
-                    t('billing.creditsInfo.storageQuota')
-                  }}</span>
-                  <span class="font-medium text-ink">{{
-                    formatStorage(planMetadata?.storage_quota_mb)
-                  }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-ink-2">{{
-                    t('billing.creditsInfo.retentionPeriod')
-                  }}</span>
-                  <span class="font-medium text-ink">{{
-                    formatRetention(planMetadata?.retention_days)
-                  }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div class="flex min-w-0 flex-1 flex-col gap-2 xl:px-7">
+      <div class="flex items-baseline justify-between gap-3">
+        <span class="text-[11px] text-ink-3">
+          {{ t('billing.currentSubscription.creditsUsage') }}
+        </span>
+        <span class="font-mono text-[12.5px] text-ink-3">
+          {{
+            t('billing.currentSubscription.creditsSplit', { used: usedCredits })
+          }}
+          <span class="font-medium text-ink">{{
+            credits?.available_credits ?? 0
+          }}</span>
+          / {{ credits?.total_credits ?? 0 }}
+        </span>
+      </div>
+      <div class="h-1.5 rounded-md bg-chip">
+        <div
+          class="h-1.5 rounded-md bg-accent transition-all"
+          :style="{ width: `${usedPercentage}%` }"
+        ></div>
       </div>
     </div>
 
-    <div v-else class="text-center py-4">
-      <svg
-        class="mx-auto h-10 w-10 text-ink-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-      <p class="mt-2 text-sm text-ink-3">
-        {{ t('common.loading') }}
-      </p>
+    <div class="flex flex-shrink-0 items-center gap-[9px] xl:pl-2">
+      <slot name="actions" />
     </div>
+  </div>
+
+  <div
+    v-else
+    class="rounded-[11px] border border-line bg-panel px-5 py-8 text-center text-sm text-ink-3"
+  >
+    {{ t('common.loading') }}
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { format, differenceInDays } from 'date-fns'
 import { usePreferencesStore } from '@/store/preferences'
@@ -270,21 +102,6 @@ const props = defineProps({
     type: Object,
     default: null
   }
-})
-
-const planMetadata = computed(() => {
-  return (
-    props.subscription?.plan_metadata || props.credits?.plan_metadata || null
-  )
-})
-
-const creditsPercentage = computed(() => {
-  if (!props.credits || !props.credits.total_credits) {
-    return 0
-  }
-  return Math.round(
-    (props.credits.available_credits / props.credits.total_credits) * 100
-  )
 })
 
 function getStatusIconClass(status) {
@@ -320,40 +137,57 @@ function formatDate(dateString) {
   }
 }
 
+// A free account has no subscription record but still has a credit period,
+// which is the window this bar is really describing.
+const periodStart = computed(
+  () =>
+    props.subscription?.current_period_start ||
+    props.credits?.period_start ||
+    null
+)
+const periodEnd = computed(
+  () =>
+    props.subscription?.current_period_end || props.credits?.period_end || null
+)
+
+const planName = computed(
+  () =>
+    props.subscription?.plan_name ||
+    props.credits?.plan_name ||
+    t('billing.plans.freePlan')
+)
+
 const daysRemaining = computed(() => {
-  if (!props.subscription || !props.subscription.current_period_end) {
+  if (!periodEnd.value) {
     return null
   }
 
-  const endDate = new Date(props.subscription.current_period_end)
+  const endDate = new Date(periodEnd.value)
   const today = new Date()
   const days = differenceInDays(endDate, today)
 
   return days > 0 ? days : 0
 })
 
-function formatStorage(storageMb) {
-  if (!storageMb) return '-'
-  if (storageMb >= 1024) {
-    return `${(storageMb / 1024).toFixed(0)} GB`
-  }
-  return `${storageMb} MB`
-}
+const usedCredits = computed(() => {
+  const total = props.credits?.total_credits ?? 0
+  const available = props.credits?.available_credits ?? 0
+  return Math.max(0, total - available)
+})
 
-function formatRetention(retentionDays) {
-  if (retentionDays === null || retentionDays === undefined) {
-    return t('billing.creditsInfo.retentionNotSet')
-  }
-  if (retentionDays === -1) {
-    return t('billing.creditsInfo.retentionPermanent')
-  }
-  if (retentionDays >= 365) {
-    const years = Math.floor(retentionDays / 365)
-    if (years === 1) {
-      return preferencesStore.currentLanguage === 'zh-CN' ? '1年' : '1 year'
-    }
-    return t('billing.creditsInfo.retentionYears', { years })
-  }
-  return t('billing.creditsInfo.retentionDays', { days: retentionDays })
-}
+// The bar fills with what has been spent, which is the number that grows.
+const usedPercentage = computed(() => {
+  const total = props.credits?.total_credits
+  if (!total) return 0
+  return Math.round((usedCredits.value / total) * 100)
+})
+
+const providerLine = computed(() => {
+  const provider = props.subscription?.provider
+  if (!provider) return ''
+  const renews = props.subscription?.cancel_at_period_end
+    ? t('billing.currentSubscription.autoRenewOff')
+    : t('billing.currentSubscription.autoRenewOn')
+  return `${provider} · ${renews}`
+})
 </script>

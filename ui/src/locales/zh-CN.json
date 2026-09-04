@@ -994,7 +994,7 @@
       "periodStart": "周期开始",
       "periodEnd": "周期结束",
       "remaining": "剩余时间",
-      "daysRemaining": "剩余{days}天",
+      "daysRemaining": "剩余时间",
       "daysRemainingValue": "{days}天",
       "autoRenew": "自动续费",
       "creditsUsage": "积分使用情况",
@@ -1002,7 +1002,12 @@
       "noSubscription": "暂无订阅",
       "upgradePrompt": "升级到付费计划以获得更多功能和积分",
       "freePlanTitle": "免费计划",
-      "freePlanDesc": "免费计划 - 升级以获得更多功能"
+      "freePlanDesc": "免费计划 - 升级以获得更多功能",
+      "creditsSplit": "已用 {used} · 剩余",
+      "autoRenewOn": "自动续费开启",
+      "autoRenewOff": "到期后不再续费",
+      "days": "{days} 天",
+      "currentPeriod": "当前周期"
     },
     "plans": {
       "title": "订阅计划",
@@ -1032,7 +1037,8 @@
       "retentionNotSet": "未设置",
       "retentionPermanent": "永久保留",
       "retentionYears": "{years}年保留",
-      "retentionDays": "{days}天保留"
+      "retentionDays": "{days}天保留",
+      "freePlan": "免费版"
     },
     "downgrade": {
       "title": "降级订阅",
@@ -1062,7 +1068,9 @@
       "totalConsumed": "总消耗",
       "available": "剩余可用",
       "totalCredits": "总额度",
-      "creditsConsumed": "消耗积分"
+      "creditsConsumed": "消耗积分",
+      "days": "{days} 天",
+      "rangeSummary": "最近 {days} 天 · 共 {credits} 积分"
     },
     "creditUsage": {
       "title": "对话积分消耗明细",
@@ -1070,7 +1078,9 @@
       "last30Days": "最近 30 天",
       "last90Days": "最近 90 天",
       "noData": "该时间段内暂无积分消耗记录",
-      "noSubject": "无主题"
+      "noSubject": "无主题",
+      "chat": "来源对话",
+      "credits": "消耗"
     },
     "creditsInfo": {
       "title": "关于积分",

@@ -1,49 +1,35 @@
 <template>
-  <div class="bg-panel rounded-lg shadow-sm border border-line p-4">
-    <div class="mb-4">
-      <h3 class="text-base font-semibold text-ink mb-3">
+  <div
+    class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-5 py-4"
+  >
+    <div class="flex flex-wrap items-baseline gap-3">
+      <span class="text-[13px] font-semibold text-ink">
         {{ t('billing.usageStats.title') }}
-      </h3>
+      </span>
+      <span class="font-mono text-[11px] text-ink-4">
+        {{ rangeSummary }}
+      </span>
 
-      <div
-        class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
-      >
-        <div class="flex gap-2">
-          <button
-            v-for="period in periods"
-            :key="period.value"
-            @click="selectPeriod(period.value)"
-            :class="[
-              'px-4 py-2 text-sm font-medium rounded-md transition-colors',
-              selectedPeriod === period.value
-                ? 'bg-accent text-accent-on'
-                : 'bg-chip text-ink-2 hover:bg-chip'
-            ]"
-          >
-            {{ period.label }}
-          </button>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <input
-            v-model="customStartDate"
-            type="date"
-            class="px-3 py-2 text-sm border border-line rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-            @change="handleCustomDateChange"
-          />
-          <span class="text-ink-3">-</span>
-          <input
-            v-model="customEndDate"
-            type="date"
-            class="px-3 py-2 text-sm border border-line rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-            @change="handleCustomDateChange"
-          />
-        </div>
+      <div class="ml-auto flex gap-[5px]">
+        <button
+          v-for="period in periods"
+          :key="period.value"
+          type="button"
+          class="rounded-[5px] px-[9px] py-[3px] font-mono text-[11px] transition-colors"
+          :class="
+            selectedPeriod === period.value
+              ? 'bg-accent text-accent-on'
+              : 'border border-line text-ink-3 hover:border-ink-4'
+          "
+          @click="selectPeriod(period.value)"
+        >
+          {{ period.label }}
+        </button>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-      <div class="bg-app-sub rounded-lg p-3">
+    <div class="grid grid-cols-3 gap-3">
+      <div class="rounded border border-line bg-panel-sub p-3">
         <div class="text-xs text-ink-3 mb-0.5">
           {{ t('billing.usageStats.totalConsumed') }}
         </div>
@@ -52,7 +38,7 @@
         </div>
       </div>
 
-      <div class="bg-app-sub rounded-lg p-3">
+      <div class="rounded border border-line bg-panel-sub p-3">
         <div class="text-xs text-ink-3 mb-0.5">
           {{ t('billing.usageStats.available') }}
         </div>
@@ -61,7 +47,7 @@
         </div>
       </div>
 
-      <div class="bg-app-sub rounded-lg p-3">
+      <div class="rounded border border-line bg-panel-sub p-3">
         <div class="text-xs text-ink-3 mb-0.5">
           {{ t('billing.usageStats.totalCredits') }}
         </div>
@@ -88,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Line } from 'vue-chartjs'
 import {
@@ -123,11 +109,20 @@ const selectedPeriod = ref(30)
 const customStartDate = ref('')
 const customEndDate = ref('')
 
-const periods = [
-  { value: 1, label: '1d' },
-  { value: 7, label: '7d' },
-  { value: 30, label: '30d' }
-]
+const periods = computed(() => [
+  { value: 7, label: t('billing.usageStats.days', { days: 7 }) },
+  { value: 30, label: t('billing.usageStats.days', { days: 30 }) },
+  { value: 90, label: t('billing.usageStats.days', { days: 90 }) }
+])
+
+// "Last 30 days · 138 credits" — the window and what it cost, together.
+const rangeSummary = computed(() => {
+  const total = stats.value?.total_consumed ?? 0
+  return t('billing.usageStats.rangeSummary', {
+    days: selectedPeriod.value,
+    credits: total
+  })
+})
 
 // Read the accent from the theme so the line follows light and dark
 // rather than staying the blue it was hard-coded to.
@@ -223,17 +218,6 @@ function selectPeriod(days) {
   startDate.setDate(startDate.getDate() - days)
 
   fetchUsageStats(startDate.toISOString(), endDate.toISOString())
-}
-
-function handleCustomDateChange() {
-  if (customStartDate.value && customEndDate.value) {
-    selectedPeriod.value = null
-
-    const startDate = new Date(customStartDate.value)
-    const endDate = new Date(customEndDate.value)
-
-    fetchUsageStats(startDate.toISOString(), endDate.toISOString())
-  }
 }
 
 onMounted(() => {

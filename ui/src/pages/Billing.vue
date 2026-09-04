@@ -1,131 +1,92 @@
 <template>
-  <AppLayout>
-    <div class="space-y-4">
-      <div>
-        <h2 class="text-lg font-bold leading-7 text-ink sm:text-xl">
-          {{ t('billing.title') }}
-        </h2>
-        <p class="mt-0.5 text-xs text-ink-3">
-          {{ t('billing.description') }}
+  <AppLayout :padded="false">
+    <PageHeader :title="t('billing.title')" gutter="md">
+      <span class="hidden text-xs text-ink-3 lg:block">
+        {{ t('billing.description') }}
+      </span>
+    </PageHeader>
+
+    <div class="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+      <div class="flex flex-col gap-4">
+        <p
+          v-if="successMessage"
+          class="rounded-lg border border-ok bg-ok-soft px-4 py-2.5 text-sm text-ok"
+        >
+          {{ successMessage }}
         </p>
-      </div>
-
-      <div
-        v-if="successMessage"
-        class="mb-6 bg-ok-soft border border-ok rounded-lg p-4 flex items-center justify-between"
-      >
-        <div class="flex items-center">
-          <svg
-            class="w-5 h-5 text-ok mr-3"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span class="text-ok">{{ successMessage }}</span>
-        </div>
-        <button @click="successMessage = ''" class="text-ok hover:text-ok">
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <div
-        v-if="errorMessage"
-        class="mb-6 bg-bad-soft border border-bad rounded-lg p-4 flex items-center justify-between"
-      >
-        <div class="flex items-center">
-          <svg
-            class="w-5 h-5 text-bad mr-3"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span class="text-bad">{{ errorMessage }}</span>
-        </div>
-        <button @click="errorMessage = ''" class="text-bad hover:text-bad">
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <div
-        v-if="billingStatus && billingStatus.recharge_enabled === false"
-        class="rounded-lg border border-warn bg-warn-soft p-4 text-sm text-warn"
-      >
-        <p class="font-medium">
-          {{ t('billing.plans.stripeNotConfigured') }}
+        <p
+          v-if="errorMessage"
+          class="rounded-lg border border-bad bg-bad-soft px-4 py-2.5 text-sm text-bad"
+        >
+          {{ errorMessage }}
         </p>
-        <p class="mt-1">
-          {{ t('billing.status.stripeMissingHint') }}
-        </p>
-      </div>
-
-      <div v-if="loading" class="flex items-center justify-center py-12">
         <div
-          class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent"
-        ></div>
-        <p class="ml-3 text-sm text-ink-3">{{ t('common.loading') }}</p>
-      </div>
-
-      <div v-else class="space-y-4">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="lg:col-span-1">
-            <CurrentSubscription
-              :subscription="currentSubscription"
-              :credits="credits"
-            />
-          </div>
-
-          <div class="lg:col-span-2">
-            <SubscriptionPlans
-              :current-subscription="currentSubscription"
-              :billing-status="billingStatus"
-              @subscription-updated="handleSubscriptionUpdated"
-              @operation-success="handleOperationSuccess"
-              @operation-error="handleOperationError"
-            />
-          </div>
+          v-if="billingStatus && billingStatus.recharge_enabled === false"
+          class="rounded-lg border border-warn bg-warn-soft p-4 text-sm text-warn"
+        >
+          <p class="font-medium">
+            {{ t('billing.plans.stripeNotConfigured') }}
+          </p>
+          <p class="mt-1">{{ t('billing.status.stripeMissingHint') }}</p>
         </div>
 
-        <UsageChart />
+        <div
+          v-if="loading"
+          class="flex items-center justify-center gap-3 py-12"
+        >
+          <span
+            class="h-8 w-8 animate-spin rounded-full border-b-2 border-accent"
+          ></span>
+          <p class="text-sm text-ink-3">{{ t('common.loading') }}</p>
+        </div>
 
-        <CreditUsageList />
+        <template v-else>
+          <CurrentSubscription
+            :subscription="currentSubscription"
+            :credits="credits"
+          >
+            <template #actions>
+              <button
+                v-if="plansRef?.canResume?.()"
+                type="button"
+                class="font-display flex h-[34px] items-center rounded border border-line px-3.5 text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+                @click="plansRef.openResumeDialog()"
+              >
+                {{ t('billing.resume.title') }}
+              </button>
+              <button
+                v-else-if="plansRef?.canCancel?.()"
+                type="button"
+                class="font-display flex h-[34px] items-center rounded border border-line px-3.5 text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+                @click="plansRef.openCancelDialog()"
+              >
+                {{ t('billing.cancel.title') }}
+              </button>
+            </template>
+          </CurrentSubscription>
+
+          <div class="flex flex-col gap-4 xl:flex-row">
+            <div class="flex min-w-0 flex-1 flex-col gap-4">
+              <UsageChart />
+              <CreditUsageList />
+            </div>
+
+            <div class="flex flex-col gap-4 xl:w-96 xl:flex-none">
+              <SubscriptionPlans
+                ref="plansRef"
+                :current-subscription="currentSubscription"
+                :billing-status="billingStatus"
+                @subscription-updated="handleSubscriptionUpdated"
+                @operation-success="handleOperationSuccess"
+                @operation-error="handleOperationError"
+              />
+              <CreditsInfoCard
+                :subscription="currentSubscription"
+                :credits="credits"
+              />
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </AppLayout>
@@ -136,6 +97,8 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import CreditsInfoCard from '@/components/billing/CreditsInfoCard.vue'
 import CurrentSubscription from '@/components/billing/CurrentSubscription.vue'
 import SubscriptionPlans from '@/components/billing/SubscriptionPlans.vue'
 import UsageChart from '@/components/billing/UsageChart.vue'
@@ -143,6 +106,9 @@ import CreditUsageList from '@/components/billing/CreditUsageList.vue'
 import billingApi from '@/api/billing'
 
 const { t } = useI18n()
+
+// The summary bar's cancel and resume reach the dialogs the plan list owns.
+const plansRef = ref(null)
 const route = useRoute()
 const router = useRouter()
 

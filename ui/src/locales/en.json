@@ -63,7 +63,8 @@
     "collapse": "Collapse",
     "expand": "Expand",
     "today": "Today",
-    "yesterday": "Yesterday"
+    "yesterday": "Yesterday",
+    "typeToConfirm": "Type “{phrase}” to confirm:"
   },
   "virtualEmail": {
     "yourAddress": "Your AI Email"
@@ -280,7 +281,10 @@
     "newChannel": "New channel",
     "channelEnabled": "Enabled",
     "pickChannel": "Pick a channel on the left to configure it.",
-    "changeType": "Change type"
+    "changeType": "Change type",
+    "deleteChannel": "Delete channel",
+    "deleteChannelTitle": "Delete channel “{name}”",
+    "deleteChannelWarning": "Its delivery history goes with it. Anything already created in the external system is untouched. This cannot be undone."
   },
   "management": {
     "adminConsole": "Admin Console"

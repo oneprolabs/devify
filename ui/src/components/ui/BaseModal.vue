@@ -14,7 +14,7 @@
     >
       <div class="flex min-h-full items-center justify-center p-4">
         <div
-          class="fixed inset-0 bg-ink-3 bg-opacity-75 transition-opacity"
+          class="fixed inset-0 bg-ink/40 transition-opacity"
           aria-hidden="true"
         />
 
@@ -28,7 +28,7 @@
         >
           <div
             v-if="show"
-            class="relative transform overflow-hidden rounded-lg bg-panel text-left shadow-xl transition-all w-full max-w-lg max-h-[90vh] sm:max-h-[90vh] flex flex-col my-4 sm:my-8"
+            class="relative my-4 flex max-h-[90vh] w-full max-w-lg transform flex-col overflow-hidden rounded-xl border border-line bg-panel text-left shadow-soft-lg transition-all sm:my-8"
             @click.stop
           >
             <!-- Header -->
@@ -69,7 +69,7 @@
             <!-- Footer (fixed at bottom) -->
             <div
               v-if="$slots.footer"
-              class="bg-app-sub px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 flex-shrink-0 border-t border-line"
+              class="flex-shrink-0 border-t border-line-soft bg-panel-sub px-5 py-3"
             >
               <slot name="footer" />
             </div>

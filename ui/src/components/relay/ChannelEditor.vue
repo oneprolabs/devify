@@ -643,8 +643,20 @@
     {{ editorSuccess }}
   </p>
 
-  <div class="flex justify-end pt-2">
-    <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+  <div class="flex items-center justify-end gap-2 pt-2">
+    <!-- Deleting a channel is the one irreversible thing on this page, so it
+         sits apart from save and asks for the name back. -->
+    <button
+      v-if="editorForm.id"
+      type="button"
+      class="mr-auto text-[12.5px] text-bad transition-opacity hover:underline disabled:opacity-50"
+      :disabled="saving"
+      @click="confirmingDelete = true"
+    >
+      {{ t('relay.deleteChannel') }}
+    </button>
+
+    <div class="flex flex-col gap-2 sm:flex-row">
       <BaseButton
         variant="secondary"
         class="w-full sm:w-auto"
@@ -675,13 +687,26 @@
   <p v-if="!editorCanSave" class="text-xs text-warn">
     {{ t('relay.saveAfterTestHint') }}
   </p>
+
+  <ConfirmDialog
+    :show="confirmingDelete"
+    :title="t('relay.deleteChannelTitle', { name: editorForm.name })"
+    :message="t('relay.deleteChannelWarning')"
+    :confirm-text="t('relay.deleteChannel')"
+    :confirm-phrase="editorForm.name"
+    variant="danger"
+    @close="confirmingDelete = false"
+    @confirm="handleDelete"
+  />
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import GitHubIssueConfig from '@/components/relay/GitHubIssueConfig.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { TYPE_INITIALS, TYPE_LABEL_KEYS } from './channelTypes'
 
 const props = defineProps({
@@ -690,6 +715,13 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
+
+const confirmingDelete = ref(false)
+
+const handleDelete = async () => {
+  confirmingDelete.value = false
+  await props.editor.deleteSubscription(props.editor.editorForm.id)
+}
 
 const {
   saving,

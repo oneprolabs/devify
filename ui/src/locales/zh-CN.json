@@ -63,7 +63,8 @@
     "collapse": "收起",
     "expand": "展开",
     "today": "今天",
-    "yesterday": "昨天"
+    "yesterday": "昨天",
+    "typeToConfirm": "请输入「{phrase}」以确认："
   },
   "virtualEmail": {
     "yourAddress": "您的AI智能邮箱"
@@ -280,7 +281,10 @@
     "newChannel": "新建渠道",
     "channelEnabled": "已启用",
     "pickChannel": "从左侧选择一个渠道进行配置。",
-    "changeType": "更换类型"
+    "changeType": "更换类型",
+    "deleteChannel": "删除渠道",
+    "deleteChannelTitle": "删除渠道「{name}」",
+    "deleteChannelWarning": "删除后这个渠道的投递记录会一并清除，已经建到外部系统的记录不受影响。此操作不可撤销。"
   },
   "management": {
     "adminConsole": "管理控制台"

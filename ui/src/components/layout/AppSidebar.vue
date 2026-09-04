@@ -3,23 +3,11 @@
     class="flex w-[232px] flex-shrink-0 flex-col border-r border-line bg-app-sub py-[18px]"
   >
     <router-link to="/chats" class="flex items-center gap-2.5 px-5 pb-5">
-      <span
-        class="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-accent text-accent-on"
-      >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.3"
-        >
-          <path
-            d="M21 12a8 8 0 01-11.3 7.3L4 21l1.7-5.7A8 8 0 1121 12z"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </span>
+      <img
+        src="/android-chrome-192x192.png"
+        alt=""
+        class="h-[26px] w-[26px] flex-none rounded-[7px]"
+      />
       <span
         class="font-display text-base font-semibold tracking-tight text-ink"
       >

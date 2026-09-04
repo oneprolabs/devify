@@ -3,11 +3,11 @@
     class="flex h-[60px] flex-shrink-0 items-center justify-between border-b border-line bg-app px-4 md:px-10"
   >
     <div class="flex min-w-0 items-center gap-2.5">
-      <span
-        class="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-[7px] bg-accent text-accent-on"
-      >
-        <IconChats class="h-[15px] w-[15px]" />
-      </span>
+      <img
+        src="/android-chrome-192x192.png"
+        alt=""
+        class="h-[26px] w-[26px] flex-none rounded-[7px]"
+      />
       <span class="font-display text-base font-semibold text-ink">
         {{ t('common.appName') }}
       </span>
@@ -62,7 +62,6 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher.vue'
-import { IconChats } from './navIcons'
 
 const { t } = useI18n()
 const copied = ref(false)

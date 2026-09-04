@@ -11,11 +11,11 @@
         class="flex h-[52px] flex-shrink-0 items-center justify-between border-b border-line px-4 md:hidden"
       >
         <router-link to="/chats" class="flex items-center gap-2">
-          <span
-            class="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] bg-accent text-accent-on"
-          >
-            <IconChats class="h-[15px] w-[15px]" />
-          </span>
+          <img
+            src="/android-chrome-192x192.png"
+            alt=""
+            class="h-[26px] w-[26px] flex-none rounded-[7px]"
+          />
           <span class="font-display text-[15px] font-semibold text-ink">
             {{ t('common.appName') }}
           </span>
@@ -47,7 +47,6 @@ import { useI18n } from 'vue-i18n'
 import AppSidebar from './AppSidebar.vue'
 import AppMobileNav from './AppMobileNav.vue'
 import UserMenu from './UserMenu.vue'
-import { IconChats } from './navIcons'
 
 defineProps({
   // The canvas puts every page in a full-bleed column with its own 56px

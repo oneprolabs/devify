@@ -575,7 +575,11 @@
       "tabFiles": "Files",
       "tabRaw": "Raw",
       "tabInfo": "Info"
-    }
+    },
+    "emptyTitle": "Forward your first email",
+    "emptyBody": "Send it to the address below and it comes back as a summary and todos.\nText inside images is read too.",
+    "emptyConnectImap": "Or connect your own IMAP mailbox",
+    "noResultsBody": "Try another keyword, or widen the status and time range."
   },
   "metadata": {
     "sectionTitle": "Basic Information",

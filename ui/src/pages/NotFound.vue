@@ -1,96 +1,47 @@
 <template>
-  <AppLayout>
-    <div
-      class="not-found-wrapper min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-app-sub via-accent-soft to-accent-soft -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-12"
-    >
-      <div class="max-w-2xl mx-auto px-6 py-12 text-center relative">
-        <!-- Floating particles animation -->
-        <div class="absolute inset-0 overflow-hidden pointer-events-none">
-          <div
-            v-for="(pos, i) in particlePositions"
-            :key="i"
-            class="particle absolute rounded-full"
-            :style="pos"
-          ></div>
+  <AppLayout :padded="false">
+    <!-- The canvas keeps the existing words and drops the gradients and
+         floating particles: a 404 should be quiet, not decorated. -->
+    <div class="flex min-h-0 flex-1 items-center justify-center p-6">
+      <div
+        class="flex w-full max-w-[560px] flex-col items-center gap-3.5 rounded-[11px] border border-line bg-panel px-6 py-14 text-center"
+      >
+        <span
+          class="font-display text-[56px] font-bold leading-none tracking-[-0.03em] text-line"
+        >
+          {{ t('notFound.title') }}
+        </span>
+
+        <div class="flex max-w-[400px] flex-col items-center gap-2">
+          <p class="text-[14.5px] font-semibold text-ink">
+            {{ t('notFound.quote') }}
+          </p>
+          <p class="text-[12.5px] leading-[1.75] text-ink-3">
+            {{ t('notFound.description') }}
+          </p>
         </div>
 
-        <!-- Main content -->
-        <div class="relative z-10">
-          <!-- 404 Number with style -->
-          <div class="mb-8">
-            <h1
-              class="text-8xl md:text-9xl font-light text-transparent bg-clip-text bg-gradient-to-r from-accent via-accent to-pink-600 tracking-tight"
-            >
-              {{ t('notFound.title') }}
-            </h1>
-          </div>
+        <span class="h-px w-[52px] bg-line"></span>
 
-          <!-- Philosophical quote -->
-          <div class="mb-8 space-y-6">
-            <div
-              class="text-2xl md:text-3xl font-light text-ink-2 italic leading-relaxed"
-            >
-              <p class="mb-4">"{{ t('notFound.quote') }}"</p>
-            </div>
+        <p class="text-[11.5px] italic leading-[1.7] text-ink-4">
+          {{ t('notFound.philosophy') }}
+        </p>
 
-            <div class="text-lg md:text-xl text-ink-3 font-light">
-              <p>
-                {{ t('notFound.description') }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Decorative line -->
-          <div class="flex items-center justify-center gap-4 mb-8">
-            <div
-              class="h-px w-16 bg-gradient-to-r from-transparent via-accent to-transparent"
-            ></div>
-            <div class="w-2 h-2 rounded-full bg-accent"></div>
-            <div
-              class="h-px w-16 bg-gradient-to-r from-transparent via-accent to-transparent"
-            ></div>
-          </div>
-
-          <!-- Navigation buttons -->
-          <div
-            class="flex flex-col sm:flex-row gap-4 justify-center items-center"
+        <div class="flex gap-[9px] pt-1">
+          <button
+            type="button"
+            class="font-display flex h-[34px] items-center rounded px-[15px] text-[12.5px] font-medium text-accent-on transition-opacity bg-accent hover:opacity-90"
+            @click="goHome"
           >
-            <BaseButton
-              @click="goHome"
-              variant="primary"
-              class="group relative px-8 py-3 bg-gradient-to-r from-accent to-accent text-accent-on rounded-full font-medium transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 transform"
-            >
-              {{ t('notFound.returnHome') }}
-              <svg
-                class="inline-block ml-2 w-5 h-5 transform transition-transform group-hover:translate-x-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
-              </svg>
-            </BaseButton>
-
-            <BaseButton
-              @click="goBack"
-              variant="outline"
-              class="px-8 py-3 border-2 border-line text-ink-2 rounded-full font-medium transition-all duration-300 hover:bg-chip hover:border-line"
-            >
-              {{ t('notFound.goBack') }}
-            </BaseButton>
-          </div>
-
-          <!-- Additional philosophical note -->
-          <div class="mt-12 pt-8 border-t border-line">
-            <p class="text-sm text-ink-4 italic">
-              {{ t('notFound.philosophy') }}
-            </p>
-          </div>
+            {{ t('notFound.returnHome') }}
+          </button>
+          <button
+            type="button"
+            class="font-display flex h-[34px] items-center rounded border border-line px-[15px] text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+            @click="goBack"
+          >
+            {{ t('notFound.goBack') }}
+          </button>
         </div>
       </div>
     </div>
@@ -98,97 +49,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
 
 const router = useRouter()
 const { t } = useI18n()
 
 const goHome = () => {
-  router.push('/dashboard')
+  router.push('/chats')
 }
 
 const goBack = () => {
   if (window.history.length > 1) {
     router.back()
   } else {
-    router.push('/dashboard')
+    router.push('/chats')
   }
 }
-
-const particlePositions = ref([])
-
-onMounted(() => {
-  const positions = []
-  for (let i = 0; i < 12; i++) {
-    const size = 20 + Math.random() * 40
-    const left = Math.random() * 100
-    const top = Math.random() * 100
-    const delay = Math.random() * 5
-    const duration = 10 + Math.random() * 10
-    const color1 = Math.floor(99 + Math.random() * 100)
-    const color2 = Math.floor(102 + Math.random() * 100)
-    const color3 = Math.floor(141 + Math.random() * 100)
-
-    positions.push({
-      width: `${size}px`,
-      height: `${size}px`,
-      left: `${left}%`,
-      top: `${top}%`,
-      background: `radial-gradient(circle,
-        rgba(${color1}, ${color2}, ${color3}, 0.3),
-        rgba(${color1}, ${color2}, ${color3}, 0)
-      )`,
-      '--delay': `${delay}s`,
-      '--duration': `${duration}s`
-    })
-  }
-  particlePositions.value = positions
-})
 </script>
-
-<style scoped>
-.not-found-wrapper {
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, sans-serif;
-}
-
-/* Smooth fade in */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.not-found-wrapper > div {
-  animation: fadeIn 0.8s ease-out;
-}
-
-.particle {
-  animation: float var(--duration, 15s) ease-in-out var(--delay, 0s) infinite
-    alternate;
-}
-
-@keyframes float {
-  0% {
-    transform: translateY(0) translateX(0) rotate(0deg);
-    opacity: 0.2;
-  }
-  50% {
-    opacity: 0.4;
-  }
-  100% {
-    transform: translateY(-30px) translateX(20px) rotate(180deg);
-    opacity: 0.1;
-  }
-}
-</style>

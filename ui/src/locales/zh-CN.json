@@ -585,7 +585,11 @@
       "tabFiles": "附件",
       "tabRaw": "原文",
       "tabInfo": "信息"
-    }
+    },
+    "emptyTitle": "把第一封邮件转发过来",
+    "emptyBody": "转发到下面这个地址，AI 会整理成纪要与待办。\n也支持图片里的文字。",
+    "emptyConnectImap": "或者连接自己的 IMAP 邮箱",
+    "noResultsBody": "换一个关键词，或把状态与时间范围放宽一些。"
   },
   "metadata": {
     "sectionTitle": "基本信息",

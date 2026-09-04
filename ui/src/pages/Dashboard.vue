@@ -107,38 +107,72 @@
     </div>
 
     <div class="min-h-0 flex-1 overflow-y-auto">
-      <div v-if="loading" class="flex flex-col items-center gap-2 py-16">
-        <span
-          class="h-8 w-8 animate-spin rounded-full border-b-2 border-accent"
-        ></span>
-        <p class="text-sm text-ink-3">{{ t('common.loading') }}</p>
-      </div>
+      <SkeletonRows v-if="loading" :count="6" />
 
-      <div
-        v-else-if="!results.length"
-        class="flex flex-col items-center gap-2 py-16 text-center"
+      <!-- Nothing yet and nothing found are different problems: one needs the
+           mailbox address, the other needs the filters loosened. -->
+      <EmptyState
+        v-else-if="!results.length && hasFilters"
+        :title="t('chats.noResults')"
+        :description="t('chats.noResultsBody')"
       >
-        <svg
-          class="h-12 w-12 text-ink-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-          aria-hidden="true"
+        <template #icon>
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-4.5-4.5" stroke-linecap="round" />
+          </svg>
+        </template>
+        <button
+          type="button"
+          class="font-display text-xs text-accent hover:underline"
+          @click="clearFilters"
         >
-          <path
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-        <h3 class="text-sm font-medium text-ink">
-          {{ hasFilters ? t('chats.noResults') : t('chats.noChats') }}
-        </h3>
-        <p v-if="!hasFilters" class="text-sm text-ink-3">
-          {{ t('chats.noChatsDesc') }}
-        </p>
-      </div>
+          {{ t('todos.filters.clearAll') }}
+        </button>
+      </EmptyState>
+
+      <EmptyState
+        v-else-if="!results.length"
+        :title="t('chats.emptyTitle')"
+        :description="t('chats.emptyBody')"
+      >
+        <template #icon>
+          <svg
+            class="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            aria-hidden="true"
+          >
+            <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+            <path
+              d="M3 7l9 6 9-6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </template>
+
+        <VirtualEmailBanner
+          v-if="userStore.userInfo?.virtual_email"
+          :virtual-email="userStore.userInfo.virtual_email"
+          :label="t('chats.mailboxLabel')"
+        />
+        <router-link
+          to="/settings"
+          class="font-display text-xs text-accent hover:underline"
+        >
+          {{ t('chats.emptyConnectImap') }}
+        </router-link>
+      </EmptyState>
 
       <template v-else>
         <ChatRow
@@ -277,6 +311,9 @@ import ChatStatStrip from '@/components/chats/ChatStatStrip.vue'
 import ChatRow from '@/components/chats/ChatRow.vue'
 import ChatCard from '@/components/chats/ChatCard.vue'
 import ChatPager from '@/components/chats/ChatPager.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
+import VirtualEmailBanner from '@/components/ui/VirtualEmailBanner.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import RetryDialog from '@/components/RetryDialog.vue'
 import { useToast } from '@/composables/useToast'
@@ -416,6 +453,12 @@ const loadStats = async () => {
 const refreshData = () => {
   loadData()
   loadStats()
+}
+
+const clearFilters = () => {
+  searchQuery.value = ''
+  statusFilter.value = ''
+  rangeFilter.value = ''
 }
 
 const goToPage = (page) => {

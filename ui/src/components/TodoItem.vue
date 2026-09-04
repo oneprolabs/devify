@@ -193,7 +193,7 @@
 
         <div
           v-if="showDetails"
-          class="mt-[5px] flex flex-wrap items-center gap-2 font-mono text-[10.5px] text-ink-4"
+          class="mt-[5px] flex flex-wrap items-center gap-2 font-mono text-[10.5px] text-ink-4 [&>*:not(:first-child)]:before:mr-2 [&>*:not(:first-child)]:before:content-['·']"
         >
           <!-- Priority Inline Edit -->
           <div
@@ -270,7 +270,7 @@
           <span
             v-else-if="!readOnly"
             :class="[
-              'self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
+              'hidden self-center italic text-ink-4 group-hover:inline',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly
@@ -363,7 +363,7 @@
           <span
             v-else-if="!readOnly"
             :class="[
-              'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
+              'hidden items-center gap-1 self-center italic text-ink-4 group-hover:flex',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : 'cursor-pointer hover:opacity-80'
@@ -473,7 +473,7 @@
           <span
             v-else-if="!readOnly"
             :class="[
-              'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
+              'hidden items-center gap-1 self-center italic text-ink-4 group-hover:flex',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly
@@ -607,7 +607,7 @@
           <span
             v-else-if="!readOnly"
             :class="[
-              'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
+              'hidden items-center gap-1 self-center italic text-ink-4 group-hover:flex',
               todo.is_completed
                 ? 'cursor-not-allowed opacity-60'
                 : readOnly

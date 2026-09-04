@@ -588,7 +588,10 @@
       "tabTodos": "待办",
       "tabFiles": "附件",
       "tabRaw": "原文",
-      "tabInfo": "信息"
+      "tabInfo": "信息",
+      "position": "第 {index} 条 / {total}",
+      "previous": "上一条",
+      "next": "下一条"
     },
     "emptyTitle": "把第一封邮件转发过来",
     "emptyBody": "转发到下面这个地址，AI 会整理成纪要与待办。\n也支持图片里的文字。",

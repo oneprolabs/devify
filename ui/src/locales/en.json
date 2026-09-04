@@ -578,7 +578,10 @@
       "tabTodos": "Todos",
       "tabFiles": "Files",
       "tabRaw": "Raw",
-      "tabInfo": "Info"
+      "tabInfo": "Info",
+      "position": "{index} of {total}",
+      "previous": "Previous",
+      "next": "Next"
     },
     "emptyTitle": "Forward your first email",
     "emptyBody": "Send it to the address below and it comes back as a summary and todos.\nText inside images is read too.",

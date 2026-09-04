@@ -9,6 +9,10 @@ function extractData(response) {
 }
 
 export const expenseApi = {
+  getStats() {
+    return apiClient.get('/v1/apps/expense/stats').then(extractData)
+  },
+
   getConfig() {
     return apiClient.get('/v1/apps/expense/config').then(extractData)
   },

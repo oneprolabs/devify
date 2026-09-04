@@ -2,8 +2,10 @@
   <div class="space-y-4">
     <FilterChips v-model="stage" :options="stageOptions" />
 
-    <BaseCard>
-      <div class="space-y-4">
+    <div
+      class="flex flex-col overflow-hidden rounded-[11px] border border-line bg-panel"
+    >
+      <div class="flex flex-col gap-3.5 border-b border-line p-4 md:p-5">
         <InvoiceFilters v-model="filters" :buyers="buyers" />
 
         <p
@@ -86,15 +88,15 @@
             </template>
           </div>
         </div>
-
-        <InvoiceMonthList
-          v-model="selectedUuids"
-          :invoices="invoices"
-          selectable
-          @select="open"
-        />
       </div>
-    </BaseCard>
+
+      <InvoiceMonthList
+        v-model="selectedUuids"
+        :invoices="invoices"
+        selectable
+        @select="open"
+      />
+    </div>
   </div>
 
   <FileAwayDialog
@@ -129,7 +131,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseCard from '@/components/ui/BaseCard.vue'
 import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
 import FileAwayDialog from '@/components/expense/FileAwayDialog.vue'
 import FilterChips from '@/components/expense/FilterChips.vue'

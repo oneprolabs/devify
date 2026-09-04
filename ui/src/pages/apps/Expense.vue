@@ -1,118 +1,121 @@
 <template>
-  <AppLayout>
-    <div class="space-y-6">
-      <div>
-        <h1 class="text-2xl font-semibold text-ink">
-          {{ t('expense.pageTitle') }}
-        </h1>
-        <p class="mt-1 text-sm text-ink-3">
-          {{ t('expense.pageSubtitle') }}
-        </p>
-      </div>
-
-      <div class="border-b border-line">
-        <div class="flex gap-6" role="tablist">
-          <button
-            v-for="tab in tabs"
-            :key="tab.value"
-            type="button"
-            role="tab"
-            class="flex-shrink-0 border-b-2 px-1 py-3 text-sm font-medium transition-colors"
-            :aria-selected="activeTab === tab.value"
-            :class="
-              activeTab === tab.value
-                ? 'border-accent text-accent'
-                : 'border-transparent text-ink-3 hover:border-line hover:text-ink-2'
-            "
-            @click="activeTab = tab.value"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-      </div>
-
-      <BaseCard v-if="loading">
-        <div class="space-y-4 animate-pulse">
-          <div class="h-5 w-40 rounded bg-chip"></div>
-          <div class="h-20 rounded bg-chip"></div>
-        </div>
-      </BaseCard>
-
-      <template v-else>
-        <p
-          v-if="error"
-          class="rounded-lg border border-bad bg-bad-soft p-4 text-sm text-bad"
+  <AppLayout :padded="false">
+    <PageHeader
+      :parent="{ to: '/apps', label: t('apps.centerTitle') }"
+      :title="t('expense.pageTitle')"
+      :count="headerSummary"
+    >
+      <!-- Three resources, not three states: an invoice's status is a filter
+           inside the first one. -->
+      <div
+        class="ml-auto flex h-8 items-center overflow-hidden rounded-md border border-line"
+        role="tablist"
+      >
+        <button
+          v-for="(tab, index) in tabs"
+          :key="tab.value"
+          type="button"
+          role="tab"
+          class="font-display flex h-8 items-center px-3.5 text-[12.5px] transition-colors"
+          :aria-selected="activeTab === tab.value"
+          :class="[
+            activeTab === tab.value
+              ? 'bg-accent-soft font-medium text-accent'
+              : 'text-ink-2 hover:bg-chip',
+            index ? 'border-l border-line' : ''
+          ]"
+          @click="activeTab = tab.value"
         >
-          {{ error }}
-        </p>
+          {{ tab.label }}
+        </button>
+      </div>
+    </PageHeader>
 
-        <BaseCard v-if="activeTab !== 'settings' && !config?.enabled">
-          <p class="py-8 text-center text-sm text-ink-3">
-            {{ t('expense.disabledHint') }}
-          </p>
+    <div class="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
+      <div class="flex flex-col gap-3.5">
+        <BaseCard v-if="loading">
+          <div class="space-y-4 animate-pulse">
+            <div class="h-5 w-40 rounded bg-chip"></div>
+            <div class="h-20 rounded bg-chip"></div>
+          </div>
         </BaseCard>
 
-        <!-- Invoices: everything the app found, filtered by where each
-             one is headed rather than split across another row of tabs -->
-        <template v-else-if="activeTab === 'invoices'">
-          <TripSuggestionCard
-            :trips="trips"
-            :accepting="acceptingTrip"
-            @accept="acceptTrip"
-            @dismiss="dismissTrip"
-          />
-
-          <InvoiceSection
-            ref="invoiceSection"
-            @rescanned="refreshData"
-            @grouped="groupSection?.load()"
-          />
-
-          <PendingLinkList
-            :links="links"
-            :releasing="releasing"
-            @release="releaseLink"
-          />
-        </template>
-
-        <!-- Groups: one group is one real claim form -->
-        <template v-else-if="activeTab === 'groups'">
-          <GroupSection ref="groupSection" />
-        </template>
-
-        <!-- Settings: the switch, how scanning behaves, and its history -->
         <template v-else>
-          <ExpenseEnableCard
-            v-if="config"
-            :model-value="config"
-            :saving="saving"
-            @toggle="handleToggle"
-          />
+          <p
+            v-if="error"
+            class="rounded-lg border border-bad bg-bad-soft p-4 text-sm text-bad"
+          >
+            {{ error }}
+          </p>
 
-          <ExpensePreferences
-            v-if="config?.enabled"
-            :config="config"
-            @updated="onConfigUpdated"
-          />
+          <BaseCard v-if="activeTab !== 'settings' && !config?.enabled">
+            <p class="py-8 text-center text-sm text-ink-3">
+              {{ t('expense.disabledHint') }}
+            </p>
+          </BaseCard>
 
-          <ScanRunList
-            v-if="config?.enabled"
-            :runs="runs"
-            :scanning="scanning"
-            @scan="openPreview"
-          />
+          <!-- Invoices: everything the app found, filtered by where each
+               one is headed rather than split across another row of tabs -->
+          <template v-else-if="activeTab === 'invoices'">
+            <TripSuggestionCard
+              :trips="trips"
+              :accepting="acceptingTrip"
+              @accept="acceptTrip"
+              @dismiss="dismissTrip"
+            />
+
+            <InvoiceSection
+              ref="invoiceSection"
+              @rescanned="refreshData"
+              @grouped="groupSection?.load()"
+            />
+
+            <PendingLinkList
+              :links="links"
+              :releasing="releasing"
+              @release="releaseLink"
+            />
+          </template>
+
+          <!-- Groups: one group is one real claim form -->
+          <template v-else-if="activeTab === 'groups'">
+            <GroupSection ref="groupSection" />
+          </template>
+
+          <!-- Settings: the switch, how scanning behaves, and its history -->
+          <template v-else>
+            <ExpenseEnableCard
+              v-if="config"
+              :model-value="config"
+              :saving="saving"
+              @toggle="handleToggle"
+            />
+
+            <ExpensePreferences
+              v-if="config?.enabled"
+              :config="config"
+              @updated="onConfigUpdated"
+            />
+
+            <ScanRunList
+              v-if="config?.enabled"
+              :runs="runs"
+              :scanning="scanning"
+              @scan="openPreview"
+            />
+          </template>
         </template>
-      </template>
-
-      <ScanPreviewDialog
-        v-if="previewOpen"
-        :preview="preview"
-        :loading="previewLoading"
-        :error="previewError"
-        @close="previewOpen = false"
-        @confirm="confirmScan"
-      />
+      </div>
     </div>
+
+    <ScanPreviewDialog
+      v-if="previewOpen"
+      :preview="preview"
+      :loading="previewLoading"
+      :error="previewError"
+      @close="previewOpen = false"
+      @confirm="confirmScan"
+    />
   </AppLayout>
 </template>
 
@@ -120,6 +123,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import ExpenseEnableCard from '@/components/expense/ExpenseEnableCard.vue'
 import ExpensePreferences from '@/components/expense/ExpensePreferences.vue'
@@ -132,6 +136,32 @@ import TripSuggestionCard from '@/components/expense/TripSuggestionCard.vue'
 import { expenseApi } from '@/api/expense'
 
 const { t } = useI18n()
+
+// The header says what is still waiting to be claimed, which is the number
+// this app exists to bring down.
+const stats = ref(null)
+const headerSummary = computed(() => {
+  if (!stats.value) return null
+  return t('expense.headerSummary', {
+    count: stats.value.unfiled ?? 0,
+    amount: formatAmount(stats.value.amount ?? 0)
+  })
+})
+
+function formatAmount(amount) {
+  return new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount)
+}
+
+async function loadStats() {
+  try {
+    stats.value = await expenseApi.getStats()
+  } catch (error) {
+    console.error('Failed to load expense stats:', error)
+  }
+}
 
 // Tabs separate resources, not states: an invoice's status is a filter
 // within its own list, so it never becomes a second row of tabs.
@@ -310,5 +340,8 @@ async function releaseLink(link) {
   }
 }
 
-onMounted(loadConfig)
+onMounted(() => {
+  loadConfig()
+  loadStats()
+})
 </script>

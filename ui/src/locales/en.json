@@ -1555,7 +1555,8 @@
         "invoice_type": "Invoice type",
         "city": "City"
       }
-    }
+    },
+    "headerSummary": "{count} unfiled · ¥{amount}"
   },
   "nav": {
     "account": "Account",

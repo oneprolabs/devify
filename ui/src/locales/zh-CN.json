@@ -1564,7 +1564,8 @@
         "invoice_type": "发票类型",
         "city": "消费城市"
       }
-    }
+    },
+    "headerSummary": "{count} 张未报销 · ¥{amount}"
   },
   "nav": {
     "account": "账户",

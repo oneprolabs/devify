@@ -4,12 +4,16 @@
       {{ t('expense.invoices.empty') }}
     </p>
 
-    <div v-for="month in months" :key="month.key" class="mb-2 last:mb-0">
+    <div v-for="month in months" :key="month.key">
       <div
-        class="flex items-baseline justify-between border-b border-line-soft px-1 py-2"
+        class="flex h-[34px] items-center gap-2 border-y border-line bg-panel-sub px-4 md:px-5"
       >
-        <strong class="text-sm text-ink">{{ month.label }}</strong>
-        <span class="text-xs tabular-nums text-ink-3">
+        <span
+          class="font-display text-[11.5px] font-semibold tracking-[0.02em] text-ink"
+        >
+          {{ month.label }}
+        </span>
+        <span class="font-mono text-[10.5px] text-ink-4">
           {{
             t('expense.invoices.monthSummary', {
               count: month.invoices.length,
@@ -22,7 +26,7 @@
       <div
         v-for="invoice in month.invoices"
         :key="invoice.uuid"
-        class="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 border-b border-line-soft px-1 py-3 last:border-0 hover:bg-app-sub"
+        class="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 border-b border-line-soft px-4 py-[var(--rowpy)] transition-colors hover:bg-panel-sub md:px-5"
         @click="$emit('select', invoice)"
       >
         <input

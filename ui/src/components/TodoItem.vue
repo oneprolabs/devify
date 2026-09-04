@@ -268,7 +268,7 @@
             {{ t(`todos.priorityShort.${todo.priority}`) }}
           </span>
           <span
-            v-else
+            v-else-if="!readOnly"
             :class="[
               'self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
               todo.is_completed
@@ -361,7 +361,7 @@
             {{ todo.owner }}
           </span>
           <span
-            v-else
+            v-else-if="!readOnly"
             :class="[
               'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
               todo.is_completed
@@ -471,7 +471,7 @@
             </span>
           </span>
           <span
-            v-else
+            v-else-if="!readOnly"
             :class="[
               'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
               todo.is_completed
@@ -605,7 +605,7 @@
             {{ todo.location }}
           </span>
           <span
-            v-else
+            v-else-if="!readOnly"
             :class="[
               'flex items-center gap-1 self-center italic text-ink-4 opacity-0 transition-opacity group-hover:opacity-100',
               todo.is_completed

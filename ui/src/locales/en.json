@@ -1291,7 +1291,11 @@
     "clickToView": "View link",
     "openLink": "Open link",
     "hideLink": "Hide link",
-    "shareButton": "Share"
+    "shareButton": "Share",
+    "viewSubtitle": "Shared conversation",
+    "readOnlyNotice": "A read-only copy of this conversation.",
+    "expiresOn": "Link expires {date}",
+    "participantCount": "{count} participants"
   },
   "expense": {
     "pageTitle": "Expense",

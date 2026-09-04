@@ -1300,7 +1300,11 @@
     "clickToView": "查看链接",
     "openLink": "打开链接",
     "hideLink": "隐藏链接",
-    "shareButton": "分享"
+    "shareButton": "分享",
+    "viewSubtitle": "分享的对话纪要",
+    "readOnlyNotice": "这是一份只读分享。",
+    "expiresOn": "链接 {date} 到期",
+    "participantCount": "参与者 {count} 人"
   },
   "expense": {
     "pageTitle": "发票管家",

@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen bg-app-sub">
+  <div class="flex min-h-screen flex-col bg-app-sub">
     <ShareHeader />
-    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-4xl space-y-6">
+    <main class="flex flex-1 justify-center px-4 py-7 md:px-10">
+      <div class="flex w-full max-w-[860px] flex-col gap-4">
         <BaseCard
           v-if="loading"
           class="bg-gradient-to-b from-white via-white to-accent-soft/40 border border-accent shadow-sm"
@@ -168,266 +168,121 @@
 
         <!-- Threadline Content - Reusing Detail Page Structure -->
         <div v-else-if="threadline" class="space-y-6">
-          <!-- Core Topic (Summary Title) -->
-          <BaseCard>
-            <div class="space-y-2">
-              <h1 class="text-xl font-semibold text-ink">
+          <div
+            class="flex items-center gap-[11px] rounded-[9px] border border-line border-l-[3px] border-l-accent bg-panel px-[15px] py-[11px]"
+          >
+            <svg
+              class="h-4 w-4 flex-none text-accent"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.9"
+              aria-hidden="true"
+            >
+              <path
+                d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M12 3v12M8 7l4-4 4 4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="text-[12.5px] text-ink-2">
+              {{ t('share.readOnlyNotice') }}
+            </span>
+            <span
+              v-if="shareExpiresAt"
+              class="ml-auto font-mono text-[11px] text-ink-4"
+            >
+              {{
+                t('share.expiresOn', {
+                  date: formatShareDate(shareExpiresAt)
+                })
+              }}
+            </span>
+          </div>
+
+          <div
+            class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-7 py-[26px]"
+          >
+            <h1
+              class="text-[25px] font-semibold leading-[1.4] tracking-tight text-ink"
+            >
+              {{
+                threadline.summary_title ||
+                threadline.subject ||
+                t('common.noSubject')
+              }}
+            </h1>
+            <div
+              class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 font-mono text-[11.5px] text-ink-4"
+            >
+              <span>
                 {{
-                  threadline.summary_title ||
-                  threadline.subject ||
-                  t('common.noSubject')
-                }}
-              </h1>
-              <div
-                class="flex items-center gap-2 text-sm text-ink-3"
-                v-if="threadline.received_at || threadline.created_at"
-              >
-                <svg
-                  class="w-4 h-4 text-ink-4 flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span>{{
                   formatShareDate(
                     threadline.received_at || threadline.created_at
                   )
-                }}</span>
-              </div>
+                }}
+              </span>
+              <template v-for="fact in metaFacts" :key="fact">
+                <span>·</span>
+                <span>{{ fact }}</span>
+              </template>
             </div>
-          </BaseCard>
-
-          <BaseCard v-if="hasMetadataInfo" :header-muted="true">
-            <template #header>
-              <div class="flex items-center gap-2 text-ink">
-                <svg
-                  class="w-5 h-5 -mt-px flex-none"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <h3 class="text-base font-semibold leading-5">
-                  {{ t('metadata.sectionTitle') }}
-                </h3>
-              </div>
-            </template>
-            <div class="space-y-3 text-xs sm:text-sm text-ink-2">
-              <div
-                class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5"
+            <div v-if="shareTags.length" class="flex flex-wrap gap-1.5">
+              <span
+                v-for="tag in shareTags"
+                :key="tag"
+                class="rounded-sm bg-chip px-[9px] py-[3px] font-mono text-[10.5px] text-ink-2"
               >
-                <div class="flex items-center gap-1 text-ink-3">
-                  <svg
-                    class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                    />
-                  </svg>
-                  <span>{{ t('metadata.category.title') }}</span>
-                </div>
-                <div class="flex items-center gap-2 min-w-0">
-                  <span
-                    v-if="metadataCategory"
-                    class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-accent-soft text-accent"
-                  >
-                    {{ metadataCategory }}
-                  </span>
-                  <span v-else class="text-ink-4">
-                    {{ t('todos.notSet') }}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5"
-              >
-                <div class="flex items-center gap-1 text-ink-3">
-                  <svg
-                    class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
-                  <span>{{ t('metadata.participants.title') }}</span>
-                </div>
-                <div class="flex items-center gap-2 min-w-0">
-                  <div
-                    v-if="metadataParticipants.length > 0"
-                    class="flex flex-wrap gap-2"
-                  >
-                    <span
-                      v-for="(participant, index) in metadataParticipants"
-                      :key="`participant-${index}`"
-                      class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-ok-soft text-ok"
-                    >
-                      {{ participant }}
-                    </span>
-                  </div>
-                  <span v-else class="text-ink-4">
-                    {{ t('todos.notSet') }}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-1.5"
-              >
-                <div class="flex items-center gap-1 text-ink-3">
-                  <svg
-                    class="w-3.5 h-3.5 text-ink-4 flex-shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M7 7h.01M3 7a4 4 0 014-4h5l7 7a2 2 0 010 2.828l-5.172 5.172a2 2 0 01-2.828 0L3 12V7z"
-                    />
-                  </svg>
-                  <span>{{ t('metadata.keywords.title') }}</span>
-                </div>
-                <div class="flex items-center gap-2 min-w-0">
-                  <div
-                    v-if="metadataTags.length > 0"
-                    class="flex flex-wrap gap-2"
-                  >
-                    <span
-                      v-for="(tag, index) in metadataTags"
-                      :key="`tag-${index}`"
-                      class="inline-flex items-center gap-1 px-2 h-6 rounded-md text-xs font-medium select-none bg-bad-soft text-bad"
-                    >
-                      {{ tag }}
-                    </span>
-                  </div>
-                  <span v-else class="text-ink-4">
-                    {{ t('todos.notSet') }}
-                  </span>
-                </div>
-              </div>
+                {{ tag }}
+              </span>
             </div>
-          </BaseCard>
+          </div>
 
           <!-- Details Section (New Format) -->
-          <BaseCard
+          <PanelCard
             v-if="hasNewFormat && summaryData.details"
-            :header-muted="true"
+            :title="t('chats.detail.coreTopic')"
           >
-            <template #header>
-              <div class="flex items-center justify-between w-full">
-                <div class="flex items-center gap-2 text-ink">
-                  <svg
-                    class="w-5 h-5 -mt-px flex-none"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <h3 class="text-base font-semibold leading-5">
-                    {{ t('todos.newFormat.details') }}
-                  </h3>
-                </div>
-                <button
-                  @click="copyContent(summaryData.details, 'details')"
-                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink bg-app-sub hover:bg-chip border border-line hover:border-line px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
-                  :title="t('common.copy')"
-                >
-                  <svg
-                    v-if="!copiedStates.details"
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <svg
-                    v-else
-                    class="h-3.5 w-3.5 text-ok"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  <span class="hidden sm:inline">
-                    {{
-                      copiedStates.details
-                        ? t('common.copied')
-                        : t('common.copy')
-                    }}
-                  </span>
-                </button>
-              </div>
+            <template #icon>
+              <svg
+                class="h-[15px] w-[15px] text-accent"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                aria-hidden="true"
+              >
+                <path
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </template>
             <MarkdownRenderer :content="summaryData.details" />
-          </BaseCard>
+          </PanelCard>
 
           <!-- TODOs Section -->
-          <BaseCard v-if="threadlineTodos.length > 0" :header-muted="true">
-            <template #header>
-              <div class="flex items-center gap-2 text-ink">
-                <svg
-                  class="w-5 h-5 -mt-px flex-none"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                  />
-                </svg>
-                <h3 class="text-base font-semibold leading-5">
-                  {{ t('todos.newFormat.todos') }}
-                </h3>
-              </div>
+          <PanelCard
+            v-if="threadlineTodos.length > 0"
+            :title="t('todos.newFormat.todos')"
+            :meta="String(threadlineTodos.length)"
+          >
+            <template #icon>
+              <svg
+                class="h-[15px] w-[15px] text-accent"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                aria-hidden="true"
+              >
+                <path
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </template>
             <TransitionGroup name="todo-list" tag="div" class="space-y-2">
               <TodoItem
@@ -443,167 +298,74 @@
                 @editing-change="() => {}"
               />
             </TransitionGroup>
-          </BaseCard>
+          </PanelCard>
 
           <!-- Key Process Section -->
-          <BaseCard
+          <PanelCard
             v-if="
               hasNewFormat &&
               summaryData.key_process &&
               summaryData.key_process.length > 0
             "
-            :header-muted="true"
+            :title="t('todos.newFormat.keyProcess')"
           >
-            <template #header>
-              <div class="flex items-center justify-between w-full">
-                <div class="flex items-center gap-2 text-ink">
-                  <svg
-                    class="w-5 h-5 -mt-px flex-none"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                    />
-                  </svg>
-                  <h3 class="text-base font-semibold leading-5">
-                    {{ t('todos.newFormat.keyProcess') }}
-                  </h3>
-                </div>
-                <button
-                  @click="copyKeyProcess"
-                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink bg-app-sub hover:bg-chip border border-line hover:border-line px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
-                  :title="t('common.copy')"
-                >
-                  <svg
-                    v-if="!copiedStates.keyProcess"
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <svg
-                    v-else
-                    class="h-3.5 w-3.5 text-ok"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  <span class="hidden sm:inline">
-                    {{
-                      copiedStates.keyProcess
-                        ? t('common.copied')
-                        : t('common.copy')
-                    }}
-                  </span>
-                </button>
-              </div>
+            <template #icon>
+              <svg
+                class="h-[15px] w-[15px] text-accent"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                aria-hidden="true"
+              >
+                <path
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </template>
-            <ul class="space-y-2">
+            <ol class="flex flex-col gap-[11px]">
               <li
                 v-for="(item, index) in summaryData.key_process"
                 :key="index"
-                class="flex items-start gap-2 text-sm text-ink-2"
+                class="flex items-start gap-[11px]"
               >
-                <span class="text-accent mt-0.5">•</span>
-                <span>{{ item }}</span>
+                <span
+                  class="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full border border-line font-mono text-[10px] text-ink-3"
+                >
+                  {{ index + 1 }}
+                </span>
+                <span class="text-[13px] leading-[1.6] text-ink-2">
+                  {{ item }}
+                </span>
               </li>
-            </ul>
-          </BaseCard>
+            </ol>
+          </PanelCard>
 
           <!-- Conversation Records (LLM Content) -->
-          <BaseCard
+          <PanelCard
             v-if="
               threadline.llm_content ||
               (!hasNewFormat && threadline.summary_content)
             "
-            :header-muted="true"
+            :title="t('chats.processedContent')"
           >
-            <template #header>
-              <div class="flex items-center justify-between w-full">
-                <div class="flex items-center gap-2 text-ink">
-                  <svg
-                    class="w-5 h-5 -mt-px flex-none"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
-                    />
-                  </svg>
-                  <h3 class="text-base font-semibold leading-5">
-                    {{ t('chats.processedContent') }}
-                  </h3>
-                </div>
-                <button
-                  @click="
-                    copyContent(
-                      threadline.llm_content || threadline.summary_content,
-                      threadline.llm_content ? 'llm' : 'summary'
-                    )
-                  "
-                  class="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink bg-app-sub hover:bg-chip border border-line hover:border-line px-2.5 py-1.5 rounded-lg transition-all shadow-sm"
-                  :title="t('common.copy')"
-                >
-                  <svg
-                    v-if="!copiedStates.llm && !copiedStates.summary"
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <svg
-                    v-else
-                    class="h-3.5 w-3.5 text-ok"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  <span class="hidden sm:inline">
-                    {{
-                      copiedStates.llm || copiedStates.summary
-                        ? t('common.copied')
-                        : t('common.copy')
-                    }}
-                  </span>
-                </button>
-              </div>
+            <template #icon>
+              <svg
+                class="h-[15px] w-[15px] text-accent"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </template>
             <div v-if="threadline.llm_content">
               <MarkdownRenderer :content="threadline.llm_content" />
@@ -611,7 +373,7 @@
             <div v-else-if="threadline.summary_content">
               <MarkdownRenderer :content="threadline.summary_content" />
             </div>
-          </BaseCard>
+          </PanelCard>
         </div>
       </div>
     </main>
@@ -622,10 +384,12 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { usePreferencesStore } from '@/store/preferences'
+import { formatDate } from '@/utils/timezone'
 import { chatApi } from '@/api/chat'
-import { useToast } from '@/composables/useToast'
 import ShareHeader from '@/components/layout/ShareHeader.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import PanelCard from '@/components/ui/PanelCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import MarkdownRenderer from '@/components/ui/MarkdownRenderer.vue'
 import TodoItem from '@/components/TodoItem.vue'
@@ -633,10 +397,11 @@ import TodoItem from '@/components/TodoItem.vue'
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const { showSuccess, showError } = useToast()
+const preferences = usePreferencesStore()
 
 const loading = ref(true)
 const error = ref('')
+const shareExpiresAt = ref(null)
 const requiresPassword = ref(false)
 const verifying = ref(false)
 const threadline = ref(null)
@@ -645,13 +410,6 @@ const passwordError = ref('')
 const passwordInputRef = ref(null)
 
 // Copy states
-const copiedStates = ref({
-  details: false,
-  keyProcess: false,
-  llm: false,
-  summary: false
-})
-
 const MAX_RETRIES = 5
 const RETRY_DELAY = 2000
 
@@ -726,20 +484,34 @@ const metadataParticipants = computed(() =>
 const metadataTags = computed(() =>
   normalizeMetadataArray(metadataInfo.value?.keywords)
 )
-const hasMetadataInfo = computed(
-  () =>
-    !!metadataInfo.value &&
-    (metadataCategory.value ||
-      metadataParticipants.value.length > 0 ||
-      metadataTags.value.length > 0)
-)
+// The title block carries the facts as one line, the way the canvas reads
+// them: category, then participants, then anything else worth naming.
+const metaFacts = computed(() => {
+  const facts = []
+  if (metadataCategory.value) facts.push(metadataCategory.value)
+  if (metadataParticipants.value.length) {
+    facts.push(
+      t('share.participantCount', {
+        count: metadataParticipants.value.length
+      })
+    )
+  }
+  return facts
+})
+
+const shareTags = computed(() => metadataTags.value)
 
 const formatShareDate = (dateString) => {
   if (!dateString) {
     return t('common.noData')
   }
   try {
-    return new Date(dateString).toLocaleString()
+    return formatDate(
+      dateString,
+      preferences.currentTimezone,
+      'yyyy-MM-dd HH:mm',
+      preferences.currentLanguage
+    )
   } catch (err) {
     console.error('Failed to format date:', err)
     return dateString
@@ -782,6 +554,7 @@ const loadShare = async (retryCount = 0) => {
     const response = await chatApi.getPublicShare(token.value)
     const data = response.data.data || response.data
     requiresPassword.value = data.requires_password
+    shareExpiresAt.value = data.share?.expires_at || null
     if (!data.requires_password) {
       threadline.value = prepareThreadline(data.threadline)
     }
@@ -929,103 +702,6 @@ const submitPassword = async (retryCount = 0) => {
 
 const goHome = () => {
   router.push('/chats')
-}
-
-// Copy content function with fallback
-const copyToClipboard = async (text) => {
-  // Try modern clipboard API first
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch (err) {
-      console.warn('Clipboard API failed, trying fallback:', err)
-    }
-  }
-
-  // Fallback for older browsers or non-HTTPS contexts
-  try {
-    const textArea = document.createElement('textarea')
-    textArea.value = text
-    textArea.style.position = 'fixed'
-    textArea.style.left = '-999999px'
-    textArea.style.top = '-999999px'
-    document.body.appendChild(textArea)
-    textArea.focus()
-    textArea.select()
-    const successful = document.execCommand('copy')
-    document.body.removeChild(textArea)
-    return successful
-  } catch (err) {
-    console.error('Fallback copy failed:', err)
-    return false
-  }
-}
-
-// Copy content function
-const copyContent = async (content, section) => {
-  if (!content) {
-    showError(t('common.copyFailed'))
-    return
-  }
-
-  try {
-    // Extract plain text from markdown content
-    let textContent = content
-      .replace(/```[\s\S]*?```/g, '')
-      .replace(/`([^`]+)`/g, '$1')
-      .replace(/^#+\s+/gm, '')
-      .replace(/\*\*([^*]+)\*\*/g, '$1')
-      .replace(/\*([^*]+)\*/g, '$1')
-      .replace(/__([^_]+)__/g, '$1')
-      .replace(/_([^_]+)_/g, '$1')
-      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
-      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
-
-    const success = await copyToClipboard(textContent)
-    if (success) {
-      copiedStates.value[section] = true
-      showSuccess(t('common.copied'))
-      setTimeout(() => {
-        copiedStates.value[section] = false
-      }, 2000)
-    } else {
-      showError(t('common.copyFailed'))
-    }
-  } catch (error) {
-    console.error('Failed to copy content:', error)
-    showError(t('common.copyFailed'))
-  }
-}
-
-// Copy key process function
-const copyKeyProcess = async () => {
-  const keyProcess = summaryData.value?.key_process || []
-  if (keyProcess.length === 0) {
-    showError(t('common.copyFailed'))
-    return
-  }
-
-  try {
-    const text = keyProcess
-      .map((item, index) => `${index + 1}. ${item}`)
-      .join('\n')
-    const success = await copyToClipboard(text)
-    if (success) {
-      copiedStates.value.keyProcess = true
-      showSuccess(t('common.copied'))
-      setTimeout(() => {
-        copiedStates.value.keyProcess = false
-      }, 2000)
-    } else {
-      showError(t('common.copyFailed'))
-    }
-  } catch (error) {
-    console.error('Failed to copy key process:', error)
-    showError(t('common.copyFailed'))
-  }
 }
 
 const focusPasswordInput = async () => {

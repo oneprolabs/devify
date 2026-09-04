@@ -50,8 +50,18 @@ class TestAppRegistry:
         )
 
         entry = registry.list_apps()[0]
+        # `order` is how the registry sorts; `stats` is the callable, not the
+        # numbers. Clients see the numbers under "stats", never the function.
         assert "order" not in entry
-        assert set(entry) == {"key", "name", "name_zh", "path", "description"}
+        assert set(entry) == {
+            "key",
+            "name",
+            "name_zh",
+            "path",
+            "description",
+            "stats",
+        }
+        assert entry["stats"] == {}
 
     def test_re_registering_replaces_instead_of_duplicating(self):
         registry = AppRegistry()

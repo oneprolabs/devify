@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex w-full flex-col gap-2 border-line bg-panel-sub p-3 md:w-[230px] md:flex-none md:border-r"
+    class="flex w-full flex-col gap-2 border-line bg-panel-sub p-3 md:w-[255px] md:flex-none md:border-r"
   >
     <label
       class="flex h-8 items-center gap-2 rounded-md border border-line bg-panel px-2.5"
@@ -26,7 +26,7 @@
 
     <template v-for="group in groups" :key="group.key">
       <div
-        class="px-0.5 pt-1 font-mono text-[10.5px] tracking-[0.04em] text-ink-4"
+        class="px-0.5 pt-1 font-mono text-[calc(10.5px*var(--fs))] tracking-[0.04em] text-ink-4"
       >
         {{ group.label }} · {{ group.channels.length }}
       </div>
@@ -46,7 +46,7 @@
       >
         <span class="flex items-center gap-2">
           <span
-            class="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md font-mono text-[8px] font-semibold"
+            class="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md font-mono text-[calc(8px*var(--fs))] font-semibold"
             :class="
               String(channel.id) === String(selectedId)
                 ? 'bg-panel text-accent'
@@ -56,7 +56,7 @@
             {{ TYPE_INITIALS[channel.target_type] || '··' }}
           </span>
           <span
-            class="min-w-0 truncate text-[12.5px] font-semibold"
+            class="min-w-0 truncate text-[calc(12.5px*var(--fs))] font-semibold"
             :class="
               String(channel.id) === String(selectedId)
                 ? 'text-accent'
@@ -79,7 +79,7 @@
           </span>
         </span>
         <span
-          class="font-mono text-[10px]"
+          class="font-mono text-[calc(10px*var(--fs))]"
           :class="
             String(channel.id) === String(selectedId)
               ? 'text-accent opacity-80'
@@ -93,7 +93,7 @@
 
     <button
       type="button"
-      class="mt-1 flex items-center gap-2 rounded-[9px] border border-dashed border-line px-[11px] py-2.5 text-[12.5px] text-ink-2 transition-colors hover:border-accent hover:text-accent"
+      class="mt-1 flex items-center gap-2 rounded-[9px] border border-dashed border-line px-[11px] py-2.5 text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-accent hover:text-accent"
       @click="$emit('create')"
     >
       <svg

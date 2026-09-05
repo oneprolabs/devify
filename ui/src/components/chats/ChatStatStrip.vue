@@ -19,14 +19,14 @@
         >
           {{ stat.value }}
         </span>
-        <span class="text-[10px] text-ink-3">{{ stat.label }}</span>
+        <span class="text-[calc(10px*var(--fs))] text-ink-3">{{ stat.label }}</span>
       </div>
     </div>
   </div>
 
   <!-- Desktop: one 74px strip, numbers divided by rules, mailbox at the end. -->
   <div
-    class="hidden h-[74px] flex-shrink-0 items-center border-b border-line px-5 md:flex"
+    class="hidden h-[75px] flex-shrink-0 items-center border-b border-line px-5 md:flex"
   >
     <div
       v-for="(stat, index) in stats"
@@ -38,12 +38,12 @@
       ]"
     >
       <span
-        class="font-mono text-[23px] font-medium leading-none"
+        class="font-mono text-[calc(23px*var(--fs))] font-medium leading-none"
         :class="stat.tone"
       >
         {{ stat.value }}
       </span>
-      <span class="text-[11.5px] text-ink-3">{{ stat.label }}</span>
+      <span class="text-[calc(11.5px*var(--fs))] text-ink-3">{{ stat.label }}</span>
     </div>
 
     <VirtualEmailBanner

@@ -16,9 +16,9 @@
         <!-- Each section names itself and carries its own save, so a change
              here never looks like it might have saved something over there. -->
         <div
-          class="flex h-14 flex-shrink-0 items-center gap-3 border-b border-line px-4 md:px-7"
+          class="flex h-[57px] flex-shrink-0 items-center gap-3 border-b border-line px-4 md:px-7"
         >
-          <span class="text-[14.5px] font-semibold text-ink">
+          <span class="text-[calc(14.5px*var(--fs))] font-semibold text-ink">
             {{ activeSection.label }}
           </span>
           <span class="hidden text-xs text-ink-3 lg:block">
@@ -40,14 +40,13 @@
           >
             <div class="flex items-center gap-4 pb-1">
               <span
-                :class="avatarBgColor"
-                class="flex h-14 w-14 flex-none items-center justify-center rounded-full text-[22px] text-accent-on"
+                class="flex h-14 w-14 flex-none items-center justify-center rounded-full bg-chip text-[calc(22px*var(--fs))] text-ink-2"
               >
                 {{ userInitials }}
               </span>
               <span class="flex min-w-0 flex-col gap-1">
                 <span
-                  class="font-display truncate text-[17px] font-semibold text-ink"
+                  class="font-display truncate text-[calc(17px*var(--fs))] font-semibold text-ink"
                 >
                   {{ displayName }}
                 </span>
@@ -87,17 +86,17 @@
                     />
                   </svg>
                   <span
-                    class="min-w-0 flex-1 truncate font-mono text-[13.5px] text-ink"
+                    class="min-w-0 flex-1 truncate font-mono text-[calc(13.5px*var(--fs))] text-ink"
                   >
                     {{ displayedAiEmail }}
                   </span>
                   <span
-                    class="flex-none rounded-sm bg-chip px-[7px] py-0.5 font-mono text-[10.5px] text-ink-3"
+                    class="flex-none rounded-sm bg-chip px-[7px] py-0.5 font-mono text-[calc(10.5px*var(--fs))] text-ink-3"
                   >
                     {{ t('settings.systemAssigned') }}
                   </span>
                 </div>
-                <p class="text-[11.5px] text-ink-3">
+                <p class="text-[calc(11.5px*var(--fs))] text-ink-3">
                   {{ t('settings.aiEmailInUse') }}
                   <button
                     type="button"
@@ -160,7 +159,7 @@
                   />
                 </svg>
                 <span class="flex min-w-0 flex-1 flex-col gap-px">
-                  <span class="text-[13px] text-ink">
+                  <span class="text-[calc(13px*var(--fs))] font-medium text-ink">
                     {{
                       isOauth
                         ? t('settings.oauthAuth')
@@ -169,7 +168,7 @@
                   </span>
                   <span
                     v-if="isOauth && authInfo?.login_identifier"
-                    class="truncate font-mono text-[11px] text-ink-3"
+                    class="truncate font-mono text-[calc(11px*var(--fs))] text-ink-3"
                   >
                     {{ authInfo.provider }} · {{ authInfo.login_identifier }}
                   </span>
@@ -187,16 +186,16 @@
 
               <p
                 v-if="!authInfo?.can_change_password"
-                class="text-[11.5px] leading-[1.6] text-ink-3"
+                class="text-[calc(11.5px*var(--fs))] leading-[1.6] text-ink-3"
               >
                 {{ t('settings.oauthPasswordChangeInfo') }}
               </p>
 
-              <p v-if="resetEmailSent" class="text-[11.5px] text-ok">
+              <p v-if="resetEmailSent" class="text-[calc(11.5px*var(--fs))] text-ok">
                 {{ t('settings.passwordResetEmailSent') }} ·
                 {{ t('settings.passwordResetEmailSentDesc') }}
               </p>
-              <p v-if="resetEmailError" class="text-[11.5px] text-bad">
+              <p v-if="resetEmailError" class="text-[calc(11.5px*var(--fs))] text-bad">
                 {{ resetEmailError }}
               </p>
             </SettingsRow>
@@ -569,27 +568,6 @@ const displayName = computed(() => {
 const userInitials = computed(() => {
   const name = displayName.value || 'User'
   return name.trim().charAt(0).toUpperCase() || 'U'
-})
-
-const avatarBgColor = computed(() => {
-  const colors = [
-    'bg-accent',
-    'bg-accent',
-    'bg-accent',
-    'bg-pink-500',
-    'bg-bad',
-    'bg-bad',
-    'bg-warn',
-    'bg-warn',
-    'bg-warn',
-    'bg-ok',
-    'bg-ok',
-    'bg-ok',
-    'bg-accent',
-    'bg-accent',
-    'bg-accent'
-  ]
-  return colors[userInitials.value.charCodeAt(0) % colors.length]
 })
 
 const detectedTimezoneLabel = computed(() => {

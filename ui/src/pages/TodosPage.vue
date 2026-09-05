@@ -6,7 +6,7 @@
       :count="openCountLabel"
     >
       <label
-        class="flex h-8 max-w-[360px] flex-1 items-center gap-2 rounded-md border border-line bg-panel-sub px-2.5"
+        class="flex h-8 max-w-[382px] flex-1 items-center gap-2 rounded-md border border-line bg-panel-sub px-2.5"
       >
         <svg
           class="h-3.5 w-3.5 flex-none text-ink-3"
@@ -23,7 +23,7 @@
           v-model="filters.search"
           type="text"
           :placeholder="t('todos.searchPlaceholder')"
-          class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
+          class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[calc(12.5px*var(--fs))] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
         />
       </label>
 
@@ -35,7 +35,7 @@
             v-for="(mode, index) in viewModes"
             :key="mode.value"
             type="button"
-            class="font-display flex h-8 items-center gap-1.5 px-3 text-[12.5px] transition-colors"
+            class="font-display flex h-8 items-center gap-1.5 px-3 text-[calc(12.5px*var(--fs))] transition-colors"
             :class="[
               viewMode === mode.value
                 ? 'bg-accent-soft font-medium text-accent'
@@ -49,16 +49,9 @@
           </button>
         </div>
 
-        <FilterSelect
-          :label="groupLabel"
-          :options="groupOptions"
-          :model-value="groupBy"
-          @update:model-value="groupBy = $event"
-        />
-
         <button
           type="button"
-          class="font-display flex h-8 items-center gap-[7px] rounded-md bg-accent px-[13px] text-[12.5px] font-medium text-accent-on transition-opacity hover:opacity-90"
+          class="font-display flex h-8 items-center gap-[7px] rounded-md bg-accent px-[13px] text-[calc(12.5px*var(--fs))] font-medium text-accent-on transition-opacity hover:opacity-90"
           @click="openNewTodo"
         >
           <svg
@@ -71,7 +64,7 @@
           >
             <path d="M12 5v14M5 12h14" stroke-linecap="round" />
           </svg>
-          {{ t('todos.add') }}
+          {{ t('todos.newTodo') }}
         </button>
       </div>
 
@@ -106,48 +99,69 @@
       :ranges="timeRanges"
     />
 
-    <!-- Status chips: the one filter worth reaching for without a menu. -->
+    <!-- Filter bar: the canvas puts every filter here, grouping on the right. -->
     <div
-      class="flex h-11 flex-shrink-0 items-center gap-1.5 overflow-x-auto border-b border-line px-4 md:px-5"
+      class="flex h-[49px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-line bg-panel-sub px-4 md:px-5"
     >
-      <button
-        v-for="chip in statusChips"
-        :key="String(chip.value)"
-        type="button"
-        class="font-display flex-none rounded-md px-3 py-1.5 text-xs transition-colors"
-        :class="
-          filters.is_completed === chip.value
-            ? 'bg-accent font-medium text-accent-on'
-            : 'border border-line text-ink-2'
-        "
-        @click="filters.is_completed = chip.value"
-      >
-        {{ chip.label }}
-      </button>
+      <span class="hidden flex-none text-[calc(11.5px*var(--fs))] text-ink-3 md:inline">
+        {{ t('todos.filters.label') }}
+      </span>
+
+      <FilterSelect
+        class="flex-none"
+        size="sm"
+        :label="statusLabel"
+        :options="statusOptions"
+        :model-value="filters.is_completed"
+        @update:model-value="filters.is_completed = $event"
+      />
+
+      <FilterSelect
+        class="flex-none"
+        size="sm"
+        :label="priorityLabel"
+        :options="priorityOptions"
+        :model-value="filters.priority"
+        @update:model-value="filters.priority = $event"
+      />
 
       <template v-if="timeRange === 'custom'">
         <input
           v-model="customStartDate"
           type="date"
-          class="h-8 flex-none rounded-md border border-line bg-panel-sub px-2 font-mono text-[11.5px] text-ink focus:border-accent focus:outline-none focus:ring-0"
+          class="h-[30px] flex-none rounded-md border border-line bg-panel px-2 font-mono text-[calc(11.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
           @change="handleCustomDateChange"
         />
         <span class="flex-none text-ink-4">–</span>
         <input
           v-model="customEndDate"
           type="date"
-          class="h-8 flex-none rounded-md border border-line bg-panel-sub px-2 font-mono text-[11.5px] text-ink focus:border-accent focus:outline-none focus:ring-0"
+          class="h-[30px] flex-none rounded-md border border-line bg-panel px-2 font-mono text-[calc(11.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
           @change="handleCustomDateChange"
         />
       </template>
 
-      <FilterSelect
-        class="ml-auto hidden md:block"
-        :label="priorityLabel"
-        :options="priorityOptions"
-        :model-value="filters.priority"
-        @update:model-value="filters.priority = $event"
-      />
+      <button
+        v-if="hasActiveFilters"
+        type="button"
+        class="font-display flex-none text-[calc(11.5px*var(--fs))] text-ink-3 transition-colors hover:text-ink-2"
+        @click="clearFilters"
+      >
+        {{ t('todos.filters.clearAll') }}
+      </button>
+
+      <div class="ml-auto flex flex-none items-center gap-1.5">
+        <span class="hidden text-[calc(11.5px*var(--fs))] text-ink-3 md:inline">
+          {{ t('todos.groupTitle') }}
+        </span>
+        <FilterSelect
+          size="sm"
+          :label="groupLabel"
+          :options="groupOptions"
+          :model-value="groupBy"
+          @update:model-value="groupBy = $event"
+        />
+      </div>
     </div>
 
     <div class="min-h-0 flex-1 overflow-y-auto">
@@ -168,7 +182,7 @@
 
       <!-- Column headings, matching the row widths below. -->
       <div
-        class="sticky top-0 z-10 hidden h-[30px] items-center gap-3 bg-app px-5 font-mono text-[10.5px] tracking-[0.06em] text-ink-4 md:flex"
+        class="sticky top-0 z-10 hidden h-[30px] items-center gap-3 bg-app px-5 font-mono text-[calc(10.5px*var(--fs))] tracking-[0.06em] text-ink-4 md:flex"
       >
         <div class="w-4 flex-none"></div>
         <div class="min-w-0 flex-1">{{ t('todos.content') }}</div>
@@ -178,15 +192,9 @@
         <div class="w-[76px] flex-none">{{ t('todos.owner') }}</div>
         <div class="w-[118px] flex-none">{{ t('todos.deadline') }}</div>
         <div class="w-[210px] flex-none">{{ t('todos.sourceChat') }}</div>
-        <div class="w-3.5 flex-none"></div>
       </div>
 
-      <div v-if="loading" class="flex flex-col items-center gap-2 py-16">
-        <span
-          class="h-8 w-8 animate-spin rounded-full border-b-2 border-accent"
-        ></span>
-        <p class="text-sm text-ink-3">{{ t('common.loading') }}</p>
-      </div>
+      <SkeletonRows v-if="loading" :count="5" />
 
       <p
         v-else-if="!visibleTodos.length"
@@ -198,19 +206,19 @@
       <template v-else>
         <template v-for="group in orderedGroups" :key="group.key">
           <div
-            class="flex h-[34px] items-center gap-2 border-y border-line bg-panel-sub px-4 md:px-5"
+            class="flex h-9 items-center gap-2 border-y border-line bg-panel-sub px-4 md:px-5"
           >
             <span
               class="h-[5px] w-[5px] rounded-full"
               :class="group.dotClass"
             ></span>
             <span
-              class="font-display text-[11.5px] font-semibold tracking-[0.02em]"
+              class="font-display text-[calc(11.5px*var(--fs))] font-semibold tracking-[0.02em]"
               :class="group.labelClass"
             >
               {{ group.label }}
             </span>
-            <span class="font-mono text-[10.5px] text-ink-4">
+            <span class="font-mono text-[calc(10.5px*var(--fs))] text-ink-4">
               {{ t('todos.groupCount', { count: group.todos.length }) }}
             </span>
           </div>
@@ -260,6 +268,7 @@ import TodoRow from '@/components/todos/TodoRow.vue'
 import TodoCalendar from '@/components/todos/TodoCalendar.vue'
 import TodoStatStrip from '@/components/todos/TodoStatStrip.vue'
 import { IconApps, IconTodos } from '@/components/layout/navIcons'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 
 const { t, locale } = useI18n()
 const preferencesStore = usePreferencesStore()
@@ -599,17 +608,30 @@ const groupOptions = computed(() => [
 ])
 const groupLabel = computed(
   () =>
-    `${t('todos.groupByLabel')}${
-      groupOptions.value.find((option) => option.value === groupBy.value)
-        ?.label || ''
-    }`
+    groupOptions.value.find((option) => option.value === groupBy.value)
+      ?.label || ''
 )
 
-const statusChips = computed(() => [
+const statusOptions = computed(() => [
   { value: null, label: t('todos.filters.all') },
   { value: false, label: t('todos.filters.incomplete') },
   { value: true, label: t('todos.filters.completed') }
 ])
+const statusLabel = computed(
+  () =>
+    `${t('todos.filters.status')}：${
+      statusOptions.value.find(
+        (option) => option.value === filters.value.is_completed
+      )?.label || ''
+    }`
+)
+
+const clearFilters = () => {
+  filters.value.is_completed = null
+  filters.value.priority = null
+  filters.value.owner = ''
+  filters.value.search = ''
+}
 
 const priorityOptions = computed(() => [
   { value: null, label: t('todos.filters.all') },

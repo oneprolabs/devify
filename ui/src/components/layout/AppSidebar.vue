@@ -1,6 +1,6 @@
 <template>
   <aside
-    class="flex w-[232px] flex-shrink-0 flex-col border-r border-line bg-app-sub py-[18px]"
+    class="flex w-[233px] flex-shrink-0 flex-col border-r border-line bg-app-sub py-[18px]"
   >
     <router-link to="/chats" class="flex items-center gap-2.5 px-5 pb-5">
       <img
@@ -21,7 +21,7 @@
         {{ t('chats.title') }}
         <span
           v-if="pendingChats"
-          class="ml-auto rounded-full bg-warn-soft px-[7px] py-0.5 font-mono text-[10.5px] text-warn"
+          class="ml-auto rounded-full bg-warn-soft px-[7px] py-0.5 font-mono text-[calc(10.5px*var(--fs))] text-warn"
         >
           {{ pendingChats }}
         </span>
@@ -37,7 +37,7 @@
         <span class="font-display text-xs font-semibold tracking-wide">
           {{ t('apps.centerTitle') }}
         </span>
-        <span class="ml-auto font-mono text-[10.5px] text-ink-4">
+        <span class="ml-auto font-mono text-[calc(10.5px*var(--fs))] text-ink-4">
           {{ appLinks.length }}
         </span>
       </router-link>
@@ -49,7 +49,7 @@
           v-for="app in appLinks"
           :key="app.to"
           :to="app.to"
-          class="flex h-9 items-center gap-2.5 rounded px-2.5 text-[13px] transition-colors"
+          class="flex h-9 items-center gap-2.5 rounded px-2.5 text-[calc(13px*var(--fs))] transition-colors"
           :class="
             isActive(app.match)
               ? 'bg-accent-soft text-accent'
@@ -60,7 +60,7 @@
           {{ app.label }}
           <span
             v-if="app.count"
-            class="ml-auto font-mono text-[10.5px] text-ink-4"
+            class="ml-auto font-mono text-[calc(10.5px*var(--fs))] text-ink-4"
           >
             {{ app.count }}
           </span>
@@ -69,7 +69,7 @@
     </div>
 
     <div
-      class="font-display px-6 pb-[7px] pt-[19px] text-[10.5px] font-semibold tracking-[0.1em] text-ink-3"
+      class="font-display px-6 pb-[7px] pt-[19px] text-[calc(10.5px*var(--fs))] font-semibold tracking-[0.1em] text-ink-3"
     >
       {{ t('nav.account') }}
     </div>
@@ -98,8 +98,8 @@
         class="flex flex-col gap-2 rounded-[10px] border border-line bg-panel p-3"
       >
         <div class="flex items-baseline justify-between">
-          <span class="text-[11.5px] text-ink-2">{{ t('nav.credits') }}</span>
-          <span class="font-mono text-[12.5px] font-medium text-ink">
+          <span class="text-[calc(11.5px*var(--fs))] text-ink-2">{{ t('nav.credits') }}</span>
+          <span class="font-mono text-[calc(12.5px*var(--fs))] font-medium text-ink">
             {{ availableCredits
             }}<span class="text-ink-3"> / {{ totalCredits }}</span>
           </span>
@@ -112,7 +112,7 @@
         </div>
       </div>
 
-      <div class="pt-3.5">
+      <div class="pb-0.5 pt-3.5">
         <UserMenu placement="top" :plan-name="planName" />
       </div>
     </div>
@@ -183,6 +183,6 @@ onMounted(ensureLoaded)
 
 <style scoped>
 .nav-item {
-  @apply flex h-[38px] items-center gap-2.5 rounded px-3 text-[13.5px] transition-colors;
+  @apply flex h-[38px] items-center gap-2.5 rounded px-3 text-[calc(13.5px*var(--fs))] transition-colors;
 }
 </style>

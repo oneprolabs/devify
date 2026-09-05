@@ -17,7 +17,7 @@
         <div class="flex flex-wrap items-end gap-6 flex-1 min-w-0">
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{ t('notificationManagement.stats.userScope') }}
             </label>
@@ -40,7 +40,7 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{ t('notificationManagement.stats.granularity') }}
             </label>
@@ -63,7 +63,7 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{
                 granularity === 'day'
@@ -191,7 +191,7 @@
                   </svg>
                 </span>
                 <span class="text-xs font-medium uppercase text-blue-600"
-                  >TOTAL</span
+                  >{{ t('notificationManagement.stats.total') }}</span
                 >
               </div>
               <div class="text-2xl font-semibold text-gray-900">
@@ -223,7 +223,7 @@
                   </svg>
                 </span>
                 <span class="text-xs font-medium uppercase text-green-600"
-                  >SUCCESS</span
+                  >{{ t('notificationManagement.stats.totalSent') }}</span
                 >
               </div>
               <div class="text-2xl font-semibold text-green-600">
@@ -262,7 +262,7 @@
                   </svg>
                 </span>
                 <span class="text-xs font-medium uppercase text-red-600"
-                  >FAILURE</span
+                  >{{ t('notificationManagement.stats.totalFailed') }}</span
                 >
               </div>
               <div class="text-2xl font-semibold text-red-600">

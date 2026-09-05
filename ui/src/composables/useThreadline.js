@@ -25,6 +25,7 @@ export function useThreadline(
   const threadline = threadlineRef || ref(null)
   const loading = ref(false)
   const error = ref('')
+
   const deleting = ref(false)
   const showDeleteConfirm = ref(false)
   const showActionMenu = ref(false)
@@ -93,15 +94,17 @@ export function useThreadline(
     })
   })
 
-  // Format date
-  const formatDate = (dateString) => {
+  // Format date. Callers that need a shorter stamp than the section
+  // headings use — a delivery log line, say — pass their own pattern.
+  const formatDate = (dateString, pattern) => {
     if (!dateString) return t('common.noData')
 
     // Use different date format based on language
     const dateFormat =
-      preferencesStore.currentLanguage === 'zh-CN'
+      pattern ||
+      (preferencesStore.currentLanguage === 'zh-CN'
         ? 'yyyy年MM月dd日 HH:mm'
-        : 'MMM dd, yyyy HH:mm'
+        : 'MMM dd, yyyy HH:mm')
 
     return formatDateUtil(
       dateString,
@@ -122,13 +125,23 @@ export function useThreadline(
     return statusMap[status] || 'bg-chip text-ink'
   }
 
+  // J/K walks the list faster than the API answers. Every load takes a
+  // ticket; a response whose ticket is no longer the current one belongs to
+  // a conversation the reader has already left, so it is dropped rather
+  // than written over the one they are looking at now.
+  let loadTicket = 0
+
   // Load threadline
   const loadThreadline = async () => {
+    const ticket = ++loadTicket
+    const requestedId = route.params.id
     loading.value = true
     error.value = ''
 
     try {
-      const response = await chatApi.getThreadline(route.params.id)
+      const response = await chatApi.getThreadline(requestedId)
+      if (ticket !== loadTicket) return
+
       // Handle the actual response format from backend
       const data = response.data.data || response.data
       threadline.value = data
@@ -140,6 +153,8 @@ export function useThreadline(
         }
       }
     } catch (err) {
+      if (ticket !== loadTicket) return
+
       console.error('Failed to load threadline:', err)
 
       // If resource not found (404), redirect to 404 page
@@ -150,7 +165,7 @@ export function useThreadline(
 
       error.value = err.response?.data?.message || 'Failed to load threadline'
     } finally {
-      loading.value = false
+      if (ticket === loadTicket) loading.value = false
     }
   }
 

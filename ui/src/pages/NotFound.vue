@@ -7,37 +7,37 @@
         class="flex w-full max-w-[560px] flex-col items-center gap-3.5 rounded-[11px] border border-line bg-panel px-6 py-14 text-center"
       >
         <span
-          class="font-display text-[56px] font-bold leading-none tracking-[-0.03em] text-line"
+          class="font-display text-[calc(56px*var(--fs))] font-bold leading-none tracking-[-0.03em] text-line"
         >
           {{ t('notFound.title') }}
         </span>
 
         <div class="flex max-w-[400px] flex-col items-center gap-2">
-          <p class="text-[14.5px] font-semibold text-ink">
+          <p class="text-[calc(14.5px*var(--fs))] font-semibold text-ink">
             {{ t('notFound.quote') }}
           </p>
-          <p class="text-[12.5px] leading-[1.75] text-ink-3">
+          <p class="text-[calc(12.5px*var(--fs))] leading-[1.75] text-ink-3">
             {{ t('notFound.description') }}
           </p>
         </div>
 
         <span class="h-px w-[52px] bg-line"></span>
 
-        <p class="text-[11.5px] italic leading-[1.7] text-ink-4">
+        <p class="text-[calc(11.5px*var(--fs))] italic leading-[1.7] text-ink-4">
           {{ t('notFound.philosophy') }}
         </p>
 
         <div class="flex gap-[9px] pt-1">
           <button
             type="button"
-            class="font-display flex h-[34px] items-center rounded px-[15px] text-[12.5px] font-medium text-accent-on transition-opacity bg-accent hover:opacity-90"
+            class="font-display flex h-[34px] items-center rounded px-[15px] text-[calc(12.5px*var(--fs))] font-medium text-accent-on transition-opacity bg-accent hover:opacity-90"
             @click="goHome"
           >
             {{ t('notFound.returnHome') }}
           </button>
           <button
             type="button"
-            class="font-display flex h-[34px] items-center rounded border border-line px-[15px] text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+            class="font-display flex h-[34px] items-center rounded border border-line px-[15px] text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4"
             @click="goBack"
           >
             {{ t('notFound.goBack') }}

@@ -49,7 +49,7 @@
               {{ group.name }}
               <span
                 v-if="group.status !== 'draft'"
-                class="ml-1 rounded-full bg-chip px-2 py-0.5 text-[11px] text-ink-2"
+                class="ml-1 rounded-full bg-chip px-2 py-0.5 text-[calc(11px*var(--fs))] text-ink-2"
               >
                 {{ t(`expense.groups.statuses.${group.status}`) }}
               </span>

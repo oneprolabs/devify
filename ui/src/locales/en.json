@@ -581,7 +581,8 @@
       "tabInfo": "Info",
       "position": "{index} of {total}",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "loadFailed": "This conversation didn't load"
     },
     "emptyTitle": "Forward your first email",
     "emptyBody": "Send it to the address below and it comes back as a summary and todos.\nText inside images is read too.",
@@ -1040,7 +1041,14 @@
       "retentionPermanent": "Permanent",
       "retentionYears": "{years}-year retention",
       "retentionDays": "{days}-day retention",
-      "freePlan": "Free"
+      "freePlan": "Free",
+      "names": {
+        "free": "Free Plan",
+        "starter": "Starter Plan",
+        "standard": "Standard Plan",
+        "pro": "Pro Plan",
+        "internal": "Internal Plan"
+      }
     },
     "downgrade": {
       "title": "Downgrade Subscription",
@@ -1174,6 +1182,7 @@
       "byPriority": "By Priority"
     },
     "filters": {
+      "label": "Filters",
       "all": "All",
       "status": "Status",
       "completed": "Completed",
@@ -1233,7 +1242,9 @@
     "groupByLabel": "Group: ",
     "openByPriority": "Open · by priority",
     "overdueGroup": "Overdue",
-    "priorityColumn": "Pri"
+    "priorityColumn": "Pri",
+    "groupTitle": "Group",
+    "newTodo": "New todo"
   },
   "share": {
     "title": "Share",
@@ -1581,5 +1592,10 @@
     "light": "Light",
     "dark": "Dark",
     "system": "System"
+  },
+  "fontSize": {
+    "label": "Text size",
+    "standard": "Standard",
+    "large": "Large"
   }
 }

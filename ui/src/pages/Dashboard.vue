@@ -6,7 +6,11 @@
          screen on its own. -->
     <!-- Too narrow for both: the conversation takes the screen on its own,
          which is also where a resize past the threshold lands. -->
-    <ThreadlineDetailPanel v-if="openId && !isWide" variant="page" />
+    <ThreadlineDetailPanel
+      v-if="openId && !isWide"
+      variant="page"
+      :seed="openRow"
+    />
 
     <div v-else-if="drawerOpen" class="flex min-h-0 flex-1 overflow-hidden">
       <div
@@ -15,10 +19,10 @@
         <div
           class="flex h-14 flex-shrink-0 items-center gap-2 border-b border-line px-3.5"
         >
-          <span class="text-[13.5px] font-semibold text-ink">
+          <span class="text-[calc(13.5px*var(--fs))] font-semibold text-ink">
             {{ t('chats.title') }}
           </span>
-          <span class="font-mono text-[10.5px] text-ink-3">
+          <span class="font-mono text-[calc(10.5px*var(--fs))] text-ink-3">
             {{ pagination.total }}
           </span>
           <div class="ml-auto flex items-center gap-1.5">
@@ -66,7 +70,7 @@
             v-model="searchQuery"
             type="text"
             :placeholder="t('chats.searchHint')"
-            class="h-8 w-full rounded-md border border-line bg-panel-sub px-2.5 text-[12.5px] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-0"
+            class="h-8 w-full rounded-md border border-line bg-panel-sub px-2.5 text-[calc(12.5px*var(--fs))] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-0"
           />
         </div>
 
@@ -85,13 +89,13 @@
         <div
           class="flex h-11 flex-shrink-0 items-center justify-between border-t border-line px-3.5"
         >
-          <span class="font-mono text-[10.5px] text-ink-3">
+          <span class="font-mono text-[calc(10.5px*var(--fs))] text-ink-3">
             {{ railRangeLabel }}
           </span>
           <div class="flex items-center gap-1.5">
             <button
               type="button"
-              class="rounded-md border border-line px-[9px] py-1 font-mono text-[10.5px] transition-colors"
+              class="rounded-md border border-line px-[9px] py-1 font-mono text-[calc(10.5px*var(--fs))] transition-colors"
               :class="
                 pagination.page > 1
                   ? 'text-ink hover:border-ink-4'
@@ -104,7 +108,7 @@
             </button>
             <button
               type="button"
-              class="rounded-md border border-line px-[9px] py-1 font-mono text-[10.5px] transition-colors"
+              class="rounded-md border border-line px-[9px] py-1 font-mono text-[calc(10.5px*var(--fs))] transition-colors"
               :class="
                 pagination.hasMore
                   ? 'text-ink hover:border-ink-4'
@@ -125,6 +129,7 @@
         <ThreadlineDetailPanel
           ref="detailPanel"
           variant="drawer"
+          :seed="openRow"
           :position="drawerPosition"
           :has-prev="drawerIndex > 0"
           :has-next="drawerIndex >= 0 && drawerIndex < results.length - 1"
@@ -197,7 +202,7 @@
           v-model="searchQuery"
           type="text"
           :placeholder="t('chats.searchHint')"
-          class="h-9 w-full rounded-md border border-line bg-panel-sub px-3 text-[13px] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-0"
+          class="h-9 w-full rounded-md border border-line bg-panel-sub px-3 text-[calc(13px*var(--fs))] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-0"
         />
       </div>
 
@@ -231,7 +236,7 @@
 
       <!-- Desktop column headings, matching the row widths below. -->
       <div
-        class="hidden h-8 flex-shrink-0 items-center gap-[14px] border-b border-line bg-panel-sub px-5 font-mono text-[10.5px] tracking-[0.06em] text-ink-4 md:flex"
+        class="hidden h-[33px] flex-shrink-0 items-center gap-[14px] border-b border-line bg-panel-sub px-5 font-mono text-[calc(10.5px*var(--fs))] tracking-[0.06em] text-ink-4 md:flex"
       >
         <div class="w-[15px] flex-none"></div>
         <div class="w-[92px] flex-none">{{ t('chats.colStatus') }}</div>
@@ -416,19 +421,19 @@
           v-if="selectedCount > 0"
           class="fixed inset-x-3 bottom-[70px] z-40 flex items-center gap-3 rounded-lg border border-accent bg-panel/95 px-3 py-2.5 shadow-soft-lg backdrop-blur md:hidden"
         >
-          <span class="text-[13px] text-ink">
+          <span class="text-[calc(13px*var(--fs))] text-ink">
             {{ t('chats.bulkMerge.selectedCount', { count: selectedCount }) }}
           </span>
           <button
             type="button"
-            class="ml-auto text-[13px] text-ink-3"
+            class="ml-auto text-[calc(13px*var(--fs))] text-ink-3"
             @click="clearSelection"
           >
             {{ t('chats.bulkMerge.clear') }}
           </button>
           <button
             type="button"
-            class="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-on disabled:opacity-50"
+            class="rounded-md bg-accent px-3 py-1.5 text-[calc(13px*var(--fs))] font-medium text-accent-on disabled:opacity-50"
             :disabled="selectedCount < 2 || mergeLoading"
             @click="openMergeConfirm"
           >
@@ -619,6 +624,12 @@ const railSearchOpen = ref(false)
 const drawerIndex = computed(() =>
   results.value.findIndex((chat) => String(chat.uuid) === String(openId.value))
 )
+// The row the panel was opened from, so the wait can draw what the list
+// already knows instead of an empty panel.
+const openRow = computed(() =>
+  drawerIndex.value < 0 ? null : results.value[drawerIndex.value]
+)
+
 const drawerPosition = computed(() => {
   if (drawerIndex.value < 0) return null
   return {

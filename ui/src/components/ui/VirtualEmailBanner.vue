@@ -19,8 +19,8 @@
     </svg>
 
     <span class="flex min-w-0 flex-col gap-px">
-      <span class="text-[10px] text-ink-3">{{ label }}</span>
-      <span class="truncate font-mono text-[12.5px] text-ink">
+      <span class="text-[calc(10px*var(--fs))] text-ink-3">{{ label }}</span>
+      <span class="truncate font-mono text-[calc(12.5px*var(--fs))] text-ink">
         {{ virtualEmail }}
       </span>
     </span>

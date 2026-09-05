@@ -591,7 +591,8 @@
       "tabInfo": "信息",
       "position": "第 {index} 条 / {total}",
       "previous": "上一条",
-      "next": "下一条"
+      "next": "下一条",
+      "loadFailed": "这条对话没能加载出来"
     },
     "emptyTitle": "把第一封邮件转发过来",
     "emptyBody": "转发到下面这个地址，AI 会整理成纪要与待办。\n也支持图片里的文字。",
@@ -998,7 +999,7 @@
   "billing": {
     "menuTitle": "订阅管理",
     "title": "订阅管理",
-    "description": "统一管理您的订阅、Credits 和使用情况。",
+    "description": "统一管理您的订阅、积分和使用情况。",
     "currentSubscription": {
       "title": "当前订阅",
       "provider": "支付方式",
@@ -1038,7 +1039,7 @@
       "unavailable": "不可用",
       "notAvailable": "不可用",
       "rechargeUnavailable": "充值不可用",
-      "stripeNotConfigured": "Stripe支付未配置",
+      "stripeNotConfigured": "Stripe 支付未配置",
       "upgradeFailed": "升级失败，请重试",
       "portalFailed": "无法打开管理页面，请重试",
       "cancelSuccess": "订阅已取消，将在当前周期结束后失效",
@@ -1049,7 +1050,14 @@
       "retentionPermanent": "永久保留",
       "retentionYears": "{years}年保留",
       "retentionDays": "{days}天保留",
-      "freePlan": "免费版"
+      "freePlan": "免费版",
+      "names": {
+        "free": "免费版",
+        "starter": "入门版",
+        "standard": "标准版",
+        "pro": "专业版",
+        "internal": "内部版"
+      }
     },
     "downgrade": {
       "title": "降级订阅",
@@ -1112,7 +1120,7 @@
       "canceled": "已取消",
       "trialing": "试用中",
       "pastDue": "逾期",
-      "stripeMissingHint": "当前尚未配置 Stripe 支付，您仍然可以查看 Credits 和订阅状态，但无法发起充值或订阅变更。"
+      "stripeMissingHint": "当前尚未配置 Stripe 支付，您仍然可以查看积分和订阅状态，但无法发起充值或订阅变更。"
     },
     "messages": {
       "paymentSuccess": "支付成功！您的订阅已激活。",
@@ -1183,6 +1191,7 @@
       "byPriority": "按优先级"
     },
     "filters": {
+      "label": "筛选",
       "all": "全部",
       "status": "状态",
       "completed": "已完成",
@@ -1242,7 +1251,9 @@
     "groupByLabel": "分组：",
     "openByPriority": "未完成 · 按优先级",
     "overdueGroup": "已逾期",
-    "priorityColumn": "优先"
+    "priorityColumn": "优先",
+    "groupTitle": "分组",
+    "newTodo": "新建待办"
   },
   "share": {
     "title": "分享",
@@ -1590,5 +1601,10 @@
     "light": "浅色",
     "dark": "深色",
     "system": "跟随系统"
+  },
+  "fontSize": {
+    "label": "字号",
+    "standard": "标准",
+    "large": "较大"
   }
 }

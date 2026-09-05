@@ -3,15 +3,15 @@
     class="flex flex-col gap-2 rounded-lg border border-line bg-panel px-4 py-[13px]"
   >
     <div class="flex items-center gap-2">
-      <span class="text-[12.5px] font-semibold text-ink">
+      <span class="text-[calc(12.5px*var(--fs))] font-semibold text-ink">
         {{ t('chats.detail.mergedSources') }}
       </span>
-      <span class="font-mono text-[10.5px] text-ink-3">
+      <span class="font-mono text-[calc(10.5px*var(--fs))] text-ink-3">
         {{ t('chats.mergedBadge', { count: children.length }) }}
       </span>
     </div>
 
-    <div class="flex flex-col gap-[5px] font-mono text-[10.5px] text-ink-4">
+    <div class="flex flex-col gap-[5px] font-mono text-[calc(10.5px*var(--fs))] text-ink-4">
       <span
         v-for="child in children"
         :key="child.uuid || child.id"

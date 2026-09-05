@@ -3,7 +3,7 @@
     <span class="h-1.5 w-1.5 flex-none rounded-full" :class="dotClass"></span>
     <span
       class="whitespace-nowrap font-mono"
-      :class="[textClass, compact ? 'text-[10.5px]' : 'text-[11.5px]']"
+      :class="[textClass, compact ? 'text-[calc(10.5px*var(--fs))]' : 'text-[calc(11.5px*var(--fs))]']"
     >
       {{ label }}
     </span>

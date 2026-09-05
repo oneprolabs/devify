@@ -3,10 +3,10 @@
     class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-5 py-4"
   >
     <div class="flex flex-wrap items-baseline gap-3">
-      <span class="text-[13px] font-semibold text-ink">
+      <span class="text-[calc(13px*var(--fs))] font-semibold text-ink">
         {{ t('billing.usageStats.title') }}
       </span>
-      <span class="font-mono text-[11px] text-ink-4">
+      <span class="font-mono text-[calc(11px*var(--fs))] text-ink-4">
         {{ rangeSummary }}
       </span>
 
@@ -15,7 +15,7 @@
           v-for="period in periods"
           :key="period.value"
           type="button"
-          class="rounded-[5px] px-[9px] py-[3px] font-mono text-[11px] transition-colors"
+          class="rounded-[5px] px-[9px] py-[3px] font-mono text-[calc(11px*var(--fs))] transition-colors"
           :class="
             selectedPeriod === period.value
               ? 'bg-accent text-accent-on'
@@ -28,43 +28,23 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-3 gap-3">
-      <div class="rounded border border-line bg-panel-sub p-3">
-        <div class="text-xs text-ink-3 mb-0.5">
-          {{ t('billing.usageStats.totalConsumed') }}
-        </div>
-        <div class="text-xl font-semibold text-ink">
-          {{ stats?.total_consumed || 0 }}
-        </div>
-      </div>
-
-      <div class="rounded border border-line bg-panel-sub p-3">
-        <div class="text-xs text-ink-3 mb-0.5">
-          {{ t('billing.usageStats.available') }}
-        </div>
-        <div class="text-xl font-semibold text-accent">
-          {{ stats?.total_available || 0 }}
-        </div>
-      </div>
-
-      <div class="rounded border border-line bg-panel-sub p-3">
-        <div class="text-xs text-ink-3 mb-0.5">
-          {{ t('billing.usageStats.totalCredits') }}
-        </div>
-        <div class="text-xl font-semibold text-ink">
-          {{ stats?.total_credits || 0 }}
-        </div>
-      </div>
-    </div>
-
-    <div class="relative" style="height: 240px">
-      <Line
+    <div class="relative" style="height: 180px">
+      <Bar
         v-if="!loading && chartData"
         :data="chartData"
         :options="chartOptions"
       />
-      <div v-else-if="loading" class="flex items-center justify-center h-full">
-        <div class="text-ink-3">{{ t('common.loading') }}</div>
+      <div
+        v-else-if="loading"
+        class="flex h-full items-end gap-[7px] px-1 pb-5"
+        aria-busy="true"
+      >
+        <span
+          v-for="(height, index) in BAR_HEIGHTS"
+          :key="index"
+          class="min-w-0 flex-1 rounded-sm bg-chip"
+          :style="{ height }"
+        ></span>
       </div>
       <div v-else class="flex items-center justify-center h-full">
         <div class="text-ink-3">{{ t('common.noData') }}</div>
@@ -76,30 +56,19 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Line } from 'vue-chartjs'
+import { Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
+  BarElement,
   Title,
   Tooltip,
-  Legend,
-  Filler
+  Legend
 } from 'chart.js'
 import billingApi from '@/api/billing'
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const { t } = useI18n()
 
@@ -108,6 +77,13 @@ const stats = ref(null)
 const selectedPeriod = ref(30)
 const customStartDate = ref('')
 const customEndDate = ref('')
+
+// A chart-shaped placeholder: fixed heights so the wait does not shimmer
+// into a different silhouette on every render.
+const BAR_HEIGHTS = [
+  '38%', '61%', '29%', '74%', '52%', '83%', '44%', '67%',
+  '31%', '58%', '77%', '41%', '69%', '35%', '55%'
+]
 
 const periods = computed(() => [
   { value: 7, label: t('billing.usageStats.days', { days: 7 }) },
@@ -141,10 +117,8 @@ const chartData = computed(() => {
     return null
   }
 
-  const dates = stats.value.stats.map((item) => {
-    const date = new Date(item.date)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  })
+  // The canvas labels the axis MM-DD, in the same mono style as the rest.
+  const dates = stats.value.stats.map((item) => String(item.date).slice(5, 10))
 
   const consumed = stats.value.stats.map((item) => item.consumed)
 
@@ -154,10 +128,11 @@ const chartData = computed(() => {
       {
         label: t('billing.usageStats.creditsConsumed'),
         data: consumed,
-        borderColor: accentColor(),
-        backgroundColor: accentColor(0.12),
-        tension: 0.3,
-        fill: true
+        backgroundColor: accentColor(0.45),
+        hoverBackgroundColor: accentColor(),
+        borderRadius: 2,
+        borderSkipped: false,
+        maxBarThickness: 14
       }
     ]
   }
@@ -183,14 +158,12 @@ const chartOptions = {
   scales: {
     y: {
       beginAtZero: true,
-      ticks: {
-        precision: 0
-      }
+      border: { display: false },
+      ticks: { precision: 0, maxTicksLimit: 3, font: { size: 10 } }
     },
     x: {
-      grid: {
-        display: false
-      }
+      grid: { display: false },
+      ticks: { maxTicksLimit: 6, font: { size: 10 } }
     }
   }
 }

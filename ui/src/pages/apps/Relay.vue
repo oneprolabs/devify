@@ -8,7 +8,7 @@
       :title="selectedChannel.name"
     >
       <span
-        class="rounded-sm px-[7px] py-0.5 font-mono text-[10.5px]"
+        class="rounded-sm px-[7px] py-0.5 font-mono text-[calc(10.5px*var(--fs))]"
         :class="
           selectedChannel.enabled ? 'bg-ok-soft text-ok' : 'bg-chip text-ink-3'
         "
@@ -23,7 +23,7 @@
       <div class="ml-auto flex items-center gap-2">
         <button
           type="button"
-          class="font-display flex h-8 items-center gap-[7px] rounded-md border border-line px-[13px] text-[12.5px] text-ink-2 transition-colors hover:border-ink-4 disabled:opacity-50"
+          class="font-display flex h-8 items-center gap-[7px] rounded-md border border-line px-[13px] text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4 disabled:opacity-50"
           :disabled="editor.testing.value || editor.saving.value"
           @click="editor.runEditorTest"
         >
@@ -41,7 +41,7 @@
         </button>
         <button
           type="button"
-          class="font-display flex h-8 items-center rounded-md bg-accent px-[15px] text-[12.5px] font-medium text-accent-on transition-opacity hover:opacity-90 disabled:opacity-40"
+          class="font-display flex h-8 items-center rounded-md bg-accent px-[15px] text-[calc(12.5px*var(--fs))] font-medium text-accent-on transition-opacity hover:opacity-90 disabled:opacity-40"
           :disabled="
             editor.saving.value ||
             editor.testing.value ||
@@ -60,7 +60,7 @@
       :title="t('relay.pageTitle')"
     >
       <label
-        class="flex h-8 max-w-[340px] flex-1 items-center gap-2 rounded-md border border-line bg-panel-sub px-2.5"
+        class="flex h-8 max-w-[362px] flex-1 items-center gap-2 rounded-md border border-line bg-panel-sub px-2.5"
       >
         <svg
           class="h-3.5 w-3.5 flex-none text-ink-3"
@@ -77,7 +77,7 @@
           v-model="search"
           type="text"
           :placeholder="t('relay.searchPlaceholder')"
-          class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
+          class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[calc(12.5px*var(--fs))] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
         />
       </label>
 
@@ -97,7 +97,7 @@
         <button
           v-if="failedCount"
           type="button"
-          class="font-display flex h-8 items-center gap-[7px] rounded-md border border-bad px-[13px] text-[12.5px] text-bad transition-colors hover:bg-bad-soft"
+          class="font-display flex h-8 items-center gap-[7px] rounded-md border border-bad px-[13px] text-[calc(12.5px*var(--fs))] text-bad transition-colors hover:bg-bad-soft"
           @click="retryAllDeliveries"
         >
           <svg
@@ -127,7 +127,7 @@
         v-for="tab in tabs"
         :key="tab.value"
         type="button"
-        class="font-display flex h-11 items-center text-[13px] transition-colors"
+        class="font-display flex h-11 items-center text-[calc(13px*var(--fs))] transition-colors"
         :class="
           activeTab === tab.value
             ? '-mb-px border-b-2 border-accent font-semibold text-accent'
@@ -140,7 +140,7 @@
         {{ tab.label }}
         <span
           v-if="tab.count"
-          class="ml-[7px] font-mono text-[10.5px] text-ink-4"
+          class="ml-[7px] font-mono text-[calc(10.5px*var(--fs))] text-ink-4"
         >
           {{ tab.count }}
         </span>
@@ -158,7 +158,7 @@
 
     <template v-if="activeTab === 'deliveries'">
       <div
-        class="hidden h-8 flex-shrink-0 items-center gap-[14px] border-b border-line bg-panel-sub px-5 font-mono text-[10.5px] tracking-[0.06em] text-ink-4 md:flex"
+        class="hidden h-8 flex-shrink-0 items-center gap-[14px] border-b border-line bg-panel-sub px-5 font-mono text-[calc(10.5px*var(--fs))] tracking-[0.06em] text-ink-4 md:flex"
       >
         <div class="w-20 flex-none">{{ t('relay.colStatus') }}</div>
         <div class="min-w-0 flex-1">{{ t('relay.colSource') }}</div>
@@ -169,12 +169,7 @@
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <div v-if="loading" class="flex flex-col items-center gap-2 py-16">
-          <span
-            class="h-8 w-8 animate-spin rounded-full border-b-2 border-accent"
-          ></span>
-          <p class="text-sm text-ink-3">{{ t('common.loading') }}</p>
-        </div>
+        <SkeletonRows v-if="loading" :count="5" />
 
         <p
           v-else-if="!deliveryRows.length"
@@ -198,7 +193,7 @@
             <button
               ref="deliveryLoadMoreSentinel"
               type="button"
-              class="rounded-md border border-line px-4 py-1.5 text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+              class="rounded-md border border-line px-4 py-1.5 text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4"
               :disabled="loadingMoreDeliveries"
               @click="deliveryList.loadDeliveries(true)"
             >
@@ -240,7 +235,7 @@
               ></span>
               <span class="flex flex-none items-center gap-[9px]">
                 <span
-                  class="flex h-[22px] w-[22px] items-center justify-center rounded-full font-mono text-[11px]"
+                  class="flex h-[22px] w-[22px] items-center justify-center rounded-full font-mono text-[calc(11px*var(--fs))]"
                   :class="
                     step.done
                       ? 'bg-accent font-medium text-accent-on'
@@ -250,7 +245,7 @@
                   {{ index + 1 }}
                 </span>
                 <span
-                  class="font-display text-[13px]"
+                  class="font-display text-[calc(13px*var(--fs))]"
                   :class="
                     step.done ? 'font-semibold text-accent' : 'text-ink-3'
                   "
@@ -262,7 +257,7 @@
 
             <button
               type="button"
-              class="font-display ml-auto flex h-8 flex-none items-center rounded-md border border-line px-[13px] text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+              class="font-display ml-auto flex h-8 flex-none items-center rounded-md border border-line px-[13px] text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4"
               @click="cancelEditor"
             >
               {{ t('common.cancel') }}
@@ -275,17 +270,20 @@
               v-model="editorForm.target_type"
               :channels="subscriptions"
             />
-            <ChannelEditor v-else :editor="editor" />
+            <div v-else class="p-4 md:p-6">
+              <ChannelEditor :editor="editor" />
+            </div>
           </div>
         </template>
 
         <!-- `editSubscription` marks the row rather than opening a panel;
              in a master-detail that mark is what selects the editor. -->
-        <ChannelEditor
+        <div
           v-else-if="expandedSubscriptionId"
           class="min-h-0 flex-1 overflow-y-auto p-4 md:p-6"
-          :editor="editor"
-        />
+        >
+          <ChannelEditor :editor="editor" />
+        </div>
 
         <p
           v-else
@@ -330,6 +328,7 @@ import RelayStatStrip from '@/components/relay/RelayStatStrip.vue'
 import ChannelRail from '@/components/relay/ChannelRail.vue'
 import ChannelEditor from '@/components/relay/ChannelEditor.vue'
 import ChannelTypePicker from '@/components/relay/ChannelTypePicker.vue'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import { relayApi } from '@/api/relay'
 import { useRelayFormatters } from '@/composables/useRelayFormatters'
 import { useRelayDeliveryList } from '@/composables/useRelayDeliveryList'
@@ -389,12 +388,12 @@ const statusOptions = computed(() => [
   { value: 'processing', label: t('common.status.processing') },
   { value: 'pending', label: t('common.status.pending') }
 ])
-const channelFilterLabel = computed(() =>
-  t('relay.channelFilter', {
-    name:
-      channelOptions.value.find((o) => o.value === channelFilter.value)
-        ?.label || ''
-  })
+// The option label already reads as the field ("all channels", or the
+// channel's own name), so the canvas shows it without a prefix.
+const channelFilterLabel = computed(
+  () =>
+    channelOptions.value.find((o) => o.value === channelFilter.value)?.label ||
+    ''
 )
 const statusFilterLabel = computed(() =>
   t('relay.statusFilter', {

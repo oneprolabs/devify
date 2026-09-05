@@ -14,7 +14,7 @@
   >
     <span class="flex items-center gap-[7px]">
       <ChatStatus :status="status" :percent="percent" compact />
-      <span class="ml-auto flex-none font-mono text-[10px] text-ink-4">
+      <span class="ml-auto flex-none font-mono text-[calc(10px*var(--fs))] text-ink-4">
         {{ time }}
       </span>
     </span>
@@ -22,16 +22,16 @@
     <span class="flex min-w-0 items-center gap-1.5">
       <span
         v-if="mergedCount"
-        class="flex-none rounded-sm border border-accent px-1 py-px font-mono text-[9px] text-accent opacity-85"
+        class="flex-none rounded-sm border border-accent px-1 py-px font-mono text-[calc(9px*var(--fs))] text-accent opacity-85"
       >
         {{ t('chats.mergedBadge', { count: mergedCount }) }}
       </span>
-      <span class="truncate text-[12.5px] font-semibold text-ink">
+      <span class="truncate text-[calc(12.5px*var(--fs))] font-semibold text-ink">
         {{ title }}
       </span>
     </span>
 
-    <span class="truncate text-[11px] text-ink-3">{{ preview }}</span>
+    <span class="truncate text-[calc(11px*var(--fs))] text-ink-3">{{ preview }}</span>
   </button>
 </template>
 

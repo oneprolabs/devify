@@ -24,7 +24,7 @@
           />
         </svg>
       </button>
-      <span class="text-[13px] font-semibold text-ink">{{ label }}</span>
+      <span class="text-[calc(13px*var(--fs))] font-semibold text-ink">{{ label }}</span>
       <div
         class="order-last ml-auto flex h-8 items-center overflow-hidden rounded-md border border-line"
       >
@@ -32,7 +32,7 @@
           v-for="(option, index) in modes"
           :key="option.value"
           type="button"
-          class="font-display h-8 px-3 text-[12px] transition-colors"
+          class="font-display h-8 px-3 text-[calc(12px*var(--fs))] transition-colors"
           :class="[
             mode === option.value
               ? 'bg-accent-soft font-medium text-accent'
@@ -72,7 +72,7 @@
         <span
           v-for="day in weekDays"
           :key="day"
-          class="py-1 text-center font-mono text-[10.5px] text-ink-4"
+          class="py-1 text-center font-mono text-[calc(10.5px*var(--fs))] text-ink-4"
         >
           {{ day }}
         </span>
@@ -93,14 +93,14 @@
           ]"
           @click="$emit('select', date.date)"
         >
-          <span class="mb-1 block font-mono text-[11px] font-medium">
+          <span class="mb-1 block font-mono text-[calc(11px*var(--fs))] font-medium">
             {{ date.day }}
           </span>
           <span class="flex max-h-[60px] flex-col gap-1 overflow-hidden">
             <span
               v-for="todo in todosFor(date.date).slice(0, 3)"
               :key="todo.id"
-              class="truncate rounded-sm px-1 py-0.5 text-[10.5px]"
+              class="truncate rounded-sm px-1 py-0.5 text-[calc(10.5px*var(--fs))]"
               :class="chipClass(todo)"
               @click.stop="$emit('open', todo, date.date)"
             >
@@ -108,7 +108,7 @@
             </span>
             <span
               v-if="todosFor(date.date).length > 3"
-              class="rounded-sm bg-chip px-1 py-0.5 text-[10.5px] text-ink-2"
+              class="rounded-sm bg-chip px-1 py-0.5 text-[calc(10.5px*var(--fs))] text-ink-2"
             >
               {{
                 t('todos.calendar.moreTodos', {

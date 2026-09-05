@@ -2,7 +2,12 @@
   <div ref="root" class="relative">
     <button
       type="button"
-      class="flex h-8 items-center gap-1.5 rounded-md border border-line px-[11px] text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+      class="flex items-center gap-1.5 rounded-md border border-line text-ink-2 transition-colors hover:border-ink-4"
+      :class="
+        size === 'sm'
+          ? 'h-[30px] bg-panel px-[11px] text-xs'
+          : 'h-8 px-[11px] text-[calc(12.5px*var(--fs))]'
+      "
       @click="open = !open"
     >
       {{ label }}
@@ -26,7 +31,7 @@
         v-for="option in options"
         :key="String(option.value)"
         type="button"
-        class="flex w-full items-center px-3 py-1.5 text-left text-[12.5px] transition-colors hover:bg-chip"
+        class="flex w-full items-center px-3 py-1.5 text-left text-[calc(12.5px*var(--fs))] transition-colors hover:bg-chip"
         :class="option.value === modelValue ? 'text-accent' : 'text-ink-2'"
         @click="pick(option.value)"
       >
@@ -43,6 +48,9 @@ defineProps({
   // Text on the closed control; it already carries the field name.
   label: { type: String, required: true },
   options: { type: Array, required: true },
+  // The canvas draws these at 32px in a page header and 30px on a filter
+  // bar, where they sit on the panel rather than the bar's tint.
+  size: { type: String, default: 'md' },
   modelValue: { type: [String, Number, null], default: null }
 })
 

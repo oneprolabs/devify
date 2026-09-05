@@ -10,11 +10,11 @@
       <div class="flex flex-col gap-3.5 md:gap-[22px]">
         <div class="flex max-w-[720px] flex-col gap-[7px]">
           <h1
-            class="font-display hidden text-[22px] font-semibold tracking-tight text-ink md:block"
+            class="font-display hidden text-[calc(22px*var(--fs))] font-semibold tracking-tight text-ink md:block"
           >
             {{ t('apps.centerHeadline') }}
           </h1>
-          <p class="text-[12.5px] leading-[1.7] text-ink-3 md:text-[13px]">
+          <p class="text-[calc(12.5px*var(--fs))] leading-[1.7] text-ink-3 md:text-[calc(13px*var(--fs))]">
             {{ t('apps.panelDescription') }}
           </p>
         </div>

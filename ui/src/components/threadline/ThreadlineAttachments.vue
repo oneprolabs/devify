@@ -40,7 +40,7 @@
         />
         <span
           v-else
-          class="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-md font-mono text-[9px] font-medium"
+          class="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-md font-mono text-[calc(9px*var(--fs))] font-medium"
           :class="chipClass(att)"
         >
           {{ extLabel(att) }}
@@ -49,7 +49,7 @@
           <span class="truncate text-xs text-ink">{{ att.filename }}</span>
           <span
             v-if="att.file_size != null"
-            class="font-mono text-[10px] text-ink-4"
+            class="font-mono text-[calc(10px*var(--fs))] text-ink-4"
           >
             {{ formatBytes(att.file_size) }}
           </span>

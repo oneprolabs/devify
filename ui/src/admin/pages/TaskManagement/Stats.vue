@@ -17,7 +17,7 @@
         <div class="flex flex-wrap items-end gap-6 flex-1 min-w-0">
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{ t('taskManagement.stats.userScope') }}
             </label>
@@ -40,7 +40,7 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{ t('taskManagement.stats.granularity') }}
             </label>
@@ -63,7 +63,7 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{
                 granularity === 'day'

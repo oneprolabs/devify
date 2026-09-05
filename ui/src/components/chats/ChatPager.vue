@@ -1,14 +1,14 @@
 <template>
   <div
-    class="flex h-11 flex-shrink-0 items-center justify-between border-t border-line bg-panel-sub px-4 md:px-5"
+    class="flex h-[45px] flex-shrink-0 items-center justify-between border-t border-line bg-panel-sub px-4 md:px-5"
   >
-    <span class="font-mono text-[11px] text-ink-3">
+    <span class="font-mono text-[calc(11px*var(--fs))] text-ink-3">
       {{ t('chats.showingRange', { from, to, total }) }}
     </span>
     <div class="flex items-center gap-1.5">
       <button
         type="button"
-        class="rounded-md border border-line px-[11px] py-[5px] font-mono text-[11px] transition-colors"
+        class="rounded-md border border-line px-[11px] py-[5px] font-mono text-[calc(11px*var(--fs))] transition-colors"
         :class="
           page > 1
             ? 'text-ink hover:border-ink-4'
@@ -21,7 +21,7 @@
       </button>
       <button
         type="button"
-        class="rounded-md border border-line px-[11px] py-[5px] font-mono text-[11px] transition-colors"
+        class="rounded-md border border-line px-[11px] py-[5px] font-mono text-[calc(11px*var(--fs))] transition-colors"
         :class="
           hasMore
             ? 'text-ink hover:border-ink-4'

@@ -13,26 +13,26 @@
         ]"
       >
         <span
-          class="font-mono text-lg font-medium leading-[1.1] md:text-[23px] md:leading-none"
+          class="font-mono text-lg font-medium leading-[1.1] md:text-[calc(23px*var(--fs))] md:leading-none"
           :class="stat.tone"
         >
           {{ stat.value }}
         </span>
-        <span class="text-[10px] text-ink-3 md:text-[11.5px]">
+        <span class="text-[calc(10px*var(--fs))] text-ink-3 md:text-[calc(11.5px*var(--fs))]">
           {{ stat.label }}
         </span>
       </div>
     </div>
 
     <div v-if="channels.length" class="flex items-center gap-2.5 md:ml-auto">
-      <span class="font-mono text-[11px] text-ink-3">
+      <span class="font-mono text-[calc(11px*var(--fs))] text-ink-3">
         {{ t('relay.byChannel') }}
       </span>
       <div class="flex gap-[7px]">
         <span
           v-for="channel in channels"
           :key="channel.key"
-          class="rounded-sm bg-chip px-2.5 py-1 font-mono text-[11px] text-ink-2"
+          class="rounded-sm bg-chip px-2.5 py-1 font-mono text-[calc(11px*var(--fs))] text-ink-2"
         >
           {{ channel.label }} {{ channel.count }}
         </span>

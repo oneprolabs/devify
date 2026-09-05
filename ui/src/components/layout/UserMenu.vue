@@ -2,7 +2,7 @@
   <div class="relative" ref="rootRef">
     <button
       type="button"
-      class="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-chip focus:outline-none focus:ring-2 focus:ring-accent"
+      class="flex h-8 w-full items-center gap-[9px] rounded-lg px-2 text-left transition-colors hover:bg-chip focus:outline-none focus:ring-2 focus:ring-accent"
       @click.stop="open = !open"
     >
       <span
@@ -11,10 +11,10 @@
         {{ userInitial }}
       </span>
       <span v-if="showName" class="flex min-w-0 flex-col">
-        <span class="truncate text-[12.5px] font-medium text-ink">
+        <span class="truncate text-[calc(12.5px*var(--fs))] font-medium text-ink">
           {{ displayName }}
         </span>
-        <span class="truncate text-[11px] text-ink-3">{{ planName }}</span>
+        <span class="truncate text-[calc(11px*var(--fs))] text-ink-3">{{ planName }}</span>
       </span>
     </button>
 
@@ -46,12 +46,12 @@
           v-if="virtualEmail"
           class="mt-1 rounded-lg border border-line bg-panel-sub p-2.5"
         >
-          <div class="mb-1.5 text-[11px] text-ink-3">
+          <div class="mb-1.5 text-[calc(11px*var(--fs))] text-ink-3">
             {{ t('virtualEmail.yourAddress') }}
           </div>
           <div class="flex items-center gap-2">
             <span
-              class="min-w-0 flex-1 truncate font-mono text-[12.5px] text-ink"
+              class="min-w-0 flex-1 truncate font-mono text-[calc(12.5px*var(--fs))] text-ink"
               :title="virtualEmail"
             >
               {{ virtualEmail }}
@@ -101,6 +101,10 @@
           <ThemeSwitcher />
         </div>
         <div class="flex items-center justify-between px-2 py-1.5">
+          <span class="text-xs text-ink-2">{{ t('fontSize.label') }}</span>
+          <FontSizeSwitcher />
+        </div>
+        <div class="flex items-center justify-between px-2 py-1.5">
           <span class="text-xs text-ink-2">{{ t('common.language') }}</span>
           <LanguageSwitcher />
         </div>
@@ -141,6 +145,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher.vue'
 import ThemeSwitcher from '@/components/ui/ThemeSwitcher.vue'
+import FontSizeSwitcher from '@/components/ui/FontSizeSwitcher.vue'
 
 defineProps({
   placement: {

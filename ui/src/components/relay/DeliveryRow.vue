@@ -5,7 +5,7 @@
     <span class="flex w-20 flex-none items-center gap-1.5">
       <span class="h-1.5 w-1.5 flex-none rounded-full" :class="tone.dot"></span>
       <span
-        class="whitespace-nowrap font-mono text-[11.5px]"
+        class="whitespace-nowrap font-mono text-[calc(11.5px*var(--fs))]"
         :class="tone.text"
       >
         {{ statusLabel }}
@@ -15,30 +15,30 @@
     <span class="flex min-w-0 flex-1 flex-col gap-[3px]">
       <router-link
         :to="chatLink"
-        class="truncate text-[13.5px] font-semibold text-ink transition-colors hover:text-accent"
+        class="truncate text-[calc(13.5px*var(--fs))] font-semibold text-ink transition-colors hover:text-accent"
         :title="title"
       >
         {{ title }}
       </router-link>
-      <span class="truncate font-mono text-[11px] text-ink-4">
+      <span class="truncate font-mono text-[calc(11px*var(--fs))] text-ink-4">
         {{ actionLabel }}
       </span>
     </span>
 
     <span
-      class="hidden w-[196px] flex-none truncate font-mono text-[11.5px] text-ink-2 md:block"
+      class="hidden w-[196px] flex-none truncate font-mono text-[calc(11.5px*var(--fs))] text-ink-2 md:block"
     >
       {{ channelLabel }}
     </span>
 
     <span
-      class="hidden w-28 flex-none truncate font-mono text-[11.5px] text-accent md:block"
+      class="hidden w-28 flex-none truncate font-mono text-[calc(11.5px*var(--fs))] text-accent md:block"
     >
       {{ delivery.external_id || '—' }}
     </span>
 
     <span
-      class="w-24 flex-none whitespace-nowrap text-right font-mono text-[11px] text-ink-4"
+      class="w-24 flex-none whitespace-nowrap text-right font-mono text-[calc(11px*var(--fs))] text-ink-4"
     >
       {{ time }}
     </span>
@@ -47,7 +47,7 @@
       <button
         v-if="delivery.status === 'failed'"
         type="button"
-        class="font-mono text-[11px] text-bad transition-opacity hover:underline disabled:opacity-50"
+        class="font-display rounded-md border border-bad px-2.5 py-1 text-[calc(11.5px*var(--fs))] text-bad transition-colors hover:bg-bad-soft disabled:opacity-50"
         :disabled="busy"
         @click="$emit('retry', delivery)"
       >
@@ -83,6 +83,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRelayDeliveries } from '@/composables/useRelayDeliveries'
 import { usePreferencesStore } from '@/store/preferences'
 import { formatDate } from '@/utils/timezone'
 
@@ -96,6 +97,7 @@ defineEmits(['retry'])
 
 const { t, locale } = useI18n()
 const preferences = usePreferencesStore()
+const { relayDeliveryAction } = useRelayDeliveries()
 
 const TONES = {
   success: { dot: 'bg-ok', text: 'text-ok' },
@@ -138,20 +140,7 @@ const chatLink = computed(() => {
   return id ? `/chats/${id}` : '/chats'
 })
 
-// What the delivery did — created, linked, updated — which is the part a
-// channel name alone does not tell you. The strategy resolver records it on
-// the delivery when the plan is worked out.
-const ACTION_KEYS = {
-  new: 'relay.actionNew',
-  new_and_link: 'relay.actionNewAndLink',
-  update: 'relay.actionUpdate'
-}
-const actionLabel = computed(() => {
-  const action =
-    props.delivery.action ||
-    props.delivery.metadata?.relay_delivery_plan?.action
-  return ACTION_KEYS[action] ? t(ACTION_KEYS[action]) : ''
-})
+const actionLabel = computed(() => relayDeliveryAction(props.delivery))
 
 const CHANNEL_KEYS = {
   jira: 'relay.targetJira',

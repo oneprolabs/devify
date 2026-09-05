@@ -11,10 +11,10 @@
           :class="delivery.status === 'failed' ? 'bg-bad' : 'bg-ok'"
         ></span>
         <span class="flex min-w-0 flex-col gap-px">
-          <span class="truncate font-mono text-[11.5px] text-accent">
+          <span class="truncate font-mono text-[calc(11.5px*var(--fs))] text-accent">
             {{ relayDeliveryLabel(delivery) }}
           </span>
-          <span class="font-mono text-[10px] text-ink-4">
+          <span class="font-mono text-[calc(10px*var(--fs))] text-ink-4">
             {{ deliveryNote(delivery) }}
           </span>
         </span>
@@ -58,17 +58,22 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
-const { getRelayDeliveries, relayDeliveryLabel, relayDeliveryKey } =
-  useRelayDeliveries()
+const {
+  getRelayDeliveries,
+  relayDeliveryLabel,
+  relayDeliveryAction,
+  relayDeliveryKey
+} = useRelayDeliveries()
 
 const deliveries = computed(() => getRelayDeliveries(props.threadline))
 
 // The second line says what the delivery did and when, which is what
 // distinguishes two rows pointing at the same channel.
 const deliveryNote = (delivery) => {
-  const action = delivery.action_display || delivery.action || ''
+  const action = relayDeliveryAction(delivery)
   const at = delivery.completed_at || delivery.created_at
-  const stamp = at ? props.formatDate(at) : ''
+  // The canvas keeps this line short: month-day and time, no year.
+  const stamp = at ? props.formatDate(at, 'MM-dd HH:mm') : ''
   return [action, stamp].filter(Boolean).join(' · ')
 }
 </script>

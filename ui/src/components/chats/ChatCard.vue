@@ -38,18 +38,18 @@
 
       <span
         v-if="mergedCount"
-        class="rounded-sm border border-accent px-1.5 py-px font-mono text-[9.5px] text-accent opacity-85"
+        class="rounded-sm border border-accent px-1.5 py-px font-mono text-[calc(9.5px*var(--fs))] text-accent opacity-85"
       >
         {{ t('chats.mergedBadge', { count: mergedCount }) }}
       </span>
       <span
         v-if="shared"
-        class="rounded-sm border border-ok px-1.5 py-px font-mono text-[9.5px] text-ok opacity-85"
+        class="rounded-sm border border-ok px-1.5 py-px font-mono text-[calc(9.5px*var(--fs))] text-ok opacity-85"
       >
         {{ t('share.statusShared') }}
       </span>
 
-      <span class="ml-auto flex-none font-mono text-[10.5px] text-ink-4">
+      <span class="ml-auto flex-none font-mono text-[calc(10.5px*var(--fs))] text-ink-4">
         {{ time }}
       </span>
     </div>
@@ -68,13 +68,13 @@
       <span
         v-for="tag in tags.slice(0, 2)"
         :key="tag"
-        class="rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[10px] text-ink-2"
+        class="rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ink-2"
       >
         {{ tag }}
       </span>
       <span
         v-if="firstDelivery"
-        class="ml-auto truncate font-mono text-[10px] text-accent"
+        class="ml-auto truncate font-mono text-[calc(10px*var(--fs))] text-accent"
       >
         {{ relayDeliveryLabel(firstDelivery) }}
       </span>

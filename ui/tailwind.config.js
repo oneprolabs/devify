@@ -91,6 +91,23 @@ export default {
         display: ['Space Grotesk', 'Noto Sans SC', 'system-ui', 'sans-serif'],
         mono: ['IBM Plex Mono', 'ui-monospace', 'Menlo', 'monospace']
       },
+      // Two departures from Tailwind's defaults. The line-height is left at
+      // the browser default because the canvas sets one only where copy
+      // needs to breathe, and pages opt in with `leading-*`. The size is
+      // multiplied by `--fs`, the reader's type-size preference from
+      // tokens.css, so the whole scale moves together while the grid stays
+      // on the canvas's measurements.
+      fontSize: {
+        xs: ['calc(0.75rem * var(--fs))', 'normal'],
+        sm: ['calc(0.875rem * var(--fs))', 'normal'],
+        base: ['calc(1rem * var(--fs))', 'normal'],
+        lg: ['calc(1.125rem * var(--fs))', 'normal'],
+        xl: ['calc(1.25rem * var(--fs))', 'normal'],
+        '2xl': ['calc(1.5rem * var(--fs))', 'normal'],
+        '3xl': ['calc(1.875rem * var(--fs))', 'normal'],
+        '4xl': ['calc(2.25rem * var(--fs))', 'normal'],
+        '5xl': ['calc(3rem * var(--fs))', 'normal']
+      },
       // The canvas works in three radius tiers — 3/4 on badges, 7/8 on
       // controls, 9/10/11 on cards — so the named steps carry those rather
       // than the 16/20/24 the old rounded look was built on.
@@ -101,6 +118,17 @@ export default {
         lg: '10px',
         xl: '12px',
         '2xl': '16px'
+      },
+      // The drawer's only "still loading" signal: a 2px accent segment
+      // sweeping the hairline under the header.
+      keyframes: {
+        'drawer-progress': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(300%)' }
+        }
+      },
+      animation: {
+        'drawer-progress': 'drawer-progress 1.1s ease-in-out infinite'
       },
       boxShadow: {
         soft: '0 2px 8px rgba(0, 0, 0, 0.08)',

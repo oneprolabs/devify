@@ -17,6 +17,8 @@
 
   body {
     @apply bg-app text-ink;
+    /* Preflight pins this to 1.5; the canvas leaves it to the font. */
+    line-height: normal;
   }
 
   /* Form controls follow the theme instead of being pinned to light.
@@ -62,8 +64,10 @@
 }
 
 @layer components {
+  /* The canvas draws controls at 32px with a 7px radius; BaseButton's size
+     map supplies the height and padding, so the base only carries the shape. */
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
@@ -89,7 +93,13 @@
   }
 
   .input {
-    @apply block w-full px-3 py-2 text-sm border border-line rounded-lg shadow-sm placeholder-ink-4 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply block w-full rounded-md border border-line bg-panel px-[11px] py-[6px] text-[12.5px] leading-[18px] placeholder-ink-4 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* A select ignores line-height for its own box, so it needs the height
+     spelled out to sit at the same 32px as every other control. */
+  select.input {
+    @apply h-8 py-0;
   }
 
   .input-error {

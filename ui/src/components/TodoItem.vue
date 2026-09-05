@@ -178,7 +178,7 @@
         <div
           v-else
           :class="[
-            'select-text text-[13px] leading-[1.5] transition-colors',
+            'select-text text-[calc(12.5px*var(--fs))] leading-[1.5] transition-colors',
             todo.is_completed
               ? 'text-ink-3 line-through cursor-not-allowed'
               : readOnly
@@ -193,7 +193,7 @@
 
         <div
           v-if="showDetails"
-          class="mt-[5px] flex flex-wrap items-center gap-2 font-mono text-[10.5px] text-ink-4 [&>*:not(:first-child)]:before:mr-2 [&>*:not(:first-child)]:before:content-['·']"
+          class="mt-[5px] flex flex-wrap items-center gap-2 font-mono text-[calc(10.5px*var(--fs))] text-ink-4 [&>*:not(:first-child)]:before:mr-2 [&>*:not(:first-child)]:before:content-['·']"
         >
           <!-- Priority Inline Edit -->
           <div
@@ -858,14 +858,14 @@ watch(
 
 const getPriorityClass = (priority) => {
   const classes = {
-    high: 'rounded-sm bg-bad-soft px-1.5 py-0.5 font-mono text-[10px] text-bad',
+    high: 'rounded-sm bg-bad-soft px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-bad',
     medium:
-      'rounded-sm bg-warn-soft px-1.5 py-0.5 font-mono text-[10px] text-warn',
-    low: 'rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[10px] text-ink-3'
+      'rounded-sm bg-warn-soft px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-warn',
+    low: 'rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ink-3'
   }
   return (
     classes[priority] ||
-    'rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[10px] text-ink-3'
+    'rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ink-3'
   )
 }
 

@@ -1,67 +1,73 @@
 <template>
   <div
-    class="group flex items-center gap-3 border-b border-line-soft px-4 py-[var(--rowpy)] transition-colors hover:bg-panel-sub md:px-5"
+    class="group relative flex items-start gap-3 border-b border-line-soft px-4 py-3 transition-colors hover:bg-panel-sub md:items-center md:px-5 md:py-[var(--rowpy)]"
   >
     <input
       type="checkbox"
       :checked="todo.is_completed"
       :disabled="loading"
-      class="h-4 w-4 flex-none rounded-sm border-line text-ok focus:ring-accent"
+      class="mt-px h-[22px] w-[22px] flex-none rounded-md border-line text-ok focus:ring-accent md:mt-0 md:h-[18px] md:w-[18px] md:rounded-sm"
       @change="$emit('toggle', todo.id)"
     />
 
-    <button
-      type="button"
-      class="min-w-0 flex-1 truncate text-left text-[13.5px] transition-colors"
-      :class="
-        todo.is_completed
-          ? 'text-ink-3 line-through'
-          : 'text-ink hover:text-accent'
-      "
-      :title="todo.content"
-      @click="$emit('edit', todo)"
-    >
-      {{ todo.content }}
-    </button>
+    <!-- Narrow screens have no columns, so the same fields stack under the
+         content the way the canvas draws them. -->
+    <div class="flex min-w-0 flex-1 flex-col gap-[5px] md:contents">
+      <button
+        type="button"
+        class="text-left text-[calc(13.5px*var(--fs))] leading-[1.45] transition-colors md:min-w-0 md:flex-1 md:truncate md:leading-[calc(18px*var(--fs))]"
+        :class="
+          todo.is_completed
+            ? 'text-ink-3 line-through'
+            : 'text-ink hover:text-accent'
+        "
+        :title="todo.content"
+        @click="$emit('edit', todo)"
+      >
+        {{ todo.content }}
+      </button>
 
-    <span
-      class="hidden w-[34px] flex-none rounded-sm py-0.5 text-center font-mono text-[10px] md:block"
-      :class="priorityClass"
-    >
-      {{ todo.priority ? t(`todos.priorityShort.${todo.priority}`) : '—' }}
-    </span>
+      <div class="flex items-center gap-[7px] md:contents">
+        <span
+          class="flex-none rounded-sm px-1.5 py-0.5 text-center font-mono text-[calc(10px*var(--fs))] md:w-[34px] md:flex-none md:px-0 md:py-0.5"
+          :class="priorityClass"
+        >
+          {{ todo.priority ? t(`todos.priorityShort.${todo.priority}`) : '—' }}
+        </span>
 
-    <span
-      class="hidden w-[76px] flex-none truncate font-mono text-[11px] text-ink-2 md:block"
-    >
-      {{ todo.owner || '—' }}
-    </span>
+        <span
+          class="order-3 truncate font-mono text-[calc(10.5px*var(--fs))] text-ink-4 md:order-none md:w-[76px] md:flex-none md:text-[calc(11px*var(--fs))] md:text-ink-2"
+        >
+          {{ todo.owner || '—' }}
+        </span>
 
-    <span
-      class="w-[100px] flex-none truncate text-right font-mono text-[11px] md:w-[118px] md:text-left"
-      :class="deadlineClass"
-    >
-      {{ deadlineText }}
-    </span>
+        <span
+          class="order-2 flex-none truncate font-mono text-[calc(10.5px*var(--fs))] md:order-none md:w-[118px] md:text-[calc(11px*var(--fs))]"
+          :class="deadlineClass"
+        >
+          {{ deadlineText }}
+        </span>
+      </div>
 
     <router-link
       v-if="sourceTitle"
       :to="`/chats/${todo.email_message.uuid || todo.email_message.id}`"
-      class="hidden w-[210px] flex-none truncate text-[11.5px] text-accent hover:underline md:block"
+      class="truncate text-[calc(11px*var(--fs))] text-accent hover:underline md:w-[210px] md:flex-none md:text-[calc(11.5px*var(--fs))]"
       :title="sourceTitle"
     >
       {{ sourceTitle }}
     </router-link>
     <span
       v-else
-      class="hidden w-[210px] flex-none text-[11.5px] text-ink-4 md:block"
+      class="hidden text-[calc(11.5px*var(--fs))] text-ink-4 md:block md:w-[210px] md:flex-none"
     >
       —
     </span>
+    </div>
 
     <button
       type="button"
-      class="flex-none text-ink-4 opacity-0 transition-opacity hover:text-bad group-hover:opacity-100"
+      class="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm bg-panel-sub p-1 text-ink-4 opacity-0 transition-opacity hover:text-bad group-hover:opacity-100"
       :disabled="loading"
       :aria-label="t('todos.delete')"
       @click="$emit('delete', todo.id)"

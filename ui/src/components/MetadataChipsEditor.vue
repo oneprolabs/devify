@@ -562,7 +562,7 @@ const chipClasses = computed(() => {
   // The canvas draws every chip the same size: 10.5px mono on a 4px radius.
   const base =
     'inline-flex items-center gap-1 px-2 py-[3px] rounded-sm ' +
-    'font-mono text-[10.5px] select-none'
+    'font-mono text-[calc(10.5px*var(--fs))] select-none'
   const map = {
     blue: 'bg-accent-soft text-accent',
     green: 'bg-ok-soft text-ok',

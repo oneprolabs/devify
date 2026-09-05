@@ -36,10 +36,10 @@
             </span>
 
             <div class="flex min-w-0 flex-1 flex-col gap-[7px]">
-              <h3 v-if="title" class="text-[15px] font-semibold text-ink">
+              <h3 v-if="title" class="text-[calc(15px*var(--fs))] font-semibold text-ink">
                 {{ title }}
               </h3>
-              <p class="text-[12.5px] leading-[1.75] text-ink-2">
+              <p class="text-[calc(12.5px*var(--fs))] leading-[1.75] text-ink-2">
                 {{ message }}
               </p>
               <slot />
@@ -47,13 +47,13 @@
               <!-- An irreversible action asks for the name back, so it cannot
                    be confirmed by muscle memory. -->
               <div v-if="confirmPhrase" class="flex flex-col gap-1.5 pt-0.5">
-                <span class="text-[11.5px] text-ink-3">
+                <span class="text-[calc(11.5px*var(--fs))] text-ink-3">
                   {{ t('common.typeToConfirm', { phrase: confirmPhrase }) }}
                 </span>
                 <input
                   v-model="typed"
                   type="text"
-                  class="h-9 rounded border border-line bg-panel px-3 font-mono text-[12.5px] text-ink placeholder:text-ink-4 focus:border-accent focus:outline-none focus:ring-0"
+                  class="h-9 rounded border border-line bg-panel px-3 font-mono text-[calc(12.5px*var(--fs))] text-ink placeholder:text-ink-4 focus:border-accent focus:outline-none focus:ring-0"
                   :placeholder="confirmPhrase"
                 />
               </div>
@@ -65,7 +65,7 @@
           >
             <button
               type="button"
-              class="font-display flex h-[34px] items-center rounded border border-line px-[15px] text-[12.5px] text-ink-2 transition-colors hover:border-ink-4 disabled:opacity-50"
+              class="font-display flex h-[34px] items-center rounded border border-line px-[15px] text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4 disabled:opacity-50"
               :disabled="loading"
               @click="handleClose"
             >
@@ -73,7 +73,7 @@
             </button>
             <button
               type="button"
-              class="font-display flex h-[34px] items-center rounded px-4 text-[12.5px] font-medium transition-opacity hover:opacity-90 disabled:opacity-45"
+              class="font-display flex h-[34px] items-center rounded px-4 text-[calc(12.5px*var(--fs))] font-medium transition-opacity hover:opacity-90 disabled:opacity-45"
               :class="TONES[variant].button"
               :disabled="loading || !canConfirm"
               @click="handleConfirm"

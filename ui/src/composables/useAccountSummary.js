@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { usePlanName } from '@/composables/usePlanName'
 import { billingApi } from '@/api/billing'
 import { chatApi } from '@/api/chat'
 import { todosApi } from '@/api/todos'
@@ -43,6 +44,8 @@ async function load() {
 }
 
 export function useAccountSummary() {
+  const { planName: planLabel } = usePlanName()
+
   const ensureLoaded = () => {
     if (!loadPromise) {
       loadPromise = load().catch((error) => {
@@ -68,7 +71,10 @@ export function useAccountSummary() {
       Math.round((availableCredits.value / totalCredits.value) * 100)
     )
   })
-  const planName = computed(() => subscription.value?.plan_name || '')
+  // The server names plans in English; the sidebar shows the localised tier.
+  const planName = computed(() =>
+    planLabel(subscription.value?.plan_slug, subscription.value?.plan_name || '')
+  )
   // The sidebar badges: conversations still waiting, and todos still open.
   const pendingChats = computed(() => chatStats.value?.pending ?? 0)
   const openTodos = computed(() => todoStats.value?.incomplete ?? 0)

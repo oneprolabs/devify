@@ -17,7 +17,7 @@
       >
         <path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <span class="text-[12.5px]">{{ label }}</span>
+      <span class="text-xs">{{ label }}</span>
       <slot name="actions" />
     </button>
 

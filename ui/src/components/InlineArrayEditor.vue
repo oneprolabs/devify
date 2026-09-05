@@ -15,12 +15,12 @@
                 class="flex items-start gap-[11px]"
               >
                 <span
-                  class="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full border border-line font-mono text-[10px] text-ink-3"
+                  class="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full border border-line font-mono text-[calc(10px*var(--fs))] text-ink-3"
                 >
                   {{ index + 1 }}
                 </span>
                 <div
-                  class="markdown-content prose prose-sm min-w-0 max-w-none flex-1 text-[13px] leading-[1.6] text-ink-2"
+                  class="markdown-content prose prose-sm min-w-0 max-w-none flex-1 text-[calc(12.5px*var(--fs))] leading-[1.5] text-ink-2"
                 >
                   <div v-html="renderMarkdown(item)"></div>
                 </div>

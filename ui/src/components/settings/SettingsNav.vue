@@ -11,7 +11,7 @@
       @click="$emit('update:modelValue', section.value)"
     >
       <span
-        class="text-[13px]"
+        class="text-[calc(13px*var(--fs))]"
         :class="
           modelValue === section.value
             ? 'font-semibold text-accent'
@@ -21,7 +21,7 @@
         {{ section.label }}
       </span>
       <span
-        class="hidden text-[11px] leading-[1.5] md:block"
+        class="hidden text-[calc(11px*var(--fs))] leading-[1.5] md:block"
         :class="
           modelValue === section.value ? 'text-accent opacity-75' : 'text-ink-3'
         "

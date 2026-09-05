@@ -10,7 +10,7 @@
       :class="isActive(tab) ? 'text-accent' : 'text-ink-3'"
     >
       <component :is="tab.icon" class="h-[19px] w-[19px]" />
-      <span class="text-[10px]">{{ tab.label }}</span>
+      <span class="text-[calc(10px*var(--fs))]">{{ tab.label }}</span>
     </router-link>
   </nav>
 </template>

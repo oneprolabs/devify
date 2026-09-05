@@ -10,10 +10,10 @@
         v-else
         type="button"
         :aria-pressed="modelValue === option.value"
-        class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors"
+        class="flex h-[30px] items-center gap-1.5 rounded-md border px-[11px] text-xs transition-colors"
         :class="
           modelValue === option.value
-            ? 'border-accent bg-accent text-accent-on'
+            ? 'border-accent bg-accent-soft text-accent'
             : 'border-line bg-panel text-ink-2 hover:border-accent hover:text-accent'
         "
         @click="$emit('update:modelValue', option.value)"
@@ -21,8 +21,7 @@
         {{ option.label }}
         <span
           v-if="option.count !== undefined"
-          class="tabular-nums text-xs"
-          :class="modelValue === option.value ? 'text-accent-on' : 'text-ink-4'"
+          class="font-mono text-[calc(10.5px*var(--fs))] opacity-70"
         >
           {{ option.count }}
         </span>

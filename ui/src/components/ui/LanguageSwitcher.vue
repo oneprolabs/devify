@@ -5,23 +5,17 @@
       :class="triggerClass"
       :title="t('common.language')"
     >
-      <!-- Language icon -->
+      {{ currentLanguageDisplay }}
       <svg
-        class="w-4 h-4"
+        class="h-3 w-3"
+        viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
+        stroke-width="2.3"
+        aria-hidden="true"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
-        />
+        <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <!-- Current language flag/name -->
-      <span class="text-xs font-medium">{{ currentLanguageDisplay }}</span>
     </button>
 
     <!-- Dropdown menu -->
@@ -35,16 +29,16 @@
     >
       <div
         v-if="showDropdown"
-        class="absolute right-0 mt-2 w-32 bg-panel rounded-md shadow-lg py-1 z-50 border border-line"
+        class="absolute right-0 z-50 mt-2 w-32 rounded-md border border-line bg-panel py-1 shadow-lg"
       >
         <button
           v-for="lang in languages"
           :key="lang.value"
           @click="selectLanguage(lang.value)"
-          class="flex items-center w-full px-3 py-2 text-sm text-ink-2 hover:bg-chip transition-colors"
+          class="flex w-full items-center px-3 py-1.5 text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:bg-chip"
           :class="{ 'bg-app-sub font-medium': locale === lang.value }"
         >
-          <span class="mr-2 text-sm">{{ lang.flag }}</span>
+          <span class="mr-2 text-[calc(12.5px*var(--fs))]">{{ lang.flag }}</span>
           {{ lang.label }}
         </button>
       </div>
@@ -77,13 +71,13 @@ const languages = [
 
 const currentLanguageDisplay = computed(() => {
   const lang = languages.find((l) => l.value === locale.value)
-  return lang ? lang.flag : '🌐'
+  return lang ? lang.label : '🌐'
 })
 
 const triggerClass = computed(() => {
   return props.variant === 'dark'
-    ? 'flex items-center space-x-1 rounded-lg px-2 py-1 text-sm text-ink-4 transition-colors hover:bg-panel/10 hover:text-accent-on'
-    : 'flex items-center space-x-1 rounded-md px-2 py-1 text-sm text-ink-2 transition-colors hover:bg-chip hover:text-ink'
+    ? 'flex items-center gap-[5px] text-xs text-ink-4 transition-colors hover:text-accent-on'
+    : 'flex items-center gap-[5px] text-xs text-ink-3 transition-colors hover:text-ink-2'
 })
 
 const toggleDropdown = () => {

@@ -5,12 +5,12 @@
     <div
       class="flex h-[42px] flex-shrink-0 items-center gap-3 border-b border-line-soft px-5"
     >
-      <span class="text-[13px] font-semibold text-ink">
+      <span class="text-[calc(13px*var(--fs))] font-semibold text-ink">
         {{ t('billing.creditUsage.title') }}
       </span>
       <select
         v-model="selectedRange"
-        class="ml-auto rounded border-line bg-panel py-1 pl-2 pr-7 font-mono text-[11px] text-ink-3 focus:border-accent focus:ring-0"
+        class="ml-auto rounded border-line bg-panel py-1 pl-2 pr-7 font-mono text-[calc(11px*var(--fs))] text-ink-3 focus:border-accent focus:ring-0"
         @change="fetchUsageList"
       >
         <option value="7">{{ t('billing.creditUsage.last7Days') }}</option>
@@ -19,12 +19,7 @@
       </select>
     </div>
 
-    <div v-if="loading" class="flex items-center justify-center gap-3 py-10">
-      <span
-        class="h-6 w-6 animate-spin rounded-full border-b-2 border-accent"
-      ></span>
-      <p class="text-sm text-ink-3">{{ t('common.loading') }}</p>
-    </div>
+    <SkeletonRows v-if="loading" :count="4" />
 
     <p
       v-else-if="usageList.length === 0"
@@ -37,7 +32,7 @@
       <!-- Which conversation spent it, how many attachments it carried, what
            it cost and when. -->
       <div
-        class="flex h-8 flex-shrink-0 items-center gap-3 border-b border-line bg-panel-sub px-5 font-mono text-[10.5px] tracking-[0.06em] text-ink-4"
+        class="flex h-8 flex-shrink-0 items-center gap-3 border-b border-line bg-panel-sub px-5 font-mono text-[calc(10px*var(--fs))] tracking-[0.06em] text-ink-4"
       >
         <div class="min-w-0 flex-1">{{ t('billing.creditUsage.chat') }}</div>
         <div class="w-24 flex-none">{{ t('chats.files.title') }}</div>
@@ -56,7 +51,7 @@
         class="flex items-center gap-3 border-b border-line-soft px-5 py-[var(--rowpy)] text-left transition-colors last:border-b-0 hover:bg-panel-sub"
         @click="goToChat(item.chat_id)"
       >
-        <span class="min-w-0 flex-1 truncate text-[12.5px] text-ink">
+        <span class="min-w-0 flex-1 truncate text-[calc(12.5px*var(--fs))] text-ink">
           {{
             item.display_title ||
             item.summary_title ||
@@ -64,7 +59,7 @@
             t('billing.creditUsage.noSubject')
           }}
         </span>
-        <span class="w-24 flex-none font-mono text-[11px] text-ink-3">
+        <span class="w-24 flex-none font-mono text-[calc(11px*var(--fs))] text-ink-3">
           {{
             t('chats.attachmentsShort', { count: item.attachment_count || 0 })
           }}
@@ -73,9 +68,9 @@
           {{ item.amount }}
         </span>
         <span
-          class="w-[110px] flex-none text-right font-mono text-[11px] text-ink-4"
+          class="w-[110px] flex-none text-right font-mono text-[calc(11px*var(--fs))] text-ink-4"
         >
-          {{ formatRelativeDate(item.created_at, t) }}
+          {{ formatUsageTime(item.created_at) }}
         </span>
       </button>
     </template>
@@ -139,10 +134,18 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import billingApi from '@/api/billing'
-import { formatRelativeDate } from '@/utils/timezone'
+import { formatDate } from '@/utils/timezone'
+import { usePreferencesStore } from '@/store/preferences'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 
 const { t } = useI18n()
 const router = useRouter()
+const preferences = usePreferencesStore()
+
+// The canvas stamps these rows with the moment they happened, in the same
+// MM-DD HH:mm the rest of the log uses, not a relative phrase.
+const formatUsageTime = (value) =>
+  formatDate(value, preferences.currentTimezone, 'MM-dd HH:mm')
 
 const loading = ref(false)
 const usageList = ref([])

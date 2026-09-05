@@ -76,7 +76,7 @@ const classMap = {
 }
 
 const sizeMap = {
-  sm: 'px-1.5 py-0.5 text-[11px] leading-none',
+  sm: 'px-1.5 py-0.5 text-[calc(11px*var(--fs))] leading-none',
   md: 'px-2 py-0.5 text-xs'
 }
 

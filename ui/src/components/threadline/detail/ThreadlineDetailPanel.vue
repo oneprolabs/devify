@@ -75,7 +75,7 @@
 
       <span
         v-if="position"
-        class="hidden flex-none font-mono text-[11px] text-ink-3 lg:block"
+        class="hidden flex-none font-mono text-[calc(11px*var(--fs))] text-ink-3 lg:block"
       >
         {{ t('chats.detail.position', position) }}
       </span>
@@ -83,7 +83,7 @@
         <kbd
           v-for="key in ['J', 'K']"
           :key="key"
-          class="rounded-sm border border-line px-[5px] py-px font-mono text-[9.5px] text-ink-4"
+          class="rounded-sm border border-line px-[5px] py-px font-mono text-[calc(9.5px*var(--fs))] text-ink-4"
         >
           {{ key }}
         </kbd>
@@ -93,7 +93,7 @@
     <template v-else>
       <button
         type="button"
-        class="flex flex-none items-center gap-[7px] text-[12.5px] text-ink-2 transition-colors hover:text-ink"
+        class="flex flex-none items-center gap-[7px] text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:text-ink"
         @click="goBack"
       >
         <svg
@@ -112,15 +112,17 @@
         </svg>
         <span class="hidden sm:inline">{{ t('chats.title') }}</span>
       </button>
-      <span class="hidden text-[12.5px] text-ink-4 sm:inline">/</span>
-      <span class="min-w-0 flex-1 truncate text-[13px] text-ink-2 md:max-w-80">
+      <span class="hidden text-[calc(12.5px*var(--fs))] text-ink-4 sm:inline">/</span>
+      <span class="min-w-0 flex-1 truncate text-[calc(13px*var(--fs))] text-ink-2 md:max-w-80">
         {{ headerTitle }}
       </span>
     </template>
 
     <DetailActions
-      class="ml-auto"
-      :busy="isProcessing || deleting || retrying"
+      class="ml-auto transition-opacity"
+      :class="loading ? 'pointer-events-none opacity-45' : ''"
+      :inert="loading || undefined"
+      :busy="loading || isProcessing || deleting || retrying"
       :retrying="retrying"
       :shared="isShared"
       :share-busy="shareSaving || shareRevoking"
@@ -131,23 +133,64 @@
     />
   </header>
 
-  <div v-if="loading" class="flex flex-1 items-center justify-center">
-    <span
-      class="h-8 w-8 animate-spin rounded-full border-b-2 border-accent"
-    ></span>
+  <!-- The only "it is working" signal: a hairline under the header. A
+       spinner would say nothing the skeleton below does not say better. -->
+  <div v-if="loading" class="h-0.5 flex-shrink-0 overflow-hidden bg-line-soft">
+    <span class="block h-0.5 w-1/3 animate-drawer-progress bg-accent"></span>
   </div>
 
+  <DetailSkeleton
+    v-if="loading && seed"
+    :seed="seed"
+    :variant="variant"
+  />
+
+  <div
+    v-else-if="loading"
+    class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-5"
+  >
+    <span class="h-[9px] w-2/5 rounded-[5px] bg-chip"></span>
+    <span class="h-[9px] w-4/5 rounded-[5px] bg-chip"></span>
+    <span class="h-2 w-3/5 rounded bg-line-soft opacity-55"></span>
+  </div>
+
+  <!-- A failed load stays inside the drawer: the list beside it still
+       works, and the reader can retry without losing their place. -->
   <div
     v-else-if="error"
-    class="flex flex-1 flex-col items-center justify-center gap-2 text-center"
+    class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3.5 px-6 py-14 text-center"
   >
-    <p class="text-sm text-bad">{{ error }}</p>
+    <span
+      class="flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-bad-soft text-bad"
+    >
+      <svg
+        class="h-[18px] w-[18px]"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7.5v5.5M12 16.3h.01" stroke-linecap="round" />
+      </svg>
+    </span>
+    <span class="flex flex-col items-center gap-1.5">
+      <span class="text-[calc(14.5px*var(--fs))] font-semibold text-ink">
+        {{ t('chats.detail.loadFailed') }}
+      </span>
+      <span
+        class="max-w-[340px] text-[calc(12.5px*var(--fs))] leading-[1.7] text-ink-3"
+      >
+        {{ error }}
+      </span>
+    </span>
     <button
       type="button"
-      class="text-[12.5px] text-accent hover:underline"
+      class="font-display flex h-[34px] items-center rounded-lg bg-accent px-[15px] text-[calc(12.5px*var(--fs))] font-medium text-accent-on transition-opacity hover:opacity-90"
       @click="loadThreadline"
     >
-      {{ t('common.retry') }}
+      {{ t('common.tryAgain') }}
     </button>
   </div>
 
@@ -159,24 +202,24 @@
     "
   >
     <!-- What there is to read. -->
-    <div class="flex min-w-0 flex-1 flex-col gap-4">
-      <div class="flex flex-col gap-[9px]">
+    <div class="flex min-w-0 flex-1 flex-col gap-3">
+      <div class="flex flex-col gap-2">
         <div class="flex flex-wrap items-center gap-[9px]">
           <span
             v-if="mergedCount"
-            class="rounded-sm border border-accent px-1.5 py-0.5 font-mono text-[10px] text-accent opacity-85"
+            class="rounded-sm border border-accent px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-accent opacity-85"
           >
             {{ t('chats.mergedBadge', { count: mergedCount }) }}
           </span>
           <span
-            class="rounded-sm px-[7px] py-0.5 font-mono text-[10px]"
+            class="rounded-sm px-[7px] py-0.5 font-mono text-[calc(10px*var(--fs))]"
             :class="statusChipClass"
           >
             {{ statusLabel }}
           </span>
           <span
             v-if="isShared"
-            class="rounded-sm border border-ok px-1.5 py-0.5 font-mono text-[10px] text-ok opacity-85"
+            class="rounded-sm border border-ok px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ok opacity-85"
           >
             {{ t('share.statusShared') }}
           </span>
@@ -184,7 +227,7 @@
 
         <div v-if="!editingTitle" class="group flex items-start gap-2">
           <h1
-            class="text-2xl font-semibold leading-[1.35] tracking-tight text-ink"
+            class="text-[calc(21px*var(--fs))] font-semibold leading-[1.35] tracking-tight text-ink"
           >
             {{ headerTitle }}
           </h1>
@@ -217,14 +260,14 @@
             ref="titleInputRef"
             v-model="editingTitleValue"
             rows="2"
-            class="w-full resize-none rounded-md border border-accent bg-accent-soft px-3 py-2 text-2xl font-semibold leading-[1.35] text-ink focus:outline-none"
+            class="w-full resize-none rounded-md border border-accent bg-accent-soft px-3 py-2 text-[calc(21px*var(--fs))] font-semibold leading-[1.35] text-ink focus:outline-none"
             :disabled="savingTitle"
           ></textarea>
           <p v-if="titleError" class="text-xs text-bad">{{ titleError }}</p>
           <div class="flex justify-end gap-2">
             <button
               type="button"
-              class="text-[12.5px] text-ink-3 hover:text-ink"
+              class="text-[calc(12.5px*var(--fs))] text-ink-3 hover:text-ink"
               :disabled="savingTitle"
               @click="cancelEditingTitle"
             >
@@ -232,7 +275,7 @@
             </button>
             <button
               type="button"
-              class="text-[12.5px] text-accent hover:underline"
+              class="text-[calc(12.5px*var(--fs))] text-accent hover:underline"
               :disabled="savingTitle"
               @click="saveTitle"
             >
@@ -245,7 +288,7 @@
       <!-- The phone has no side column, so the sender, time and pipeline
            move up under the title where they stay visible. -->
       <div class="flex flex-col gap-2 md:hidden">
-        <p class="font-mono text-[11px] text-ink-4">{{ mobileMetaLine }}</p>
+        <p class="font-mono text-[calc(11px*var(--fs))] text-ink-4">{{ mobileMetaLine }}</p>
         <div class="flex gap-1">
           <span
             v-for="index in 4"
@@ -295,7 +338,7 @@
           <template #actions>
             <button
               type="button"
-              class="text-[11.5px] text-accent hover:underline disabled:opacity-50"
+              class="text-[calc(11.5px*var(--fs))] text-accent hover:underline disabled:opacity-50"
               :disabled="isProcessing || editingDetails"
               @click="openDetailsEditor"
             >
@@ -304,7 +347,7 @@
             <button
               v-if="summaryData.details"
               type="button"
-              class="text-[11.5px] text-ink-3 hover:text-ink"
+              class="text-[calc(11.5px*var(--fs))] text-ink-3 hover:text-ink"
               @click="copyContent(summaryData.details, 'details')"
             >
               {{ copiedStates.details ? t('common.copied') : t('common.copy') }}
@@ -356,7 +399,7 @@
           <template #actions>
             <button
               type="button"
-              class="text-[11.5px] text-accent hover:underline disabled:opacity-50"
+              class="text-[calc(11.5px*var(--fs))] text-accent hover:underline disabled:opacity-50"
               :disabled="
                 !!tempNewTodo || savingNewTodo || editingTodoIds.size > 0
               "
@@ -427,7 +470,7 @@
           <template #actions>
             <button
               type="button"
-              class="text-[11.5px] text-accent hover:underline disabled:opacity-50"
+              class="text-[calc(11.5px*var(--fs))] text-accent hover:underline disabled:opacity-50"
               :disabled="isProcessing || editingKeyProcess"
               @click="openKeyProcessEditor"
             >
@@ -436,7 +479,7 @@
             <button
               v-if="summaryData.key_process?.length"
               type="button"
-              class="text-[11.5px] text-ink-3 hover:text-ink"
+              class="text-[calc(11.5px*var(--fs))] text-ink-3 hover:text-ink"
               @click="copyKeyProcess"
             >
               {{
@@ -469,7 +512,7 @@
           <button
             v-if="threadline.summary_content"
             type="button"
-            class="text-[11.5px] text-ink-3 hover:text-ink"
+            class="text-[calc(11.5px*var(--fs))] text-ink-3 hover:text-ink"
             @click="copyContent(threadline.summary_content, 'summary')"
           >
             {{ copiedStates.summary ? t('common.copied') : t('common.copy') }}
@@ -501,7 +544,7 @@
           :label="t('chats.detail.originalEmails')"
         >
           <pre
-            class="whitespace-pre-wrap break-words font-sans text-[13px] leading-[1.7] text-ink-2"
+            class="whitespace-pre-wrap break-words font-sans text-[calc(13px*var(--fs))] leading-[1.7] text-ink-2"
             >{{ originalEmailContent }}</pre
           >
         </DetailDisclosure>
@@ -595,6 +638,7 @@ import DetailDisclosure from '@/components/threadline/detail/DetailDisclosure.vu
 import DetailInfoCard from '@/components/threadline/detail/DetailInfoCard.vue'
 import DetailMergeCard from '@/components/threadline/detail/DetailMergeCard.vue'
 import DetailRelayCard from '@/components/threadline/detail/DetailRelayCard.vue'
+import DetailSkeleton from '@/components/threadline/detail/DetailSkeleton.vue'
 import DetailStatusCard from '@/components/threadline/detail/DetailStatusCard.vue'
 import DetailTagsCard from '@/components/threadline/detail/DetailTagsCard.vue'
 import ThreadlineShareModal from '@/components/threadline/detail/ThreadlineShareModal.vue'
@@ -608,7 +652,7 @@ import { useRelayDeliveries } from '@/composables/useRelayDeliveries'
 
 const route = useRoute()
 const { t } = useI18n()
-defineProps({
+const props = defineProps({
   variant: {
     type: String,
     default: 'page',
@@ -617,7 +661,11 @@ defineProps({
   // { index, total } for the drawer's position counter.
   position: { type: Object, default: null },
   hasPrev: { type: Boolean, default: false },
-  hasNext: { type: Boolean, default: false }
+  hasNext: { type: Boolean, default: false },
+  // The list row this was opened from. The list already knows the title,
+  // status, tags and delivery target, so the wait shows those for real
+  // instead of a blank panel.
+  seed: { type: Object, default: null }
 })
 
 const emit = defineEmits(['close', 'prev', 'next'])
@@ -749,10 +797,15 @@ const mobileTabs = computed(() => [
 const isNarrow = ref(false)
 const showsOnMobile = (key) => !isNarrow.value || mobileTab.value === key
 
+// The list row already knows the title, so the header names the
+// conversation from the first frame instead of reading "no subject" until
+// the request lands.
 const headerTitle = computed(
   () =>
     threadline.value?.summary_title ||
     threadline.value?.subject ||
+    props.seed?.summary_title ||
+    props.seed?.subject ||
     t('common.noSubject')
 )
 const mergedCount = computed(

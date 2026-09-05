@@ -13,12 +13,12 @@
         ]"
       >
         <span
-          class="font-mono text-lg font-medium leading-[1.1] md:text-[23px] md:leading-none"
+          class="font-mono text-lg font-medium leading-[1.1] md:text-[calc(23px*var(--fs))] md:leading-none"
           :class="stat.tone"
         >
           {{ stat.value }}
         </span>
-        <span class="text-[10px] text-ink-3 md:text-[11.5px]">
+        <span class="text-[calc(10px*var(--fs))] text-ink-3 md:text-[calc(11.5px*var(--fs))]">
           {{ stat.label }}
         </span>
       </div>
@@ -27,10 +27,10 @@
     <!-- What is left to do, split by how urgent it is. -->
     <div class="flex flex-col gap-[7px] md:w-[300px] md:pl-7">
       <div class="flex items-center justify-between">
-        <span class="text-[11px] text-ink-3">
+        <span class="text-[calc(11px*var(--fs))] text-ink-3">
           {{ t('todos.openByPriority') }}
         </span>
-        <span class="font-mono text-[10.5px] text-ink-4">{{ breakdown }}</span>
+        <span class="font-mono text-[calc(10.5px*var(--fs))] text-ink-4">{{ breakdown }}</span>
       </div>
       <div class="flex h-1.5 gap-[3px]">
         <span

@@ -185,12 +185,12 @@
                 stroke-linejoin="round"
               />
             </svg>
-            <span class="text-[12.5px] text-ink-2">
+            <span class="text-[calc(12.5px*var(--fs))] text-ink-2">
               {{ t('share.readOnlyNotice') }}
             </span>
             <span
               v-if="shareExpiresAt"
-              class="ml-auto font-mono text-[11px] text-ink-4"
+              class="ml-auto font-mono text-[calc(11px*var(--fs))] text-ink-4"
             >
               {{
                 t('share.expiresOn', {
@@ -204,7 +204,7 @@
             class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-7 py-[26px]"
           >
             <h1
-              class="text-[25px] font-semibold leading-[1.4] tracking-tight text-ink"
+              class="text-[calc(25px*var(--fs))] font-semibold leading-[1.4] tracking-tight text-ink"
             >
               {{
                 threadline.summary_title ||
@@ -213,7 +213,7 @@
               }}
             </h1>
             <div
-              class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 font-mono text-[11.5px] text-ink-4"
+              class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 font-mono text-[calc(11.5px*var(--fs))] text-ink-4"
             >
               <span>
                 {{
@@ -231,7 +231,7 @@
               <span
                 v-for="tag in shareTags"
                 :key="tag"
-                class="rounded-sm bg-chip px-[9px] py-[3px] font-mono text-[10.5px] text-ink-2"
+                class="rounded-sm bg-chip px-[9px] py-[3px] font-mono text-[calc(10.5px*var(--fs))] text-ink-2"
               >
                 {{ tag }}
               </span>
@@ -332,11 +332,11 @@
                 class="flex items-start gap-[11px]"
               >
                 <span
-                  class="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full border border-line font-mono text-[10px] text-ink-3"
+                  class="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full border border-line font-mono text-[calc(10px*var(--fs))] text-ink-3"
                 >
                   {{ index + 1 }}
                 </span>
-                <span class="text-[13px] leading-[1.6] text-ink-2">
+                <span class="text-[calc(13px*var(--fs))] leading-[1.6] text-ink-2">
                   {{ item }}
                 </span>
               </li>

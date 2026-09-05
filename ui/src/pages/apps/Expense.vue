@@ -4,41 +4,41 @@
       :parent="{ to: '/apps', label: t('apps.centerTitle') }"
       :title="t('expense.pageTitle')"
       :count="headerSummary"
-    >
-      <!-- Three resources, not three states: an invoice's status is a filter
-           inside the first one. -->
-      <div
-        class="ml-auto flex h-8 items-center overflow-hidden rounded-md border border-line"
-        role="tablist"
-      >
-        <button
-          v-for="(tab, index) in tabs"
-          :key="tab.value"
-          type="button"
-          role="tab"
-          class="font-display flex h-8 items-center px-3.5 text-[12.5px] transition-colors"
-          :aria-selected="activeTab === tab.value"
-          :class="[
-            activeTab === tab.value
-              ? 'bg-accent-soft font-medium text-accent'
-              : 'text-ink-2 hover:bg-chip',
-            index ? 'border-l border-line' : ''
-          ]"
-          @click="activeTab = tab.value"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-    </PageHeader>
+    />
 
-    <div class="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
-      <div class="flex flex-col gap-3.5">
-        <BaseCard v-if="loading">
-          <div class="space-y-4 animate-pulse">
-            <div class="h-5 w-40 rounded bg-chip"></div>
-            <div class="h-20 rounded bg-chip"></div>
-          </div>
-        </BaseCard>
+    <!-- Three resources, not three states: an invoice's status is a filter
+         inside the first one. -->
+    <div
+      class="flex h-11 flex-shrink-0 items-center gap-[26px] border-b border-line px-4 md:px-5"
+      role="tablist"
+    >
+      <button
+        v-for="tab in tabs"
+        :key="tab.value"
+        type="button"
+        role="tab"
+        class="font-display flex h-11 items-center text-[calc(13px*var(--fs))] transition-colors"
+        :class="
+          activeTab === tab.value
+            ? '-mb-px border-b-2 border-accent font-semibold text-accent'
+            : 'font-medium text-ink-3 hover:text-ink-2'
+        "
+        :aria-selected="activeTab === tab.value"
+        @click="activeTab = tab.value"
+      >
+        {{ tab.label }}
+        <span
+          v-if="tab.count"
+          class="ml-[7px] font-mono text-[calc(10.5px*var(--fs))] text-ink-4"
+        >
+          {{ tab.count }}
+        </span>
+      </button>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto">
+      <div class="flex flex-col" :class="bodyClass">
+        <SkeletonRows v-if="loading" :count="5" />
 
         <template v-else>
           <p
@@ -133,6 +133,7 @@ import PendingLinkList from '@/components/expense/PendingLinkList.vue'
 import ScanPreviewDialog from '@/components/expense/ScanPreviewDialog.vue'
 import ScanRunList from '@/components/expense/ScanRunList.vue'
 import TripSuggestionCard from '@/components/expense/TripSuggestionCard.vue'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import { expenseApi } from '@/api/expense'
 
 const { t } = useI18n()
@@ -166,6 +167,12 @@ async function loadStats() {
 // Tabs separate resources, not states: an invoice's status is a filter
 // within its own list, so it never becomes a second row of tabs.
 const activeTab = ref('invoices')
+// The invoice tab runs edge to edge, like the canvas; the other two keep
+// the padded card layout they are drawn with.
+const bodyClass = computed(() =>
+  activeTab.value === 'invoices' ? '' : 'gap-3.5 p-4 md:p-5'
+)
+
 const tabs = computed(() => [
   { value: 'invoices', label: t('expense.tabsInvoices') },
   { value: 'groups', label: t('expense.tabsGroups') },

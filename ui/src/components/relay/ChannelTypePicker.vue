@@ -2,7 +2,7 @@
   <div class="flex flex-col gap-5 p-4 md:p-6">
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
       <label
-        class="flex h-9 items-center gap-2.5 rounded border border-line bg-panel px-3 md:w-[340px]"
+        class="flex h-9 items-center gap-2.5 rounded border border-line bg-panel px-3 md:w-[366px]"
       >
         <svg
           class="h-[15px] w-[15px] flex-none text-ink-3"
@@ -19,7 +19,7 @@
           v-model="search"
           type="text"
           :placeholder="t('relay.searchTypes')"
-          class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
+          class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[calc(12.5px*var(--fs))] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
         />
       </label>
 
@@ -42,7 +42,7 @@
     </div>
 
     <div v-for="group in groups" :key="group.key" class="flex flex-col gap-3">
-      <span class="font-mono text-[10.5px] tracking-[0.06em] text-ink-4">{{
+      <span class="font-mono text-[calc(10.5px*var(--fs))] tracking-[0.06em] text-ink-4">{{
         group.label
       }}</span>
       <div class="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
@@ -60,7 +60,7 @@
         >
           <span class="flex items-start gap-[11px]">
             <span
-              class="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] font-mono text-[11px] font-semibold"
+              class="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] font-mono text-[calc(11px*var(--fs))] font-semibold"
               :class="
                 modelValue === type.value
                   ? 'bg-panel text-accent'
@@ -77,7 +77,7 @@
                 {{ t(TYPE_LABEL_KEYS[type.value]) }}
               </span>
               <span
-                class="font-mono text-[10.5px]"
+                class="font-mono text-[calc(10.5px*var(--fs))]"
                 :class="
                   modelValue === type.value
                     ? 'text-accent opacity-75'
@@ -108,7 +108,7 @@
           </span>
 
           <span
-            class="text-[11.5px] leading-[1.65]"
+            class="text-[calc(11.5px*var(--fs))] leading-[1.65]"
             :class="
               modelValue === type.value
                 ? 'text-accent opacity-85'
@@ -122,7 +122,7 @@
             <span
               v-for="action in type.actions"
               :key="action.key"
-              class="rounded-sm px-1.5 py-px font-mono text-[9.5px]"
+              class="rounded-sm px-1.5 py-px font-mono text-[calc(9.5px*var(--fs))]"
               :class="actionClass(action, modelValue === type.value)"
             >
               {{ t(ACTION_LABEL_KEYS[action.key]) }}

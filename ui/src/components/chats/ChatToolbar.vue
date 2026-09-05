@@ -1,7 +1,7 @@
 <template>
   <div class="flex min-w-0 flex-1 items-center gap-3">
     <label
-      class="flex h-8 max-w-[420px] flex-1 items-center gap-2 rounded-md border border-line bg-panel-sub px-2.5"
+      class="flex h-8 max-w-[442px] flex-1 items-center gap-2 rounded-md border border-line bg-panel-sub px-2.5"
     >
       <svg
         class="h-3.5 w-3.5 flex-none text-ink-3"
@@ -19,11 +19,11 @@
         :value="search"
         type="text"
         :placeholder="t('chats.searchHint')"
-        class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
+        class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[calc(12.5px*var(--fs))] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
         @input="$emit('update:search', $event.target.value)"
       />
       <kbd
-        class="flex-none rounded-sm border border-line px-[5px] py-px font-mono text-[10px] text-ink-4"
+        class="flex-none rounded-sm border border-line px-[5px] py-px font-mono text-[calc(10px*var(--fs))] text-ink-4"
       >
         /
       </kbd>
@@ -46,7 +46,7 @@
       <button
         v-if="selectedCount"
         type="button"
-        class="font-display flex h-8 items-center gap-[7px] rounded-md bg-accent px-[13px] text-[12.5px] font-medium text-accent-on transition-opacity hover:opacity-90 disabled:opacity-50"
+        class="font-display flex h-8 items-center gap-[7px] rounded-md bg-accent px-[13px] text-[calc(12.5px*var(--fs))] font-medium text-accent-on transition-opacity hover:opacity-90 disabled:opacity-50"
         :disabled="selectedCount < 2"
         @click="$emit('merge')"
       >

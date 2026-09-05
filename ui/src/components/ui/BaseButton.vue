@@ -95,9 +95,9 @@ const buttonClasses = computed(() => {
     warning: 'btn-warning'
   }
   const sizeClasses = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base'
+    sm: 'h-7 px-2.5 text-[calc(11.5px*var(--fs))]',
+    md: 'h-8 px-[13px] text-[calc(12.5px*var(--fs))]',
+    lg: 'h-11 rounded-[9px] px-4 text-sm font-semibold'
   }
   const blockClass = props.block ? 'w-full' : ''
 

@@ -2,7 +2,7 @@
   <div
     class="flex flex-col gap-[11px] rounded-[11px] border border-line bg-panel px-[18px] py-4"
   >
-    <span class="text-[13px] font-semibold text-ink">
+    <span class="text-[calc(13px*var(--fs))] font-semibold text-ink">
       {{ t('billing.creditsInfo.title') }}
     </span>
     <p class="text-xs leading-[1.7] text-ink-3">

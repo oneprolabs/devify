@@ -635,7 +635,10 @@
       "noData": "No data",
       "chartByModelE2e": "E2E latency trend (by model)",
       "chartByModelTtft": "TTFT trend (by model)",
-      "chartByModelOutputTps": "Output TPS trend (by model)"
+      "chartByModelOutputTps": "Output TPS trend (by model)",
+      "capCost": "Cost",
+      "capPrompt": "Prompt",
+      "capCompletion": "Completion"
     },
     "strategy": {
       "title": "Strategy",

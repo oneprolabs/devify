@@ -6,7 +6,7 @@
   >
     <button
       type="button"
-      class="flex h-[15px] w-[15px] flex-none items-center justify-center rounded-sm border transition-colors"
+      class="flex h-[17px] w-[17px] flex-none items-center justify-center rounded-sm border transition-colors"
       :class="
         selected
           ? 'border-accent bg-accent text-accent-on'
@@ -46,19 +46,19 @@
       <div class="flex items-center gap-2">
         <span
           v-if="mergedCount"
-          class="rounded-sm border border-accent px-1.5 py-px font-mono text-[9.5px] text-accent opacity-85"
+          class="rounded-sm border border-accent px-1.5 py-px font-mono text-[calc(9.5px*var(--fs))] text-accent opacity-85"
         >
           {{ t('chats.mergedBadge', { count: mergedCount }) }}
         </span>
         <span
           v-if="shared"
-          class="rounded-sm border border-ok px-1.5 py-px font-mono text-[9.5px] text-ok opacity-85"
+          class="rounded-sm border border-ok px-1.5 py-px font-mono text-[calc(9.5px*var(--fs))] text-ok opacity-85"
         >
           {{ t('share.statusShared') }}
         </span>
         <span
           v-if="chat.invoice_count > 0"
-          class="rounded-sm border border-warn px-1.5 py-px font-mono text-[9.5px] text-warn opacity-85"
+          class="rounded-sm border border-warn px-1.5 py-px font-mono text-[calc(9.5px*var(--fs))] text-warn opacity-85"
           :title="
             t('chats.handledByExpenseHint', { count: chat.invoice_count })
           "
@@ -71,11 +71,11 @@
             )
           }}
         </span>
-        <span class="truncate text-[13.5px] font-semibold text-ink">
+        <span class="truncate text-[calc(13.5px*var(--fs))] font-semibold leading-[calc(18px*var(--fs))] text-ink">
           {{ title }}
         </span>
       </div>
-      <span class="max-w-[490px] truncate text-xs text-ink-3">
+      <span class="max-w-[490px] truncate text-xs leading-[calc(17px*var(--fs))] text-ink-3">
         {{ preview }}
       </span>
     </div>
@@ -84,20 +84,20 @@
       <span
         v-for="tag in visibleTags"
         :key="tag"
-        class="rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[10px] text-ink-2"
+        class="rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ink-2"
       >
         {{ tag }}
       </span>
-      <span v-if="hiddenTagCount" class="font-mono text-[10px] text-ink-4">
+      <span v-if="hiddenTagCount" class="font-mono text-[calc(10px*var(--fs))] text-ink-4">
         +{{ hiddenTagCount }}
       </span>
     </div>
 
-    <div class="w-[150px] flex-none truncate font-mono text-[11px] text-ink-2">
+    <div class="w-[150px] flex-none truncate font-mono text-[calc(11px*var(--fs))] text-ink-2">
       {{ source }}
     </div>
 
-    <div class="w-[108px] flex-none truncate font-mono text-[11px]">
+    <div class="w-[108px] flex-none truncate font-mono text-[calc(11px*var(--fs))]">
       <button
         v-if="status === 'failed'"
         type="button"
@@ -124,7 +124,7 @@
     </div>
 
     <div
-      class="w-[88px] flex-none whitespace-nowrap text-right font-mono text-[11px] text-ink-4"
+      class="w-[88px] flex-none whitespace-nowrap text-right font-mono text-[calc(11px*var(--fs))] text-ink-4"
     >
       {{ time }}
     </div>

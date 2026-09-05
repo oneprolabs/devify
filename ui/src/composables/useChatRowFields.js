@@ -102,6 +102,7 @@ export function useChatRowFields(source) {
     percent,
     title,
     preview,
+    senderName,
     source: source_,
     time,
     mergedCount,

@@ -2,7 +2,7 @@
   <div class="flex items-center gap-[7px]">
     <button
       type="button"
-      class="flex h-8 items-center gap-[7px] rounded-md border border-line px-3 text-[12.5px] text-ink-2 transition-colors hover:border-ink-4 disabled:opacity-50"
+      class="flex h-8 items-center gap-[7px] rounded-md border border-line px-3 text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4 disabled:opacity-50"
       :disabled="busy"
       @click="$emit('retry')"
     >
@@ -26,7 +26,7 @@
 
     <button
       type="button"
-      class="flex h-8 items-center gap-[7px] rounded-md border px-3 text-[12.5px] transition-colors disabled:opacity-50"
+      class="flex h-8 items-center gap-[7px] rounded-md border px-3 text-[calc(12.5px*var(--fs))] transition-colors disabled:opacity-50"
       :class="
         shared
           ? 'border-ok text-ok hover:bg-ok-soft'
@@ -81,14 +81,14 @@
       >
         <button
           type="button"
-          class="flex w-full items-center px-3 py-1.5 text-left text-[12.5px] text-ink-2 transition-colors hover:bg-chip"
+          class="flex w-full items-center px-3 py-1.5 text-left text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:bg-chip"
           @click="pick('share-settings')"
         >
           {{ t('share.modalTitle') }}
         </button>
         <button
           type="button"
-          class="flex w-full items-center px-3 py-1.5 text-left text-[12.5px] text-bad transition-colors hover:bg-chip"
+          class="flex w-full items-center px-3 py-1.5 text-left text-[calc(12.5px*var(--fs))] text-bad transition-colors hover:bg-chip"
           @click="pick('delete')"
         >
           {{ t('common.delete') }}

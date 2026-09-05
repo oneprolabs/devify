@@ -7,6 +7,7 @@ import router from './router'
 import i18n from './i18n'
 import { usePreferencesStore } from './store/preferences'
 import { initTheme } from './composables/useTheme'
+import { initFontScale } from './composables/useFontScale'
 import './assets/css/main.css'
 import '@vuepic/vue-datepicker/dist/main.css'
 
@@ -35,5 +36,6 @@ const preferencesStore = usePreferencesStore()
 preferencesStore.loadFromLocalStorage()
 
 initTheme()
+initFontScale()
 
 app.mount('#app')

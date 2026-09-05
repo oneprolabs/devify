@@ -8,7 +8,7 @@
       <div
         class="flex h-[42px] flex-shrink-0 items-center border-b border-line-soft px-[18px]"
       >
-        <span class="text-[13px] font-semibold text-ink">
+        <span class="text-[calc(13px*var(--fs))] font-semibold text-ink">
           {{ t('billing.plans.title') }}
         </span>
       </div>
@@ -24,11 +24,11 @@
             class="font-display text-sm font-semibold"
             :class="isCurrentPlan(plan) ? 'text-accent' : 'text-ink'"
           >
-            {{ plan.name }}
+            {{ label(plan) }}
           </span>
           <span
             v-if="isCurrentPlan(plan)"
-            class="rounded-sm border border-accent px-1.5 py-px font-mono text-[10px] text-accent"
+            class="rounded-sm border border-accent px-1.5 py-px font-mono text-[calc(10px*var(--fs))] text-accent"
           >
             {{ t('billing.plans.current') }}
           </span>
@@ -45,7 +45,7 @@
 
         <div
           v-if="plan.metadata"
-          class="flex flex-wrap gap-x-3.5 gap-y-[5px] font-mono text-[10.5px]"
+          class="flex flex-wrap gap-x-3.5 gap-y-[5px] font-mono text-[calc(10.5px*var(--fs))]"
           :class="isCurrentPlan(plan) ? 'text-accent opacity-80' : 'text-ink-3'"
         >
           <span>
@@ -60,26 +60,26 @@
           <button
             v-if="!rechargeEnabled"
             disabled
-            class="flex h-8 w-full items-center justify-center rounded border border-line text-[12.5px] text-ink-4"
+            class="flex h-8 w-full items-center justify-center rounded border border-line text-[calc(12.5px*var(--fs))] text-ink-4"
           >
             {{ t('billing.plans.rechargeUnavailable') }}
           </button>
           <button
             v-else-if="canUpgrade(plan)"
             type="button"
-            class="font-display flex h-8 w-full items-center justify-center rounded bg-accent text-[12.5px] font-medium text-accent-on transition-opacity hover:opacity-90 disabled:opacity-50"
+            class="font-display flex h-8 w-full items-center justify-center rounded bg-accent text-[calc(12.5px*var(--fs))] font-medium text-accent-on transition-opacity hover:opacity-90 disabled:opacity-50"
             :disabled="upgrading"
             @click="handleUpgrade(plan)"
           >
-            {{ t('billing.plans.upgradeTo', { plan: plan.name }) }}
+            {{ t('billing.plans.upgradeTo', { plan: label(plan) }) }}
           </button>
           <button
             v-else-if="canDowngrade(plan)"
             type="button"
-            class="font-display flex h-8 w-full items-center justify-center rounded border border-line text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+            class="font-display flex h-8 w-full items-center justify-center rounded border border-line text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4"
             @click="handleDowngradeClick(plan)"
           >
-            {{ t('billing.plans.downgradeTo', { plan: plan.name }) }}
+            {{ t('billing.plans.downgradeTo', { plan: label(plan) }) }}
           </button>
         </div>
       </div>
@@ -374,6 +374,7 @@ import { useToast } from '@/composables/useToast'
 import { format } from 'date-fns'
 import { zhCN, enUS } from 'date-fns/locale'
 import billingApi from '@/api/billing'
+import { usePlanName } from '@/composables/usePlanName'
 
 defineExpose({
   openCancelDialog: () => handleManageSubscription(),
@@ -383,6 +384,10 @@ defineExpose({
 })
 
 const { t, locale } = useI18n()
+const { planName } = usePlanName()
+
+// The tier name, localised where we ship that tier.
+const label = (plan) => planName(plan?.slug, plan?.name)
 const toast = useToast()
 
 const props = defineProps({

@@ -124,7 +124,7 @@
                     <div class="min-w-0">
                       <div class="flex flex-wrap items-center gap-2">
                         <span
-                          class="inline-flex items-center rounded-full border border-gray-200 bg-white/90 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500"
+                          class="inline-flex items-center rounded-full border border-gray-200 bg-white/90 px-2.5 py-1 text-[calc(11px*var(--fs))] font-semibold uppercase tracking-[0.18em] text-gray-500"
                         >
                           {{ t('billing.paymentCheck.title') }}
                         </span>
@@ -158,12 +158,12 @@
                           :class="item.dotClass"
                         />
                         <span
-                          class="inline-flex shrink-0 items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-gray-700"
+                          class="inline-flex shrink-0 items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[calc(11px*var(--fs))] font-semibold tracking-[0.08em] text-gray-700"
                         >
                           {{ item.userLabel }}
                         </span>
                         <span
-                          class="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em]"
+                          class="rounded-full px-2 py-0.5 text-[calc(11px*var(--fs))] font-semibold uppercase tracking-[0.12em]"
                           :class="item.badgeClass"
                         >
                           {{ item.statusLabel }}

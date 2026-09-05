@@ -1,13 +1,13 @@
 <template>
   <section
-    class="flex flex-col gap-[11px] rounded-lg border border-line bg-panel px-4 py-3.5"
+    class="flex flex-col gap-2.5 rounded-lg border border-line bg-panel px-[15px] py-[13px]"
   >
     <div class="flex items-center justify-between">
-      <span class="text-[12.5px] font-semibold text-ink">
+      <span class="text-[calc(12.5px*var(--fs))] font-semibold text-ink">
         {{ t('chats.detail.processingStatus') }}
       </span>
       <span
-        class="rounded-sm px-[7px] py-0.5 font-mono text-[10.5px]"
+        class="rounded-sm px-[7px] py-0.5 font-mono text-[calc(10.5px*var(--fs))]"
         :class="chipClass"
       >
         {{ statusLabel }}
@@ -23,7 +23,7 @@
       ></span>
     </div>
 
-    <div class="flex justify-between font-mono text-[10px] text-ink-4">
+    <div class="flex justify-between font-mono text-[calc(10px*var(--fs))] text-ink-4">
       <span v-for="stage in stages" :key="stage">{{ t(stage) }}</span>
     </div>
   </section>

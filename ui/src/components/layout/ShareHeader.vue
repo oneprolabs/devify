@@ -11,7 +11,7 @@
       <span class="font-display text-base font-semibold text-ink">
         {{ t('common.appName') }}
       </span>
-      <span class="hidden text-[12.5px] text-ink-4 sm:block">
+      <span class="hidden text-[calc(12.5px*var(--fs))] text-ink-4 sm:block">
         {{ t('share.viewSubtitle') }}
       </span>
     </div>
@@ -20,7 +20,7 @@
       <LanguageSwitcher />
       <button
         type="button"
-        class="font-display flex h-8 items-center gap-[7px] rounded-md border border-line px-[13px] text-[12.5px] text-ink-2 transition-colors hover:border-ink-4"
+        class="font-display flex h-8 items-center gap-[7px] rounded-md border border-line px-[13px] text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4"
         @click="copyLink"
       >
         <svg

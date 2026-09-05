@@ -12,10 +12,10 @@
     </span>
 
     <span class="flex flex-col items-center gap-1.5">
-      <span class="text-[15px] font-semibold text-ink">{{ title }}</span>
+      <span class="text-[calc(15px*var(--fs))] font-semibold text-ink">{{ title }}</span>
       <span
         v-if="description"
-        class="max-w-[340px] whitespace-pre-line text-[12.5px] leading-[1.7] text-ink-3"
+        class="max-w-[340px] whitespace-pre-line text-[calc(12.5px*var(--fs))] leading-[1.7] text-ink-3"
       >
         {{ description }}
       </span>

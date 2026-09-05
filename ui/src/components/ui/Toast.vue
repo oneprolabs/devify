@@ -20,7 +20,7 @@
           class="mt-px h-[17px] w-[17px] flex-shrink-0"
           :class="iconClasses[state.type]"
         />
-        <p class="min-w-0 flex-1 text-[13px] font-semibold text-ink">
+        <p class="min-w-0 flex-1 text-[calc(13px*var(--fs))] font-semibold text-ink">
           {{ state.message }}
         </p>
         <button

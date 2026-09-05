@@ -1,11 +1,15 @@
 <template>
-  <div class="space-y-4">
-    <FilterChips v-model="stage" :options="stageOptions" />
+  <div class="flex flex-col">
+    <!-- The canvas runs these bands edge to edge, separated by hairlines,
+         rather than boxing the list in a card. -->
+    <div class="flex-shrink-0 px-4 pt-3.5 md:px-5">
+      <FilterChips v-model="stage" :options="stageOptions" />
+    </div>
 
-    <div
-      class="flex flex-col overflow-hidden rounded-[11px] border border-line bg-panel"
-    >
-      <div class="flex flex-col gap-3.5 border-b border-line p-4 md:p-5">
+    <div class="flex flex-col">
+      <div
+        class="flex flex-col gap-3.5 border-b border-line px-4 pb-4 pt-3.5 md:px-5"
+      >
         <InvoiceFilters v-model="filters" :buyers="buyers" />
 
         <p
@@ -41,61 +45,63 @@
             </BaseButton>
           </div>
         </div>
+      </div>
 
-        <div
-          v-if="selectedUuids.length"
-          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent bg-accent-soft p-3"
-        >
-          <span class="text-sm text-accent">
-            {{
-              t('expense.invoices.selectedCount', {
-                count: selectedUuids.length
-              })
-            }}
-          </span>
-          <div class="flex flex-wrap gap-2">
+      <div
+        v-if="selectedUuids.length"
+        class="mx-4 mt-3.5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-accent bg-accent-soft px-3.5 py-2.5 md:mx-5"
+      >
+        <span class="text-sm text-accent">
+          {{
+            t('expense.invoices.selectedCount', {
+              count: selectedUuids.length
+            })
+          }}
+        </span>
+        <div class="flex flex-wrap gap-2">
+          <BaseButton
+            size="sm"
+            variant="secondary"
+            @click="selectedUuids = []"
+          >
+            {{ t('expense.invoices.clearSelection') }}
+          </BaseButton>
+          <BaseButton
+            v-if="stage === 'filed'"
+            size="sm"
+            :loading="filing"
+            @click="restoreSelected"
+          >
+            {{ t('expense.invoices.restore') }}
+          </BaseButton>
+          <template v-else>
             <BaseButton
               size="sm"
               variant="secondary"
-              @click="selectedUuids = []"
-            >
-              {{ t('expense.invoices.clearSelection') }}
-            </BaseButton>
-            <BaseButton
-              v-if="stage === 'filed'"
-              size="sm"
               :loading="filing"
-              @click="restoreSelected"
+              @click="fileOpen = true"
             >
-              {{ t('expense.invoices.restore') }}
+              {{ t('expense.invoices.fileAway') }}
             </BaseButton>
-            <template v-else>
-              <BaseButton
-                size="sm"
-                variant="secondary"
-                :loading="filing"
-                @click="fileOpen = true"
-              >
-                {{ t('expense.invoices.fileAway') }}
-              </BaseButton>
-              <BaseButton size="sm" @click="groupOpen = true">
-                {{
-                  stage === 'claiming'
-                    ? t('expense.groups.moveAction')
-                    : t('expense.groups.addAction')
-                }}
-              </BaseButton>
-            </template>
-          </div>
+            <BaseButton size="sm" @click="groupOpen = true">
+              {{
+                stage === 'claiming'
+                  ? t('expense.groups.moveAction')
+                  : t('expense.groups.addAction')
+              }}
+            </BaseButton>
+          </template>
         </div>
       </div>
 
-      <InvoiceMonthList
-        v-model="selectedUuids"
-        :invoices="invoices"
-        selectable
-        @select="open"
-      />
+      <div class="pt-3">
+        <InvoiceMonthList
+          v-model="selectedUuids"
+          :invoices="invoices"
+          selectable
+          @select="open"
+        />
+      </div>
     </div>
   </div>
 
@@ -181,7 +187,6 @@ const stageOptions = computed(() => [
     label: t('expense.stages.filed'),
     count: counts.value.filed
   },
-  { divider: true, value: '__divider__' },
   { value: 'all', label: t('expense.stages.all'), count: counts.value.all }
 ])
 

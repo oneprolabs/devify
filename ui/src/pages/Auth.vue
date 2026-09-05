@@ -4,20 +4,20 @@
          It carries no controls, so the narrow layout drops this column and
          restates the three steps in one line above the form instead. -->
     <aside
-      class="hidden border-r border-line bg-app-sub px-14 py-12 lg:flex lg:w-[41.4%] lg:flex-col lg:justify-between"
+      class="hidden border-r border-line bg-app-sub px-14 py-12 lg:flex lg:w-[709px] lg:flex-col lg:justify-between"
     >
       <div class="flex items-center gap-2.5">
         <img
           src="/android-chrome-192x192.png"
           alt=""
-          class="h-[30px] w-[30px] rounded-lg"
+          class="h-[30px] w-[30px] rounded-[8px]"
         />
         <span class="text-lg font-semibold text-ink">AImyChats</span>
       </div>
 
       <div class="flex flex-col gap-[30px]">
         <h2
-          class="whitespace-pre-line text-[27px] font-semibold leading-snug text-ink"
+          class="whitespace-pre-line text-[calc(27px*var(--fs))] font-semibold leading-[1.5] text-ink"
         >
           {{ t('auth.pitch.headline') }}
         </h2>
@@ -30,10 +30,10 @@
           >
             <div class="flex flex-col items-center">
               <span
-                class="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-accent-soft text-accent"
+                class="flex h-8 w-8 flex-none items-center justify-center rounded-full border border-accent text-accent"
               >
                 <svg
-                  class="h-4 w-4"
+                  class="h-[15px] w-[15px]"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -50,13 +50,16 @@
                 class="w-px flex-1 bg-line"
               ></span>
             </div>
-            <div class="flex flex-col gap-1 pb-[22px]">
-              <span class="text-sm font-semibold text-ink">
+            <div
+              class="flex flex-col gap-1"
+              :class="index < pitchSteps.length - 1 ? 'pb-[22px]' : ''"
+            >
+              <span class="text-sm font-semibold leading-[calc(18px*var(--fs))] text-ink">
                 {{ t(`auth.pitch.${step.key}.title`) }}
               </span>
               <span
                 v-if="step.body"
-                class="text-[12.5px] leading-relaxed text-ink-3"
+                class="text-[calc(12.5px*var(--fs))] leading-[1.7] text-ink-3"
               >
                 {{ t(`auth.pitch.${step.key}.body`) }}
               </span>
@@ -64,7 +67,7 @@
                 <span
                   v-for="target in deliveryTargets"
                   :key="target"
-                  class="rounded bg-chip px-2.5 py-1 text-[11px] text-ink-2"
+                  class="rounded-sm bg-chip px-2.5 py-1 text-[calc(11px*var(--fs))] leading-[calc(15px*var(--fs))] text-ink-2"
                 >
                   {{ t(target) }}
                 </span>
@@ -74,7 +77,7 @@
         </ol>
       </div>
 
-      <p class="text-[11px] text-ink-4">© 2026 AImyChats</p>
+      <p class="text-[calc(11px*var(--fs))] leading-[calc(13px*var(--fs))] text-ink-4">© 2026 AImyChats</p>
     </aside>
 
     <div
@@ -89,19 +92,21 @@
               <img
                 src="/android-chrome-192x192.png"
                 alt=""
-                class="h-[30px] w-[30px] rounded-lg"
+                class="h-[30px] w-[30px] rounded-[8px]"
               />
-              <span class="text-lg font-semibold text-ink">AImyChats</span>
+              <span class="text-[calc(16.5px*var(--fs))] font-semibold text-ink">
+                AImyChats
+              </span>
             </div>
             <LanguageSwitcher />
           </div>
           <div class="flex flex-col gap-2">
             <h2
-              class="whitespace-pre-line text-[22px] font-semibold leading-snug text-ink"
+              class="whitespace-pre-line text-[calc(22px*var(--fs))] font-semibold leading-snug text-ink"
             >
               {{ t('auth.pitch.headline') }}
             </h2>
-            <p class="text-[12.5px] leading-relaxed text-ink-3">
+            <p class="text-[calc(12.5px*var(--fs))] leading-[1.7] text-ink-3">
               {{ t('auth.pitch.summary') }}
             </p>
           </div>
@@ -168,12 +173,12 @@
         </div>
 
         <!-- Google OAuth Button (Priority) -->
-        <div v-if="!emailSent">
+        <div v-if="!emailSent" class="space-y-[22px]">
           <a
             :href="googleOAuthUrl"
-            class="w-full flex items-center justify-center px-4 py-3 border border-line rounded-lg shadow-sm bg-panel text-sm font-medium text-ink-2 hover:bg-app-sub transition-colors"
+            class="flex h-11 w-full items-center justify-center gap-2.5 rounded-[9px] border border-line bg-panel text-[calc(13.5px*var(--fs))] font-medium text-ink-2 transition-colors hover:bg-app-sub"
           >
-            <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
+            <svg class="h-[17px] w-[17px]" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -195,29 +200,26 @@
           </a>
 
           <!-- Divider -->
-          <div class="relative mt-6">
-            <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-line" />
-            </div>
-            <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-app text-ink-3">
-                {{ t('auth.divider.or') }}
-              </span>
-            </div>
+          <div class="flex items-center gap-3.5">
+            <div class="h-px flex-1 bg-line" />
+            <span class="text-[calc(11.5px*var(--fs))] text-ink-4">
+              {{ t('auth.divider.or') }}
+            </span>
+            <div class="h-px flex-1 bg-line" />
           </div>
         </div>
 
         <!-- Login Form -->
         <form
           v-if="activeTab === 'login' && !emailSent"
-          class="mt-6 space-y-4"
+          class="space-y-3.5"
           @submit.prevent="handleLogin"
         >
-          <div>
-            <label class="block text-sm font-medium text-ink-2 mb-1">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-ink-2">
               {{ t('auth.virtualEmailUsername') }}
             </label>
-            <div class="flex rounded-md shadow-sm">
+            <div class="flex">
               <input
                 v-model="formData.username"
                 type="text"
@@ -226,16 +228,16 @@
                 :placeholder="t('auth.username')"
                 required
                 :disabled="loading"
-                class="input rounded-r-none flex-1"
+                class="input h-11 flex-1 rounded-l-[9px] rounded-r-none px-[13px] text-[calc(13px*var(--fs))]"
                 :class="{ 'input-error': errors.username }"
               />
               <span
-                class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-line bg-app-sub text-ink-3 text-sm"
+                class="flex h-11 items-center rounded-r-[9px] border border-l-0 border-line bg-app-sub px-[13px] text-[calc(13px*var(--fs))] text-ink-3"
               >
                 @{{ emailDomain }}
               </span>
             </div>
-            <p v-if="errors.username" class="mt-1 text-sm text-bad">
+            <p v-if="errors.username" class="text-[calc(11.5px*var(--fs))] text-bad">
               {{ errors.username }}
             </p>
           </div>
@@ -247,21 +249,20 @@
             name="password"
             autocomplete="current-password"
             :placeholder="t('auth.password')"
+            size="lg"
             required
             :error="errors.password"
             :disabled="loading"
           />
 
           <div class="flex items-center justify-end">
-            <div class="text-sm">
-              <a
-                href="#"
-                @click.prevent="showForgotPassword = true"
-                class="font-medium text-accent hover:text-accent"
-              >
-                {{ t('auth.forgotPassword') }}
-              </a>
-            </div>
+            <a
+              href="#"
+              @click.prevent="showForgotPassword = true"
+              class="text-[calc(13px*var(--fs))] text-accent hover:underline md:text-[calc(12.5px*var(--fs))]"
+            >
+              {{ t('auth.forgotPassword') }}
+            </a>
           </div>
 
           <div
@@ -276,7 +277,8 @@
           <BaseButton
             type="submit"
             variant="primary"
-            class="w-full"
+            size="lg"
+            block
             :loading="loading"
             :disabled="loading"
           >
@@ -287,7 +289,7 @@
         <!-- Register Form -->
         <form
           v-if="activeTab === 'register' && !emailSent"
-          class="mt-6 space-y-4"
+          class="space-y-3.5"
           @submit.prevent="handleRegister"
         >
           <BaseInput
@@ -297,12 +299,13 @@
             name="email"
             autocomplete="email"
             :placeholder="t('register.emailPlaceholder')"
+            size="lg"
             required
             :error="errors.email"
             :disabled="loading"
           />
 
-          <p class="text-sm text-ink-3">
+          <p class="text-[calc(11.5px*var(--fs))] leading-relaxed text-ink-3">
             {{ t('register.emailHint') }}
           </p>
 
@@ -318,7 +321,8 @@
           <BaseButton
             type="submit"
             variant="primary"
-            class="w-full"
+            size="lg"
+            block
             :loading="loading"
             :disabled="loading || !formData.email"
           >
@@ -326,7 +330,7 @@
           </BaseButton>
         </form>
 
-        <p v-if="!emailSent" class="text-center text-[12.5px] text-ink-3">
+        <p v-if="!emailSent" class="text-center text-[calc(12.5px*var(--fs))] text-ink-3">
           {{
             activeTab === 'login'
               ? t('auth.noAccountYet')

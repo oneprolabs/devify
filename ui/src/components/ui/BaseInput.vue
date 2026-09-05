@@ -1,18 +1,17 @@
 <template>
-  <div class="space-y-1">
+  <div class="flex flex-col gap-1.5">
     <label
       v-if="label"
       :for="inputId"
-      class="block text-sm font-medium text-ink-2"
+      class="text-xs text-ink-2"
     >
       {{ label }}
-      <span v-if="required" class="text-bad">*</span>
     </label>
 
     <div class="relative">
       <input
         :id="inputId"
-        :type="type"
+        :type="revealed ? 'text' : type"
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
@@ -23,6 +22,29 @@
         @blur="$emit('blur', $event)"
         @focus="$emit('focus', $event)"
       />
+
+      <button
+        v-if="type === 'password'"
+        type="button"
+        class="absolute inset-y-0 right-0 flex items-center pr-3 text-ink-3 transition-colors hover:text-ink-2"
+        :aria-label="revealed ? t('common.hide') : t('common.show')"
+        @click="revealed = !revealed"
+      >
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.9"
+          aria-hidden="true"
+        >
+          <path
+            d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"
+          />
+          <circle cx="12" cy="12" r="2.6" />
+          <path v-if="revealed" d="M4 20L20 4" stroke-linecap="round" />
+        </svg>
+      </button>
 
       <div
         v-if="$slots.icon"
@@ -65,11 +87,11 @@
       </div>
     </div>
 
-    <p v-if="error" class="text-sm text-bad">
+    <p v-if="error" class="text-[calc(11.5px*var(--fs))] text-bad">
       {{ error }}
     </p>
 
-    <p v-else-if="help" class="text-sm text-ink-3">
+    <p v-else-if="help" class="text-[calc(11.5px*var(--fs))] text-ink-3">
       {{ help }}
     </p>
   </div>
@@ -77,6 +99,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps({
   modelValue: {
@@ -132,15 +155,17 @@ const props = defineProps({
 
 defineEmits(['update:modelValue', 'blur', 'focus'])
 
+const { t } = useI18n()
+const revealed = ref(false)
 const inputId = ref(`input-${Math.random().toString(36).substr(2, 9)}`)
 
 const inputClasses = computed(() => {
   const baseClasses = 'input'
   const errorClass = props.error ? 'input-error' : ''
   const sizeClasses = {
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-2 text-sm',
-    lg: 'px-4 py-3 text-base'
+    sm: 'px-2 py-1 text-[calc(11.5px*var(--fs))] leading-4',
+    md: '',
+    lg: 'rounded-[9px] px-[13px] py-[11px] text-[calc(13px*var(--fs))] leading-5'
   }
   const iconPadding = props.$slots?.icon ? 'pl-10' : ''
   const hasRightIcon =

@@ -7,88 +7,70 @@
       class="flex items-center gap-3 rounded-lg border border-line bg-panel-sub px-4 py-3"
     >
       <span
-        class="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-chip font-mono text-[11px] font-semibold text-ink-2"
+        class="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-chip font-mono text-[calc(11px*var(--fs))] font-semibold text-ink-2"
       >
         {{ TYPE_INITIALS[editorForm.target_type] || '··' }}
       </span>
       <span class="flex flex-col gap-px">
-        <span class="text-[13px] font-semibold text-ink">
+        <span class="text-[calc(13px*var(--fs))] font-semibold text-ink">
           {{
             t(TYPE_LABEL_KEYS[editorForm.target_type] || 'relay.targetFeishu')
           }}
         </span>
-        <span class="text-[11.5px] text-ink-3">
+        <span class="text-[calc(11.5px*var(--fs))] text-ink-3">
           {{ t('relay.channelTypeHelp') }}
         </span>
       </span>
       <button
         type="button"
-        class="ml-auto text-[11.5px] text-accent hover:underline"
+        class="ml-auto text-[calc(11.5px*var(--fs))] text-accent hover:underline"
         @click="editorForm.target_type = ''"
       >
         {{ t('relay.changeType') }}
       </button>
     </div>
 
-    <div class="flex flex-col gap-3 md:flex-row md:gap-7">
-      <div class="md:w-44 md:flex-none">
-        <label class="block text-sm font-medium text-ink-2 mb-1">
-          {{ t('relay.name') }}
-        </label>
-        <p class="text-xs text-ink-3">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div class="flex flex-col gap-[5px] md:col-span-2 md:max-w-[640px]">
+        <label class="text-xs text-ink-2">{{ t('relay.name') }}</label>
+        <input v-model="editorForm.name" class="input" />
+        <p class="text-[calc(11px*var(--fs))] text-ink-3">
           {{ t('relay.channelNameHelp') }}
         </p>
       </div>
-      <div class="min-w-0 md:max-w-[640px] md:flex-1">
-        <input v-model="editorForm.name" class="input" />
-      </div>
-    </div>
 
-    <div class="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-4 md:items-center">
-      <div class="md:w-44 md:flex-none">
-        <label class="block text-sm font-medium text-ink-2 mb-1">
-          {{ t('relay.enabled') }}
-        </label>
-        <p class="text-xs text-ink-3">
-          {{ t('relay.channelEnabledHelp') }}
-        </p>
-      </div>
-      <div class="min-w-0 md:max-w-[640px] md:flex-1">
-        <label class="flex items-center gap-2 text-sm text-ink-2">
+      <div class="flex flex-col gap-[5px]">
+        <label class="text-xs text-ink-2">{{ t('relay.enabled') }}</label>
+        <label
+          class="flex h-8 items-center gap-2 text-[calc(12.5px*var(--fs))] text-ink-2"
+        >
           <input
             v-model="editorForm.enabled"
             type="checkbox"
-            class="rounded border-line"
+            class="h-[15px] w-[15px] rounded-sm border-line text-accent focus:ring-accent"
           />
           {{ editorForm.enabled ? t('common.yes') : t('common.no') }}
         </label>
+        <p class="text-[calc(11px*var(--fs))] text-ink-3">
+          {{ t('relay.channelEnabledHelp') }}
+        </p>
       </div>
-    </div>
 
-    <div class="flex flex-col gap-3 md:flex-row md:gap-7">
-      <div class="md:w-44 md:flex-none">
-        <label class="block text-sm font-medium text-ink-2 mb-1">
-          {{ t('relay.language') }}
-        </label>
-        <p class="text-xs text-ink-3">
+      <div class="flex flex-col gap-[5px]">
+        <label class="text-xs text-ink-2">{{ t('relay.language') }}</label>
+        <select v-model="editorForm.language" class="input">
+          <option value="Chinese">{{ t('relay.languageChinese') }}</option>
+          <option value="English">{{ t('relay.languageEnglish') }}</option>
+        </select>
+        <p class="text-[calc(11px*var(--fs))] text-ink-3">
           {{ t('relay.languageHelp') }}
         </p>
       </div>
-      <div class="min-w-0 md:max-w-[640px] md:flex-1">
-        <select v-model="editorForm.language" class="input">
-          <option value="Chinese">
-            {{ t('relay.languageChinese') }}
-          </option>
-          <option value="English">
-            {{ t('relay.languageEnglish') }}
-          </option>
-        </select>
-      </div>
     </div>
 
-    <div class="rounded-lg border border-line bg-app-sub p-4 space-y-4">
+    <div class="space-y-4 rounded-lg border border-line bg-panel p-4">
       <div>
-        <h4 class="text-sm font-semibold text-ink">
+        <h4 class="text-[calc(13px*var(--fs))] font-semibold text-ink">
           {{ t('relay.strategiesTitle') }}
         </h4>
         <p class="mt-1 text-xs text-ink-3">
@@ -98,7 +80,7 @@
 
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div>
-          <label class="mb-1 block text-sm font-medium text-ink-2">
+          <label class="mb-[5px] block text-xs text-ink-2">
             {{ t('settings.autoMergeStrategy') }}
           </label>
           <select
@@ -115,7 +97,7 @@
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-ink-2">
+          <label class="mb-[5px] block text-xs text-ink-2">
             {{ t('settings.manualMergeStrategy') }}
           </label>
           <select
@@ -132,7 +114,7 @@
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-ink-2">
+          <label class="mb-[5px] block text-xs text-ink-2">
             {{ t('settings.retryIssueStrategy') }}
           </label>
           <select
@@ -152,10 +134,10 @@
 
     <div
       v-if="editorForm.target_type === 'feishu_bitable'"
-      class="rounded-lg border border-line bg-app-sub p-4 space-y-4"
+      class="space-y-4 rounded-lg border border-line bg-panel p-4"
     >
       <div>
-        <h4 class="text-sm font-semibold text-ink">
+        <h4 class="text-[calc(13px*var(--fs))] font-semibold text-ink">
           {{ t('relay.feishuConfigTitle') }}
         </h4>
         <p class="mt-1 text-xs text-ink-3">
@@ -173,7 +155,7 @@
           :placeholder="t('settings.feishuAppIdPlaceholder')"
         />
         <div>
-          <label class="mb-1 block text-sm font-medium text-ink-2">
+          <label class="mb-[5px] block text-xs text-ink-2">
             {{ t('settings.feishuAppSecret') }}
           </label>
           <div class="relative">
@@ -230,7 +212,7 @@
 
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div class="space-y-1">
-          <label class="mb-1 block text-sm font-medium text-ink-2">
+          <label class="mb-[5px] block text-xs text-ink-2">
             {{ t('settings.feishuAppTokenType') }}
           </label>
           <select
@@ -271,10 +253,10 @@
         :help="t('relay.feishuSummaryPrefixHelp')"
       />
 
-      <div class="rounded-lg border border-line bg-app-sub p-4 space-y-4">
+      <div class="space-y-4 rounded-lg border border-line bg-panel p-4">
         <div class="space-y-2">
           <div>
-            <h5 class="text-sm font-semibold text-ink">
+            <h5 class="text-[calc(13px*var(--fs))] font-semibold text-ink">
               {{ t('settings.feishuFieldMappings') }}
             </h5>
             <p class="mt-1 text-xs text-ink-3">
@@ -354,7 +336,7 @@
         </div>
       </div>
 
-      <div class="rounded-lg border border-line bg-app-sub p-4 space-y-4">
+      <div class="space-y-4 rounded-lg border border-line bg-panel p-4">
         <BaseInput
           v-model="editorForm.feishuConfig.attachment_field_name"
           :label="t('settings.feishuAttachmentFieldName')"
@@ -366,10 +348,10 @@
 
     <div
       v-else-if="editorForm.target_type === 'jira'"
-      class="rounded-lg border border-line bg-app-sub p-4 space-y-4"
+      class="space-y-4 rounded-lg border border-line bg-panel p-4"
     >
       <div>
-        <h4 class="text-sm font-semibold text-ink">
+        <h4 class="text-[calc(13px*var(--fs))] font-semibold text-ink">
           {{ t('relay.jiraConfigTitle') }}
         </h4>
         <p class="mt-1 text-xs text-ink-3">
@@ -464,9 +446,9 @@
         </label>
       </div>
 
-      <div class="rounded-lg border border-line bg-app-sub p-4 space-y-4">
+      <div class="space-y-4 rounded-lg border border-line bg-panel p-4">
         <div>
-          <h4 class="text-sm font-semibold text-ink">
+          <h4 class="text-[calc(13px*var(--fs))] font-semibold text-ink">
             {{ t('settings.jiraAssigneeSectionTitle') }}
           </h4>
           <p class="mt-1 text-xs text-ink-3">
@@ -482,7 +464,7 @@
             :help="t('settings.jiraAssigneeDefaultHelp')"
           />
           <div>
-            <label class="mb-1 block text-sm font-medium text-ink-2">
+            <label class="mb-[5px] block text-xs text-ink-2">
               {{ t('settings.jiraAssigneeAllowValues') }}
             </label>
             <textarea
@@ -497,7 +479,7 @@
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-ink-2">
+          <label class="mb-[5px] block text-xs text-ink-2">
             {{ t('settings.jiraAssigneePrompt') }}
           </label>
           <textarea
@@ -511,9 +493,9 @@
         </div>
       </div>
 
-      <div class="rounded-lg border border-line bg-app-sub p-4 space-y-4">
+      <div class="space-y-4 rounded-lg border border-line bg-panel p-4">
         <div>
-          <h4 class="text-sm font-semibold text-ink">
+          <h4 class="text-[calc(13px*var(--fs))] font-semibold text-ink">
             {{ t('settings.jiraComponentsSectionTitle') }}
           </h4>
           <p class="mt-1 text-xs text-ink-3">
@@ -542,7 +524,7 @@
 
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
-            <label class="mb-1 block text-sm font-medium text-ink-2">
+            <label class="mb-[5px] block text-xs text-ink-2">
               {{ t('settings.jiraComponentsDefault') }}
             </label>
             <textarea
@@ -555,7 +537,7 @@
             </p>
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-ink-2">
+            <label class="mb-[5px] block text-xs text-ink-2">
               {{ t('settings.jiraComponentsPrompt') }}
             </label>
             <textarea
@@ -570,9 +552,9 @@
         </div>
       </div>
 
-      <div class="rounded-lg border border-line bg-app-sub p-4 space-y-4">
+      <div class="space-y-4 rounded-lg border border-line bg-panel p-4">
         <div>
-          <h4 class="text-sm font-semibold text-ink">
+          <h4 class="text-[calc(13px*var(--fs))] font-semibold text-ink">
             {{ t('settings.jiraEpicLinkSectionTitle') }}
           </h4>
           <p class="mt-1 text-xs text-ink-3">
@@ -615,7 +597,7 @@
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-ink-2">
+          <label class="mb-[5px] block text-xs text-ink-2">
             {{ t('settings.jiraEpicLinkPrompt') }}
           </label>
           <textarea
@@ -649,7 +631,7 @@
     <button
       v-if="editorForm.id"
       type="button"
-      class="mr-auto text-[12.5px] text-bad transition-opacity hover:underline disabled:opacity-50"
+      class="mr-auto text-[calc(12.5px*var(--fs))] text-bad transition-opacity hover:underline disabled:opacity-50"
       :disabled="saving"
       @click="confirmingDelete = true"
     >

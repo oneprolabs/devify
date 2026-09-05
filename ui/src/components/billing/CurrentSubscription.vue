@@ -9,18 +9,18 @@
       class="flex flex-col gap-[7px] xl:flex-none xl:border-r xl:border-line-soft xl:pr-7"
     >
       <div class="flex items-center gap-[9px]">
-        <span class="font-display text-[19px] font-semibold text-ink">
+        <span class="font-display text-[calc(19px*var(--fs))] font-semibold text-ink">
           {{ planName }}
         </span>
         <span
           v-if="subscription?.status"
-          class="rounded-sm px-[7px] py-0.5 font-mono text-[10.5px]"
+          class="rounded-sm px-[7px] py-0.5 font-mono text-[calc(10.5px*var(--fs))]"
           :class="getStatusIconClass(subscription.status)"
         >
           {{ getStatusText(subscription.status) }}
         </span>
       </div>
-      <span v-if="providerLine" class="font-mono text-[11px] text-ink-4">
+      <span v-if="providerLine" class="font-mono text-[calc(11px*var(--fs))] text-ink-4">
         {{ providerLine }}
       </span>
     </div>
@@ -28,10 +28,10 @@
     <div
       class="flex flex-col gap-[5px] xl:flex-none xl:border-r xl:border-line-soft xl:px-7"
     >
-      <span class="text-[11px] text-ink-3">
+      <span class="text-[calc(11px*var(--fs))] text-ink-3">
         {{ t('billing.currentSubscription.currentPeriod') }}
       </span>
-      <span class="font-mono text-[12.5px] text-ink">
+      <span class="font-mono text-[calc(12.5px*var(--fs))] text-ink">
         {{ formatDate(periodStart) }} → {{ formatDate(periodEnd) }}
       </span>
     </div>
@@ -40,20 +40,20 @@
       v-if="daysRemaining !== null"
       class="flex flex-col gap-[5px] xl:flex-none xl:border-r xl:border-line-soft xl:px-7"
     >
-      <span class="text-[11px] text-ink-3">
+      <span class="text-[calc(11px*var(--fs))] text-ink-3">
         {{ t('billing.currentSubscription.daysRemaining') }}
       </span>
-      <span class="font-mono text-[12.5px] text-ink">
+      <span class="font-mono text-[calc(12.5px*var(--fs))] text-ink">
         {{ t('billing.currentSubscription.days', { days: daysRemaining }) }}
       </span>
     </div>
 
     <div class="flex min-w-0 flex-1 flex-col gap-2 xl:px-7">
       <div class="flex items-baseline justify-between gap-3">
-        <span class="text-[11px] text-ink-3">
+        <span class="text-[calc(11px*var(--fs))] text-ink-3">
           {{ t('billing.currentSubscription.creditsUsage') }}
         </span>
-        <span class="font-mono text-[12.5px] text-ink-3">
+        <span class="font-mono text-[calc(12.5px*var(--fs))] text-ink-3">
           {{
             t('billing.currentSubscription.creditsSplit', { used: usedCredits })
           }}
@@ -78,9 +78,22 @@
 
   <div
     v-else
-    class="rounded-[11px] border border-line bg-panel px-5 py-8 text-center text-sm text-ink-3"
+    class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-5 py-[18px] md:flex-row md:items-center md:gap-7"
+    aria-busy="true"
   >
-    {{ t('common.loading') }}
+    <span class="h-[13px] w-[72px] flex-none rounded-[5px] bg-chip"></span>
+    <span class="flex flex-col gap-[7px]">
+      <span class="h-2 w-14 rounded-sm bg-line-soft"></span>
+      <span class="h-2.5 w-[168px] rounded-[5px] bg-chip"></span>
+    </span>
+    <span class="flex flex-col gap-[7px]">
+      <span class="h-2 w-12 rounded-sm bg-line-soft"></span>
+      <span class="h-2.5 w-14 rounded-[5px] bg-chip"></span>
+    </span>
+    <span class="flex min-w-0 flex-1 flex-col gap-[7px] opacity-55">
+      <span class="h-2 w-20 rounded-sm bg-line-soft"></span>
+      <span class="h-1.5 w-full rounded-sm bg-chip"></span>
+    </span>
   </div>
 </template>
 
@@ -88,10 +101,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { format, differenceInDays } from 'date-fns'
-import { usePreferencesStore } from '@/store/preferences'
+import { usePlanName } from '@/composables/usePlanName'
 
+const { planName: planLabel } = usePlanName()
 const { t } = useI18n()
-const preferencesStore = usePreferencesStore()
 
 const props = defineProps({
   subscription: {
@@ -124,17 +137,11 @@ function getStatusText(status) {
   return texts[status] || status
 }
 
+// The canvas writes the cycle as two ISO dates in the mono face, so the
+// arrow between them reads as a range rather than as prose.
 function formatDate(dateString) {
   if (!dateString) return '-'
-  const date = new Date(dateString)
-
-  const isZhCN = preferencesStore.currentLanguage === 'zh-CN'
-
-  if (isZhCN) {
-    return format(date, 'yyyy年M月d日')
-  } else {
-    return format(date, 'MMM dd, yyyy')
-  }
+  return format(new Date(dateString), 'yyyy-MM-dd')
 }
 
 // A free account has no subscription record but still has a credit period,
@@ -150,11 +157,13 @@ const periodEnd = computed(
     props.subscription?.current_period_end || props.credits?.period_end || null
 )
 
-const planName = computed(
-  () =>
+const planName = computed(() =>
+  planLabel(
+    props.subscription?.plan_slug || props.credits?.plan_slug,
     props.subscription?.plan_name ||
-    props.credits?.plan_name ||
-    t('billing.plans.freePlan')
+      props.credits?.plan_name ||
+      t('billing.plans.freePlan')
+  )
 )
 
 const daysRemaining = computed(() => {

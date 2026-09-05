@@ -16,7 +16,7 @@
             alt=""
             class="h-[26px] w-[26px] flex-none rounded-[7px]"
           />
-          <span class="font-display text-[15px] font-semibold text-ink">
+          <span class="font-display text-[calc(15px*var(--fs))] font-semibold text-ink">
             {{ t('common.appName') }}
           </span>
         </router-link>

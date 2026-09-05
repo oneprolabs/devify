@@ -3,16 +3,16 @@
     <header
       v-if="title || $slots.header || $slots.actions"
       class="flex items-center gap-2 border-b border-line-soft px-4"
-      :class="dense ? 'h-[38px]' : 'h-10'"
+      :class="dense ? 'h-9' : 'h-[38px]'"
     >
       <slot name="icon" />
       <span
         class="font-semibold text-ink"
-        :class="dense ? 'text-[12.5px]' : 'text-[13px]'"
+        :class="dense ? 'text-[calc(12.5px*var(--fs))]' : 'text-[calc(13px*var(--fs))]'"
       >
         {{ title }}
       </span>
-      <span v-if="meta" class="font-mono text-[11px] text-ink-3">{{
+      <span v-if="meta" class="font-mono text-[calc(11px*var(--fs))] text-ink-3">{{
         meta
       }}</span>
       <slot name="header" />
@@ -34,13 +34,15 @@ const props = defineProps({
   title: { type: String, default: '' },
   // A count or short note beside the title.
   meta: { type: String, default: '' },
-  // Side-panel cards use the shorter 38px header.
+  // Side-panel cards use the shorter 36px header and tighter body.
   dense: { type: Boolean, default: false },
   // Rows draw their own padding and dividers, so they opt out of the body's.
   flush: { type: Boolean, default: false }
 })
 
+// The canvas draws the detail panel's main cards with a 38px header over
+// 14/16 padding, and the narrower side cards with a 36px header over 11/15.
 const bodyClass = computed(() =>
-  props.flush ? '' : props.dense ? 'px-4 py-3' : 'px-4 py-3.5'
+  props.flush ? '' : props.dense ? 'px-[15px] py-[11px]' : 'px-4 py-3.5'
 )
 </script>

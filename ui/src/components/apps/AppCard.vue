@@ -9,10 +9,10 @@
         <component :is="icon" class="h-[19px] w-[19px] md:h-5 md:w-5" />
       </span>
       <div class="flex min-w-0 flex-col gap-1 md:gap-[5px]">
-        <span class="text-[14.5px] font-semibold text-ink md:text-[15px]">
+        <span class="text-[calc(14.5px*var(--fs))] font-semibold text-ink md:text-[calc(15px*var(--fs))]">
           {{ name }}
         </span>
-        <span class="text-xs leading-[1.6] text-ink-3 md:text-[12.5px]">
+        <span class="text-xs leading-[1.6] text-ink-3 md:text-[calc(12.5px*var(--fs))]">
           {{ description }}
         </span>
       </div>
@@ -40,14 +40,14 @@
         >
           {{ stat.value }}
         </span>
-        <span class="text-[10px] text-ink-3 md:text-[11px]">
+        <span class="text-[calc(10px*var(--fs))] text-ink-3 md:text-[calc(11px*var(--fs))]">
           {{ stat.label }}
         </span>
       </div>
 
       <button
         type="button"
-        class="font-display ml-auto hidden h-8 items-center rounded-md bg-accent px-[15px] text-[12.5px] font-medium text-accent-on transition-opacity hover:opacity-90 md:flex"
+        class="font-display ml-auto hidden h-8 items-center rounded-md bg-accent px-[15px] text-[calc(12.5px*var(--fs))] font-medium text-accent-on transition-opacity hover:opacity-90 md:flex"
         @click="$emit('open')"
       >
         {{ t('apps.openApp') }}
@@ -58,7 +58,7 @@
       <span
         v-for="tag in tags"
         :key="tag"
-        class="rounded-sm bg-chip px-2 py-[3px] font-mono text-[10.5px] text-ink-2"
+        class="rounded-sm bg-chip px-2 py-[3px] font-mono text-[calc(10.5px*var(--fs))] text-ink-2"
       >
         {{ tag }}
       </span>
@@ -66,7 +66,7 @@
 
     <button
       type="button"
-      class="font-display flex h-11 items-center justify-center rounded-[9px] bg-accent text-[13.5px] font-medium text-accent-on md:hidden"
+      class="font-display flex h-11 items-center justify-center rounded-[9px] bg-accent text-[calc(13.5px*var(--fs))] font-medium text-accent-on md:hidden"
       @click="$emit('open')"
     >
       {{ t('apps.openApp') }}

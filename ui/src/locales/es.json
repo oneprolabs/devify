@@ -8,6 +8,8 @@
     "delete": "Eliminar",
     "edit": "Editar",
     "close": "Cerrar",
+    "show": "Mostrar",
+    "hide": "Ocultar",
     "confirm": "Confirmar",
     "back": "Atrás",
     "next": "Siguiente",
@@ -464,5 +466,10 @@
     "light": "Claro",
     "dark": "Oscuro",
     "system": "Sistema"
+  },
+  "fontSize": {
+    "label": "Tamaño de texto",
+    "standard": "Estándar",
+    "large": "Grande"
   }
 }

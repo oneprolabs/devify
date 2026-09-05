@@ -131,12 +131,16 @@ def _get_relay_deliveries(instance):
 
 def _serialize_relay_delivery(delivery):
     subscription = getattr(delivery, "subscription", None)
+    # The delivery log says what the delivery did, not just where it went,
+    # which is what separates two rows pointing at the same channel.
+    plan = (delivery.metadata or {}).get("relay_delivery_plan") or {}
     return {
         "id": delivery.id,
         "target_type": delivery.target_type,
         "status": delivery.status,
         "external_id": delivery.external_id,
         "external_url": delivery.external_url,
+        "action": plan.get("action") or "",
         "subscription_name": subscription.name if subscription else None,
         "subscription_enabled": (
             subscription.enabled if subscription is not None else None

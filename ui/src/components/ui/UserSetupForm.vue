@@ -2,9 +2,9 @@
   <div class="space-y-6">
     <div
       v-if="displayEmail"
-      class="bg-blue-50 border border-blue-200 rounded-lg p-4"
+      class="bg-accent-soft border border-accent rounded-lg p-4"
     >
-      <p class="text-sm text-blue-800">
+      <p class="text-sm text-accent">
         <span class="font-medium">{{ emailLabel }}:</span>
         {{ displayEmail }}
       </p>
@@ -64,11 +64,11 @@
         :error="errors.scene"
       />
 
-      <div class="border-t border-gray-200 pt-4">
+      <div class="border-t border-line pt-4">
         <button
           type="button"
           @click="showAdvanced = !showAdvanced"
-          class="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900"
+          class="flex items-center text-sm font-medium text-ink-2 hover:text-ink"
         >
           <svg
             :class="{ 'rotate-90': showAdvanced }"
@@ -87,7 +87,7 @@
 
         <div v-if="showAdvanced" class="mt-4 space-y-4 pl-5">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-ink-2 mb-1">
               {{ t('settings.language') }}
             </label>
             <select v-model="formData.language" class="input w-full">
@@ -99,22 +99,20 @@
                 {{ opt.label }}
               </option>
             </select>
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs text-ink-3">
               {{ t('settings.detectedText') }}:
               {{ getFriendlyLanguageName(detectedLanguage) }}
             </p>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-ink-2 mb-1">
               {{ t('settings.timezone') }}
             </label>
-            <div
-              class="input w-full bg-gray-50 text-gray-600 cursor-not-allowed"
-            >
+            <div class="input w-full bg-app-sub text-ink-2 cursor-not-allowed">
               {{ getFriendlyTimezoneName(detectedTimezone) }}
             </div>
-            <p class="mt-1 text-xs text-gray-500">
+            <p class="mt-1 text-xs text-ink-3">
               {{ t('settings.autoDetected') }}
             </p>
           </div>
@@ -124,9 +122,9 @@
 
     <div
       v-if="errorMessage"
-      class="rounded-md bg-red-50 border border-red-200 p-4"
+      class="rounded-md bg-bad-soft border border-bad p-4"
     >
-      <p class="text-sm text-red-700">
+      <p class="text-sm text-bad">
         {{ errorMessage }}
       </p>
     </div>

@@ -1,16 +1,13 @@
 <template>
   <section
-    class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+    class="space-y-4 rounded-lg border border-line bg-app-sub p-4"
     aria-labelledby="github-issue-config-title"
   >
     <div>
-      <h4
-        id="github-issue-config-title"
-        class="text-sm font-semibold text-gray-900"
-      >
+      <h4 id="github-issue-config-title" class="text-sm font-semibold text-ink">
         {{ t('relay.githubConfigTitle') }}
       </h4>
-      <p class="mt-1 text-xs text-gray-500">
+      <p class="mt-1 text-xs text-ink-3">
         {{ t('relay.githubConfigHelp') }}
       </p>
     </div>
@@ -27,10 +24,10 @@
     <div class="space-y-1">
       <label
         for="github-issue-token"
-        class="block text-sm font-medium text-gray-700"
+        class="block text-sm font-medium text-ink-2"
       >
         {{ t('relay.githubToken') }}
-        <span class="text-red-500">*</span>
+        <span class="text-bad">*</span>
       </label>
       <div class="relative">
         <input
@@ -44,7 +41,7 @@
         />
         <button
           type="button"
-          class="absolute inset-y-0 right-0 flex items-center px-3 text-sm text-gray-500 transition hover:text-gray-800"
+          class="absolute inset-y-0 right-0 flex items-center px-3 text-sm text-ink-3 transition hover:text-ink"
           :aria-label="showToken ? t('common.hide') : t('common.show')"
           :title="showToken ? t('common.hide') : t('common.show')"
           @click="showToken = !showToken"
@@ -52,7 +49,7 @@
           {{ showToken ? t('common.hide') : t('common.show') }}
         </button>
       </div>
-      <p class="text-xs text-gray-500">
+      <p class="text-xs text-ink-3">
         {{ t('relay.githubTokenHelp') }}
       </p>
     </div>
@@ -61,7 +58,7 @@
       <div>
         <label
           for="github-issue-labels"
-          class="mb-1 block text-sm font-medium text-gray-700"
+          class="mb-1 block text-sm font-medium text-ink-2"
         >
           {{ t('relay.githubLabels') }}
         </label>
@@ -71,7 +68,7 @@
           class="input min-h-[96px]"
           :placeholder="t('relay.githubLabelsPlaceholder')"
         />
-        <p class="mt-1 text-xs text-gray-500">
+        <p class="mt-1 text-xs text-ink-3">
           {{ t('relay.githubLabelsHelp') }}
         </p>
       </div>
@@ -79,7 +76,7 @@
       <div>
         <label
           for="github-issue-assignees"
-          class="mb-1 block text-sm font-medium text-gray-700"
+          class="mb-1 block text-sm font-medium text-ink-2"
         >
           {{ t('relay.githubAssignees') }}
         </label>
@@ -89,7 +86,7 @@
           class="input min-h-[96px]"
           :placeholder="t('relay.githubAssigneesPlaceholder')"
         />
-        <p class="mt-1 text-xs text-gray-500">
+        <p class="mt-1 text-xs text-ink-3">
           {{ t('relay.githubAssigneesHelp') }}
         </p>
       </div>

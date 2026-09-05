@@ -1,13 +1,11 @@
 <template>
   <div class="space-y-4">
-    <div
-      class="grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-4 sm:grid-cols-4"
-    >
+    <div class="grid grid-cols-2 gap-3 rounded-lg bg-app-sub p-4 sm:grid-cols-4">
       <div v-for="stat in stats" :key="stat.key">
-        <dt class="text-xs text-gray-500">
+        <dt class="text-xs text-ink-3">
           {{ t(`expense.groups.${stat.key}`) }}
         </dt>
-        <dd class="mt-1 text-sm font-medium tabular-nums text-gray-900">
+        <dd class="mt-1 text-sm font-medium tabular-nums text-ink">
           {{ stat.value }}
         </dd>
       </div>
@@ -15,7 +13,7 @@
 
     <div>
       <div class="mb-2 flex items-center justify-between">
-        <h3 class="text-sm font-medium text-gray-900">
+        <h3 class="text-sm font-medium text-ink">
           {{ t('expense.groups.formFields') }}
         </h3>
         <BaseButton size="sm" variant="outline" @click="copyAll">
@@ -25,7 +23,7 @@
         </BaseButton>
       </div>
       <pre
-        class="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-800"
+        class="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-panel p-3 text-xs leading-relaxed text-ink"
         >{{ summary.text_block }}</pre
       >
     </div>

@@ -8,6 +8,8 @@
     "delete": "Eliminar",
     "edit": "Editar",
     "close": "Cerrar",
+    "show": "Mostrar",
+    "hide": "Ocultar",
     "confirm": "Confirmar",
     "back": "Atrás",
     "next": "Siguiente",
@@ -48,7 +50,6 @@
     "confirmPassword": "Confirmar contraseña",
     "passwordHelp": "La contraseña debe tener al menos 8 caracteres",
     "passwordHelpComplex": "8-32 caracteres, debe contener letras y números",
-    "rememberMe": "Recordarme",
     "forgotPassword": "¿Olvidaste tu contraseña?",
     "forgotPasswordDescription": "Por favor ingresa el correo de seguridad que usaste durante el registro. Te enviaremos un enlace de restablecimiento a ese correo.",
     "securityEmailPlaceholder": "Ingresa tu correo de seguridad",
@@ -193,7 +194,6 @@
     "noResults": "No se encontraron resultados coincidentes",
     "tags": "Etiquetas",
     "basicInformation": "Información Básica",
-    "aiSummary": "Resumen IA",
     "processedContent": "Notas de Conversación",
     "summaryProcessing": "El resumen IA está siendo procesado...",
     "processedContentProcessing": "Las notas de conversación están siendo procesadas...",
@@ -453,5 +453,23 @@
     "addPassword": "Añadir contraseña",
     "passwordRemoved": "Contraseña eliminada",
     "passwordUpdated": "Contraseña actualizada"
+  },
+  "nav": {
+    "account": "Cuenta",
+    "credits": "Créditos del período",
+    "tabChats": "Chats",
+    "tabApps": "Apps",
+    "tabSettings": "Ajustes"
+  },
+  "theme": {
+    "label": "Tema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
+  },
+  "fontSize": {
+    "label": "Tamaño de texto",
+    "standard": "Estándar",
+    "large": "Grande"
   }
 }

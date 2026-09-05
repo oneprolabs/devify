@@ -61,7 +61,10 @@
     },
     "undo": "撤销",
     "collapse": "收起",
-    "expand": "展开"
+    "expand": "展开",
+    "today": "今天",
+    "yesterday": "昨天",
+    "typeToConfirm": "请输入「{phrase}」以确认："
   },
   "virtualEmail": {
     "yourAddress": "您的AI智能邮箱"
@@ -78,7 +81,18 @@
     "relayDesc": "订阅工作流完成事件，并投递到飞书、Jira 或 GitHub Issue。",
     "todoDesc": "收集后续待办，把分析后的动作统一整理在一个地方。",
     "expenseName": "发票管家",
-    "expenseDesc": "自动识别邮件中的发票，分类归档并按报销组打包下载。"
+    "expenseDesc": "自动识别邮件中的发票，分类归档并按报销组打包下载。",
+    "centerHeadline": "打开各个应用模块并连接外部工具",
+    "appCount": "{count} 个应用",
+    "statChannels": "启用渠道",
+    "statDeliveriesThisWeek": "本周投递",
+    "statFailed": "失败待重试",
+    "statIncomplete": "未完成",
+    "statOverdue": "已逾期",
+    "statCompletionRate": "完成率",
+    "statInvoices": "已识别发票",
+    "statUnfiled": "待归集",
+    "statOpenGroups": "进行中报销组"
   },
   "relay": {
     "pageTitle": "智能投递",
@@ -226,7 +240,51 @@
     "disableSuccess": "渠道已禁用",
     "confirmDelete": "确定删除该订阅？",
     "testSuccess": "测试投递成功",
-    "noExternalId": "未返回外部 ID"
+    "noExternalId": "未返回外部 ID",
+    "searchPlaceholder": "搜索对话或投递目标…",
+    "allChannels": "全部渠道",
+    "statusAll": "状态：全部",
+    "statusFilter": "状态：{name}",
+    "channelFilter": "渠道：{name}",
+    "retryAllFailed": "重试全部失败（{count}）",
+    "statTotal": "累计投递",
+    "statThisWeek": "本周",
+    "statFailed": "失败待重试",
+    "statSuccessRate": "成功率",
+    "byChannel": "按渠道",
+    "colStatus": "状态",
+    "colSource": "来源对话 / 动作",
+    "colChannel": "渠道",
+    "colTarget": "目标",
+    "colTime": "时间",
+    "actionNew": "新建",
+    "actionNewAndLink": "新建并关联",
+    "actionUpdate": "更新",
+    "statusSkipped": "已跳过",
+    "searchChannels": "搜索渠道",
+    "searchTypes": "搜索渠道类型",
+    "channelDisabled": "已禁用",
+    "deliveryCount": "{count} 次投递",
+    "existingChannels": "已有 {count} 个渠道",
+    "categoryTracker": "工单系统",
+    "categoryTable": "表格与文档",
+    "typeJiraDesc": "新建 issue、关联到已有 issue，或更新已有 issue。",
+    "typeGitHubDesc": "投递到指定仓库的 Issues，支持标签与负责人。",
+    "typeFeishuDesc": "写入多维表格的一行，字段按映射填充。",
+    "actionNew2": "新建",
+    "actionLink": "关联",
+    "actionUpdate2": "更新",
+    "partialSupport": "部分支持",
+    "stepPickType": "选择渠道类型",
+    "stepConfigure": "填写连接配置",
+    "stepTest": "测试投递",
+    "newChannel": "新建渠道",
+    "channelEnabled": "已启用",
+    "pickChannel": "从左侧选择一个渠道进行配置。",
+    "changeType": "更换类型",
+    "deleteChannel": "删除渠道",
+    "deleteChannelTitle": "删除渠道「{name}」",
+    "deleteChannelWarning": "删除后这个渠道的投递记录会一并清除，已经建到外部系统的记录不受影响。此操作不可撤销。"
   },
   "management": {
     "adminConsole": "管理控制台"
@@ -254,7 +312,6 @@
     "confirmPassword": "确认密码",
     "passwordHelp": "密码长度至少为8个字符",
     "passwordHelpComplex": "8-32个字符，必须包含字母和数字",
-    "rememberMe": "记住我",
     "forgotPassword": "忘记密码？",
     "forgotPasswordDescription": "请输入您注册时提供的安全邮箱，我们将向该邮箱发送重置密码的链接。",
     "securityEmailPlaceholder": "请输入安全邮箱",
@@ -262,7 +319,7 @@
     "resetPasswordError": "发送重置邮件失败，请重试。",
     "emailPlaceholder": "输入您的邮箱",
     "noAccount": "还没有账户？",
-    "haveAccount": "已有账户？",
+    "haveAccount": "已经有账户？",
     "signIn": "登录",
     "signUp": "注册",
     "signingIn": "登录中...",
@@ -299,7 +356,23 @@
     "loginFailedMessage": "登录失败。请检查您的用户名和密码是否正确，或者",
     "registerNewAccount": "注册新账户",
     "period": "。",
-    "processing": "处理中..."
+    "processing": "处理中...",
+    "pitch": {
+      "headline": "把邮件转发过来，\n剩下的交给它整理。",
+      "summary": "转发到你的 AI 智能邮箱 → 整理成纪要、待办与标签 → 投递到飞书、Jira 或 GitHub Issue。",
+      "forward": {
+        "title": "转发到你的 AI 智能邮箱",
+        "body": "系统分配一个专属地址，也可以接自己的 IMAP。支持文字与图片识别。"
+      },
+      "organise": {
+        "title": "整理成纪要、待办与标签",
+        "body": "同一件事的多封往来会自动合并成一条记录，附件一并解析。"
+      },
+      "deliver": {
+        "title": "投递到你已经在用的系统"
+      }
+    },
+    "noAccountYet": "还没有账户？"
   },
   "register": {
     "emailPlaceholder": "请输入您的邮箱地址",
@@ -457,7 +530,7 @@
       "openInNewWindow": "在新窗口打开"
     },
     "files": {
-      "title": "文件",
+      "title": "附件",
       "download": "下载",
       "previewError": "预览加载失败",
       "file": "文件"
@@ -465,7 +538,66 @@
     "errorLoading": "加载对话详情失败",
     "errorLoadingDesc": "无法加载对话详情",
     "handledByExpense": "发票 {count} 张",
-    "handledByExpenseHint": "发票管家从这封邮件里识别出了 {count} 张发票"
+    "handledByExpenseHint": "发票管家从这封邮件里识别出了 {count} 张发票",
+    "mergedBadge": "合并 {count}",
+    "attachmentsShort": "{count} 附件",
+    "rangeAll": "全部时间",
+    "range7": "近 7 天",
+    "range30": "近 30 天",
+    "range90": "近 90 天",
+    "statusAll": "状态：全部",
+    "statusFilter": "状态：{name}",
+    "searchHint": "搜索标题、内容、标签…支持多关键词",
+    "showingRange": "显示第 {from}–{to} 条，共 {total} 条",
+    "prevPage": "上一页",
+    "nextPage": "下一页",
+    "statTotal": "总消息",
+    "statThisWeek": "本周",
+    "statPending": "待处理",
+    "statCompleted": "已完成",
+    "mailboxLabel": "你的 AI 智能邮箱 · 转发即整理",
+    "colStatus": "状态",
+    "colTitle": "标题 / 摘要",
+    "colTags": "标签",
+    "colSource": "来源",
+    "colRelay": "投递",
+    "colTime": "时间",
+    "filterAll": "全部",
+    "countUnit": "{count} 条",
+    "stateCompleted": "已完成",
+    "stateProcessing": "处理中",
+    "statePending": "待处理",
+    "stateFailed": "失败",
+    "detail": {
+      "processingStatus": "处理状态",
+      "stageReceived": "收件",
+      "stageParsed": "解析",
+      "stageSummarised": "总结",
+      "stageDelivered": "投递",
+      "receivedAt": "接收",
+      "deliveries": "投递记录",
+      "mergedSources": "合并来源",
+      "reprocess": "重新处理",
+      "coreTopic": "核心主题",
+      "originalEmails": "对话记录",
+      "aiOutput": "AI 原始输出",
+      "todosMeta": "{total} 项 · 已完成 {done}",
+      "attachmentsTitle": "附件",
+      "deleteConfirm": "确定要删除这条对话吗？此操作不可撤销。",
+      "tabSummary": "摘要",
+      "tabTodos": "待办",
+      "tabFiles": "附件",
+      "tabRaw": "原文",
+      "tabInfo": "信息",
+      "position": "第 {index} 条 / {total}",
+      "previous": "上一条",
+      "next": "下一条",
+      "loadFailed": "这条对话没能加载出来"
+    },
+    "emptyTitle": "把第一封邮件转发过来",
+    "emptyBody": "转发到下面这个地址，AI 会整理成纪要与待办。\n也支持图片里的文字。",
+    "emptyConnectImap": "或者连接自己的 IMAP 邮箱",
+    "noResultsBody": "换一个关键词，或把状态与时间范围放宽一些。"
   },
   "metadata": {
     "sectionTitle": "基本信息",
@@ -773,7 +905,13 @@
     "invoiceRuleFetch": "① 下载阶段：向邮件服务器搜索标题含关键词的邮件。这一步受服务器能力限制，只能搜标题，搜不了附件名。",
     "invoiceRuleRoute": "② 识别阶段：对下载回来的邮件，检查标题和附件文件名，命中任一即交给发票管家识别。",
     "invoiceRuleBody": "③ 正文不参与判断。正文匹配会把每一封页脚提到「发票」的话费账单、用量报告都算进来，误判的代价是一封真实往来邮件丢掉摘要。",
-    "invoiceRuleMiss": "④ 关键词在「发票管家 › 设置」里配置。没命中的邮件不会丢，只是不进发票管家——把它转发到这个邮箱、标题里带上关键词即可补收。"
+    "invoiceRuleMiss": "④ 关键词在「发票管家 › 设置」里配置。没命中的邮件不会丢，只是不进发票管家——把它转发到这个邮箱、标题里带上关键词即可补收。",
+    "basicInfoDesc": "个人信息、登录方式与密码安全",
+    "preferencesDesc": "语言、时区与消息处理场景",
+    "emailConfigDesc": "收件方式、过滤规则与 IMAP 配置",
+    "systemAssigned": "系统分配",
+    "aiEmailInUse": "当前使用系统分配邮箱。",
+    "authMethodDesc": "安全邮箱用于密码重置和安全验证，与 AI 智能邮箱是两个地址。"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -861,14 +999,14 @@
   "billing": {
     "menuTitle": "订阅管理",
     "title": "订阅管理",
-    "description": "统一管理您的订阅、Credits 和使用情况。",
+    "description": "统一管理您的订阅、积分和使用情况。",
     "currentSubscription": {
       "title": "当前订阅",
       "provider": "支付方式",
       "periodStart": "周期开始",
       "periodEnd": "周期结束",
       "remaining": "剩余时间",
-      "daysRemaining": "剩余{days}天",
+      "daysRemaining": "剩余时间",
       "daysRemainingValue": "{days}天",
       "autoRenew": "自动续费",
       "creditsUsage": "积分使用情况",
@@ -876,7 +1014,12 @@
       "noSubscription": "暂无订阅",
       "upgradePrompt": "升级到付费计划以获得更多功能和积分",
       "freePlanTitle": "免费计划",
-      "freePlanDesc": "免费计划 - 升级以获得更多功能"
+      "freePlanDesc": "免费计划 - 升级以获得更多功能",
+      "creditsSplit": "已用 {used} · 剩余",
+      "autoRenewOn": "自动续费开启",
+      "autoRenewOff": "到期后不再续费",
+      "days": "{days} 天",
+      "currentPeriod": "当前周期"
     },
     "plans": {
       "title": "订阅计划",
@@ -896,7 +1039,7 @@
       "unavailable": "不可用",
       "notAvailable": "不可用",
       "rechargeUnavailable": "充值不可用",
-      "stripeNotConfigured": "Stripe支付未配置",
+      "stripeNotConfigured": "Stripe 支付未配置",
       "upgradeFailed": "升级失败，请重试",
       "portalFailed": "无法打开管理页面，请重试",
       "cancelSuccess": "订阅已取消，将在当前周期结束后失效",
@@ -906,7 +1049,15 @@
       "retentionNotSet": "未设置",
       "retentionPermanent": "永久保留",
       "retentionYears": "{years}年保留",
-      "retentionDays": "{days}天保留"
+      "retentionDays": "{days}天保留",
+      "freePlan": "免费版",
+      "names": {
+        "free": "免费版",
+        "starter": "入门版",
+        "standard": "标准版",
+        "pro": "专业版",
+        "internal": "内部版"
+      }
     },
     "downgrade": {
       "title": "降级订阅",
@@ -936,7 +1087,9 @@
       "totalConsumed": "总消耗",
       "available": "剩余可用",
       "totalCredits": "总额度",
-      "creditsConsumed": "消耗积分"
+      "creditsConsumed": "消耗积分",
+      "days": "{days} 天",
+      "rangeSummary": "最近 {days} 天 · 共 {credits} 积分"
     },
     "creditUsage": {
       "title": "对话积分消耗明细",
@@ -944,7 +1097,9 @@
       "last30Days": "最近 30 天",
       "last90Days": "最近 90 天",
       "noData": "该时间段内暂无积分消耗记录",
-      "noSubject": "无主题"
+      "noSubject": "无主题",
+      "chat": "来源对话",
+      "credits": "消耗"
     },
     "creditsInfo": {
       "title": "关于积分",
@@ -965,7 +1120,7 @@
       "canceled": "已取消",
       "trialing": "试用中",
       "pastDue": "逾期",
-      "stripeMissingHint": "当前尚未配置 Stripe 支付，您仍然可以查看 Credits 和订阅状态，但无法发起充值或订阅变更。"
+      "stripeMissingHint": "当前尚未配置 Stripe 支付，您仍然可以查看积分和订阅状态，但无法发起充值或订阅变更。"
     },
     "messages": {
       "paymentSuccess": "支付成功！您的订阅已激活。",
@@ -1036,6 +1191,7 @@
       "byPriority": "按优先级"
     },
     "filters": {
+      "label": "筛选",
       "all": "全部",
       "status": "状态",
       "completed": "已完成",
@@ -1079,7 +1235,25 @@
       "todos": "待办事项",
       "keyProcessPlaceholder": "每行一个流程项",
       "keyProcessHint": "每行输入一个关键流程，支持多行"
-    }
+    },
+    "priorityShort": {
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    },
+    "overdueBy": "逾期 {days} 天",
+    "dueIn": "还剩 {days} 天",
+    "dueTodayShort": "今天",
+    "searchPlaceholder": "搜索待办事项…",
+    "sourceChat": "来源对话",
+    "groupCount": "{count} 项",
+    "openCount": "{count} 项未完成",
+    "groupByLabel": "分组：",
+    "openByPriority": "未完成 · 按优先级",
+    "overdueGroup": "已逾期",
+    "priorityColumn": "优先",
+    "groupTitle": "分组",
+    "newTodo": "新建待办"
   },
   "share": {
     "title": "分享",
@@ -1147,7 +1321,12 @@
     "shareCreatedAndCopied": "分享链接已创建并复制",
     "clickToView": "查看链接",
     "openLink": "打开链接",
-    "hideLink": "隐藏链接"
+    "hideLink": "隐藏链接",
+    "shareButton": "分享",
+    "viewSubtitle": "分享的对话纪要",
+    "readOnlyNotice": "这是一份只读分享。",
+    "expiresOn": "链接 {date} 到期",
+    "participantCount": "参与者 {count} 人"
   },
   "expense": {
     "pageTitle": "发票管家",
@@ -1407,6 +1586,25 @@
         "invoice_type": "发票类型",
         "city": "消费城市"
       }
-    }
+    },
+    "headerSummary": "{count} 张未报销 · ¥{amount}"
+  },
+  "nav": {
+    "account": "账户",
+    "credits": "本期积分",
+    "tabChats": "对话",
+    "tabApps": "应用",
+    "tabSettings": "设置"
+  },
+  "theme": {
+    "label": "主题",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  },
+  "fontSize": {
+    "label": "字号",
+    "standard": "标准",
+    "large": "较大"
   }
 }

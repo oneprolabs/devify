@@ -17,7 +17,7 @@
         <div class="flex flex-wrap items-end gap-6 flex-1 min-w-0">
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{ t('llm.stats.filterByUser') }}
             </label>
@@ -34,7 +34,7 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{ t('llm.stats.granularity') }}
             </label>
@@ -57,7 +57,7 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label
-              class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1"
+              class="text-[calc(10px*var(--fs))] font-bold text-gray-400 uppercase tracking-wider ml-1"
             >
               {{
                 granularity === 'day'
@@ -204,7 +204,7 @@
                   </svg>
                 </span>
                 <span class="text-xs font-medium uppercase text-green-600"
-                  >CALLS</span
+                  >{{ t('llm.stats.totalCalls') }}</span
                 >
               </div>
               <div class="text-2xl font-semibold text-green-600">
@@ -236,7 +236,7 @@
                   </svg>
                 </span>
                 <span class="text-xs font-medium uppercase text-amber-600"
-                  >COST</span
+                  >{{ t('llm.stats.capCost') }}</span
                 >
               </div>
               <div class="text-2xl font-semibold text-amber-600">
@@ -261,7 +261,7 @@
                   <span class="text-sm font-bold">P</span>
                 </span>
                 <span class="text-xs font-medium uppercase text-purple-600"
-                  >PROMPT</span
+                  >{{ t('llm.stats.capPrompt') }}</span
                 >
               </div>
               <div class="text-2xl font-semibold text-purple-600">
@@ -281,7 +281,7 @@
                   <span class="text-sm font-bold">C</span>
                 </span>
                 <span class="text-xs font-medium uppercase text-orange-600"
-                  >COMPLETION</span
+                  >{{ t('llm.stats.capCompletion') }}</span
                 >
               </div>
               <div class="text-2xl font-semibold text-orange-600">

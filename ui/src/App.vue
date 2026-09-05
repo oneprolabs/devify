@@ -1,5 +1,5 @@
 <template>
-  <div id="app" class="min-h-screen bg-gray-50">
+  <div id="app" class="min-h-screen bg-app-sub">
     <ErrorBoundary>
       <router-view />
     </ErrorBoundary>

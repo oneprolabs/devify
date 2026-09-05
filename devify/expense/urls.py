@@ -3,6 +3,7 @@
 from django.urls import path
 
 from expense.views import (
+    ExpenseStatsAPIView,
     ExpenseConfigAPIView,
     ExpenseGroupDetailAPIView,
     ExpenseGroupExportAPIView,
@@ -32,6 +33,11 @@ urlpatterns = [
         "apps/expense/config",
         ExpenseConfigAPIView.as_view(),
         name="expense-config",
+    ),
+    path(
+        "apps/expense/stats",
+        ExpenseStatsAPIView.as_view(),
+        name="expense-stats",
     ),
     path(
         "apps/expense/scan",

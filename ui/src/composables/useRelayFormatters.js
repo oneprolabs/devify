@@ -11,26 +11,26 @@ export function useRelayFormatters() {
   }
 
   function targetIconBg(targetType) {
-    if (targetType === 'jira') return 'bg-blue-600'
-    if (targetType === 'github_issue') return 'bg-gray-900'
-    return 'bg-primary-600'
+    if (targetType === 'jira') return 'bg-accent'
+    if (targetType === 'github_issue') return 'bg-ink'
+    return 'bg-accent'
   }
 
   function targetBadgeClass(targetType) {
-    if (targetType === 'jira') return 'bg-sky-100 text-sky-700 ring-sky-200'
+    if (targetType === 'jira') return 'bg-accent-soft text-accent ring-accent'
     if (targetType === 'github_issue')
-      return 'bg-gray-100 text-gray-700 ring-gray-200'
-    return 'bg-primary-100 text-primary-700 ring-primary-200'
+      return 'bg-chip text-ink-2 ring-line'
+    return 'bg-accent-soft text-accent ring-accent'
   }
 
   function eventStatusBadgeClass(status) {
     if (status === 'completed')
-      return 'bg-green-100 text-green-700 ring-green-200'
-    if (status === 'failed') return 'bg-red-100 text-red-700 ring-red-200'
+      return 'bg-ok-soft text-ok ring-ok'
+    if (status === 'failed') return 'bg-bad-soft text-bad ring-bad'
     if (status === 'processing')
-      return 'bg-yellow-100 text-yellow-700 ring-yellow-200'
-    if (status === 'pending') return 'bg-blue-100 text-blue-700 ring-blue-200'
-    return 'bg-gray-100 text-gray-600 ring-gray-200'
+      return 'bg-warn-soft text-warn ring-warn'
+    if (status === 'pending') return 'bg-accent-soft text-accent ring-accent'
+    return 'bg-chip text-ink-2 ring-line'
   }
 
   function targetIconPath(targetType) {
@@ -45,11 +45,11 @@ export function useRelayFormatters() {
 
   function statusClass(status) {
     if (status === 'success' || status === 'completed')
-      return 'bg-green-100 text-green-700'
-    if (status === 'failed') return 'bg-red-100 text-red-700'
-    if (status === 'processing') return 'bg-blue-100 text-blue-700'
-    if (status === 'pending') return 'bg-blue-100 text-blue-700'
-    return 'bg-gray-100 text-gray-600'
+      return 'bg-ok-soft text-ok'
+    if (status === 'failed') return 'bg-bad-soft text-bad'
+    if (status === 'processing') return 'bg-accent-soft text-accent'
+    if (status === 'pending') return 'bg-accent-soft text-accent'
+    return 'bg-chip text-ink-2'
   }
 
   function statusLabel(status) {

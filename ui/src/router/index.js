@@ -65,9 +65,12 @@ const routes = [
     redirect: '/chats'
   },
   {
+    // The same screen as /chats: wide viewports show the list with the
+    // drawer open, narrow ones the conversation alone. The page decides,
+    // so resizing across the threshold does not strand the reader.
     path: '/chats/:id',
     name: 'ChatDetail',
-    component: () => import('@/pages/ThreadlineDetail.vue'),
+    component: () => import('@/pages/Dashboard.vue'),
     meta: { requiresAuth: true }
   },
   {
@@ -87,7 +90,7 @@ const routes = [
   {
     path: '/apps',
     name: 'AppCenter',
-    redirect: '/apps/relay',
+    component: () => import('@/pages/AppCenter.vue'),
     meta: { requiresAuth: true }
   },
   {

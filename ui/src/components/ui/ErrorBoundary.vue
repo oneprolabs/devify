@@ -1,14 +1,14 @@
 <template>
   <div
     v-if="hasError"
-    class="min-h-screen flex items-center justify-center bg-gray-50"
+    class="min-h-screen flex items-center justify-center bg-app-sub"
   >
     <div class="max-w-md w-full text-center">
       <div
-        class="mx-auto h-24 w-24 bg-red-100 rounded-full flex items-center justify-center"
+        class="mx-auto h-24 w-24 bg-bad-soft rounded-full flex items-center justify-center"
       >
         <svg
-          class="h-12 w-12 text-red-600"
+          class="h-12 w-12 text-bad"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -22,11 +22,9 @@
         </svg>
       </div>
 
-      <h1 class="mt-6 text-3xl font-bold text-gray-900">
-        Something went wrong
-      </h1>
+      <h1 class="mt-6 text-3xl font-bold text-ink">Something went wrong</h1>
 
-      <p class="mt-2 text-sm text-gray-500">
+      <p class="mt-2 text-sm text-ink-3">
         {{ error?.message || 'An unexpected error occurred' }}
       </p>
 

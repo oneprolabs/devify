@@ -3,10 +3,10 @@
     <div class="space-y-4">
       <div class="flex items-center justify-between gap-4">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">
+          <h2 class="text-lg font-semibold text-ink">
             {{ t('expense.scan.historyTitle') }}
           </h2>
-          <p class="mt-1 text-sm text-gray-500">
+          <p class="mt-1 text-sm text-ink-3">
             {{ t('expense.scan.historySubtitle') }}
           </p>
         </div>
@@ -15,16 +15,14 @@
         </BaseButton>
       </div>
 
-      <p v-if="!runs.length" class="py-6 text-center text-sm text-gray-500">
+      <p v-if="!runs.length" class="py-6 text-center text-sm text-ink-3">
         {{ t('expense.scan.empty') }}
       </p>
 
       <div v-else class="overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead>
-            <tr
-              class="border-b border-gray-200 text-left text-xs text-gray-500"
-            >
+            <tr class="border-b border-line text-left text-xs text-ink-3">
               <th class="py-2 pr-4 font-medium">
                 {{ t('expense.scan.startedAt') }}
               </th>
@@ -52,12 +50,12 @@
             <tr
               v-for="run in runs"
               :key="run.uuid"
-              class="border-b border-gray-100 last:border-0"
+              class="border-b border-line-soft last:border-0"
             >
-              <td class="py-2 pr-4 text-gray-900">
+              <td class="py-2 pr-4 text-ink">
                 {{ formatTime(run.started_at) }}
               </td>
-              <td class="py-2 pr-4 text-gray-600">
+              <td class="py-2 pr-4 text-ink-2">
                 {{ t(`expense.scan.triggers.${run.trigger}`) }}
               </td>
               <td class="py-2 pr-4">
@@ -68,23 +66,23 @@
                   {{ t(`expense.scan.statuses.${run.status}`) }}
                 </span>
               </td>
-              <td class="py-2 pr-4 text-right tabular-nums text-gray-900">
+              <td class="py-2 pr-4 text-right tabular-nums text-ink">
                 {{ run.emails_scanned }}
               </td>
-              <td class="py-2 pr-4 text-right tabular-nums text-gray-900">
+              <td class="py-2 pr-4 text-right tabular-nums text-ink">
                 {{ run.candidate_emails }}
               </td>
-              <td class="py-2 pr-4 text-right tabular-nums text-gray-900">
+              <td class="py-2 pr-4 text-right tabular-nums text-ink">
                 {{ run.invoices_created }}
                 <span
                   v-if="run.duplicates"
-                  class="ml-1 text-xs text-gray-400"
+                  class="ml-1 text-xs text-ink-4"
                   :title="t('expense.scan.duplicates')"
                 >
                   +{{ run.duplicates }}
                 </span>
               </td>
-              <td class="py-2 text-right tabular-nums text-gray-900">
+              <td class="py-2 text-right tabular-nums text-ink">
                 {{ run.credits_consumed }}
               </td>
             </tr>
@@ -121,8 +119,8 @@ function formatTime(value) {
 }
 
 function statusClass(status) {
-  if (status === 'completed') return 'bg-green-100 text-green-700'
-  if (status === 'failed') return 'bg-red-100 text-red-700'
-  return 'bg-gray-100 text-gray-600'
+  if (status === 'completed') return 'bg-ok-soft text-ok'
+  if (status === 'failed') return 'bg-bad-soft text-bad'
+  return 'bg-chip text-ink-2'
 }
 </script>

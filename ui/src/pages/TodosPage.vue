@@ -1,769 +1,254 @@
 <template>
-  <AppLayout>
-    <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-900">
-          {{ t('todos.title') }}
-        </h1>
-        <!-- View Toggle (Web only) -->
-        <div class="hidden md:flex items-center gap-2">
-          <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            <button
-              @click="viewMode = 'list'"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-                viewMode === 'list'
-                  ? 'bg-white text-primary-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              ]"
-            >
-              {{ t('todos.view.list') }}
-            </button>
-            <button
-              @click="viewMode = 'calendar'"
-              :class="[
-                'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-                viewMode === 'calendar'
-                  ? 'bg-white text-primary-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              ]"
-            >
-              {{ t('todos.view.calendar') }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Error Message -->
-      <div
-        v-if="errorMessage"
-        class="rounded-md bg-red-50 border border-red-200 p-3"
+  <AppLayout :padded="false">
+    <PageHeader
+      :parent="{ to: '/apps', label: t('apps.centerTitle') }"
+      :title="t('todos.title')"
+      :count="openCountLabel"
+    >
+      <label
+        class="flex h-8 max-w-[382px] flex-1 items-center gap-2 rounded-md border border-line bg-panel-sub px-2.5"
       >
-        <div class="flex gap-2">
-          <div class="flex-shrink-0 pt-0.5">
-            <svg
-              class="h-4 w-4 text-red-400"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </div>
-          <div class="flex-1">
-            <p class="text-sm font-medium text-red-800">{{ errorMessage }}</p>
-          </div>
-          <button
-            @click="errorMessage = ''"
-            class="flex-shrink-0 text-red-400 hover:text-red-600"
-          >
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Success Message -->
-      <div
-        v-if="successMessage"
-        class="rounded-md bg-green-50 border border-green-200 p-3"
-      >
-        <div class="flex gap-2">
-          <div class="flex-shrink-0 pt-0.5">
-            <svg
-              class="h-4 w-4 text-green-400"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </div>
-          <div class="flex-1">
-            <p class="text-sm font-medium text-green-800">
-              {{ successMessage }}
-            </p>
-          </div>
-          <button
-            @click="successMessage = ''"
-            class="flex-shrink-0 text-green-400 hover:text-green-600"
-          >
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Stats Chart -->
-      <TodoStatsChart :stats="stats" />
-
-      <!-- Filters and Time Range -->
-      <BaseCard>
-        <div class="p-4 space-y-4 relative">
-          <!-- Loading Overlay -->
-          <div
-            v-if="loading"
-            class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg"
-          >
-            <div class="flex items-center gap-2 text-sm text-gray-600">
-              <svg
-                class="animate-spin h-4 w-4 text-primary-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                ></circle>
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              <span>{{ t('common.loading') }}</span>
-            </div>
-          </div>
-
-          <!-- Time Range Filter (Separate Row) -->
-          <!-- List View: Time Range Selector -->
-          <div
-            v-if="viewMode === 'list'"
-            class="flex flex-col sm:flex-row items-start sm:items-end gap-3"
-            :class="{ 'opacity-50': loading }"
-          >
-            <div class="flex-1 w-full sm:w-auto">
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                {{ t('todos.timeRange.title') }}
-              </label>
-              <select
-                v-model="timeRange"
-                @change="selectTimeRange(timeRange)"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option
-                  v-for="range in timeRanges"
-                  :key="range.value"
-                  :value="range.value"
-                >
-                  {{ range.label }}
-                </option>
-                <option value="custom">
-                  {{ t('todos.timeRange.custom') }}
-                </option>
-              </select>
-            </div>
-            <!-- Date Range (Always visible, readonly when not custom) -->
-            <div
-              class="flex-1 w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-end gap-3 sm:gap-2 min-w-0"
-            >
-              <div class="flex-1 w-full sm:w-auto min-w-0">
-                <label class="block text-xs text-gray-500 mb-1">{{
-                  t('todos.timeRange.startDate')
-                }}</label>
-                <input
-                  type="date"
-                  v-model="displayStartDate"
-                  @change="handleCustomDateChange"
-                  :readonly="timeRange !== 'custom'"
-                  :class="[
-                    'w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500',
-                    timeRange !== 'custom'
-                      ? 'bg-gray-50 cursor-not-allowed'
-                      : ''
-                  ]"
-                />
-              </div>
-              <div class="flex-shrink-0 hidden sm:block sm:pt-6">
-                <span class="text-sm text-gray-500">-</span>
-              </div>
-              <div class="flex-1 w-full sm:w-auto min-w-0">
-                <label class="block text-xs text-gray-500 mb-1">{{
-                  t('todos.timeRange.endDate')
-                }}</label>
-                <input
-                  type="date"
-                  v-model="displayEndDate"
-                  @change="handleCustomDateChange"
-                  :readonly="timeRange !== 'custom'"
-                  :class="[
-                    'w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500',
-                    timeRange !== 'custom'
-                      ? 'bg-gray-50 cursor-not-allowed'
-                      : ''
-                  ]"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Calendar View: Calendar View Mode Selector (Month/Week) -->
-          <div
-            v-if="viewMode === 'calendar'"
-            class="flex flex-col sm:flex-row items-start sm:items-end gap-3"
-            :class="{ 'opacity-50': loading }"
-          >
-            <div class="flex-1 w-full sm:w-auto">
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                {{ t('todos.calendar.viewMode') }}
-              </label>
-              <select
-                v-model="calendarViewMode"
-                @change="handleCalendarViewModeChange"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="month">
-                  {{ t('todos.calendar.monthView') }}
-                </option>
-                <option value="week">{{ t('todos.calendar.weekView') }}</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Filter Inputs -->
-          <div
-            class="grid grid-cols-1 md:grid-cols-4 gap-4"
-            :class="{ 'opacity-50': loading }"
-          >
-            <!-- Status Filter -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                {{ t('todos.filters.status') }}
-              </label>
-              <select
-                v-model="filters.is_completed"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option :value="null">{{ t('todos.filters.all') }}</option>
-                <option :value="false">
-                  {{ t('todos.filters.incomplete') }}
-                </option>
-                <option :value="true">
-                  {{ t('todos.filters.completed') }}
-                </option>
-              </select>
-            </div>
-
-            <!-- Priority Filter -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                {{ t('todos.filters.priority') }}
-              </label>
-              <select
-                v-model="filters.priority"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option :value="null">{{ t('todos.filters.all') }}</option>
-                <option value="high">{{ t('todos.priority.high') }}</option>
-                <option value="medium">
-                  {{ t('todos.priority.medium') }}
-                </option>
-                <option value="low">{{ t('todos.priority.low') }}</option>
-              </select>
-            </div>
-
-            <!-- Owner Filter -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                {{ t('todos.filters.owner') }}
-              </label>
-              <input
-                v-model="filters.owner"
-                type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                :placeholder="t('todos.filters.owner')"
-              />
-            </div>
-
-            <!-- Search -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                {{ t('common.search') }}
-              </label>
-              <input
-                v-model="filters.search"
-                type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                :placeholder="t('todos.filters.search')"
-              />
-            </div>
-          </div>
-
-          <!-- Active Filters Display -->
-          <div
-            v-if="hasActiveFilters"
-            class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200"
-          >
-            <span class="text-xs font-medium text-gray-500">
-              {{ t('todos.filters.activeFilters') }}:
-            </span>
-            <span
-              v-for="(filter, key) in activeFilters"
-              :key="key"
-              class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded-md text-xs font-medium cursor-pointer hover:bg-primary-200 transition-colors"
-              @click="removeFilter(key)"
-            >
-              {{ filter.label }}: {{ filter.value }}
-              <svg
-                class="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </span>
-            <button
-              v-if="hasActiveFilters"
-              @click="clearFilters"
-              class="text-xs text-gray-500 hover:text-gray-700 underline"
-            >
-              {{ t('todos.filters.clearAll') }}
-            </button>
-          </div>
-        </div>
-      </BaseCard>
-
-      <!-- Calendar View (Hidden on mobile, only show when viewMode is calendar) -->
-      <BaseCard v-if="viewMode === 'calendar'" class="hidden md:block">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <button
-                @click="previousPeriod"
-                class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
-              >
-                <svg
-                  class="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-              <h2 class="text-lg font-semibold text-gray-900">
-                {{
-                  calendarViewMode === 'week'
-                    ? currentWeekLabel
-                    : currentMonthLabel
-                }}
-              </h2>
-              <button
-                @click="nextPeriod"
-                class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
-              >
-                <svg
-                  class="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </template>
-
-        <div class="p-4">
-          <!-- Calendar Grid -->
-          <div class="grid grid-cols-7 gap-2 mb-4">
-            <div
-              v-for="day in weekDays"
-              :key="day"
-              class="text-center text-sm font-medium text-gray-700 py-2"
-            >
-              {{ day }}
-            </div>
-          </div>
-
-          <div class="grid grid-cols-7 gap-2">
-            <div
-              v-for="(date, index) in calendarDays"
-              :key="index"
-              :class="[
-                'min-h-[80px] p-2 border rounded cursor-pointer transition-colors',
-                date.isCurrentMonth
-                  ? 'bg-white border-gray-200 hover:border-primary-500 hover:bg-primary-50'
-                  : 'bg-gray-50 border-gray-100 text-gray-400',
-                date.isToday ? 'ring-2 ring-primary-500' : '',
-                selectedDate && isSameDay(date.date, selectedDate)
-                  ? 'bg-primary-100 border-primary-500'
-                  : ''
-              ]"
-              @click="selectDate(date.date)"
-            >
-              <div class="text-sm font-medium mb-1">
-                {{ date.day }}
-              </div>
-              <div class="space-y-1 max-h-[60px] overflow-hidden">
-                <template
-                  v-for="(todo, todoIndex) in getTodosForDate(date.date).slice(
-                    0,
-                    3
-                  )"
-                  :key="todo.id"
-                >
-                  <div
-                    :class="[
-                      'text-xs px-1 py-0.5 rounded truncate',
-                      todo.is_completed
-                        ? 'bg-gray-200 text-gray-600 line-through'
-                        : todo.priority === 'high'
-                          ? 'bg-red-100 text-red-700'
-                          : todo.priority === 'medium'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-blue-100 text-blue-700'
-                    ]"
-                    @click.stop="handleCalendarTodoClick(todo, date.date)"
-                  >
-                    {{ todo.content }}
-                  </div>
-                </template>
-                <div
-                  v-if="getTodosForDate(date.date).length > 3"
-                  class="text-xs px-1 py-0.5 rounded bg-gray-100 text-gray-600 cursor-pointer hover:bg-gray-200"
-                  @click.stop="selectDate(date.date)"
-                >
-                  {{
-                    t('todos.calendar.moreTodos', {
-                      count: getTodosForDate(date.date).length - 3
-                    })
-                  }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </BaseCard>
-
-      <!-- Todos List (Always show, default to all todos in current month) -->
-      <BaseCard
-        v-if="todos.length > 0 || tempNewTodo"
-        ref="selectedDateCard"
-        class="relative"
-      >
-        <!-- Loading overlay -->
-        <Transition name="fade">
-          <div
-            v-if="calendarClickLoading"
-            class="absolute inset-0 bg-white bg-opacity-75 z-10 flex items-center justify-center rounded-lg"
-          >
-            <div class="flex flex-col items-center gap-2">
-              <svg
-                class="animate-spin h-6 w-6 text-primary-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                ></circle>
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              <span class="text-sm text-gray-600">{{
-                t('common.loading') || 'Loading...'
-              }}</span>
-            </div>
-          </div>
-        </Transition>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold">
-              {{
-                selectedDate
-                  ? formatSelectedDate(selectedDate)
-                  : t('todos.allTodos')
-              }}
-            </h3>
-            <div class="flex items-center gap-2">
-              <!-- Group By Selector -->
-              <select
-                v-model="groupBy"
-                class="text-xs px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="date">{{ t('todos.groupBy.date') }}</option>
-                <option value="email">{{ t('todos.groupBy.subject') }}</option>
-                <option value="owner">{{ t('todos.groupBy.owner') }}</option>
-                <option value="priority">
-                  {{ t('todos.groupBy.priority') }}
-                </option>
-                <option value="category">
-                  {{ t('todos.groupBy.category') }}
-                </option>
-                <option value="location">
-                  {{ t('todos.groupBy.location') }}
-                </option>
-              </select>
-              <BaseButton
-                v-if="selectedDate"
-                @click="selectedDate = null"
-                variant="secondary"
-                size="sm"
-              >
-                {{ t('common.close') }}
-              </BaseButton>
-            </div>
-          </div>
-        </template>
-
-        <div class="p-4">
-          <div
-            v-for="(group, key) in groupedTodos"
-            :key="key"
-            class="mb-6 last:mb-0"
-          >
-            <!-- Group Header -->
-            <div
-              class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200"
-            >
-              <!-- Date Icon -->
-              <svg
-                v-if="groupBy === 'date'"
-                class="w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <!-- Owner Icon -->
-              <svg
-                v-else-if="groupBy === 'owner'"
-                class="w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-              <!-- Priority Icon -->
-              <svg
-                v-else-if="groupBy === 'priority'"
-                class="w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <!-- Category Icon -->
-              <svg
-                v-else-if="groupBy === 'category'"
-                class="w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                />
-              </svg>
-              <!-- Location Icon -->
-              <svg
-                v-else-if="groupBy === 'location'"
-                class="w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              <!-- Email Icon -->
-              <svg
-                v-else-if="groupBy === 'email'"
-                class="w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                />
-              </svg>
-              <h4 class="text-sm font-semibold text-gray-700">
-                {{ getGroupLabel(key, groupBy) }}
-              </h4>
-              <span class="text-xs text-gray-500">({{ group.length }})</span>
-            </div>
-
-            <!-- Timeline Container -->
-            <div class="relative pl-4 sm:pl-6 border-l-2 border-gray-200">
-              <TransitionGroup
-                name="todo-list"
-                tag="div"
-                class="space-y-4 sm:space-y-3"
-              >
-                <div
-                  v-for="(todo, index) in group"
-                  :key="todo.id"
-                  class="relative"
-                >
-                  <!-- Timeline Content -->
-                  <div class="pb-4 sm:pb-3 last:pb-0">
-                    <TodoItem
-                      :todo="todo"
-                      :loading="todoLoading[todo.id]"
-                      :is-new="todo.id === tempNewTodo?.id"
-                      @toggle="handleToggleTodo"
-                      @save="handleSaveTodoInline"
-                      @delete="handleDeleteTodo"
-                      @cancel-new="handleCancelNewTodo"
-                    />
-                  </div>
-                </div>
-              </TransitionGroup>
-            </div>
-          </div>
-
-          <div
-            v-if="selectedDateTodos.length === 0 && !tempNewTodo"
-            class="text-gray-500 italic text-center py-8"
-          >
-            <p>
-              {{
-                selectedDate ? t('todos.noTodosForDate') : t('todos.noTodos')
-              }}
-            </p>
-          </div>
-        </div>
-      </BaseCard>
-
-      <!-- Todo Editor Modal -->
-      <div
-        v-if="showTodoEditor"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-        @click.self="closeTodoEditor"
-      >
-        <div
-          class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        <svg
+          class="h-3.5 w-3.5 flex-none text-ink-3"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
         >
-          <div class="p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold text-gray-900">
-                {{ editingTodo ? t('todos.editTodo') : t('todos.addTodo') }}
-              </h3>
-              <button
-                @click="closeTodoEditor"
-                class="text-gray-400 hover:text-gray-600"
-              >
-                <svg
-                  class="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <TodoEditor
-              :todo="editingTodo"
-              :email-message-id="null"
-              :loading="savingTodo"
-              @save="handleSaveTodo"
-              @cancel="closeTodoEditor"
-            />
-          </div>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-4.5-4.5" stroke-linecap="round" />
+        </svg>
+        <input
+          v-model="filters.search"
+          type="text"
+          :placeholder="t('todos.searchPlaceholder')"
+          class="min-w-0 flex-1 border-0 bg-transparent p-0 text-[calc(12.5px*var(--fs))] text-ink placeholder:text-ink-3 focus:outline-none focus:ring-0"
+        />
+      </label>
+
+      <div class="ml-auto flex items-center gap-[7px]">
+        <div
+          class="flex h-8 items-center overflow-hidden rounded-md border border-line"
+        >
+          <button
+            v-for="(mode, index) in viewModes"
+            :key="mode.value"
+            type="button"
+            class="font-display flex h-8 items-center gap-1.5 px-3 text-[calc(12.5px*var(--fs))] transition-colors"
+            :class="[
+              viewMode === mode.value
+                ? 'bg-accent-soft font-medium text-accent'
+                : 'text-ink-2 hover:bg-chip',
+              index ? 'border-l border-line' : ''
+            ]"
+            @click="viewMode = mode.value"
+          >
+            <component :is="mode.icon" class="h-[13px] w-[13px]" />
+            {{ mode.label }}
+          </button>
         </div>
+
+        <button
+          type="button"
+          class="font-display flex h-8 items-center gap-[7px] rounded-md bg-accent px-[13px] text-[calc(12.5px*var(--fs))] font-medium text-accent-on transition-opacity hover:opacity-90"
+          @click="openNewTodo"
+        >
+          <svg
+            class="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" stroke-linecap="round" />
+          </svg>
+          {{ t('todos.newTodo') }}
+        </button>
+      </div>
+
+      <template #mobile>
+        <button
+          type="button"
+          class="text-ink-2"
+          :aria-label="t('todos.add')"
+          @click="openNewTodo"
+        >
+          <svg
+            class="h-[19px] w-[19px]"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" stroke-linecap="round" />
+          </svg>
+        </button>
+      </template>
+    </PageHeader>
+
+    <TodoStatStrip
+      v-model="timeRange"
+      :total="stats?.total || 0"
+      :completed="stats?.completed || 0"
+      :incomplete="stats?.incomplete || 0"
+      :completion-rate="completionRate"
+      :by-priority="openByPriority"
+      :ranges="timeRanges"
+    />
+
+    <!-- Filter bar: the canvas puts every filter here, grouping on the right. -->
+    <div
+      class="flex h-[49px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-line bg-panel-sub px-4 md:px-5"
+    >
+      <span class="hidden flex-none text-[calc(11.5px*var(--fs))] text-ink-3 md:inline">
+        {{ t('todos.filters.label') }}
+      </span>
+
+      <FilterSelect
+        class="flex-none"
+        size="sm"
+        :label="statusLabel"
+        :options="statusOptions"
+        :model-value="filters.is_completed"
+        @update:model-value="filters.is_completed = $event"
+      />
+
+      <FilterSelect
+        class="flex-none"
+        size="sm"
+        :label="priorityLabel"
+        :options="priorityOptions"
+        :model-value="filters.priority"
+        @update:model-value="filters.priority = $event"
+      />
+
+      <template v-if="timeRange === 'custom'">
+        <input
+          v-model="customStartDate"
+          type="date"
+          class="h-[30px] flex-none rounded-md border border-line bg-panel px-2 font-mono text-[calc(11.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
+          @change="handleCustomDateChange"
+        />
+        <span class="flex-none text-ink-4">–</span>
+        <input
+          v-model="customEndDate"
+          type="date"
+          class="h-[30px] flex-none rounded-md border border-line bg-panel px-2 font-mono text-[calc(11.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
+          @change="handleCustomDateChange"
+        />
+      </template>
+
+      <button
+        v-if="hasActiveFilters"
+        type="button"
+        class="font-display flex-none text-[calc(11.5px*var(--fs))] text-ink-3 transition-colors hover:text-ink-2"
+        @click="clearFilters"
+      >
+        {{ t('todos.filters.clearAll') }}
+      </button>
+
+      <div class="ml-auto flex flex-none items-center gap-1.5">
+        <span class="hidden text-[calc(11.5px*var(--fs))] text-ink-3 md:inline">
+          {{ t('todos.groupTitle') }}
+        </span>
+        <FilterSelect
+          size="sm"
+          :label="groupLabel"
+          :options="groupOptions"
+          :model-value="groupBy"
+          @update:model-value="groupBy = $event"
+        />
       </div>
     </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto">
+      <TodoCalendar
+        v-if="viewMode === 'calendar'"
+        :days="calendarDays"
+        :week-days="weekDays"
+        :label="
+          calendarViewMode === 'week' ? currentWeekLabel : currentMonthLabel
+        "
+        :selected-date="selectedDate"
+        :todos-for="getTodosForDate"
+        @previous="previousPeriod"
+        @next="nextPeriod"
+        @select="selectDate"
+        @open="handleCalendarTodoClick"
+      />
+
+      <!-- Column headings, matching the row widths below. -->
+      <div
+        class="sticky top-0 z-10 hidden h-[30px] items-center gap-3 bg-app px-5 font-mono text-[calc(10.5px*var(--fs))] tracking-[0.06em] text-ink-4 md:flex"
+      >
+        <div class="w-4 flex-none"></div>
+        <div class="min-w-0 flex-1">{{ t('todos.content') }}</div>
+        <div class="w-[34px] flex-none text-center">
+          {{ t('todos.priorityColumn') }}
+        </div>
+        <div class="w-[76px] flex-none">{{ t('todos.owner') }}</div>
+        <div class="w-[118px] flex-none">{{ t('todos.deadline') }}</div>
+        <div class="w-[210px] flex-none">{{ t('todos.sourceChat') }}</div>
+      </div>
+
+      <SkeletonRows v-if="loading" :count="5" />
+
+      <p
+        v-else-if="!visibleTodos.length"
+        class="py-16 text-center text-sm italic text-ink-3"
+      >
+        {{ selectedDate ? t('todos.noTodosForDate') : t('todos.noTodos') }}
+      </p>
+
+      <template v-else>
+        <template v-for="group in orderedGroups" :key="group.key">
+          <div
+            class="flex h-9 items-center gap-2 border-y border-line bg-panel-sub px-4 md:px-5"
+          >
+            <span
+              class="h-[5px] w-[5px] rounded-full"
+              :class="group.dotClass"
+            ></span>
+            <span
+              class="font-display text-[calc(11.5px*var(--fs))] font-semibold tracking-[0.02em]"
+              :class="group.labelClass"
+            >
+              {{ group.label }}
+            </span>
+            <span class="font-mono text-[calc(10.5px*var(--fs))] text-ink-4">
+              {{ t('todos.groupCount', { count: group.todos.length }) }}
+            </span>
+          </div>
+
+          <TodoRow
+            v-for="todo in group.todos"
+            :key="todo.id"
+            :todo="todo"
+            :loading="todoLoading[todo.id]"
+            @toggle="handleToggleTodo"
+            @edit="handleEditTodo"
+            @delete="handleDeleteTodo"
+          />
+        </template>
+      </template>
+    </div>
+
+    <BaseModal
+      :show="showTodoEditor"
+      :title="editingTodo ? t('todos.editTodo') : t('todos.addTodo')"
+      @close="closeTodoEditor"
+    >
+      <TodoEditor
+        :todo="editingTodo"
+        :email-message-id="null"
+        :loading="savingTodo"
+        @save="handleSaveTodo"
+        @cancel="closeTodoEditor"
+      />
+    </BaseModal>
   </AppLayout>
 </template>
 
@@ -775,11 +260,15 @@ import { formatDate as formatDateUtil } from '@/utils/timezone'
 import { extractErrorMessage } from '@/utils/api'
 import { todosApi } from '@/api/todos'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import BaseCard from '@/components/ui/BaseCard.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
-import TodoItem from '@/components/TodoItem.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
+import FilterSelect from '@/components/ui/FilterSelect.vue'
 import TodoEditor from '@/components/TodoEditor.vue'
-import TodoStatsChart from '@/components/todos/TodoStatsChart.vue'
+import TodoRow from '@/components/todos/TodoRow.vue'
+import TodoCalendar from '@/components/todos/TodoCalendar.vue'
+import TodoStatStrip from '@/components/todos/TodoStatStrip.vue'
+import { IconApps, IconTodos } from '@/components/layout/navIcons'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 
 const { t, locale } = useI18n()
 const preferencesStore = usePreferencesStore()
@@ -787,7 +276,6 @@ const preferencesStore = usePreferencesStore()
 const todos = ref([])
 const stats = ref(null)
 const loading = ref(false)
-const calendarClickLoading = ref(false)
 const currentMonth = ref(new Date())
 const selectedDate = ref(null)
 const viewMode = ref('list') // 'list' or 'calendar', default to 'list'
@@ -845,14 +333,14 @@ const savingTodo = ref(false)
 const todoLoading = ref({})
 const errorMessage = ref('')
 const successMessage = ref('')
-const tempNewTodo = ref(null)
 const groupBy = ref('email') // 'date', 'owner', 'priority', 'category', 'location', 'email'
 
 // Time range options (no more than 1 year)
 const timeRanges = computed(() => [
-  { value: 'week', label: t('todos.timeRange.week') },
   { value: 'month', label: t('todos.timeRange.month') },
-  { value: 'quarter', label: t('todos.timeRange.quarter') }
+  { value: 'week', label: t('todos.timeRange.week') },
+  { value: 'quarter', label: t('todos.timeRange.quarter') },
+  { value: 'custom', label: t('todos.timeRange.custom') }
 ])
 
 // Get time range dates for display (helper function)
@@ -1084,9 +572,7 @@ const selectedDateTodos = computed(() => {
   }
 
   // Add temporary new todo if exists
-  const allTodos = tempNewTodo.value
-    ? [tempNewTodo.value, ...dateTodos]
-    : dateTodos
+  const allTodos = dateTodos
 
   // Sort by created_at (timeline order - oldest first)
   return allTodos.sort((a, b) => {
@@ -1105,6 +591,118 @@ const selectedDateTodos = computed(() => {
 })
 
 // Group todos by selected method
+// --- What the canvas header and grouped table need -------------------------
+
+const viewModes = computed(() => [
+  { value: 'list', label: t('todos.view.list'), icon: IconTodos },
+  { value: 'calendar', label: t('todos.view.calendar'), icon: IconApps }
+])
+
+const groupOptions = computed(() => [
+  { value: 'date', label: t('todos.groupBy.date') },
+  { value: 'email', label: t('todos.groupBy.subject') },
+  { value: 'owner', label: t('todos.groupBy.owner') },
+  { value: 'priority', label: t('todos.groupBy.priority') },
+  { value: 'category', label: t('todos.groupBy.category') },
+  { value: 'location', label: t('todos.groupBy.location') }
+])
+const groupLabel = computed(
+  () =>
+    groupOptions.value.find((option) => option.value === groupBy.value)
+      ?.label || ''
+)
+
+const statusOptions = computed(() => [
+  { value: null, label: t('todos.filters.all') },
+  { value: false, label: t('todos.filters.incomplete') },
+  { value: true, label: t('todos.filters.completed') }
+])
+const statusLabel = computed(
+  () =>
+    `${t('todos.filters.status')}：${
+      statusOptions.value.find(
+        (option) => option.value === filters.value.is_completed
+      )?.label || ''
+    }`
+)
+
+const clearFilters = () => {
+  filters.value.is_completed = null
+  filters.value.priority = null
+  filters.value.owner = ''
+  filters.value.search = ''
+}
+
+const priorityOptions = computed(() => [
+  { value: null, label: t('todos.filters.all') },
+  { value: 'high', label: t('todos.priority.high') },
+  { value: 'medium', label: t('todos.priority.medium') },
+  { value: 'low', label: t('todos.priority.low') }
+])
+const priorityLabel = computed(
+  () =>
+    `${t('todos.priority.label')}：${
+      priorityOptions.value.find(
+        (option) => option.value === filters.value.priority
+      )?.label || ''
+    }`
+)
+
+const openCountLabel = computed(() =>
+  stats.value ? t('todos.openCount', { count: stats.value.incomplete }) : null
+)
+
+const openByPriority = computed(() => {
+  const open = todos.value.filter((todo) => !todo.is_completed)
+  return {
+    high: open.filter((todo) => todo.priority === 'high').length,
+    medium: open.filter((todo) => todo.priority === 'medium').length,
+    low: open.filter((todo) => todo.priority === 'low').length
+  }
+})
+
+const visibleTodos = computed(() => selectedDateTodos.value)
+
+// Late work is its own group at the top: it is not "another day", it is the
+// thing to deal with first.
+const isOverdue = (todo) =>
+  !todo.is_completed && todo.deadline && new Date(todo.deadline) < new Date()
+
+const orderedGroups = computed(() => {
+  const overdue = visibleTodos.value.filter(isOverdue)
+  const groups = []
+
+  if (overdue.length) {
+    groups.push({
+      key: 'overdue',
+      label: t('todos.overdueGroup'),
+      todos: overdue,
+      dotClass: 'bg-bad',
+      labelClass: 'text-bad'
+    })
+  }
+
+  const rest = new Set(overdue.map((todo) => todo.id))
+  Object.entries(groupedTodos.value).forEach(([key, items]) => {
+    const remaining = items.filter((todo) => !rest.has(todo.id))
+    if (!remaining.length) return
+    groups.push({
+      key,
+      label: getGroupLabel(key, groupBy.value),
+      todos: remaining,
+      dotClass: 'bg-ink-4',
+      labelClass: 'text-ink-2'
+    })
+  })
+
+  return groups
+})
+
+const openNewTodo = () => {
+  editingTodo.value = null
+  showTodoEditor.value = true
+}
+
 const groupedTodos = computed(() => {
   if (!selectedDateTodos.value.length) return {}
 
@@ -1488,24 +1086,8 @@ const nextPeriod = () => {
   }
 }
 
-const selectedDateCard = ref(null)
-
 const selectDate = (date) => {
-  if (isSameDay(date, selectedDate.value)) {
-    selectedDate.value = null
-  } else {
-    selectedDate.value = date
-    // Scroll to selected date card after DOM update
-    nextTick(() => {
-      const element = selectedDateCard.value?.$el || selectedDateCard.value
-      if (element) {
-        element.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
-        })
-      }
-    })
-  }
+  selectedDate.value = isSameDay(date, selectedDate.value) ? null : date
 }
 
 let searchTimeout = null
@@ -1519,83 +1101,9 @@ const debounceLoadTodos = () => {
   }, 300)
 }
 
-const clearFilters = () => {
-  filters.value = {
-    is_completed: null,
-    priority: null,
-    owner: '',
-    search: ''
-  }
-  // Filters will be watched, so loadTodos will be called automatically
-}
-
-const removeFilter = (key) => {
-  if (key === 'is_completed') {
-    filters.value.is_completed = null
-  } else if (key === 'priority') {
-    filters.value.priority = null
-  } else if (key === 'owner') {
-    filters.value.owner = ''
-  } else if (key === 'search') {
-    filters.value.search = ''
-  }
-  // Filters will be watched, so loadTodos will be called automatically
-}
-
-const handleAddTodo = () => {
-  // If no date selected, use today
-  const targetDate = selectedDate.value || new Date()
-  const d = targetDate instanceof Date ? targetDate : new Date(targetDate)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const hours = String(d.getHours()).padStart(2, '0')
-  const minutes = String(d.getMinutes()).padStart(2, '0')
-
-  // Create temporary todo for inline editing
-  tempNewTodo.value = {
-    id: `temp-${Date.now()}`,
-    content: '',
-    priority: null,
-    owner: '',
-    deadline: `${year}-${month}-${day}T${hours}:${minutes}`,
-    location: '',
-    is_completed: false,
-    isNew: true // Flag to indicate this is a new todo
-  }
-
-  // Auto-select date if not selected
-  if (!selectedDate.value) {
-    selectedDate.value = targetDate
-  }
-}
-
-// Handle todo click in calendar view - select date and scroll to detail area
+// Clicking a todo in the calendar narrows the list below to that day.
 const handleCalendarTodoClick = (todo, date) => {
-  // Show loading effect
-  calendarClickLoading.value = true
-
-  // Select the date to show todos for that date
   selectedDate.value = date
-
-  // Scroll to detail area after DOM update
-  nextTick(() => {
-    const element = selectedDateCard.value?.$el || selectedDateCard.value
-    if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      })
-
-      // Hide loading after scroll animation completes (smooth scroll takes ~500ms)
-      setTimeout(() => {
-        calendarClickLoading.value = false
-      }, 600)
-    } else {
-      // If element not found, hide loading immediately
-      calendarClickLoading.value = false
-    }
-  })
 }
 
 const handleEditTodo = (todo) => {
@@ -1617,54 +1125,6 @@ const handleEditTodo = (todo) => {
 const closeTodoEditor = () => {
   showTodoEditor.value = false
   editingTodo.value = null
-}
-
-const handleSaveTodoInline = async (todoId, todoData) => {
-  // Ensure todoId is a string for comparison
-  const todoIdStr = String(todoId)
-  todoLoading.value[todoIdStr] = true
-  errorMessage.value = ''
-  successMessage.value = ''
-
-  // Check if this is a new todo (temp todo)
-  const isNewTodo =
-    todoIdStr.startsWith('temp-') ||
-    (tempNewTodo.value && String(tempNewTodo.value.id) === todoIdStr)
-
-  try {
-    if (isNewTodo) {
-      // Create new todo
-      await todosApi.createTodo(todoData)
-      successMessage.value =
-        t('todos.createSuccess') || 'TODO created successfully'
-      // Remove temp todo
-      tempNewTodo.value = null
-      await Promise.all([loadTodos(), loadStats()])
-    } else {
-      // Update existing todo
-      await todosApi.updateTodo(todoIdStr, todoData)
-      successMessage.value =
-        t('todos.updateSuccess') || 'TODO updated successfully'
-      await Promise.all([loadTodos(), loadStats()])
-    }
-
-    setTimeout(() => {
-      successMessage.value = ''
-    }, 3000)
-  } catch (err) {
-    console.error('Failed to save todo:', err)
-    errorMessage.value = extractErrorMessage(
-      err,
-      t('common.error') + ': ' + t('todos.save')
-    )
-    throw err // Re-throw to let TodoItem handle the error
-  } finally {
-    todoLoading.value[todoIdStr] = false
-  }
-}
-
-const handleCancelNewTodo = () => {
-  tempNewTodo.value = null
 }
 
 const handleSaveTodo = async (todoData) => {
@@ -1793,8 +1253,8 @@ const handleCustomDateChange = () => {
   }
 }
 
-// Handle calendar view mode change
-const handleCalendarViewModeChange = () => {
+// Switching to the week view jumps to the week containing today.
+watch(calendarViewMode, () => {
   // When switching to week view, show the week containing today
   if (calendarViewMode.value === 'week') {
     const now = new Date()
@@ -1810,7 +1270,7 @@ const handleCalendarViewModeChange = () => {
     const now = new Date()
     currentMonth.value = new Date(now.getFullYear(), now.getMonth(), 1)
   }
-}
+})
 
 onMounted(() => {
   loadTodos()

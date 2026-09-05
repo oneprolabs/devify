@@ -942,7 +942,7 @@
                     class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                     :placeholder="String(DEFAULT_REQUEST_TIMEOUT_SECONDS)"
                   />
-                  <p class="mt-1 text-[11px] text-gray-500">
+                  <p class="mt-1 text-[calc(11px*var(--fs))] text-gray-500">
                     {{ t('llm.config.requestTimeoutHint') }}
                   </p>
                 </div>

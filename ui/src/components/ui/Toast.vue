@@ -2,51 +2,44 @@
   <Teleport to="body">
     <Transition
       enter-active-class="transition ease-out duration-300"
-      enter-from-class="opacity-0 translate-x-full"
+      enter-from-class="opacity-0 translate-x-4"
       enter-to-class="opacity-100 translate-x-0"
       leave-active-class="transition ease-in duration-200"
       leave-from-class="opacity-100 translate-x-0"
-      leave-to-class="opacity-0 translate-x-full"
+      leave-to-class="opacity-0 translate-x-4"
     >
       <div
         v-if="state.show"
-        :class="[
-          'fixed top-4 right-4 left-4 sm:left-auto max-w-sm',
-          'rounded-md border p-3 shadow-lg',
-          typeClasses[state.type]
-        ]"
+        class="fixed left-4 right-4 top-4 flex max-w-sm gap-[11px] rounded-[9px] border border-line border-l-[3px] bg-panel px-3.5 py-3 shadow-soft-md sm:left-auto"
+        :class="edgeClasses[state.type]"
         style="z-index: 9999"
         role="alert"
       >
-        <div class="flex gap-2">
-          <div class="flex-shrink-0 pt-0.5">
-            <component :is="iconComponent" :class="iconClasses[state.type]" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <p :class="['text-sm font-medium', textClasses[state.type]]">
-              {{ state.message }}
-            </p>
-          </div>
-          <button
-            @click="handleClose"
-            :class="['flex-shrink-0', closeButtonClasses[state.type]]"
-            :title="t('common.close')"
+        <component
+          :is="iconComponent"
+          class="mt-px h-[17px] w-[17px] flex-shrink-0"
+          :class="iconClasses[state.type]"
+        />
+        <p class="min-w-0 flex-1 text-[calc(13px*var(--fs))] font-semibold text-ink">
+          {{ state.message }}
+        </p>
+        <button
+          type="button"
+          class="mt-0.5 flex-shrink-0 text-ink-4 transition-colors hover:text-ink-2"
+          :title="t('common.close')"
+          @click="handleClose"
+        >
+          <svg
+            class="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            aria-hidden="true"
           >
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
+            <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round" />
+          </svg>
+        </button>
       </div>
     </Transition>
   </Teleport>
@@ -60,35 +53,23 @@ import { useToast } from '@/composables/useToast'
 const { t } = useI18n()
 const { state, hide } = useToast()
 
-const typeClasses = {
-  success: 'bg-green-50 border-green-200',
-  error: 'bg-red-50 border-red-200',
-  warning: 'bg-yellow-50 border-yellow-200',
-  info: 'bg-blue-50 border-blue-200'
-}
-
-const textClasses = {
-  success: 'text-green-800',
-  error: 'text-red-800',
-  warning: 'text-yellow-800',
-  info: 'text-blue-800'
+// The tone lives in a 3px edge, not a tinted panel: a toast should read as
+// the app's own surface with a stripe saying how it went.
+const edgeClasses = {
+  success: 'border-l-ok',
+  error: 'border-l-bad',
+  warning: 'border-l-warn',
+  info: 'border-l-accent'
 }
 
 const iconClasses = {
-  success: 'h-4 w-4 text-green-400',
-  error: 'h-4 w-4 text-red-400',
-  warning: 'h-4 w-4 text-yellow-400',
-  info: 'h-4 w-4 text-blue-400'
+  success: 'text-ok',
+  error: 'text-bad',
+  warning: 'text-warn',
+  info: 'text-accent'
 }
 
-const closeButtonClasses = {
-  success: 'text-green-400 hover:text-green-600',
-  error: 'text-red-400 hover:text-red-600',
-  warning: 'text-yellow-400 hover:text-yellow-600',
-  info: 'text-blue-400 hover:text-blue-600'
-}
-
-const SuccessIcon = (props) =>
+const SuccessIcon = () =>
   h('svg', { viewBox: '0 0 20 20', fill: 'currentColor' }, [
     h('path', {
       'fill-rule': 'evenodd',
@@ -97,7 +78,7 @@ const SuccessIcon = (props) =>
     })
   ])
 
-const ErrorIcon = (props) =>
+const ErrorIcon = () =>
   h('svg', { viewBox: '0 0 20 20', fill: 'currentColor' }, [
     h('path', {
       'fill-rule': 'evenodd',
@@ -106,7 +87,7 @@ const ErrorIcon = (props) =>
     })
   ])
 
-const WarningIcon = (props) =>
+const WarningIcon = () =>
   h('svg', { viewBox: '0 0 20 20', fill: 'currentColor' }, [
     h('path', {
       'fill-rule': 'evenodd',
@@ -115,7 +96,7 @@ const WarningIcon = (props) =>
     })
   ])
 
-const InfoIcon = (props) =>
+const InfoIcon = () =>
   h('svg', { viewBox: '0 0 20 20', fill: 'currentColor' }, [
     h('path', {
       'fill-rule': 'evenodd',

@@ -1,137 +1,146 @@
 <template>
-  <AppLayout>
-    <div class="space-y-4">
-      <div>
-        <h2 class="text-lg font-bold leading-7 text-gray-900 sm:text-xl">
-          {{ t('billing.title') }}
-        </h2>
-        <p class="mt-0.5 text-xs text-gray-500">
-          {{ t('billing.description') }}
-        </p>
-      </div>
+  <AppLayout :padded="false">
+    <PageHeader
+      :title="t('billing.title')"
+      :parent="{ to: '/settings', label: t('common.settings') }"
+      parent-mobile-only
+      gutter="md"
+    >
+      <span class="hidden text-xs text-ink-3 lg:block">
+        {{ t('billing.description') }}
+      </span>
+    </PageHeader>
 
-      <div
-        v-if="successMessage"
-        class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between"
-      >
-        <div class="flex items-center">
-          <svg
-            class="w-5 h-5 text-green-600 mr-3"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span class="text-green-800">{{ successMessage }}</span>
-        </div>
-        <button
-          @click="successMessage = ''"
-          class="text-green-600 hover:text-green-800"
+    <div class="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+      <div class="flex flex-col gap-4">
+        <p
+          v-if="successMessage"
+          class="rounded-lg border border-ok bg-ok-soft px-4 py-2.5 text-sm text-ok"
         >
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <div
-        v-if="errorMessage"
-        class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between"
-      >
-        <div class="flex items-center">
-          <svg
-            class="w-5 h-5 text-red-600 mr-3"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span class="text-red-800">{{ errorMessage }}</span>
-        </div>
-        <button
-          @click="errorMessage = ''"
-          class="text-red-600 hover:text-red-800"
+          {{ successMessage }}
+        </p>
+        <p
+          v-if="errorMessage"
+          class="rounded-lg border border-bad bg-bad-soft px-4 py-2.5 text-sm text-bad"
         >
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <div
-        v-if="billingStatus && billingStatus.recharge_enabled === false"
-        class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
-      >
-        <p class="font-medium">
-          {{ t('billing.plans.stripeNotConfigured') }}
+          {{ errorMessage }}
         </p>
-        <p class="mt-1">
-          {{ t('billing.status.stripeMissingHint') }}
-        </p>
-      </div>
-
-      <div v-if="loading" class="flex items-center justify-center py-12">
         <div
-          class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
-        ></div>
-        <p class="ml-3 text-sm text-gray-500">{{ t('common.loading') }}</p>
-      </div>
+          v-if="billingStatus && billingStatus.recharge_enabled === false"
+          class="rounded-lg border border-warn bg-warn-soft p-4 text-sm text-warn"
+        >
+          <p class="font-medium">
+            {{ t('billing.plans.stripeNotConfigured') }}
+          </p>
+          <p class="mt-1">{{ t('billing.status.stripeMissingHint') }}</p>
+        </div>
 
-      <div v-else class="space-y-4">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="lg:col-span-1">
-            <CurrentSubscription
-              :subscription="currentSubscription"
-              :credits="credits"
-            />
+        <!-- The page's own shape while it waits: the plan bar, then the
+             two columns under it. A spinner would say less. -->
+        <div v-if="loading" class="flex flex-col gap-4" aria-busy="true">
+          <div
+            class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-5 py-[18px] md:flex-row md:items-center md:gap-7"
+          >
+            <span class="h-[13px] w-[72px] flex-none rounded-[5px] bg-chip"></span>
+            <span class="flex flex-col gap-[7px]">
+              <span class="h-2 w-14 rounded-sm bg-line-soft"></span>
+              <span class="h-2.5 w-[168px] rounded-[5px] bg-chip"></span>
+            </span>
+            <span class="flex flex-col gap-[7px]">
+              <span class="h-2 w-12 rounded-sm bg-line-soft"></span>
+              <span class="h-2.5 w-14 rounded-[5px] bg-chip"></span>
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col gap-[7px] opacity-55">
+              <span class="h-2 w-20 rounded-sm bg-line-soft"></span>
+              <span class="h-1.5 w-full rounded-sm bg-chip"></span>
+            </span>
           </div>
 
-          <div class="lg:col-span-2">
-            <SubscriptionPlans
-              :current-subscription="currentSubscription"
-              :billing-status="billingStatus"
-              @subscription-updated="handleSubscriptionUpdated"
-              @operation-success="handleOperationSuccess"
-              @operation-error="handleOperationError"
-            />
+          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_384px]">
+            <div
+              class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-5 py-4"
+            >
+              <span class="h-2.5 w-28 rounded-[5px] bg-chip"></span>
+              <div class="flex h-[180px] items-end gap-[7px] pb-5">
+                <span
+                  v-for="(height, index) in CHART_BARS"
+                  :key="index"
+                  class="min-w-0 flex-1 rounded-sm bg-chip"
+                  :style="{ height }"
+                ></span>
+              </div>
+            </div>
+
+            <div
+              class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-5 py-4"
+            >
+              <span class="h-2.5 w-20 rounded-[5px] bg-chip"></span>
+              <div
+                v-for="(row, index) in PLAN_ROWS"
+                :key="index"
+                class="flex flex-col gap-[7px]"
+                :style="{ opacity: index === PLAN_ROWS.length - 1 ? 0.55 : 1 }"
+              >
+                <span
+                  class="h-2.5 rounded-[5px] bg-chip"
+                  :style="{ width: row[0] }"
+                ></span>
+                <span
+                  class="h-2 rounded-sm bg-line-soft"
+                  :style="{ width: row[1] }"
+                ></span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <UsageChart />
+        <template v-else>
+          <CurrentSubscription
+            :subscription="currentSubscription"
+            :credits="credits"
+          >
+            <template #actions>
+              <button
+                v-if="plansRef?.canResume?.()"
+                type="button"
+                class="font-display flex h-[34px] items-center rounded border border-line px-3.5 text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4"
+                @click="plansRef.openResumeDialog()"
+              >
+                {{ t('billing.resume.title') }}
+              </button>
+              <button
+                v-else-if="plansRef?.canCancel?.()"
+                type="button"
+                class="font-display flex h-[34px] items-center rounded border border-line px-3.5 text-[calc(12.5px*var(--fs))] text-ink-2 transition-colors hover:border-ink-4"
+                @click="plansRef.openCancelDialog()"
+              >
+                {{ t('billing.cancel.title') }}
+              </button>
+            </template>
+          </CurrentSubscription>
 
-        <CreditUsageList />
+          <div class="flex flex-col gap-4 xl:flex-row">
+            <div class="flex min-w-0 flex-1 flex-col gap-4">
+              <UsageChart />
+              <CreditUsageList />
+            </div>
+
+            <div class="flex flex-col gap-4 xl:w-96 xl:flex-none">
+              <SubscriptionPlans
+                ref="plansRef"
+                :current-subscription="currentSubscription"
+                :billing-status="billingStatus"
+                @subscription-updated="handleSubscriptionUpdated"
+                @operation-success="handleOperationSuccess"
+                @operation-error="handleOperationError"
+              />
+              <CreditsInfoCard
+                :subscription="currentSubscription"
+                :credits="credits"
+              />
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </AppLayout>
@@ -142,6 +151,8 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import CreditsInfoCard from '@/components/billing/CreditsInfoCard.vue'
 import CurrentSubscription from '@/components/billing/CurrentSubscription.vue'
 import SubscriptionPlans from '@/components/billing/SubscriptionPlans.vue'
 import UsageChart from '@/components/billing/UsageChart.vue'
@@ -149,8 +160,23 @@ import CreditUsageList from '@/components/billing/CreditUsageList.vue'
 import billingApi from '@/api/billing'
 
 const { t } = useI18n()
+
+// The summary bar's cancel and resume reach the dialogs the plan list owns.
+const plansRef = ref(null)
 const route = useRoute()
 const router = useRouter()
+
+// Fixed proportions so the wait keeps one silhouette.
+const CHART_BARS = [
+  '38%', '61%', '29%', '74%', '52%', '83%', '44%', '67%',
+  '31%', '58%', '77%', '41%', '69%', '35%', '55%'
+]
+const PLAN_ROWS = [
+  ['42%', '68%'],
+  ['36%', '61%'],
+  ['48%', '72%'],
+  ['33%', '57%']
+]
 
 const loading = ref(true)
 const billingStatus = ref(null)

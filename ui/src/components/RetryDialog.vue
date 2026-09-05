@@ -3,7 +3,7 @@
     <div v-if="initializing" class="flex items-center justify-center py-8">
       <div class="text-center">
         <svg
-          class="animate-spin h-8 w-8 text-primary-600 mx-auto"
+          class="animate-spin h-8 w-8 text-accent mx-auto"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -22,13 +22,13 @@
             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
           ></path>
         </svg>
-        <p class="mt-4 text-sm text-gray-600">{{ t('common.loading') }}</p>
+        <p class="mt-4 text-sm text-ink-2">{{ t('common.loading') }}</p>
       </div>
     </div>
     <div v-else class="space-y-4">
       <!-- Language Selector -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
+        <label class="block text-sm font-medium text-ink-2 mb-2">
           {{ t('settings.language') }}
         </label>
         <select
@@ -45,7 +45,7 @@
 
       <!-- Scene Selector -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
+        <label class="block text-sm font-medium text-ink-2 mb-2">
           {{ t('settings.scene') }}
         </label>
         <select
@@ -64,21 +64,21 @@
       </div>
 
       <!-- Force Option -->
-      <div class="border-t border-gray-200 pt-4">
+      <div class="border-t border-line pt-4">
         <div class="flex items-center gap-3">
           <div class="flex items-center flex-shrink-0">
             <input
               id="force-retry"
               v-model="localForce"
               type="checkbox"
-              class="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 rounded"
+              class="focus:ring-accent h-4 w-4 text-accent border-line rounded"
               :disabled="loading || forceRequired"
             />
           </div>
           <div class="flex-1 min-w-0">
             <label
               for="force-retry"
-              class="block text-sm font-medium text-gray-700 cursor-pointer"
+              class="block text-sm font-medium text-ink-2 cursor-pointer"
             >
               {{ t('retry.forceMode') }}
             </label>
@@ -86,12 +86,12 @@
         </div>
         <div class="mt-2">
           <div
-            class="py-3 px-4 sm:px-6 bg-yellow-50 border border-yellow-200 rounded-md"
+            class="py-3 px-4 sm:px-6 bg-warn-soft border border-warn rounded-md"
           >
             <div class="flex gap-2">
               <div class="flex-shrink-0">
                 <svg
-                  class="h-5 w-5 text-yellow-400"
+                  class="h-5 w-5 text-warn"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -103,7 +103,7 @@
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm text-yellow-800 leading-relaxed">
+                <p class="text-sm text-warn leading-relaxed">
                   {{ t('retry.forceModeWarning') }}
                 </p>
               </div>
@@ -273,7 +273,7 @@ onMounted(async () => {
 
 <style scoped>
 .input {
-  @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500;
+  @apply block w-full rounded-md border-line shadow-sm focus:border-accent focus:ring-accent;
   @apply text-sm;
   @apply px-3 py-2;
   @apply min-h-[44px] sm:min-h-[36px]; /* Better touch target on mobile */

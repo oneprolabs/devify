@@ -1,7 +1,7 @@
 <template>
   <button
     @click.stop="handleCopy"
-    class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+    class="p-1 text-ink-4 hover:text-ink-2 hover:bg-chip rounded transition-colors flex-shrink-0"
     :title="t('common.copy')"
   >
     <svg

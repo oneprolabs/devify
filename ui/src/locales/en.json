@@ -61,7 +61,10 @@
     },
     "undo": "Undo",
     "collapse": "Collapse",
-    "expand": "Expand"
+    "expand": "Expand",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "typeToConfirm": "Type “{phrase}” to confirm:"
   },
   "virtualEmail": {
     "yourAddress": "Your AI Email"
@@ -78,7 +81,18 @@
     "relayDesc": "Subscribe to workflow completions and deliver them to Feishu, Jira, or GitHub Issues.",
     "todoDesc": "Collect follow-up tasks and keep post-analysis actions organized in one place.",
     "expenseName": "Expense",
-    "expenseDesc": "Collect invoices from email, classify them and package them for reimbursement."
+    "expenseDesc": "Collect invoices from email, classify them and package them for reimbursement.",
+    "centerHeadline": "Open each module and connect the tools you use",
+    "appCount": "{count} apps",
+    "statChannels": "Channels",
+    "statDeliveriesThisWeek": "This week",
+    "statFailed": "To retry",
+    "statIncomplete": "Open",
+    "statOverdue": "Overdue",
+    "statCompletionRate": "Done",
+    "statInvoices": "Invoices",
+    "statUnfiled": "Unfiled",
+    "statOpenGroups": "Open groups"
   },
   "relay": {
     "pageTitle": "Relay",
@@ -226,7 +240,51 @@
     "disableSuccess": "Channel disabled",
     "confirmDelete": "Delete this subscription?",
     "testSuccess": "Test delivery succeeded",
-    "noExternalId": "No external ID returned"
+    "noExternalId": "No external ID returned",
+    "searchPlaceholder": "Search conversations or targets…",
+    "allChannels": "All channels",
+    "statusAll": "Status: all",
+    "statusFilter": "Status: {name}",
+    "channelFilter": "Channel: {name}",
+    "retryAllFailed": "Retry all failed ({count})",
+    "statTotal": "Delivered",
+    "statThisWeek": "This week",
+    "statFailed": "To retry",
+    "statSuccessRate": "Success",
+    "byChannel": "By channel",
+    "colStatus": "Status",
+    "colSource": "Conversation / action",
+    "colChannel": "Channel",
+    "colTarget": "Target",
+    "colTime": "Time",
+    "actionNew": "Created",
+    "actionNewAndLink": "Created and linked",
+    "actionUpdate": "Updated",
+    "statusSkipped": "Skipped",
+    "searchChannels": "Search channels",
+    "searchTypes": "Search channel types",
+    "channelDisabled": "Disabled",
+    "deliveryCount": "{count} deliveries",
+    "existingChannels": "{count} set up",
+    "categoryTracker": "Issue trackers",
+    "categoryTable": "Tables and docs",
+    "typeJiraDesc": "Create an issue, link to one, or update one.",
+    "typeGitHubDesc": "Deliver to a repository’s issues, with labels and assignees.",
+    "typeFeishuDesc": "Write a row into a Bitable, filled from your field mapping.",
+    "actionNew2": "Create",
+    "actionLink": "Link",
+    "actionUpdate2": "Update",
+    "partialSupport": "partial",
+    "stepPickType": "Pick a type",
+    "stepConfigure": "Connect it",
+    "stepTest": "Test a delivery",
+    "newChannel": "New channel",
+    "channelEnabled": "Enabled",
+    "pickChannel": "Pick a channel on the left to configure it.",
+    "changeType": "Change type",
+    "deleteChannel": "Delete channel",
+    "deleteChannelTitle": "Delete channel “{name}”",
+    "deleteChannelWarning": "Its delivery history goes with it. Anything already created in the external system is untouched. This cannot be undone."
   },
   "management": {
     "adminConsole": "Admin Console"
@@ -244,7 +302,6 @@
     "confirmPassword": "Confirm Password",
     "passwordHelp": "Password must be at least 8 characters",
     "passwordHelpComplex": "8-32 characters, must contain letters and numbers",
-    "rememberMe": "Remember me",
     "forgotPassword": "Forgot password?",
     "forgotPasswordDescription": "Please enter the security email you used during registration. We'll send a reset link to that email.",
     "securityEmailPlaceholder": "Enter your security email",
@@ -299,7 +356,23 @@
     },
     "loginFailedMessage": "Login failed. Please check your username and password, or",
     "registerNewAccount": "register a new account",
-    "period": "."
+    "period": ".",
+    "pitch": {
+      "headline": "Forward the mail.\nIt files the rest.",
+      "summary": "Forward to your AI mailbox → filed as summaries, todos and tags → delivered to Feishu, Jira or GitHub Issues.",
+      "forward": {
+        "title": "Forward to your AI mailbox",
+        "body": "An address is assigned to you, or connect your own IMAP. Text and images are both read."
+      },
+      "organise": {
+        "title": "Filed as summaries, todos and tags",
+        "body": "Several messages about one thing merge into a single record, attachments included."
+      },
+      "deliver": {
+        "title": "Delivered where you already work"
+      }
+    },
+    "noAccountYet": "No account yet?"
   },
   "register": {
     "emailPlaceholder": "Enter your email address",
@@ -447,7 +520,7 @@
       "openInNewWindow": "Open in new window"
     },
     "files": {
-      "title": "Files",
+      "title": "Attachments",
       "download": "Download",
       "previewError": "Failed to load preview",
       "file": "File"
@@ -455,7 +528,66 @@
     "errorLoading": "Error loading threadline",
     "errorLoadingDesc": "Failed to load conversation details",
     "handledByExpense": "{count} invoice | {count} invoices",
-    "handledByExpenseHint": "Expense read {count} invoices out of this email"
+    "handledByExpenseHint": "Expense read {count} invoices out of this email",
+    "mergedBadge": "Merged {count}",
+    "attachmentsShort": "{count} files",
+    "rangeAll": "All time",
+    "range7": "Last 7 days",
+    "range30": "Last 30 days",
+    "range90": "Last 90 days",
+    "statusAll": "Status: all",
+    "statusFilter": "Status: {name}",
+    "searchHint": "Search titles, content, tags… several keywords work",
+    "showingRange": "Showing {from}–{to} of {total}",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "statTotal": "Total",
+    "statThisWeek": "This week",
+    "statPending": "Pending",
+    "statCompleted": "Completed",
+    "mailboxLabel": "Your AI mailbox · forward and it files",
+    "colStatus": "Status",
+    "colTitle": "Title / summary",
+    "colTags": "Tags",
+    "colSource": "From",
+    "colRelay": "Delivery",
+    "colTime": "Time",
+    "filterAll": "All",
+    "countUnit": "{count}",
+    "stateCompleted": "Completed",
+    "stateProcessing": "Processing",
+    "statePending": "Pending",
+    "stateFailed": "Failed",
+    "detail": {
+      "processingStatus": "Processing",
+      "stageReceived": "Received",
+      "stageParsed": "Parsed",
+      "stageSummarised": "Summarised",
+      "stageDelivered": "Delivered",
+      "receivedAt": "Received",
+      "deliveries": "Deliveries",
+      "mergedSources": "Merged from",
+      "reprocess": "Reprocess",
+      "coreTopic": "Summary",
+      "originalEmails": "Original emails",
+      "aiOutput": "Raw AI output",
+      "todosMeta": "{total} items · {done} done",
+      "attachmentsTitle": "Attachments",
+      "deleteConfirm": "Delete this conversation? This cannot be undone.",
+      "tabSummary": "Summary",
+      "tabTodos": "Todos",
+      "tabFiles": "Files",
+      "tabRaw": "Raw",
+      "tabInfo": "Info",
+      "position": "{index} of {total}",
+      "previous": "Previous",
+      "next": "Next",
+      "loadFailed": "This conversation didn't load"
+    },
+    "emptyTitle": "Forward your first email",
+    "emptyBody": "Send it to the address below and it comes back as a summary and todos.\nText inside images is read too.",
+    "emptyConnectImap": "Or connect your own IMAP mailbox",
+    "noResultsBody": "Try another keyword, or widen the status and time range."
   },
   "metadata": {
     "sectionTitle": "Basic Information",
@@ -764,7 +896,13 @@
     "invoiceRuleFetch": "1. Download: the mail server is asked for messages whose subject contains a keyword. The server can only search subjects, not attachment names.",
     "invoiceRuleRoute": "2. Recognition: downloaded mail is checked against both the subject and the attachment filenames; either one is enough.",
     "invoiceRuleBody": "3. The body is not consulted. Matching it pulls in every phone bill and usage report that mentions an invoice in its footer, and a wrong guess costs a real conversation its summary.",
-    "invoiceRuleMiss": "4. Keywords are set under Expense › Settings. Mail that misses is not lost, only left out of Expense — forward it here with a keyword in the subject to pick it up."
+    "invoiceRuleMiss": "4. Keywords are set under Expense › Settings. Mail that misses is not lost, only left out of Expense — forward it here with a keyword in the subject to pick it up.",
+    "basicInfoDesc": "Profile, sign-in and password",
+    "preferencesDesc": "Language, timezone and processing scene",
+    "emailConfigDesc": "How mail arrives, filters and IMAP",
+    "systemAssigned": "Assigned",
+    "aiEmailInUse": "Using the assigned mailbox.",
+    "authMethodDesc": "Your sign-in address is used for password resets — it is not the AI mailbox."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -859,7 +997,7 @@
       "periodStart": "Period Start",
       "periodEnd": "Period End",
       "remaining": "Remaining",
-      "daysRemaining": "{days} days left",
+      "daysRemaining": "Time left",
       "daysRemainingValue": "{days} days",
       "autoRenew": "Auto Renew",
       "creditsUsage": "Credits Usage",
@@ -867,7 +1005,12 @@
       "noSubscription": "No Active Subscription",
       "upgradePrompt": "Upgrade to a paid plan to get more features and credits",
       "freePlanTitle": "Free Plan",
-      "freePlanDesc": "Free Plan - Upgrade for more features"
+      "freePlanDesc": "Free Plan - Upgrade for more features",
+      "creditsSplit": "{used} used ·",
+      "autoRenewOn": "auto-renew on",
+      "autoRenewOff": "ends at period end",
+      "days": "{days} days",
+      "currentPeriod": "Current period"
     },
     "plans": {
       "title": "Subscription Plans",
@@ -897,7 +1040,15 @@
       "retentionNotSet": "Not Set",
       "retentionPermanent": "Permanent",
       "retentionYears": "{years}-year retention",
-      "retentionDays": "{days}-day retention"
+      "retentionDays": "{days}-day retention",
+      "freePlan": "Free",
+      "names": {
+        "free": "Free Plan",
+        "starter": "Starter Plan",
+        "standard": "Standard Plan",
+        "pro": "Pro Plan",
+        "internal": "Internal Plan"
+      }
     },
     "downgrade": {
       "title": "Downgrade Subscription",
@@ -927,7 +1078,9 @@
       "totalConsumed": "Total Consumed",
       "available": "Available",
       "totalCredits": "Total Credits",
-      "creditsConsumed": "Credits Consumed"
+      "creditsConsumed": "Credits Consumed",
+      "days": "{days}d",
+      "rangeSummary": "Last {days} days · {credits} credits"
     },
     "creditUsage": {
       "title": "Credit Usage by Chats",
@@ -935,7 +1088,9 @@
       "last30Days": "Last 30 days",
       "last90Days": "Last 90 days",
       "noData": "No credit usage found in this period",
-      "noSubject": "No Subject"
+      "noSubject": "No Subject",
+      "chat": "Conversation",
+      "credits": "Credits"
     },
     "creditsInfo": {
       "title": "About Credits",
@@ -1027,6 +1182,7 @@
       "byPriority": "By Priority"
     },
     "filters": {
+      "label": "Filters",
       "all": "All",
       "status": "Status",
       "completed": "Completed",
@@ -1070,7 +1226,25 @@
       "todos": "Todos",
       "keyProcessPlaceholder": "One process item per line",
       "keyProcessHint": "Enter one key process per line, supports multiple lines"
-    }
+    },
+    "priorityShort": {
+      "high": "Hi",
+      "medium": "Md",
+      "low": "Lo"
+    },
+    "overdueBy": "{days}d late",
+    "dueIn": "{days}d left",
+    "dueTodayShort": "Today",
+    "searchPlaceholder": "Search todos…",
+    "sourceChat": "From",
+    "groupCount": "{count}",
+    "openCount": "{count} open",
+    "groupByLabel": "Group: ",
+    "openByPriority": "Open · by priority",
+    "overdueGroup": "Overdue",
+    "priorityColumn": "Pri",
+    "groupTitle": "Group",
+    "newTodo": "New todo"
   },
   "share": {
     "title": "Share",
@@ -1138,7 +1312,12 @@
     "shareCreatedAndCopied": "Share link created and copied",
     "clickToView": "View link",
     "openLink": "Open link",
-    "hideLink": "Hide link"
+    "hideLink": "Hide link",
+    "shareButton": "Share",
+    "viewSubtitle": "Shared conversation",
+    "readOnlyNotice": "A read-only copy of this conversation.",
+    "expiresOn": "Link expires {date}",
+    "participantCount": "{count} participants"
   },
   "expense": {
     "pageTitle": "Expense",
@@ -1398,6 +1577,25 @@
         "invoice_type": "Invoice type",
         "city": "City"
       }
-    }
+    },
+    "headerSummary": "{count} unfiled · ¥{amount}"
+  },
+  "nav": {
+    "account": "Account",
+    "credits": "Credits this period",
+    "tabChats": "Chats",
+    "tabApps": "Apps",
+    "tabSettings": "Settings"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "fontSize": {
+    "label": "Text size",
+    "standard": "Standard",
+    "large": "Large"
   }
 }

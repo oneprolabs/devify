@@ -1,147 +1,89 @@
 <template>
-  <BaseCard>
-    <template #header>
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <svg
-            class="w-5 h-5 text-gray-700"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
-          <h3 class="text-base font-semibold text-gray-800">
-            {{ t('billing.creditUsage.title') }}
-          </h3>
-        </div>
-        <!-- Time range filter -->
-        <select
-          v-model="selectedRange"
-          @change="fetchUsageList"
-          class="text-xs border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-        >
-          <option value="7">{{ t('billing.creditUsage.last7Days') }}</option>
-          <option value="30">{{ t('billing.creditUsage.last30Days') }}</option>
-          <option value="90">{{ t('billing.creditUsage.last90Days') }}</option>
-        </select>
-      </div>
-    </template>
-
-    <div v-if="loading" class="flex items-center justify-center py-8">
-      <div
-        class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"
-      ></div>
-      <p class="ml-3 text-sm text-gray-500">{{ t('common.loading') }}</p>
-    </div>
-
-    <div v-else-if="usageList.length === 0" class="text-center py-8">
-      <svg
-        class="mx-auto h-12 w-12 text-gray-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
+  <div
+    class="flex flex-col overflow-hidden rounded-[11px] border border-line bg-panel"
+  >
+    <div
+      class="flex h-[42px] flex-shrink-0 items-center gap-3 border-b border-line-soft px-5"
+    >
+      <span class="text-[calc(13px*var(--fs))] font-semibold text-ink">
+        {{ t('billing.creditUsage.title') }}
+      </span>
+      <select
+        v-model="selectedRange"
+        class="ml-auto rounded border-line bg-panel py-1 pl-2 pr-7 font-mono text-[calc(11px*var(--fs))] text-ink-3 focus:border-accent focus:ring-0"
+        @change="fetchUsageList"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-        />
-      </svg>
-      <p class="mt-2 text-sm text-gray-500">
-        {{ t('billing.creditUsage.noData') }}
-      </p>
+        <option value="7">{{ t('billing.creditUsage.last7Days') }}</option>
+        <option value="30">{{ t('billing.creditUsage.last30Days') }}</option>
+        <option value="90">{{ t('billing.creditUsage.last90Days') }}</option>
+      </select>
     </div>
 
-    <div v-else class="divide-y divide-gray-200">
-      <!-- List item -->
+    <SkeletonRows v-if="loading" :count="4" />
+
+    <p
+      v-else-if="usageList.length === 0"
+      class="py-10 text-center text-sm italic text-ink-3"
+    >
+      {{ t('billing.creditUsage.noData') }}
+    </p>
+
+    <template v-else>
+      <!-- Which conversation spent it, how many attachments it carried, what
+           it cost and when. -->
       <div
+        class="flex h-8 flex-shrink-0 items-center gap-3 border-b border-line bg-panel-sub px-5 font-mono text-[calc(10px*var(--fs))] tracking-[0.06em] text-ink-4"
+      >
+        <div class="min-w-0 flex-1">{{ t('billing.creditUsage.chat') }}</div>
+        <div class="w-24 flex-none">{{ t('chats.files.title') }}</div>
+        <div class="w-20 flex-none text-right">
+          {{ t('billing.creditUsage.credits') }}
+        </div>
+        <div class="w-[110px] flex-none text-right">
+          {{ t('chats.colTime') }}
+        </div>
+      </div>
+
+      <button
         v-for="item in usageList"
         :key="item.id"
-        class="flex items-center justify-between py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+        type="button"
+        class="flex items-center gap-3 border-b border-line-soft px-5 py-[var(--rowpy)] text-left transition-colors last:border-b-0 hover:bg-panel-sub"
         @click="goToChat(item.chat_id)"
       >
-        <div class="flex items-center gap-3 flex-1 min-w-0">
-          <!-- Icon -->
-          <div class="flex-shrink-0">
-            <div
-              class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center"
-            >
-              <svg
-                class="w-5 h-5 text-primary-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                />
-              </svg>
-            </div>
-              </div>
-
-          <!-- Chat info -->
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <p class="text-sm font-medium text-gray-900 truncate">
-                {{
-                  item.display_title ||
-                  item.summary_title ||
-                  item.subject ||
-                  t('billing.creditUsage.noSubject')
-                }}
-              </p>
-              <!-- Status badge -->
-              <StatusBadge v-if="item.status" :status="item.status" />
-            </div>
-            <p class="text-xs text-gray-500">
-              {{ formatRelativeDate(item.created_at, t) }}
-            </p>
-          </div>
-
-          <!-- Credit amount -->
-          <div class="flex-shrink-0 text-right">
-            <span
-              class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700"
-            >
-              -{{ item.amount }}
-              <svg
-                class="ml-1 w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+        <span class="min-w-0 flex-1 truncate text-[calc(12.5px*var(--fs))] text-ink">
+          {{
+            item.display_title ||
+            item.summary_title ||
+            item.subject ||
+            t('billing.creditUsage.noSubject')
+          }}
+        </span>
+        <span class="w-24 flex-none font-mono text-[calc(11px*var(--fs))] text-ink-3">
+          {{
+            t('chats.attachmentsShort', { count: item.attachment_count || 0 })
+          }}
+        </span>
+        <span class="w-20 flex-none text-right font-mono text-xs text-ink">
+          {{ item.amount }}
+        </span>
+        <span
+          class="w-[110px] flex-none text-right font-mono text-[calc(11px*var(--fs))] text-ink-4"
+        >
+          {{ formatUsageTime(item.created_at) }}
+        </span>
+      </button>
+    </template>
 
     <!-- Pagination -->
     <div
       v-if="totalPages > 1"
-      class="flex items-center justify-between border-t border-gray-200 pt-3 mt-3"
+      class="flex items-center justify-between border-t border-line pt-3 mt-3"
     >
       <button
         @click="prevPage"
         :disabled="currentPage === 1"
-        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ink-2 bg-panel border border-line hover:bg-app-sub"
       >
         <svg
           class="w-4 h-4 mr-1"
@@ -159,14 +101,14 @@
         {{ t('common.previous') }}
       </button>
 
-      <span class="text-xs text-gray-600">
+      <span class="text-xs text-ink-2">
         {{ t('common.pageInfo', { current: currentPage, total: totalPages }) }}
       </span>
 
       <button
         @click="nextPage"
         :disabled="currentPage === totalPages"
-        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+        class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-ink-2 bg-panel border border-line hover:bg-app-sub"
       >
         {{ t('common.next') }}
         <svg
@@ -184,7 +126,7 @@
         </svg>
       </button>
     </div>
-  </BaseCard>
+  </div>
 </template>
 
 <script setup>
@@ -192,12 +134,18 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import billingApi from '@/api/billing'
-import { formatRelativeDate } from '@/utils/timezone'
-import BaseCard from '@/components/ui/BaseCard.vue'
-import StatusBadge from '@/components/ui/StatusBadge.vue'
+import { formatDate } from '@/utils/timezone'
+import { usePreferencesStore } from '@/store/preferences'
+import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 
 const { t } = useI18n()
 const router = useRouter()
+const preferences = usePreferencesStore()
+
+// The canvas stamps these rows with the moment they happened, in the same
+// MM-DD HH:mm the rest of the log uses, not a relative phrase.
+const formatUsageTime = (value) =>
+  formatDate(value, preferences.currentTimezone, 'MM-dd HH:mm')
 
 const loading = ref(false)
 const usageList = ref([])

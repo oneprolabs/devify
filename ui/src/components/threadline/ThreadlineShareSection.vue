@@ -1,14 +1,14 @@
 <template>
   <div v-if="shareStatus?.is_active" class="mt-1.5 sm:mt-3">
     <!-- Divider -->
-    <div class="border-t border-gray-200"></div>
+    <div class="border-t border-line"></div>
     <div class="pt-3">
       <div class="space-y-2 sm:space-y-3">
         <!-- Expiration Row -->
         <div
           class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-2 text-xs sm:text-sm"
         >
-          <div class="flex items-center gap-1 text-gray-500">
+          <div class="flex items-center gap-1 text-ink-3">
             <svg
               class="w-3.5 h-3.5"
               fill="none"
@@ -30,11 +30,11 @@
                 class="flex items-center gap-2 group cursor-pointer"
                 @click="startEditingExpiration"
               >
-                <span class="text-gray-700 truncate">
+                <span class="text-ink-2 truncate">
                   {{ shareExpirationDisplay }}
                 </span>
                 <svg
-                  class="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="w-3.5 h-3.5 text-ink-4 opacity-0 group-hover:opacity-100 transition-opacity"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -58,8 +58,8 @@
                     class="rounded-md border px-2 py-0.5 text-xs font-medium transition-colors"
                     :class="
                       tempExpiration === option.value
-                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                        ? 'border-accent bg-accent-soft text-accent'
+                        : 'border-line text-ink-2 hover:bg-app-sub'
                     "
                     :disabled="expirationSaving"
                     @click="tempExpiration = option.value"
@@ -70,7 +70,7 @@
                 <div class="flex items-center gap-1">
                   <button
                     type="button"
-                    class="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                    class="p-1 text-ok hover:bg-ok-soft rounded transition-colors disabled:opacity-50"
                     :disabled="expirationSaving"
                     @click="saveExpiration"
                   >
@@ -111,7 +111,7 @@
                   </button>
                   <button
                     type="button"
-                    class="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                    class="p-1 text-bad hover:bg-bad-soft rounded transition-colors"
                     :disabled="expirationSaving"
                     @click="cancelEditingExpiration"
                   >
@@ -139,7 +139,7 @@
         <div
           class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-2 text-xs sm:text-sm"
         >
-          <div class="flex items-center gap-1 text-gray-500">
+          <div class="flex items-center gap-1 text-ink-3">
             <svg
               class="w-3.5 h-3.5"
               fill="none"
@@ -160,7 +160,7 @@
               v-if="!showShareLink.main"
               :href="shareStatus.share_url"
               target="_blank"
-              class="text-gray-700 hover:text-primary-600 transition-colors"
+              class="text-ink-2 hover:text-accent transition-colors"
             >
               <span>{{ t('share.openLink') }}</span>
             </a>
@@ -168,13 +168,13 @@
               v-else
               :href="shareStatus.share_url"
               target="_blank"
-              class="text-gray-700 truncate font-mono hover:text-primary-600 hover:underline flex-1 min-w-0"
+              class="text-ink-2 truncate font-mono hover:text-accent hover:underline flex-1 min-w-0"
             >
               {{ shareStatus.share_url }}
             </a>
             <button
               type="button"
-              class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+              class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
               :title="
                 showShareLink.main ? t('share.hideLink') : t('share.openLink')
               "
@@ -217,7 +217,7 @@
             </button>
             <button
               type="button"
-              class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+              class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
               :title="
                 shareCopyState.link ? t('share.copied') : t('share.copyLink')
               "
@@ -240,7 +240,7 @@
               </svg>
               <svg
                 v-else
-                class="w-4 h-4 text-green-600"
+                class="w-4 h-4 text-ok"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -260,7 +260,7 @@
         <div
           class="grid grid-cols-[theme(spacing.28),1fr] gap-y-1 gap-x-2 text-xs sm:text-sm"
         >
-          <div class="flex items-center gap-1 text-gray-500">
+          <div class="flex items-center gap-1 text-ink-3">
             <svg
               class="w-3.5 h-3.5"
               fill="none"
@@ -278,17 +278,17 @@
           </div>
           <div class="flex items-center gap-2 min-w-0">
             <template v-if="shareStatus.has_password">
-              <span v-if="!showPassword" class="font-mono text-gray-900">
+              <span v-if="!showPassword" class="font-mono text-ink">
                 ••••••
               </span>
-              <span v-else class="font-mono text-gray-900">
+              <span v-else class="font-mono text-ink">
                 {{ inlinePassword || shareStatus.password }}
               </span>
 
               <div class="flex items-center gap-1">
                 <button
                   type="button"
-                  class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors"
+                  class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors"
                   :title="
                     showPassword
                       ? t('share.hidePassword')
@@ -333,7 +333,7 @@
                 </button>
                 <button
                   type="button"
-                  class="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-gray-100 transition-colors"
+                  class="p-1 text-ink-4 hover:text-bad rounded hover:bg-chip transition-colors"
                   :title="t('common.delete')"
                   :disabled="passwordSaving"
                   @click="removePassword"
@@ -376,7 +376,7 @@
               </div>
               <button
                 type="button"
-                class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                class="p-1 text-ink-4 hover:text-ink-2 rounded hover:bg-chip transition-colors flex-shrink-0"
                 :title="
                   shareCopyState.password
                     ? t('share.copied')
@@ -400,7 +400,7 @@
                 </svg>
                 <svg
                   v-else
-                  class="w-4 h-4 text-green-600"
+                  class="w-4 h-4 text-ok"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -415,12 +415,12 @@
               </button>
             </template>
             <template v-else>
-              <span class="text-gray-500">
+              <span class="text-ink-3">
                 {{ t('share.noPassword') }}
               </span>
               <button
                 type="button"
-                class="p-1 text-gray-400 hover:text-primary-600 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                class="p-1 text-ink-4 hover:text-accent rounded hover:bg-chip transition-colors flex-shrink-0"
                 :title="t('share.addPassword')"
                 :disabled="passwordSaving"
                 @click="createRandomPassword"

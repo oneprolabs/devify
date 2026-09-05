@@ -3,6 +3,7 @@
 from django.urls import path
 
 from relay.views import (
+    RelayStatsAPIView,
     AppsAPIView,
     RelayDeliveryDetailAPIView,
     RelayDeliveryListAPIView,
@@ -29,6 +30,11 @@ urlpatterns = [
         name="relay-subscription-detail",
     ),
     path("apps/relay/test", RelayTestAPIView.as_view(), name="relay-test"),
+    path(
+        "apps/relay/stats",
+        RelayStatsAPIView.as_view(),
+        name="relay-stats",
+    ),
     path(
         "apps/relay/events",
         RelayEventListAPIView.as_view(),

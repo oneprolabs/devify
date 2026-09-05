@@ -5,24 +5,28 @@
       <div class="flex items-start gap-2">
         <div class="flex-1 min-w-0">
           <slot name="display">
-            <ul
+            <ol
               v-if="displayValue && displayValue.length > 0"
-              class="space-y-2"
+              class="flex flex-col gap-[11px]"
             >
               <li
                 v-for="(item, index) in displayValue"
                 :key="index"
-                class="flex items-start gap-2 text-sm text-gray-700"
+                class="flex items-start gap-[11px]"
               >
-                <span class="text-primary-600 mt-1 flex-shrink-0">•</span>
+                <span
+                  class="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full border border-line font-mono text-[calc(10px*var(--fs))] text-ink-3"
+                >
+                  {{ index + 1 }}
+                </span>
                 <div
-                  class="flex-1 min-w-0 markdown-content prose prose-sm max-w-none"
+                  class="markdown-content prose prose-sm min-w-0 max-w-none flex-1 text-[calc(12.5px*var(--fs))] leading-[1.5] text-ink-2"
                 >
                   <div v-html="renderMarkdown(item)"></div>
                 </div>
               </li>
-            </ul>
-            <span v-else class="text-gray-400 italic">{{ placeholder }}</span>
+            </ol>
+            <span v-else class="text-ink-4 italic">{{ placeholder }}</span>
           </slot>
         </div>
         <div
@@ -52,7 +56,7 @@
     <!-- Edit Mode -->
     <div v-else class="space-y-1">
       <div
-        class="relative bg-blue-50 border-2 border-blue-200 rounded-md"
+        class="relative bg-accent-soft border-2 border-accent rounded-md"
         style="padding: 0.75rem 1rem"
       >
         <textarea
@@ -61,23 +65,23 @@
           :rows="rows"
           :placeholder="placeholder"
           class="w-full px-0 py-0 text-sm border-0 focus:outline-none bg-transparent resize-y overflow-auto"
-          :class="{ 'border-red-300': error }"
+          :class="{ 'border-bad': error }"
         ></textarea>
-        <p v-if="error" class="mt-2 text-xs text-red-600">{{ error }}</p>
-        <p v-if="hint && !error" class="mt-1 text-xs text-gray-500">
+        <p v-if="error" class="mt-2 text-xs text-bad">{{ error }}</p>
+        <p v-if="hint && !error" class="mt-1 text-xs text-ink-3">
           {{ hint }}
         </p>
       </div>
       <!-- Save/Cancel Icons - Right bottom below input -->
       <div class="flex items-center justify-end gap-1">
         <div
-          class="flex items-center bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden"
+          class="flex items-center bg-panel rounded-md shadow-sm border border-line overflow-hidden"
         >
           <button
             @click="handleSave"
             type="button"
             :disabled="saving"
-            class="p-1.5 pr-2 text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+            class="p-1.5 pr-2 text-ok hover:bg-ok-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
             :title="t('common.save')"
           >
             <svg
@@ -114,13 +118,13 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            <div class="absolute right-0 top-0 bottom-0 w-px bg-gray-200"></div>
+            <div class="absolute right-0 top-0 bottom-0 w-px bg-chip"></div>
           </button>
           <button
             @click="cancelEditing"
             type="button"
             :disabled="saving"
-            class="p-1.5 pl-2 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="p-1.5 pl-2 text-bad hover:bg-bad-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             :title="t('common.cancel')"
           >
             <svg
@@ -269,11 +273,11 @@ const renderMarkdown = (text) => {
 }
 
 .markdown-content :deep(code) {
-  @apply bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-xs font-mono;
+  @apply bg-chip text-ink px-1 py-0.5 rounded text-xs font-mono;
 }
 
 .markdown-content :deep(strong) {
-  @apply font-semibold text-gray-900;
+  @apply font-semibold text-ink;
 }
 
 .markdown-content :deep(em) {

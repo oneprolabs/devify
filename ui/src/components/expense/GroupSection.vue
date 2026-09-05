@@ -2,10 +2,10 @@
   <div class="space-y-4">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900">
+        <h2 class="text-lg font-semibold text-ink">
           {{ t('expense.groups.title') }}
         </h2>
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="mt-1 text-sm text-ink-3">
           {{ t('expense.groups.subtitle') }}
         </p>
       </div>
@@ -14,7 +14,7 @@
         <input
           v-model="newName"
           type="text"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+          class="rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
           :placeholder="t('expense.groups.namePlaceholder')"
           @keyup.enter="create"
         />
@@ -28,33 +28,33 @@
 
     <p
       v-if="error"
-      class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+      class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
     >
       {{ error }}
     </p>
 
     <BaseCard>
-      <p v-if="!visible.length" class="py-6 text-center text-sm text-gray-500">
+      <p v-if="!visible.length" class="py-6 text-center text-sm text-ink-3">
         {{ t('expense.groups.empty') }}
       </p>
 
-      <ul v-else class="divide-y divide-gray-100">
+      <ul v-else class="divide-y divide-line-soft">
         <li
           v-for="group in visible"
           :key="group.uuid"
           class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
         >
           <button type="button" class="min-w-0 text-left" @click="open(group)">
-            <p class="truncate text-sm font-medium text-gray-900">
+            <p class="truncate text-sm font-medium text-ink">
               {{ group.name }}
               <span
                 v-if="group.status !== 'draft'"
-                class="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
+                class="ml-1 rounded-full bg-chip px-2 py-0.5 text-[calc(11px*var(--fs))] text-ink-2"
               >
                 {{ t(`expense.groups.statuses.${group.status}`) }}
               </span>
             </p>
-            <p class="mt-0.5 text-xs text-gray-500">
+            <p class="mt-0.5 text-xs text-ink-3">
               {{
                 t('expense.groups.line', {
                   count: group.invoice_count,

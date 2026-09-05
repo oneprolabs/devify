@@ -13,6 +13,10 @@ export const relayApi = {
     return apiClient.get('/v1/apps').then(extractData)
   },
 
+  getStats() {
+    return apiClient.get('/v1/apps/relay/stats').then(extractData)
+  },
+
   getSubscriptions() {
     return apiClient.get('/v1/apps/relay/subscriptions').then(extractData)
   },

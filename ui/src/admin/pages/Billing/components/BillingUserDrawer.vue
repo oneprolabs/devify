@@ -280,7 +280,7 @@
                         <div class="min-w-0">
                           <div class="flex flex-wrap items-center gap-2">
                             <span
-                              class="inline-flex rounded-full px-2 py-1 text-[11px] font-medium"
+                              class="inline-flex rounded-full px-2 py-1 text-[calc(11px*var(--fs))] font-medium"
                               :class="item.kindClass"
                             >
                               {{ item.kindLabel }}
@@ -295,11 +295,11 @@
                         </div>
 
                         <div class="text-right">
-                          <p class="text-[11px] uppercase tracking-wide text-gray-400">
+                          <p class="text-[calc(11px*var(--fs))] uppercase tracking-wide text-gray-400">
                             {{ formatDate(item.timestamp) }}
                           </p>
                           <span
-                            class="mt-1 inline-flex rounded-full px-2 py-1 text-[11px] font-medium"
+                            class="mt-1 inline-flex rounded-full px-2 py-1 text-[calc(11px*var(--fs))] font-medium"
                             :class="item.statusClass"
                           >
                             {{ item.statusLabel }}

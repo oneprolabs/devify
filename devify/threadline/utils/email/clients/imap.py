@@ -15,15 +15,21 @@ from django.utils.translation import gettext_lazy as _
 logger = logging.getLogger(__name__)
 
 
-def _build_ssl_context() -> ssl.SSLContext:
-    """
-    A TLS context that still talks to mail servers behind the times.
+def _strict_ssl_context() -> ssl.SSLContext:
+    """The default: modern ciphers, verified certificate, checked hostname."""
+    return ssl.create_default_context()
 
-    OpenSSL 3 defaults to security level 2, which refuses key exchange
-    without forward secrecy. Several mainland providers — 139.com among
-    them — offer only plain-RSA suites over TLS 1.2, so the handshake dies
-    before the login is ever attempted. Dropping to level 1 accepts those
-    suites while keeping certificate verification and the hostname check.
+
+def _relaxed_ssl_context() -> ssl.SSLContext:
+    """
+    The same, minus OpenSSL's refusal to talk to dated servers.
+
+    OpenSSL 3 defaults to security level 2, which rejects key exchange
+    without forward secrecy. Some providers — 139.com among them — offer
+    only plain-RSA suites over TLS 1.2 and no STARTTLS on 143, so the
+    alternative to accepting that suite is sending the password in clear
+    text. Level 1 takes the weaker suite while still verifying the
+    certificate and the hostname.
     """
     context = ssl.create_default_context()
     try:
@@ -126,11 +132,7 @@ class IMAPClient:
                 f"(SSL: {self.use_ssl})"
             )
             client = (
-                imaplib.IMAP4_SSL(
-                    self.imap_host,
-                    self.imap_port,
-                    ssl_context=_build_ssl_context(),
-                )
+                self._connect_ssl()
                 if self.use_ssl
                 else imaplib.IMAP4(self.imap_host, self.imap_port)
             )
@@ -240,6 +242,49 @@ class IMAPClient:
                     detail=str(e),
                 )
             ) from e
+
+        except Exception as e:
+            # Anything the branches above did not name still gets the
+            # mailbox and server attached before it travels on, so the log
+            # says which connection failed.
+            logger.error(
+                f"[{self.user_context}] Unexpected error connecting to "
+                f"{self.imap_host}:{self.imap_port}: {type(e).__name__}: {e}"
+            )
+            raise
+
+    def _connect_ssl(self):
+        """
+        Connect with full-strength TLS, and only weaken it if the server
+        leaves no choice.
+
+        Almost every server negotiates the strict settings, and those keep
+        them. Retrying with a lower security level is reserved for the ones
+        that would otherwise fail outright, and it is logged so the weaker
+        connection is never silent.
+        """
+        try:
+            return imaplib.IMAP4_SSL(
+                self.imap_host,
+                self.imap_port,
+                ssl_context=_strict_ssl_context(),
+            )
+        except ssl.SSLError as strict_error:
+            logger.warning(
+                f"[{self.user_context}] {self.imap_host} refused a modern "
+                f"TLS handshake ({strict_error}); retrying with a lower "
+                f"security level"
+            )
+            client = imaplib.IMAP4_SSL(
+                self.imap_host,
+                self.imap_port,
+                ssl_context=_relaxed_ssl_context(),
+            )
+            logger.warning(
+                f"[{self.user_context}] Connected to {self.imap_host} over "
+                f"TLS without forward secrecy"
+            )
+            return client
 
     def _explain(self, symptom, causes, remedies, detail=""):
         """

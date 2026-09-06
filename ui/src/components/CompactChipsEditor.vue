@@ -7,7 +7,7 @@
           <span
             v-for="(chip, index) in displayChips"
             :key="index"
-            class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md border transition-colors cursor-pointer hover:bg-gray-50"
+            class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md border transition-colors cursor-pointer hover:bg-app-sub"
             :class="chipVariantClasses"
             @click="startEditing"
           >
@@ -15,7 +15,7 @@
           </span>
           <span
             v-if="hasMore"
-            class="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-500 cursor-pointer hover:text-gray-700"
+            class="inline-flex items-center px-2 py-0.5 text-xs font-medium text-ink-3 cursor-pointer hover:text-ink-2"
             @click="startEditing"
           >
             +{{ moreCount }}
@@ -23,7 +23,7 @@
         </template>
         <span
           v-else
-          class="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-400 cursor-pointer hover:text-gray-600"
+          class="inline-flex items-center px-2 py-0.5 text-xs font-medium text-ink-4 cursor-pointer hover:text-ink-2"
           @click="startEditing"
         >
           {{ emptyLabel }}
@@ -32,7 +32,7 @@
       <template v-else>
         <span
           v-if="modelValue && String(modelValue).trim()"
-          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md border transition-colors cursor-pointer hover:bg-gray-50"
+          class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md border transition-colors cursor-pointer hover:bg-app-sub"
           :class="chipVariantClasses"
           @click="startEditing"
         >
@@ -40,7 +40,7 @@
         </span>
         <span
           v-else
-          class="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-400 cursor-pointer hover:text-gray-600"
+          class="inline-flex items-center px-2 py-0.5 text-xs font-medium text-ink-4 cursor-pointer hover:text-ink-2"
           @click="startEditing"
         >
           {{ emptyLabel }}
@@ -49,7 +49,7 @@
       <button
         v-if="!disabled"
         @click="startEditing"
-        class="inline-flex items-center px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        class="inline-flex items-center px-1.5 py-0.5 text-xs text-ink-4 hover:text-ink-2 transition-colors"
         :title="t('common.edit')"
       >
         <svg
@@ -93,7 +93,7 @@
         <button
           @click="handleSave"
           :disabled="loading"
-          class="inline-flex items-center p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+          class="inline-flex items-center p-1 text-ok hover:bg-ok-soft rounded transition-colors disabled:opacity-50"
           :title="t('common.save')"
         >
           <svg
@@ -134,7 +134,7 @@
         <button
           @click="handleCancel"
           :disabled="loading"
-          class="inline-flex items-center p-1 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+          class="inline-flex items-center p-1 text-bad hover:bg-bad-soft rounded transition-colors disabled:opacity-50"
           :title="t('common.cancel')"
         >
           <svg
@@ -157,7 +157,7 @@
         <button
           @click="handleCancel"
           :disabled="loading"
-          class="inline-flex items-center p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+          class="inline-flex items-center p-1 text-ink-4 hover:text-ink-2 hover:bg-chip rounded transition-colors disabled:opacity-50"
           :title="t('common.cancel')"
         >
           <svg
@@ -282,11 +282,11 @@ const showActions = computed(() => {
 
 const chipVariantClasses = computed(() => {
   const variants = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    green: 'bg-green-50 text-green-700 border-green-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200',
-    rose: 'bg-rose-50 text-rose-700 border-rose-200',
-    gray: 'bg-gray-50 text-gray-700 border-gray-200'
+    blue: 'bg-accent-soft text-accent border-accent',
+    green: 'bg-ok-soft text-ok border-ok',
+    purple: 'bg-accent-soft text-accent border-accent',
+    rose: 'bg-bad-soft text-bad border-bad',
+    gray: 'bg-app-sub text-ink-2 border-line'
   }
   return variants[props.variant] || variants.gray
 })

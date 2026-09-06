@@ -2,13 +2,13 @@
   <BaseModal :show="show" :title="modalTitle" @close="onCancel">
     <div class="space-y-4">
       <div class="flex items-center justify-between">
-        <div class="text-xs text-gray-500">
+        <div class="text-xs text-ink-3">
           {{ t('common.key') }}:
-          <span class="font-medium text-gray-700">{{ fieldKey || '-' }}</span>
+          <span class="font-medium text-ink-2">{{ fieldKey || '-' }}</span>
         </div>
         <div class="flex items-center gap-2">
           <button
-            class="px-2 py-1 text-xs rounded-md border border-gray-200 hover:bg-gray-50"
+            class="px-2 py-1 text-xs rounded-md border border-line hover:bg-app-sub"
             @click="resetToOriginal"
             type="button"
             title="Reset"
@@ -16,7 +16,7 @@
             Reset
           </button>
           <button
-            class="px-2 py-1 text-xs rounded-md border border-gray-200 hover:bg-gray-50"
+            class="px-2 py-1 text-xs rounded-md border border-line hover:bg-app-sub"
             @click="clearValue"
             type="button"
             title="Clear"
@@ -31,8 +31,8 @@
           :class="[
             'px-2 py-1 rounded-md border',
             inputMode === 'text'
-              ? 'bg-primary-50 border-primary-200 text-primary-700'
-              : 'border-gray-200 hover:bg-gray-50'
+              ? 'bg-accent-soft border-accent text-accent'
+              : 'border-line hover:bg-app-sub'
           ]"
           @click="forceTextMode"
           type="button"
@@ -43,8 +43,8 @@
           :class="[
             'px-2 py-1 rounded-md border',
             inputMode === 'json'
-              ? 'bg-primary-50 border-primary-200 text-primary-700'
-              : 'border-gray-200 hover:bg-gray-50'
+              ? 'bg-accent-soft border-accent text-accent'
+              : 'border-line hover:bg-app-sub'
           ]"
           @click="forceJsonMode"
           type="button"
@@ -53,42 +53,42 @@
         </button>
       </div>
       <div v-if="inputMode === 'text'">
-        <label class="block text-sm font-medium text-gray-700 mb-1">{{
+        <label class="block text-sm font-medium text-ink-2 mb-1">{{
           fieldLabel
         }}</label>
         <input
           v-model="localValue"
           type="text"
-          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          class="mt-1 block w-full rounded-md border-line shadow-sm focus:border-accent focus:ring-accent sm:text-sm"
           :placeholder="placeholder"
           autofocus
         />
-        <div class="mt-1 text-xs text-gray-400">
+        <div class="mt-1 text-xs text-ink-4">
           {{ textCount }} {{ t('common.characters') }}
         </div>
       </div>
 
       <div v-else>
-        <label class="block text-sm font-medium text-gray-700 mb-1"
+        <label class="block text-sm font-medium text-ink-2 mb-1"
           >{{ fieldLabel }} (JSON)</label
         >
         <textarea
           v-model="localText"
           rows="6"
-          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          class="mt-1 block w-full rounded-md border-line shadow-sm focus:border-accent focus:ring-accent sm:text-sm"
           :placeholder="jsonPlaceholder"
         />
         <div class="mt-2 flex items-center gap-2">
           <button
-            class="px-2 py-1 text-xs rounded-md border border-gray-200 hover:bg-gray-50"
+            class="px-2 py-1 text-xs rounded-md border border-line hover:bg-app-sub"
             type="button"
             @click="beautifyJson"
           >
             Beautify
           </button>
-          <span class="text-xs text-gray-400">{{ jsonBytes }} bytes</span>
+          <span class="text-xs text-ink-4">{{ jsonBytes }} bytes</span>
         </div>
-        <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
+        <p v-if="error" class="mt-2 text-sm text-bad">{{ error }}</p>
       </div>
     </div>
 

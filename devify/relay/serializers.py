@@ -43,6 +43,9 @@ def _resolve_canonical_email_message(message):
 
 class RelaySubscriptionSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(write_only=True, required=False)
+    # How much this channel has actually carried, which is what the channel
+    # list shows under each name.
+    delivery_count = serializers.SerializerMethodField()
 
     class Meta:
         model = RelaySubscription
@@ -55,10 +58,15 @@ class RelaySubscriptionSerializer(serializers.ModelSerializer):
             "config",
             "strategies",
             "field_mappings",
+            "delivery_count",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_delivery_count(self, obj):
+        count = getattr(obj, "delivery_count_annotated", None)
+        return count if count is not None else obj.deliveries.count()
 
     def validate_user_id(self, value):
         request = self.context.get("request")
@@ -174,6 +182,13 @@ class RelayDeliverySerializer(serializers.ModelSerializer):
 
 
 class RelayDeliverySummarySerializer(serializers.ModelSerializer):
+    # The delivery log names the channel and says what the delivery did, so
+    # the summary carries the subscription's name and the resolved plan.
+    subscription_name = serializers.CharField(
+        source="subscription.name", read_only=True
+    )
+    action = serializers.SerializerMethodField()
+
     class Meta:
         model = RelayDelivery
         fields = [
@@ -184,9 +199,15 @@ class RelayDeliverySummarySerializer(serializers.ModelSerializer):
             "external_url",
             "error_message",
             "agentcore_task_id",
+            "subscription_name",
+            "action",
             "created_at",
             "updated_at",
         ]
+
+    def get_action(self, obj):
+        plan = (obj.metadata or {}).get("relay_delivery_plan") or {}
+        return plan.get("action") or ""
 
 
 class RelayEventListSerializer(serializers.ModelSerializer):

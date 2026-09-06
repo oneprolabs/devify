@@ -6,6 +6,11 @@ export const chatApi = {
     return api.get('/v1/threadlines', { params })
   },
 
+  // Header counts over the whole list, not just the page on screen
+  getThreadlineStats() {
+    return api.get('/v1/threadlines/stats')
+  },
+
   // Get specific threadline by ID
   getThreadline(id) {
     return api.get(`/v1/threadlines/${id}`)

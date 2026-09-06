@@ -26,6 +26,7 @@ from .email_message import (
     EmailMessageAPIView,
     EmailMessageDetailAPIView,
     EmailMessageMetadataAPIView,
+    EmailMessageStatsAPIView,
     EmailMessageIssueClusterAPIView,
     EmailMessageBatchMergeAPIView,
     EmailMessageBatchRetryAPIView,

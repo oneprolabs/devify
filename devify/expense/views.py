@@ -81,6 +81,17 @@ def _user_config_payload(config) -> dict:
     return data
 
 
+class ExpenseStatsAPIView(APIView):
+    """Counts behind the Expense page header."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from expense.stats import expense_stats
+
+        return _response(expense_stats(request.user))
+
+
 class ExpenseConfigAPIView(APIView):
     """User-facing switch and preferences."""
 

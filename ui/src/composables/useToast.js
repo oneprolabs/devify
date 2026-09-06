@@ -4,7 +4,7 @@ const toastState = reactive({
   show: false,
   message: '',
   type: 'info',
-  duration: 3000
+  duration: 4000
 })
 
 let hideTimer = null
@@ -49,6 +49,9 @@ const showToast = (message, type, duration) => {
 
 const startAutoHide = (duration) => {
   clearTimer()
+  // A failure stays until it is dismissed. Everything else says something
+  // went right and can leave on its own.
+  if (!duration) return
   hideTimer = setTimeout(() => {
     hide()
   }, duration)
@@ -61,10 +64,10 @@ const hide = () => {
 
 export function useToast() {
   return {
-    showSuccess: (message, duration = 3000) => {
+    showSuccess: (message, duration = 4000) => {
       showToast(message, 'success', duration)
     },
-    showError: (message, duration = 5000) => {
+    showError: (message, duration = 0) => {
       showToast(message, 'error', duration)
     },
     showWarning: (message, duration = 4000) => {

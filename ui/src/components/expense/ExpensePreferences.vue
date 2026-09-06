@@ -2,52 +2,52 @@
   <BaseCard>
     <div class="space-y-5">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900">
+        <h2 class="text-lg font-semibold text-ink">
           {{ t('expense.prefs.title') }}
         </h2>
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="mt-1 text-sm text-ink-3">
           {{ t('expense.prefs.subtitle') }}
         </p>
       </div>
 
       <p
         v-if="error"
-        class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
       >
         {{ error }}
       </p>
       <p
         v-else-if="saved"
-        class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800"
+        class="rounded-lg border border-ok bg-ok-soft p-3 text-sm text-ok"
       >
         {{ t('expense.prefs.saved') }}
       </p>
 
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <label class="block">
-          <span class="mb-1 block text-sm font-medium text-gray-700">
+          <span class="mb-1 block text-sm font-medium text-ink-2">
             {{ t('expense.prefs.homeCity') }}
           </span>
           <input
             v-model="form.home_city"
             type="text"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             :placeholder="t('expense.prefs.homeCityPlaceholder')"
           />
-          <span class="mt-1 block text-xs text-gray-500">
+          <span class="mt-1 block text-xs text-ink-3">
             {{ t('expense.prefs.homeCityHelp') }}
           </span>
         </label>
 
         <div class="block">
-          <span class="mb-1 block text-sm font-medium text-gray-700">
+          <span class="mb-1 block text-sm font-medium text-ink-2">
             {{ t('expense.prefs.filenameTemplate') }}
           </span>
           <div
-            class="flex items-center justify-between gap-3 rounded-lg border border-gray-300 px-3 py-2"
+            class="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2"
           >
             <span
-              class="truncate font-mono text-xs text-gray-600"
+              class="truncate font-mono text-xs text-ink-2"
               :title="namingSample"
             >
               {{ namingSample || t('expense.prefs.filenameLoading') }}
@@ -56,27 +56,27 @@
               {{ t('common.edit') }}
             </BaseButton>
           </div>
-          <span class="mt-1 block text-xs text-gray-500">
+          <span class="mt-1 block text-xs text-ink-3">
             {{ t('expense.prefs.filenameTemplateHelp') }}
           </span>
         </div>
       </div>
 
       <label class="block">
-        <span class="mb-1 block text-sm font-medium text-gray-700">
+        <span class="mb-1 block text-sm font-medium text-ink-2">
           {{ t('expense.prefs.keywords') }}
         </span>
         <textarea
           v-model="keywordsText"
-          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           rows="3"
           :placeholder="t('expense.prefs.keywordsPlaceholder')"
         />
-        <span class="mt-1 block text-xs text-gray-500">
+        <span class="mt-1 block text-xs text-ink-3">
           {{ t('expense.prefs.keywordsHelp') }}
         </span>
         <span
-          class="mt-2 block rounded-md bg-gray-50 p-2 text-xs leading-relaxed text-gray-500"
+          class="mt-2 block rounded-md bg-app-sub p-2 text-xs leading-relaxed text-ink-3"
         >
           {{ t('expense.prefs.keywordsScope') }}
         </span>
@@ -84,16 +84,16 @@
 
       <div>
         <label class="block">
-          <span class="mb-1 block text-sm font-medium text-gray-700">
+          <span class="mb-1 block text-sm font-medium text-ink-2">
             {{ t('expense.prefs.senders') }}
           </span>
           <textarea
             v-model="sendersText"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             rows="3"
             :placeholder="t('expense.prefs.sendersPlaceholder')"
           />
-          <span class="mt-1 block text-xs text-gray-500">
+          <span class="mt-1 block text-xs text-ink-3">
             {{ t('expense.prefs.sendersHelp') }}
           </span>
         </label>

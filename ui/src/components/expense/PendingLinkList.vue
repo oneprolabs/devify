@@ -2,25 +2,25 @@
   <BaseCard v-if="links.length">
     <div class="space-y-4">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900">
+        <h2 class="text-lg font-semibold text-ink">
           {{ t('expense.links.title') }}
         </h2>
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="mt-1 text-sm text-ink-3">
           {{ t('expense.links.subtitle') }}
         </p>
       </div>
 
-      <ul class="divide-y divide-gray-100">
+      <ul class="divide-y divide-line-soft">
         <li
           v-for="link in links"
           :key="link.uuid"
           class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="min-w-0 space-y-1">
-            <p class="truncate text-sm text-gray-900" :title="link.source_url">
+            <p class="truncate text-sm text-ink" :title="link.source_url">
               {{ link.source_url }}
             </p>
-            <p class="text-xs text-gray-500">
+            <p class="text-xs text-ink-3">
               {{ t(`expense.links.reasons.${link.fetch_status}`) }}
             </p>
           </div>
@@ -37,7 +37,7 @@
         </li>
       </ul>
 
-      <p class="text-xs leading-relaxed text-gray-500">
+      <p class="text-xs leading-relaxed text-ink-3">
         {{ t('expense.links.safetyNote') }}
       </p>
     </div>

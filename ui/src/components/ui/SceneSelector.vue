@@ -1,6 +1,6 @@
 <template>
   <div class="scene-selector">
-    <label v-if="label" class="block text-sm font-medium text-gray-700 mb-1">
+    <label v-if="label" class="block text-sm font-medium text-ink-2 mb-1">
       {{ label }}
     </label>
 
@@ -21,12 +21,12 @@
 
     <p
       v-if="selectedScene && currentSceneDescription"
-      class="mt-2 text-sm text-gray-600"
+      class="mt-2 text-sm text-ink-2"
     >
       {{ currentSceneDescription }}
     </p>
 
-    <p v-if="error" class="mt-1 text-sm text-red-600">
+    <p v-if="error" class="mt-1 text-sm text-bad">
       {{ error }}
     </p>
   </div>

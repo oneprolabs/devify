@@ -1,119 +1,74 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-    <div class="mb-4">
-      <h3 class="text-base font-semibold text-gray-900 mb-3">
+  <div
+    class="flex flex-col gap-3.5 rounded-[11px] border border-line bg-panel px-5 py-4"
+  >
+    <div class="flex flex-wrap items-baseline gap-3">
+      <span class="text-[calc(13px*var(--fs))] font-semibold text-ink">
         {{ t('billing.usageStats.title') }}
-      </h3>
+      </span>
+      <span class="font-mono text-[calc(11px*var(--fs))] text-ink-4">
+        {{ rangeSummary }}
+      </span>
 
-      <div
-        class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
-      >
-        <div class="flex gap-2">
-          <button
-            v-for="period in periods"
-            :key="period.value"
-            @click="selectPeriod(period.value)"
-            :class="[
-              'px-4 py-2 text-sm font-medium rounded-md transition-colors',
-              selectedPeriod === period.value
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            ]"
-          >
-            {{ period.label }}
-          </button>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <input
-            v-model="customStartDate"
-            type="date"
-            class="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            @change="handleCustomDateChange"
-          />
-          <span class="text-gray-500">-</span>
-          <input
-            v-model="customEndDate"
-            type="date"
-            class="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            @change="handleCustomDateChange"
-          />
-        </div>
+      <div class="ml-auto flex gap-[5px]">
+        <button
+          v-for="period in periods"
+          :key="period.value"
+          type="button"
+          class="rounded-[5px] px-[9px] py-[3px] font-mono text-[calc(11px*var(--fs))] transition-colors"
+          :class="
+            selectedPeriod === period.value
+              ? 'bg-accent text-accent-on'
+              : 'border border-line text-ink-3 hover:border-ink-4'
+          "
+          @click="selectPeriod(period.value)"
+        >
+          {{ period.label }}
+        </button>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-      <div class="bg-gray-50 rounded-lg p-3">
-        <div class="text-xs text-gray-500 mb-0.5">
-          {{ t('billing.usageStats.totalConsumed') }}
-        </div>
-        <div class="text-xl font-semibold text-gray-900">
-          {{ stats?.total_consumed || 0 }}
-        </div>
-      </div>
-
-      <div class="bg-gray-50 rounded-lg p-3">
-        <div class="text-xs text-gray-500 mb-0.5">
-          {{ t('billing.usageStats.available') }}
-        </div>
-        <div class="text-xl font-semibold text-primary-600">
-          {{ stats?.total_available || 0 }}
-        </div>
-      </div>
-
-      <div class="bg-gray-50 rounded-lg p-3">
-        <div class="text-xs text-gray-500 mb-0.5">
-          {{ t('billing.usageStats.totalCredits') }}
-        </div>
-        <div class="text-xl font-semibold text-gray-900">
-          {{ stats?.total_credits || 0 }}
-        </div>
-      </div>
-    </div>
-
-    <div class="relative" style="height: 240px">
-      <Line
+    <div class="relative" style="height: 180px">
+      <Bar
         v-if="!loading && chartData"
         :data="chartData"
         :options="chartOptions"
       />
-      <div v-else-if="loading" class="flex items-center justify-center h-full">
-        <div class="text-gray-500">{{ t('common.loading') }}</div>
+      <div
+        v-else-if="loading"
+        class="flex h-full items-end gap-[7px] px-1 pb-5"
+        aria-busy="true"
+      >
+        <span
+          v-for="(height, index) in BAR_HEIGHTS"
+          :key="index"
+          class="min-w-0 flex-1 rounded-sm bg-chip"
+          :style="{ height }"
+        ></span>
       </div>
       <div v-else class="flex items-center justify-center h-full">
-        <div class="text-gray-500">{{ t('common.noData') }}</div>
+        <div class="text-ink-3">{{ t('common.noData') }}</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Line } from 'vue-chartjs'
+import { Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
+  BarElement,
   Title,
   Tooltip,
-  Legend,
-  Filler
+  Legend
 } from 'chart.js'
 import billingApi from '@/api/billing'
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const { t } = useI18n()
 
@@ -123,21 +78,47 @@ const selectedPeriod = ref(30)
 const customStartDate = ref('')
 const customEndDate = ref('')
 
-const periods = [
-  { value: 1, label: '1d' },
-  { value: 7, label: '7d' },
-  { value: 30, label: '30d' }
+// A chart-shaped placeholder: fixed heights so the wait does not shimmer
+// into a different silhouette on every render.
+const BAR_HEIGHTS = [
+  '38%', '61%', '29%', '74%', '52%', '83%', '44%', '67%',
+  '31%', '58%', '77%', '41%', '69%', '35%', '55%'
 ]
+
+const periods = computed(() => [
+  { value: 7, label: t('billing.usageStats.days', { days: 7 }) },
+  { value: 30, label: t('billing.usageStats.days', { days: 30 }) },
+  { value: 90, label: t('billing.usageStats.days', { days: 90 }) }
+])
+
+// "Last 30 days · 138 credits" — the window and what it cost, together.
+const rangeSummary = computed(() => {
+  const total = stats.value?.total_consumed ?? 0
+  return t('billing.usageStats.rangeSummary', {
+    days: selectedPeriod.value,
+    credits: total
+  })
+})
+
+// Read the accent from the theme so the line follows light and dark
+// rather than staying the blue it was hard-coded to.
+function accentColor(alpha = 1) {
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue('--c-ac')
+    .trim()
+  const channels = raw || '75 87 200'
+  return alpha === 1
+    ? `rgb(${channels})`
+    : `rgba(${channels.split(/\s+/).join(', ')}, ${alpha})`
+}
 
 const chartData = computed(() => {
   if (!stats.value || !stats.value.stats) {
     return null
   }
 
-  const dates = stats.value.stats.map((item) => {
-    const date = new Date(item.date)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  })
+  // The canvas labels the axis MM-DD, in the same mono style as the rest.
+  const dates = stats.value.stats.map((item) => String(item.date).slice(5, 10))
 
   const consumed = stats.value.stats.map((item) => item.consumed)
 
@@ -147,10 +128,11 @@ const chartData = computed(() => {
       {
         label: t('billing.usageStats.creditsConsumed'),
         data: consumed,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.3,
-        fill: true
+        backgroundColor: accentColor(0.45),
+        hoverBackgroundColor: accentColor(),
+        borderRadius: 2,
+        borderSkipped: false,
+        maxBarThickness: 14
       }
     ]
   }
@@ -176,14 +158,12 @@ const chartOptions = {
   scales: {
     y: {
       beginAtZero: true,
-      ticks: {
-        precision: 0
-      }
+      border: { display: false },
+      ticks: { precision: 0, maxTicksLimit: 3, font: { size: 10 } }
     },
     x: {
-      grid: {
-        display: false
-      }
+      grid: { display: false },
+      ticks: { maxTicksLimit: 6, font: { size: 10 } }
     }
   }
 }
@@ -211,17 +191,6 @@ function selectPeriod(days) {
   startDate.setDate(startDate.getDate() - days)
 
   fetchUsageStats(startDate.toISOString(), endDate.toISOString())
-}
-
-function handleCustomDateChange() {
-  if (customStartDate.value && customEndDate.value) {
-    selectedPeriod.value = null
-
-    const startDate = new Date(customStartDate.value)
-    const endDate = new Date(customEndDate.value)
-
-    fetchUsageStats(startDate.toISOString(), endDate.toISOString())
-  }
 }
 
 onMounted(() => {

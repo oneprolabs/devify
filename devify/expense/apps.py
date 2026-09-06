@@ -10,6 +10,7 @@ class ExpenseConfig(AppConfig):
 
     def ready(self):
         from core.app_registry import APP_REGISTRY
+        from expense.stats import expense_stats
 
         APP_REGISTRY.register(
             key="expense",
@@ -20,4 +21,6 @@ class ExpenseConfig(AppConfig):
                 "Collect invoices from email, classify them and package "
                 "them for reimbursement."
             ),
+            order=20,
+            stats=expense_stats,
         )

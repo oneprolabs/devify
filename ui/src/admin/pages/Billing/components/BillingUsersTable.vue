@@ -41,7 +41,7 @@
               />
             </svg>
             <span>{{ t('billing.users.identityConflictChip') }}</span>
-            <span class="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+            <span class="rounded-full bg-white/80 px-1.5 py-0.5 text-[calc(10px*var(--fs))] font-semibold text-amber-700">
               {{ identityConflictCount }}
             </span>
           </button>

@@ -683,7 +683,6 @@ export function useRelayEditor({ reloadAll, activeTab }) {
   }
 
   async function deleteSubscription(id) {
-    if (!confirm(t('relay.confirmDelete'))) return
     try {
       await relayApi.deleteSubscription(id)
       await reloadAll()

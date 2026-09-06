@@ -56,8 +56,8 @@ const spinnerClasses = computed(() => {
     lg: 'h-8 w-8'
   }
   const colorClasses = {
-    default: 'border-gray-900',
-    primary: 'border-primary-600'
+    default: 'border-line',
+    primary: 'border-accent'
   }
   return `inline-block animate-spin rounded-full border-b-2 ${sizeClasses[props.size]} ${colorClasses[props.variant]}`
 })
@@ -65,6 +65,6 @@ const spinnerClasses = computed(() => {
 const textClasses = computed(() => {
   const sizeText = props.size === 'lg' ? 'text-sm' : 'text-xs'
   const marginTop = props.fullPage ? 'mt-4' : 'mt-2'
-  return `${marginTop} ${sizeText} text-gray-600`
+  return `${marginTop} ${sizeText} text-ink-2`
 })
 </script>

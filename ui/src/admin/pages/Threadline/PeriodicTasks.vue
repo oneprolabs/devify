@@ -55,7 +55,7 @@
                         {{ getTaskTitle(task) }}
                       </h4>
                       <span
-                        class="text-[11px] px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 font-medium"
+                        class="text-[calc(11px*var(--fs))] px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 font-medium"
                       >
                         threadline
                       </span>

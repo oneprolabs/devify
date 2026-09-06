@@ -55,6 +55,21 @@ export function useRelayDeliveries() {
     )
   }
 
+  // What the delivery did — created, linked, updated — which is the part a
+  // channel name alone does not tell you. The strategy resolver records it
+  // on the delivery when the plan is worked out.
+  const ACTION_KEYS = {
+    new: 'relay.actionNew',
+    new_and_link: 'relay.actionNewAndLink',
+    update: 'relay.actionUpdate'
+  }
+
+  function relayDeliveryAction(delivery) {
+    const action =
+      delivery?.action || delivery?.metadata?.relay_delivery_plan?.action
+    return ACTION_KEYS[action] ? t(ACTION_KEYS[action]) : ''
+  }
+
   /**
    * Stable v-for key that is unique across all items and deliveries.
    *
@@ -71,5 +86,10 @@ export function useRelayDeliveries() {
     return `${itemId}-${deliveryId}`
   }
 
-  return { getRelayDeliveries, relayDeliveryLabel, relayDeliveryKey }
+  return {
+    getRelayDeliveries,
+    relayDeliveryLabel,
+    relayDeliveryAction,
+    relayDeliveryKey
+  }
 }

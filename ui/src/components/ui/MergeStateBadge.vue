@@ -71,12 +71,12 @@ const props = defineProps({
 const { t } = useI18n()
 
 const classMap = {
-  original: 'border-slate-200 bg-slate-50 text-slate-700',
-  canonical: 'border-amber-200 bg-amber-50 text-amber-700'
+  original: 'border-line bg-app-sub text-ink-2',
+  canonical: 'border-warn bg-warn-soft text-warn'
 }
 
 const sizeMap = {
-  sm: 'px-1.5 py-0.5 text-[11px] leading-none',
+  sm: 'px-1.5 py-0.5 text-[calc(11px*var(--fs))] leading-none',
   md: 'px-2 py-0.5 text-xs'
 }
 

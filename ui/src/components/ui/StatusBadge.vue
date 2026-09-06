@@ -141,17 +141,17 @@ const props = defineProps({
 
 const getStatusClass = (status) => {
   const classes = {
-    success: 'bg-green-50 text-green-700',
-    failed: 'bg-red-50 text-red-700',
-    processing: 'bg-yellow-50 text-yellow-700',
-    retrying: 'bg-yellow-50 text-yellow-700',
-    fetched: 'bg-blue-50 text-blue-700',
-    canonical: 'bg-green-50 text-green-700',
-    merged: 'bg-gray-50 text-gray-700',
-    pending: 'bg-yellow-50 text-yellow-700',
-    completed: 'bg-green-50 text-green-700'
+    success: 'bg-ok-soft text-ok',
+    failed: 'bg-bad-soft text-bad',
+    processing: 'bg-warn-soft text-warn',
+    retrying: 'bg-warn-soft text-warn',
+    fetched: 'bg-accent-soft text-accent',
+    canonical: 'bg-ok-soft text-ok',
+    merged: 'bg-app-sub text-ink-2',
+    pending: 'bg-warn-soft text-warn',
+    completed: 'bg-ok-soft text-ok'
   }
-  return classes[status] || 'bg-gray-50 text-gray-700'
+  return classes[status] || 'bg-app-sub text-ink-2'
 }
 
 const badgeText = computed(() => {

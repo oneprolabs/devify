@@ -3,10 +3,10 @@
     <div class="space-y-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <h3 class="text-base font-semibold text-gray-900">
+          <h3 class="text-base font-semibold text-ink">
             {{ group.name }}
           </h3>
-          <p class="mt-1 text-sm text-gray-500">
+          <p class="mt-1 text-sm text-ink-3">
             {{
               t('expense.groups.line', {
                 count: group.invoice_count,
@@ -25,7 +25,7 @@
 
       <p
         v-if="error"
-        class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
       >
         {{ error }}
       </p>
@@ -35,7 +35,7 @@
            come from are checked against each other. -->
       <section>
         <h4
-          class="border-b border-gray-100 pb-2 text-xs font-medium uppercase tracking-wide text-gray-500"
+          class="border-b border-line-soft pb-2 text-xs font-medium uppercase tracking-wide text-ink-3"
         >
           {{ t('expense.groups.formFields') }}
         </h4>
@@ -44,20 +44,17 @@
 
       <section>
         <div
-          class="flex items-center justify-between border-b border-gray-100 pb-2"
+          class="flex items-center justify-between border-b border-line-soft pb-2"
         >
-          <h4 class="text-xs font-medium uppercase tracking-wide text-gray-500">
+          <h4 class="text-xs font-medium uppercase tracking-wide text-ink-3">
             {{ t('expense.groups.viewItems') }}
           </h4>
-          <p class="text-xs text-gray-400">
+          <p class="text-xs text-ink-4">
             {{ t('expense.groups.sectionsHint') }}
           </p>
         </div>
 
-        <p
-          v-if="!sections.length"
-          class="py-6 text-center text-sm text-gray-500"
-        >
+        <p v-if="!sections.length" class="py-6 text-center text-sm text-ink-3">
           {{ t('expense.groups.noInvoices') }}
         </p>
 
@@ -65,8 +62,8 @@
              are laid out the way the form asks for them. -->
         <div v-for="section in sections" :key="section.category" class="mt-4">
           <div class="flex items-baseline justify-between">
-            <strong class="text-sm text-gray-900">{{ section.label }}</strong>
-            <span class="text-xs tabular-nums text-gray-500">
+            <strong class="text-sm text-ink">{{ section.label }}</strong>
+            <span class="text-xs tabular-nums text-ink-3">
               {{
                 t('expense.groups.sectionSummary', {
                   count: section.count,
@@ -79,13 +76,13 @@
           <div
             v-for="invoice in section.invoices"
             :key="invoice.uuid"
-            class="flex items-center justify-between gap-3 border-b border-gray-50 py-2 last:border-0"
+            class="flex items-center justify-between gap-3 border-b border-line-soft py-2 last:border-0"
           >
             <div class="min-w-0">
-              <p class="truncate text-sm text-gray-900">
+              <p class="truncate text-sm text-ink">
                 {{ invoice.seller_name || t('expense.invoices.untitled') }}
               </p>
-              <p class="mt-0.5 truncate text-xs text-gray-500">
+              <p class="mt-0.5 truncate text-xs text-ink-3">
                 {{ invoice.expense_date || invoice.issue_date || '-' }}
                 <template v-if="invoice.summary_line">
                   · {{ invoice.summary_line }}
@@ -93,7 +90,7 @@
               </p>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-sm tabular-nums text-gray-900">
+              <span class="text-sm tabular-nums text-ink">
                 ¥{{ invoice.total_amount }}
               </span>
               <BaseButton
@@ -118,18 +115,18 @@
 
       <section>
         <h4
-          class="border-b border-gray-100 pb-2 text-xs font-medium uppercase tracking-wide text-gray-500"
+          class="border-b border-line-soft pb-2 text-xs font-medium uppercase tracking-wide text-ink-3"
         >
           {{ t('expense.groups.exportSection') }}
         </h4>
         <div
-          class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3"
+          class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3"
         >
           <div>
-            <p class="text-sm font-medium text-gray-900">
+            <p class="text-sm font-medium text-ink">
               {{ t('expense.groups.exportZip') }}
             </p>
-            <p class="mt-0.5 text-xs text-gray-500">
+            <p class="mt-0.5 text-xs text-ink-3">
               {{ t('expense.groups.exportZipHint') }}
             </p>
           </div>

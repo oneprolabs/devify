@@ -111,7 +111,7 @@ const renderedContent = computed(() => {
 
 <style scoped>
 .markdown-preview {
-  @apply text-sm text-gray-500;
+  @apply text-sm text-ink-3;
 }
 
 .markdown-preview :deep(p) {
@@ -119,7 +119,7 @@ const renderedContent = computed(() => {
 }
 
 .markdown-preview :deep(strong) {
-  @apply font-medium text-gray-700;
+  @apply font-medium text-ink-2;
 }
 
 .markdown-preview :deep(em) {
@@ -127,7 +127,7 @@ const renderedContent = computed(() => {
 }
 
 .markdown-preview :deep(code) {
-  @apply bg-gray-100 text-gray-700 px-1 rounded text-xs;
+  @apply bg-chip text-ink-2 px-1 rounded text-xs;
 }
 
 .markdown-preview :deep(.list-preview) {
@@ -139,7 +139,7 @@ const renderedContent = computed(() => {
 }
 
 .markdown-preview :deep(a) {
-  @apply text-primary-600 hover:text-primary-700;
+  @apply text-accent hover:text-accent;
 }
 
 .markdown-preview :deep(img) {

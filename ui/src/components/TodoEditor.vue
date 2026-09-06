@@ -1,15 +1,15 @@
 <template>
-  <div class="border border-gray-200 rounded-lg p-4 bg-white">
-    <div class="space-y-3 text-sm text-gray-700">
+  <div class="border border-line rounded-lg p-4 bg-panel">
+    <div class="space-y-3 text-sm text-ink-2">
       <!-- Validation Error -->
       <div
         v-if="validationError"
-        class="rounded-md bg-red-50 border border-red-200 p-2.5"
+        class="rounded-md bg-bad-soft border border-bad p-2.5"
       >
         <div class="flex gap-2">
           <div class="flex-shrink-0 pt-0.5">
             <svg
-              class="h-4 w-4 text-red-400"
+              class="h-4 w-4 text-bad"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -21,7 +21,7 @@
             </svg>
           </div>
           <div class="flex-1">
-            <p class="text-xs font-medium text-red-800">
+            <p class="text-xs font-medium text-bad">
               {{ validationError }}
             </p>
           </div>
@@ -29,26 +29,26 @@
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">
-          {{ t('todos.content') }} <span class="text-red-500">*</span>
+        <label class="block text-xs font-medium text-ink-2 mb-1">
+          {{ t('todos.content') }} <span class="text-bad">*</span>
         </label>
         <textarea
           v-model="formData.content"
           rows="3"
-          class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
-          :class="{ 'border-red-300': validationError }"
+          class="w-full px-2 py-1.5 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
+          :class="{ 'border-bad': validationError }"
           :placeholder="t('todos.content')"
         ></textarea>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">
+          <label class="block text-xs font-medium text-ink-2 mb-1">
             {{ t('todos.priority.label') }}
           </label>
           <select
             v-model="formData.priority"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+            class="w-full px-2 py-1.5 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
           >
             <option :value="null">{{ t('todos.notSet') }}</option>
             <option value="high">{{ t('todos.priority.high') }}</option>
@@ -58,19 +58,19 @@
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">
+          <label class="block text-xs font-medium text-ink-2 mb-1">
             {{ t('todos.owner') }}
           </label>
           <input
             v-model="formData.owner"
             type="text"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+            class="w-full px-2 py-1.5 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
             :placeholder="t('todos.owner')"
           />
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">
+          <label class="block text-xs font-medium text-ink-2 mb-1">
             {{ t('todos.deadline') }}
           </label>
           <BaseDateTimePicker
@@ -80,13 +80,13 @@
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">
+          <label class="block text-xs font-medium text-ink-2 mb-1">
             {{ t('todos.location') }}
           </label>
           <input
             v-model="formData.location"
             type="text"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+            class="w-full px-2 py-1.5 text-sm border border-line rounded-md shadow-sm focus:ring-accent focus:border-accent"
             :placeholder="t('todos.location')"
           />
         </div>

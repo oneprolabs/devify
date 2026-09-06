@@ -1,15 +1,19 @@
 <template>
   <div>
-    <p v-if="!invoices.length" class="py-10 text-center text-sm text-gray-500">
+    <p v-if="!invoices.length" class="py-10 text-center text-sm text-ink-3">
       {{ t('expense.invoices.empty') }}
     </p>
 
-    <div v-for="month in months" :key="month.key" class="mb-2 last:mb-0">
+    <div v-for="month in months" :key="month.key">
       <div
-        class="flex items-baseline justify-between border-b border-gray-100 px-1 py-2"
+        class="flex h-9 items-center gap-2 border-y border-line bg-panel-sub px-4 md:px-5"
       >
-        <strong class="text-sm text-gray-900">{{ month.label }}</strong>
-        <span class="text-xs tabular-nums text-gray-500">
+        <span
+          class="font-display text-[calc(11.5px*var(--fs))] font-semibold tracking-[0.02em] text-ink"
+        >
+          {{ month.label }}
+        </span>
+        <span class="font-mono text-[calc(10.5px*var(--fs))] text-ink-4">
           {{
             t('expense.invoices.monthSummary', {
               count: month.invoices.length,
@@ -22,13 +26,13 @@
       <div
         v-for="invoice in month.invoices"
         :key="invoice.uuid"
-        class="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 border-b border-gray-50 px-1 py-3 last:border-0 hover:bg-gray-50"
+        class="flex cursor-pointer items-start gap-3 border-b border-line-soft px-4 py-[var(--rowpy)] transition-colors hover:bg-panel-sub md:px-5"
         @click="$emit('select', invoice)"
       >
         <input
           v-if="selectable"
           type="checkbox"
-          class="mt-1 rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-40"
+          class="mt-0.5 h-[17px] w-[17px] flex-none rounded-sm border-line text-accent focus:ring-accent disabled:opacity-40"
           :checked="modelValue.includes(invoice.uuid)"
           :disabled="!isClaimable(invoice)"
           :title="
@@ -40,20 +44,20 @@
         />
         <span v-else></span>
 
-        <div class="min-w-0">
-          <p class="truncate text-sm font-medium text-gray-900">
+        <div class="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <p class="truncate text-[calc(13.5px*var(--fs))] font-medium text-ink">
             {{ invoice.seller_name || t('expense.invoices.untitled') }}
           </p>
           <p
             v-if="invoice.buyer_name"
-            class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500"
+            class="flex items-center gap-1.5 text-[calc(11.5px*var(--fs))] text-ink-3"
           >
             <span
-              class="rounded px-1.5 py-0.5 text-[11px]"
+              class="flex-none rounded-sm px-1.5 py-px text-[calc(10.5px*var(--fs))]"
               :class="
                 invoice.buyer_tax_id
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'bg-gray-100 text-gray-600'
+                  ? 'bg-accent-soft text-accent'
+                  : 'bg-chip text-ink-2'
               "
             >
               {{
@@ -66,37 +70,37 @@
           </p>
           <p
             v-if="invoice.summary_line"
-            class="mt-0.5 truncate text-xs text-gray-500"
+            class="truncate text-[calc(11.5px*var(--fs))] text-ink-3"
           >
             {{ invoice.summary_line }}
           </p>
-          <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
             <span
-              class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-700"
+              class="rounded-full bg-chip px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-ink-2"
             >
               {{ t(`expense.categories.${invoice.category || 'other'}`) }}
             </span>
             <span
               v-if="invoice.status === 'duplicate'"
-              class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600"
+              class="rounded-full bg-chip px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-ink-2"
             >
               {{ t('expense.invoices.duplicate') }}
             </span>
             <span
               v-if="invoice.needs_review"
-              class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800"
+              class="rounded-full bg-warn-soft px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-warn"
             >
               {{ t('expense.invoices.needsReview') }}
             </span>
             <span
               v-if="invoice.status === 'failed'"
-              class="rounded-full bg-red-100 px-2 py-0.5 text-[11px] text-red-800"
+              class="rounded-full bg-bad-soft px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-bad"
             >
               {{ t('expense.invoices.failed') }}
             </span>
             <span
               v-if="invoice.disposition === 'filed'"
-              class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700"
+              class="rounded-full bg-ok-soft px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-ok"
             >
               {{
                 t(
@@ -107,13 +111,13 @@
           </div>
         </div>
 
-        <div class="text-right">
-          <p class="text-sm font-medium tabular-nums text-gray-900">
+        <div class="flex w-[170px] flex-none flex-col items-end gap-[3px]">
+          <p class="font-mono text-[calc(13.5px*var(--fs))] font-medium text-ink">
             {{ formatAmount(invoice) }}
           </p>
-          <p class="mt-0.5 text-xs tabular-nums text-gray-500">
+          <p class="text-right font-mono text-[calc(11px*var(--fs))] text-ink-3">
             {{ t('expense.invoices.spentOn') }}
-            <b class="text-gray-700">{{ shortDate(effectiveDate(invoice)) }}</b>
+            <b class="text-ink-2">{{ shortDate(effectiveDate(invoice)) }}</b>
             <template v-if="showsBothDates(invoice)">
               · {{ t('expense.invoices.issuedOn') }}
               {{ shortDate(invoice.issue_date) }}
@@ -182,7 +186,8 @@ const months = computed(() => {
           ? t('expense.invoices.noDate')
           : t('expense.invoices.monthLabel', {
               year: key.slice(0, 4),
-              month: key.slice(5)
+              // The canvas writes the month without a leading zero.
+              month: String(Number(key.slice(5)))
             }),
       invoices,
       amount: invoices

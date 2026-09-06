@@ -1,18 +1,18 @@
 <template>
   <div
-    class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8"
+    class="min-h-screen flex items-center justify-center bg-app-sub py-12 px-4 sm:px-6 lg:px-8"
   >
     <div class="max-w-md w-full space-y-8">
       <div>
         <div class="flex items-center justify-center">
-          <h2 class="text-3xl font-extrabold text-gray-900">
+          <h2 class="text-3xl font-extrabold text-ink">
             {{ t('register.google.completeTitle') }}
           </h2>
           <div class="ml-3">
             <LanguageSwitcher />
           </div>
         </div>
-        <p class="mt-2 text-center text-sm text-gray-600">
+        <p class="mt-2 text-center text-sm text-ink-2">
           {{ t('register.google.completeSubtitle') }}
         </p>
       </div>

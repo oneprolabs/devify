@@ -2,7 +2,7 @@
   <div :class="cardClasses">
     <div v-if="$slots.header || title" :class="headerClasses">
       <slot name="header">
-        <h3 v-if="title" class="text-lg font-semibold text-gray-900">
+        <h3 v-if="title" class="text-lg font-semibold text-ink">
           {{ title }}
         </h3>
       </slot>
@@ -73,7 +73,7 @@ const cardClasses = computed(() => {
 const headerClasses = computed(() => {
   const base = 'card-header'
   const muted = props.headerMuted
-    ? 'bg-gray-50 border-b border-gray-100 px-4 py-3'
+    ? 'bg-app-sub border-b border-line-soft px-4 py-3'
     : ''
   return [base, muted, props.headerClass].filter(Boolean).join(' ')
 })

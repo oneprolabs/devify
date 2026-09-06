@@ -8,6 +8,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 from django.shortcuts import get_object_or_404
+from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
@@ -82,15 +83,28 @@ class AppsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return _response(APP_REGISTRY.list_apps())
+        return _response(APP_REGISTRY.list_apps(request.user))
+
+
+class RelayStatsAPIView(APIView):
+    """Counts behind the Relay page header."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from relay.stats import relay_stats
+
+        return _response(relay_stats(request.user))
 
 
 class RelaySubscriptionListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        qs = RelaySubscription.objects.filter(user=request.user).order_by(
-            "-created_at"
+        qs = (
+            RelaySubscription.objects.filter(user=request.user)
+            .annotate(delivery_count_annotated=Count("deliveries"))
+            .order_by("-created_at")
         )
         return _response(RelaySubscriptionSerializer(qs, many=True).data)
 
@@ -394,7 +408,7 @@ class RelayEventListAPIView(APIView):
         qs = (
             RelayEvent.objects.filter(user=request.user)
             .select_related("email_message", "email_message__merged_into")
-            .prefetch_related("deliveries")
+            .prefetch_related("deliveries", "deliveries__subscription")
         )
         total = qs.count()
         start = (page - 1) * page_size

@@ -1,32 +1,29 @@
 <template>
   <div
-    class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8"
+    class="min-h-screen flex items-center justify-center bg-app-sub py-12 px-4 sm:px-6 lg:px-8"
   >
     <div class="max-w-md w-full space-y-8">
       <!-- Header -->
       <div>
         <div class="flex items-center justify-center">
-          <h2 class="text-3xl font-extrabold text-gray-900">
+          <h2 class="text-3xl font-extrabold text-ink">
             {{ t('password.reset.title') }}
           </h2>
           <div class="ml-3">
             <LanguageSwitcher />
           </div>
         </div>
-        <p class="mt-2 text-center text-sm text-gray-600">
+        <p class="mt-2 text-center text-sm text-ink-2">
           {{ t('password.reset.subtitle') }}
         </p>
       </div>
 
       <!-- Success Message -->
-      <div
-        v-if="isSuccess"
-        class="rounded-md bg-green-50 border border-green-200 p-4"
-      >
+      <div v-if="isSuccess" class="rounded-md bg-ok-soft border border-ok p-4">
         <div class="flex">
           <div class="flex-shrink-0">
             <svg
-              class="h-5 w-5 text-green-400"
+              class="h-5 w-5 text-ok"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -38,16 +35,16 @@
             </svg>
           </div>
           <div class="ml-3">
-            <h3 class="text-sm font-medium text-green-800">
+            <h3 class="text-sm font-medium text-ok">
               {{ t('password.reset.successTitle') }}
             </h3>
-            <div class="mt-2 text-sm text-green-700">
+            <div class="mt-2 text-sm text-ok">
               <p>{{ t('password.reset.successMessage') }}</p>
             </div>
             <div class="mt-4">
               <router-link
                 to="/login"
-                class="text-sm font-medium text-green-600 hover:text-green-500"
+                class="text-sm font-medium text-ok hover:text-ok"
               >
                 {{ t('password.reset.backToLogin') }} →
               </router-link>
@@ -59,12 +56,12 @@
       <!-- Error Message -->
       <div
         v-else-if="errorMessage"
-        class="rounded-md bg-red-50 border border-red-200 p-4"
+        class="rounded-md bg-bad-soft border border-bad p-4"
       >
         <div class="flex">
           <div class="flex-shrink-0">
             <svg
-              class="h-5 w-5 text-red-400"
+              class="h-5 w-5 text-bad"
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -76,16 +73,16 @@
             </svg>
           </div>
           <div class="ml-3">
-            <h3 class="text-sm font-medium text-red-800">
+            <h3 class="text-sm font-medium text-bad">
               {{ t('password.reset.error') }}
             </h3>
-            <div class="mt-2 text-sm text-red-700">
+            <div class="mt-2 text-sm text-bad">
               <p>{{ errorMessage }}</p>
             </div>
             <div class="mt-4">
               <router-link
                 to="/login"
-                class="text-sm font-medium text-red-600 hover:text-red-500"
+                class="text-sm font-medium text-bad hover:text-bad"
               >
                 {{ t('password.reset.backToLogin') }} →
               </router-link>
@@ -123,7 +120,7 @@
         </div>
 
         <!-- Password Requirements -->
-        <div class="text-sm text-gray-600">
+        <div class="text-sm text-ink-2">
           <p class="mb-2 font-medium">{{ t('password.reset.requirements') }}</p>
           <ul class="list-disc list-inside space-y-1 text-xs">
             <li>{{ t('password.reset.requirement1') }}</li>

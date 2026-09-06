@@ -5,10 +5,10 @@
         class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
       >
         <div class="space-y-1">
-          <h2 class="text-lg font-semibold text-gray-900">
+          <h2 class="text-lg font-semibold text-ink">
             {{ t('expense.enableTitle') }}
           </h2>
-          <p class="max-w-xl text-sm text-gray-500">
+          <p class="max-w-xl text-sm text-ink-3">
             {{ t('expense.enableDesc') }}
           </p>
         </div>
@@ -18,12 +18,12 @@
           role="switch"
           :aria-checked="modelValue.enabled"
           :disabled="saving"
-          class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-          :class="modelValue.enabled ? 'bg-primary-600' : 'bg-gray-300'"
+          class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          :class="modelValue.enabled ? 'bg-accent' : 'bg-chip'"
           @click="$emit('toggle', !modelValue.enabled)"
         >
           <span
-            class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+            class="inline-block h-4 w-4 transform rounded-full bg-panel transition-transform"
             :class="modelValue.enabled ? 'translate-x-6' : 'translate-x-1'"
           ></span>
         </button>
@@ -31,45 +31,39 @@
 
       <!-- Stating the price next to the switch is a hard requirement: the
            user must know what a scan costs before turning it on. -->
-      <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div class="rounded-lg border border-line bg-app-sub p-4">
         <dl class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
-            <dt
-              class="text-xs font-medium uppercase tracking-wide text-gray-500"
-            >
+            <dt class="text-xs font-medium uppercase tracking-wide text-ink-3">
               {{ t('expense.priceLabel') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-900">
+            <dd class="mt-1 text-sm text-ink">
               {{ t('expense.priceValue', { credits: costPerEmail }) }}
             </dd>
           </div>
           <div>
-            <dt
-              class="text-xs font-medium uppercase tracking-wide text-gray-500"
-            >
+            <dt class="text-xs font-medium uppercase tracking-wide text-ink-3">
               {{ t('expense.balanceLabel') }}
             </dt>
-            <dd class="mt-1 text-sm tabular-nums text-gray-900">
+            <dd class="mt-1 text-sm tabular-nums text-ink">
               {{ modelValue.credits_balance ?? '-' }}
             </dd>
           </div>
           <div>
-            <dt
-              class="text-xs font-medium uppercase tracking-wide text-gray-500"
-            >
+            <dt class="text-xs font-medium uppercase tracking-wide text-ink-3">
               {{ t('expense.lastScanLabel') }}
             </dt>
-            <dd class="mt-1 text-sm text-gray-900">
+            <dd class="mt-1 text-sm text-ink">
               {{ lastScannedText }}
             </dd>
           </div>
         </dl>
-        <p class="mt-3 text-xs leading-relaxed text-gray-500">
+        <p class="mt-3 text-xs leading-relaxed text-ink-3">
           {{ t('expense.billingNote') }}
         </p>
       </div>
 
-      <p v-if="modelValue.enabled" class="text-xs text-gray-500">
+      <p v-if="modelValue.enabled" class="text-xs text-ink-3">
         {{ t('expense.scanFloorNote', { time: enabledAtText }) }}
       </p>
     </div>

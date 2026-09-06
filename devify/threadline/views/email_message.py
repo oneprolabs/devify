@@ -6,7 +6,10 @@ This module contains APIView classes for EmailMessage model CRUD operations.
 
 import logging
 import re
+from datetime import datetime, time, timedelta
 
+from django.utils import timezone
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status, serializers
 from rest_framework.response import Response
@@ -18,6 +21,7 @@ from core.swagger import response, error_response, pagination_response
 
 from .base import BaseAPIView
 from ..models import EmailMessage
+from ..state_machine import EmailStatus
 from ..serializers import (
     EmailMessageSerializer,
     EmailMessageListSerializer,
@@ -33,6 +37,27 @@ from ..services import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_received_after(value: str):
+    """
+    Read a date or ISO 8601 datetime into an aware datetime, or None.
+
+    A bare date means the start of that day, so "since 2026-09-01" keeps
+    everything that arrived on the 1st. Naive values are read in the
+    current timezone, which is where the caller wrote them.
+    """
+    moment = parse_datetime(value)
+    if moment is None:
+        day = parse_date(value)
+        if day is None:
+            return None
+        moment = datetime.combine(day, time.min)
+
+    if timezone.is_naive(moment):
+        moment = timezone.make_aware(moment, timezone.get_current_timezone())
+
+    return moment
 
 
 def _serialize_issue_cluster(message: EmailMessage) -> dict:
@@ -180,6 +205,16 @@ class EmailMessageAPIView(BaseAPIView):
                 ),
             ),
             OpenApiParameter(
+                name="received_after",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description=(
+                    "Keep only threadlines received at or after this "
+                    "moment. A date (2026-09-01) or an ISO 8601 datetime; "
+                    "a naive value is read in the current timezone."
+                ),
+            ),
+            OpenApiParameter(
                 name="ordering",
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
@@ -260,6 +295,26 @@ class EmailMessageAPIView(BaseAPIView):
             message_status = request.query_params.get("status", None)
             if message_status:
                 queryset = queryset.filter(status=message_status)
+
+            # The list's time-range control sends the start of the window it
+            # offers. Rejecting an unparseable value keeps a typo from
+            # reading as "no range", the same way handled_by does.
+            received_after = request.query_params.get("received_after", None)
+            if received_after:
+                moment = _parse_received_after(received_after)
+                if moment is None:
+                    return Response(
+                        {
+                            "code": 400,
+                            "message": _(
+                                "received_after must be a date or an "
+                                "ISO 8601 datetime."
+                            ),
+                            "data": None,
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                queryset = queryset.filter(received_at__gte=moment)
 
             # Ordering
             ALLOWED_ORDERING_FIELDS = {
@@ -388,6 +443,64 @@ class EmailMessageAPIView(BaseAPIView):
             return Response(
                 {"code": 400, "message": str(e), "data": None},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class EmailMessageStatsAPIView(BaseAPIView):
+    """
+    Counts for the list header strip.
+    """
+
+    def get_queryset(self):
+        """
+        Only merge roots, matching what the list itself shows.
+        """
+        return EmailMessage.objects.filter(merged_into__isnull=True)
+
+    @extend_schema(
+        operation_id="threadlines_stats",
+        summary="Threadline counts",
+        description=(
+            "Totals behind the list header: everything, the last seven "
+            "days, and the two ends of the processing state machine."
+        ),
+        responses={
+            200: response(serializers.Serializer),
+            401: error_response(),
+        },
+    )
+    def get(self, request):
+        """
+        Counts over the whole list, not just the page being shown.
+        """
+        try:
+            self.request = request
+            queryset = self.filter_by_user(self.get_queryset())
+            week_ago = timezone.now() - timedelta(days=7)
+
+            return Response(
+                {
+                    "code": 200,
+                    "message": "Threadline stats retrieved successfully",
+                    "data": {
+                        "total": queryset.count(),
+                        "this_week": queryset.filter(
+                            received_at__gte=week_ago
+                        ).count(),
+                        "pending": queryset.filter(
+                            status=EmailStatus.FETCHED.value
+                        ).count(),
+                        "completed": queryset.filter(
+                            status=EmailStatus.SUCCESS.value
+                        ).count(),
+                    },
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error retrieving threadline stats: {str(e)}")
+            return Response(
+                {"code": 500, "message": str(e), "data": None},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 

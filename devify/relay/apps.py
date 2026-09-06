@@ -15,6 +15,7 @@ class RelayConfig(AppConfig):
 
         import relay.tasks  # noqa: F401
         import relay.celery_bootstrap  # noqa: F401
+        from relay.stats import relay_stats
 
         APP_REGISTRY.register(
             key="relay",
@@ -23,4 +24,5 @@ class RelayConfig(AppConfig):
             path="/apps/relay",
             description=_("Route workflow completions to external tools."),
             order=10,
+            stats=relay_stats,
         )

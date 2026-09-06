@@ -64,6 +64,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
+          # Aliyun ACR rejects the OCI `empty.v1+json` media type that
+          # buildx uses for provenance and SBOM attestations. The image
+          # itself pushes fine and then the attestation is denied,
+          # failing the release — every one since 11 August. We do not
+          # consume the attestations, so they are turned off.
+          provenance: false
+          sbom: false
 
       - name: Extract metadata for UI image
         id: ui-meta
@@ -94,6 +101,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
+          # Aliyun ACR rejects the OCI `empty.v1+json` media type that
+          # buildx uses for provenance and SBOM attestations. The image
+          # itself pushes fine and then the attestation is denied,
+          # failing the release — every one since 11 August. We do not
+          # consume the attestations, so they are turned off.
+          provenance: false
+          sbom: false
 
       - name: Verify published image platforms
         env:

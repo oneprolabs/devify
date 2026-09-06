@@ -63,18 +63,19 @@
 
     <div
       v-if="tags.length || firstDelivery"
-      class="flex items-center gap-[5px]"
+      class="flex items-center gap-[5px] overflow-hidden"
     >
       <span
         v-for="tag in tags.slice(0, 2)"
         :key="tag"
-        class="rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ink-2"
+        class="min-w-0 truncate whitespace-nowrap rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ink-2"
+        :title="tag"
       >
         {{ tag }}
       </span>
       <span
         v-if="firstDelivery"
-        class="ml-auto truncate font-mono text-[calc(10px*var(--fs))] text-accent"
+        class="ml-auto flex-none truncate font-mono text-[calc(10px*var(--fs))] text-accent"
       >
         {{ relayDeliveryLabel(firstDelivery) }}
       </span>

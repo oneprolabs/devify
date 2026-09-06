@@ -80,15 +80,19 @@
       </span>
     </div>
 
-    <div class="flex w-[130px] flex-none items-center gap-[5px]">
+    <div class="flex w-[130px] flex-none items-center gap-[5px] overflow-hidden">
       <span
         v-for="tag in visibleTags"
         :key="tag"
-        class="rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ink-2"
+        class="min-w-0 truncate whitespace-nowrap rounded-sm bg-chip px-1.5 py-0.5 font-mono text-[calc(10px*var(--fs))] text-ink-2"
+        :title="tag"
       >
         {{ tag }}
       </span>
-      <span v-if="hiddenTagCount" class="font-mono text-[calc(10px*var(--fs))] text-ink-4">
+      <span
+        v-if="hiddenTagCount"
+        class="flex-none font-mono text-[calc(10px*var(--fs))] text-ink-4"
+      >
         +{{ hiddenTagCount }}
       </span>
     </div>
@@ -160,7 +164,11 @@ const {
   tags
 } = useChatRowFields(() => props.chat)
 
-const visibleTags = computed(() => tags.value.slice(0, 2))
-const hiddenTagCount = computed(() => Math.max(0, tags.value.length - 2))
+// The canvas drew two chips because its sample tags were two characters
+// wide. Real ones are whole phrases, and two of them in a 130px column
+// leave a couple of legible characters each, so the column shows one in
+// full and counts the rest.
+const visibleTags = computed(() => tags.value.slice(0, 1))
+const hiddenTagCount = computed(() => Math.max(0, tags.value.length - 1))
 const firstDelivery = computed(() => getRelayDeliveries(props.chat)[0] || null)
 </script>

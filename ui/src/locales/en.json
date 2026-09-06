@@ -92,7 +92,8 @@
     "statCompletionRate": "Done",
     "statInvoices": "Invoices",
     "statUnfiled": "Unfiled",
-    "statOpenGroups": "Open groups"
+    "statOpenGroups": "Open groups",
+    "todoName": "Todos"
   },
   "relay": {
     "pageTitle": "Relay",
@@ -358,19 +359,25 @@
     "registerNewAccount": "register a new account",
     "period": ".",
     "pitch": {
-      "headline": "Forward the mail.\nIt files the rest.",
-      "summary": "Forward to your AI mailbox → filed as summaries, todos and tags → delivered to Feishu, Jira or GitHub Issues.",
-      "forward": {
-        "title": "Forward to your AI mailbox",
-        "body": "An address is assigned to you, or connect your own IMAP. Text and images are both read."
+      "headline": "The conversations worth keeping\nshould outlive the chat.",
+      "summary": "When the same incident comes back, nobody should have to dig through chat logs and expired screenshots to solve it twice.",
+      "collect": {
+        "title": "Forward it to your AI mailbox",
+        "body": "WeChat, Feishu, Slack — mail is the one entry point that does not care which. You get an address, or connect your own IMAP."
       },
-      "organise": {
-        "title": "Filed as summaries, todos and tags",
-        "body": "Several messages about one thing merge into a single record, attachments included."
+      "understand": {
+        "title": "Reads the text, and the screenshots",
+        "body": "The detail that matters is often inside an image. Text and pictures are parsed together, and the scattered context is put back whole."
       },
-      "deliver": {
-        "title": "Delivered where you already work"
-      }
+      "structure": {
+        "title": "Turned into structured content",
+        "body": "Messages about one thing merge into a single record — summaries, todos, tags and invoices that can be searched, and worked on by software."
+      },
+      "apps": {
+        "title": "Applications grow on what it understood",
+        "body": "Once content is understood there is more than one thing to do with it. Relay files conclusions into Jira and Feishu; Expense collects invoices into claims — same content, different applications."
+      },
+      "moreApps": "More on the way"
     },
     "noAccountYet": "No account yet?"
   },

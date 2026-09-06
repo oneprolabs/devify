@@ -92,7 +92,8 @@
     "statCompletionRate": "完成率",
     "statInvoices": "已识别发票",
     "statUnfiled": "待归集",
-    "statOpenGroups": "进行中报销组"
+    "statOpenGroups": "进行中报销组",
+    "todoName": "待办事项"
   },
   "relay": {
     "pageTitle": "智能投递",
@@ -358,19 +359,25 @@
     "period": "。",
     "processing": "处理中...",
     "pitch": {
-      "headline": "把邮件转发过来，\n剩下的交给它整理。",
-      "summary": "转发到你的 AI 智能邮箱 → 整理成纪要、待办与标签 → 投递到飞书、Jira 或 GitHub Issue。",
-      "forward": {
+      "headline": "最有价值的那些讨论，\n不该随聊天记录一起消失。",
+      "summary": "线上问题再次出现时，不必翻聊天记录、找过期截图、从头再排查一遍。",
+      "collect": {
         "title": "转发到你的 AI 智能邮箱",
-        "body": "系统分配一个专属地址，也可以接自己的 IMAP。支持文字与图片识别。"
+        "body": "微信、飞书、Slack 都行——邮件是唯一不挑平台的入口。系统分配专属地址，也可以接自己的 IMAP。"
       },
-      "organise": {
-        "title": "整理成纪要、待办与标签",
-        "body": "同一件事的多封往来会自动合并成一条记录，附件一并解析。"
+      "understand": {
+        "title": "读懂文字，也读懂截图",
+        "body": "一次故障讨论的关键往往在图里。文字和图片一起解析，把散落的上下文拼回完整。"
       },
-      "deliver": {
-        "title": "投递到你已经在用的系统"
-      }
+      "structure": {
+        "title": "变成结构化的内容",
+        "body": "同一件事的多封往来自动合并，产出纪要、待办、标签与发票——可被检索，也可被程序处理。"
+      },
+      "apps": {
+        "title": "在读懂的内容上长出应用",
+        "body": "内容一旦被理解，处理方式就不止一种。智能投递把结论送进 Jira 和飞书，发票管家把发票归集成报销组——同一批内容，不同的应用。"
+      },
+      "moreApps": "更多应用中…"
     },
     "noAccountYet": "还没有账户？"
   },

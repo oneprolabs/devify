@@ -531,31 +531,40 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
-// What the left panel promises, in the order the flow actually happens.
+// The arc the product actually follows: collect what is scattered,
+// understand it, make it structured, and let applications grow on top.
+// Delivery is one of those applications, not the destination.
 const pitchSteps = [
   {
-    key: 'forward',
+    key: 'collect',
     icon: 'M4 6h16v12H4z M4 7l8 6 8-6',
     body: true
   },
   {
-    key: 'organise',
+    key: 'understand',
+    icon: 'M2.5 12s3.6-6.5 9.5-6.5S21.5 12 21.5 12s-3.6 6.5-9.5 6.5S2.5 12 2.5 12z M12 12h.01',
+    body: true
+  },
+  {
+    key: 'structure',
     icon: 'M4 7h16M4 12h16M4 17h10',
     body: true
   },
   {
-    // The channel chips say what this step delivers to, so it needs no prose.
-    key: 'deliver',
-    icon: 'M4 12h12m0 0-4-4m4 4-4 4M18 5v14',
+    // The chips name the applications, so the step needs no closing prose.
+    key: 'apps',
+    icon: 'M3.5 3.5h7v7h-7z M13.5 3.5h7v7h-7z M3.5 13.5h7v7h-7z M13.5 13.5h7v7h-7z',
+    body: true,
     targets: true
   }
 ]
 
-// The same three channels Relay names, so the promise matches the product.
+// The app centre as it stands, plus the room left for what comes next.
 const deliveryTargets = [
-  'relay.targetFeishu',
-  'relay.targetJira',
-  'relay.targetGitHub'
+  'apps.relayName',
+  'apps.expenseName',
+  'apps.todoName',
+  'auth.pitch.moreApps'
 ]
 
 const activeTab = ref(route.query.tab === 'register' ? 'register' : 'login')

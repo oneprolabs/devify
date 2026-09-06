@@ -498,7 +498,14 @@ class IMAPClient:
                     )
                     continue
         except Exception as e:
+            # A single unreadable message is worth skipping past, which the
+            # inner handler does. Failing to connect, log in or open the
+            # folder is not: it makes the whole run meaningless. Swallowing
+            # it here handed the caller an empty generator, which reads as
+            # "connected fine, no new mail" — so the mailbox kept recording
+            # success while it had not reached the server in weeks.
             logger.error(f"Error scanning emails: {e}")
+            raise
         finally:
             self.disconnect()
 

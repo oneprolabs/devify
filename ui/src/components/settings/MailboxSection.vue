@@ -75,7 +75,7 @@
               </p>
             </div>
 
-            <div class="flex flex-shrink-0 gap-2">
+            <div v-if="!showForm" class="flex flex-shrink-0 gap-2">
               <BaseButton
                 type="button"
                 size="sm"

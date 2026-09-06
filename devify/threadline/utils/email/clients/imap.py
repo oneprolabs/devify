@@ -6,9 +6,31 @@ Pure IMAP client without email parsing logic
 
 import imaplib
 import logging
+import socket
+import ssl
 from typing import Dict, Generator, Optional
 
+from django.utils.translation import gettext_lazy as _
+
 logger = logging.getLogger(__name__)
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    """
+    A TLS context that still talks to mail servers behind the times.
+
+    OpenSSL 3 defaults to security level 2, which refuses key exchange
+    without forward secrecy. Several mainland providers — 139.com among
+    them — offer only plain-RSA suites over TLS 1.2, so the handshake dies
+    before the login is ever attempted. Dropping to level 1 accepts those
+    suites while keeping certificate verification and the hostname check.
+    """
+    context = ssl.create_default_context()
+    try:
+        context.set_ciphers("DEFAULT@SECLEVEL=1")
+    except ssl.SSLError:  # pragma: no cover - depends on the OpenSSL build
+        logger.warning("Could not lower the TLS security level")
+    return context
 
 
 class IMAPClient:
@@ -104,7 +126,11 @@ class IMAPClient:
                 f"(SSL: {self.use_ssl})"
             )
             client = (
-                imaplib.IMAP4_SSL(self.imap_host, self.imap_port)
+                imaplib.IMAP4_SSL(
+                    self.imap_host,
+                    self.imap_port,
+                    ssl_context=_build_ssl_context(),
+                )
                 if self.use_ssl
                 else imaplib.IMAP4(self.imap_host, self.imap_port)
             )
@@ -119,39 +145,118 @@ class IMAPClient:
             return client
 
         except imaplib.IMAP4.error as e:
-            error_msg = (
-                f"[{self.user_context}] IMAP authentication failed for "
-                f"{username}@{self.imap_host}: {e}\n"
-                f"Possible causes:\n"
-                f"  - Wrong username or password\n"
-                f"  - Account locked or disabled\n"
-                f"  - Two-factor authentication required\n"
-                f"  - App-specific password needed"
-            )
-            logger.error(error_msg)
-            raise ValueError(error_msg) from e
+            raise ValueError(
+                self._explain(
+                    _("Signed in to %(host)s but the mailbox refused the "
+                      "credentials.") % {"host": self.imap_host},
+                    [
+                        _("The username or the password is wrong."),
+                        _("The provider wants an app-specific password or "
+                          "authorisation code rather than the one you log "
+                          "in to the website with."),
+                        _("IMAP has not been switched on for this mailbox, "
+                          "or the account is locked."),
+                    ],
+                    [
+                        _("Check the username: most providers want the full "
+                          "address, not the part before the @."),
+                        _("Generate an authorisation code in the mailbox's "
+                          "own settings and paste that as the password."),
+                        _("Confirm IMAP is enabled in the provider's client "
+                          "settings, then verify again."),
+                    ],
+                    detail=str(e),
+                )
+            ) from e
 
-        except (ConnectionRefusedError, OSError) as e:
-            error_msg = (
-                f"[{self.user_context}] Cannot connect to IMAP server "
-                f"{self.imap_host}:{self.imap_port}: {e}\n"
-                f"Possible causes:\n"
-                f"  - Wrong server address or port\n"
-                f"  - Server is down or unreachable\n"
-                f"  - Firewall blocking connection\n"
-                f"  - SSL/TLS configuration mismatch (current: SSL={self.use_ssl})"
-            )
-            logger.error(error_msg)
-            raise ConnectionError(error_msg) from e
+        except ssl.SSLError as e:
+            # The server answered, but the two sides could not agree on how
+            # to encrypt. That is a different problem from an unreachable
+            # host, and the remedy is different too.
+            raise ConnectionError(
+                self._explain(
+                    _("Reached %(host)s:%(port)s but could not establish an "
+                      "encrypted connection.")
+                    % {"host": self.imap_host, "port": self.imap_port},
+                    [
+                        _("The server only offers outdated encryption that "
+                          "this client rejects by default."),
+                        _("The port is right for the other mode: 993 is for "
+                          "SSL, 143 is for plain or STARTTLS."),
+                        _("The server's certificate does not match its "
+                          "address, which a proxy in between can cause."),
+                    ],
+                    [
+                        _("Try the other combination — SSL on port 993, or "
+                          "SSL off on port 143."),
+                        _("Confirm the server address against the "
+                          "provider's own IMAP instructions."),
+                        _("If this keeps happening, send us the server "
+                          "address and we will look at it."),
+                    ],
+                    detail=str(e),
+                )
+            ) from e
 
-        except Exception as e:
-            error_msg = (
-                f"[{self.user_context}] Unexpected error connecting to IMAP "
-                f"server {self.imap_host}:{self.imap_port}: "
-                f"{type(e).__name__}: {e}"
-            )
-            logger.error(error_msg)
-            raise
+        except (socket.timeout, TimeoutError) as e:
+            raise ConnectionError(
+                self._explain(
+                    _("No answer from %(host)s:%(port)s before the attempt "
+                      "timed out.")
+                    % {"host": self.imap_host, "port": self.imap_port},
+                    [
+                        _("The server is slow or temporarily down."),
+                        _("A firewall is dropping the connection instead of "
+                          "refusing it."),
+                    ],
+                    [
+                        _("Wait a moment and verify again."),
+                        _("If the mailbox is on an internal network, it has "
+                          "to be reachable from this service."),
+                    ],
+                    detail=str(e),
+                )
+            ) from e
+
+        except (ConnectionRefusedError, socket.gaierror, OSError) as e:
+            raise ConnectionError(
+                self._explain(
+                    _("Could not reach %(host)s:%(port)s at all.")
+                    % {"host": self.imap_host, "port": self.imap_port},
+                    [
+                        _("The server address is misspelled, or that host "
+                          "does not serve IMAP."),
+                        _("The port is closed — most providers use 993 with "
+                          "SSL, or 143 without."),
+                        _("A firewall between this service and the mailbox "
+                          "is blocking it."),
+                    ],
+                    [
+                        _("Copy the server address and port from the "
+                          "provider's IMAP instructions."),
+                        _("Try 993 with SSL on; if that fails, 143 with SSL "
+                          "off."),
+                    ],
+                    detail=str(e),
+                )
+            ) from e
+
+    def _explain(self, symptom, causes, remedies, detail=""):
+        """
+        The shape every connection error takes: what happened, why it
+        might have happened, and what to try. A raw exception string tells
+        the reader nothing they can act on, so it goes last and only as
+        supporting detail.
+        """
+        lines = [str(symptom), "", str(_("Possible causes:"))]
+        lines += [f"  - {cause}" for cause in causes]
+        lines += ["", str(_("What to try:"))]
+        lines += [f"  - {remedy}" for remedy in remedies]
+        if detail:
+            lines += ["", f"{_('Technical detail')}: {detail}"]
+        message = "\n".join(lines)
+        logger.error(f"[{self.user_context}] {message}")
+        return message
 
     def connect(self) -> bool:
         """

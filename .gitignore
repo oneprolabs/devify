@@ -255,3 +255,13 @@ docker/nginx/certs/
 *.crt
 *.key
 *.pem
+
+# Blue/green deploy state. The production deploy root is a checkout of this
+# repository (deploy/scripts/devify-deploy.sh runs from it), and the
+# orchestrator self-updates with `git pull --ff-only` before every release.
+# These live beside the tree there; ignoring them keeps that pull clean and
+# keeps `git status` on the deploy host readable.
+.active_color
+.rollback_version
+.devify/
+cache/

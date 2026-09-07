@@ -211,11 +211,15 @@ if [[ "${INSTALLER_VERSION}" == "0.2.1" ]]; then
 else
   fail "installer patch version is ${INSTALLER_VERSION}, expected 0.2.1"
 fi
-multiarch_builds="$(grep -Fc "platforms: linux/amd64,linux/arm64" .github/workflows/build_and_deploy.yml)"
-if [[ "${multiarch_builds}" == "2" ]]; then
-  ok "release workflow builds backend and UI for amd64 and arm64"
+# arm64 was dropped from the release: it only ever built under QEMU on an
+# x86 runner, where the UI image's `npm ci` hung for hours, and no host we
+# deploy to is arm64. What the contract asserts now is that all three
+# published images — backend, UI and homepage — are built for amd64.
+amd64_builds="$(grep -Fc "platforms: linux/amd64" .github/workflows/build_and_deploy.yml)"
+if [[ "${amd64_builds}" == "3" ]]; then
+  ok "release workflow builds backend, UI and homepage for amd64"
 else
-  fail "release workflow has ${multiarch_builds} multi-architecture build(s), expected 2"
+  fail "release workflow has ${amd64_builds} amd64 build(s), expected 3"
 fi
 if grep -Fq "Verify published image platforms" .github/workflows/build_and_deploy.yml; then
   ok "release workflow verifies published image platforms"

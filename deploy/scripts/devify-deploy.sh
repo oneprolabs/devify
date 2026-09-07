@@ -5,7 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CORE_DIR="${DEPLOY_ROOT}/.devify"
 ENV_FILE="${DEPLOY_ROOT}/.env"
-ENV_SAMPLE="${DEPLOY_ROOT}/env.sample"
+# The blue/green sample, not the repository-root one: that is the
+# standalone installer's and carries no MYSQL_* or STRIPE_* keys.
+ENV_SAMPLE="${DEPLOY_ROOT}/deploy/env.sample"
 
 DEVIFY_REPO="${DEVIFY_REPO:-https://github.com/oneprolabs/devify.git}"
 DEVIFY_REF="${DEVIFY_REF:-main}"
@@ -95,6 +97,14 @@ check_requirements() {
 
 ensure_env() {
     if [ ! -f "${ENV_FILE}" ]; then
+        if [ ! -f "${ENV_SAMPLE}" ]; then
+            die "Cannot seed ${ENV_FILE}: ${ENV_SAMPLE} is missing.
+  Likely cause: ${DEPLOY_ROOT} is an old devify-deploy checkout, where the
+    sample sat at the root, or the clone of the merged repository is
+    incomplete.
+  Try: clone https://github.com/oneprolabs/devify.git into ${DEPLOY_ROOT},
+    keeping .env, data/, .active_color and .rollback_version, then rerun."
+        fi
         cp "${ENV_SAMPLE}" "${ENV_FILE}"
         echo "Created ${ENV_FILE} from env.sample."
         echo "Edit ${ENV_FILE} before production use, then rerun this command."

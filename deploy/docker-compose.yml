@@ -1,0 +1,37 @@
+# Same project as the devify app stack this overlays (devify-deploy pins
+# -p devify); explicit so it never falls back to a directory-name default.
+name: devify
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  devify-home:
+    image: registry.cn-beijing.aliyuncs.com/oneprolabs/devify-home:${DEVIFY_IMAGE_TAG:-latest}
+    container_name: devify-home
+    restart: unless-stopped
+    logging: *default-logging
+    expose:
+      - "80"
+    networks:
+      - devify_network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -Y off --quiet --tries=1 --spider http://127.0.0.1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  nginx:
+    volumes:
+      - ./deploy/docker/nginx/aimychats.com.conf:/etc/nginx/conf.d/aimychats.com.conf:ro
+    depends_on:
+      devify-home:
+        condition: service_healthy
+
+networks:
+  devify_network:
+    driver: bridge

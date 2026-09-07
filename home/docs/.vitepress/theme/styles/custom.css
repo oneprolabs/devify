@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles for VitePress theme */
+:root {
+  --vp-c-brand: #6366f1;
+  --vp-c-brand-light: #818cf8;
+  --vp-c-brand-lighter: #a5b4fc;
+  --vp-c-brand-dark: #4f46e5;
+  --vp-c-brand-darker: #4338ca;
+
+  --vp-nav-bg-color: #ffffff;
+}
+
+/* ── Light navbar ── */
+.VPNav {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  backdrop-filter: none !important;
+}
+
+.VPNavBar {
+  background: #ffffff !important;
+  border-bottom: none !important;
+}
+
+.VPNavBar .title,
+.VPNavBar .VPNavBarTitle .title {
+  color: #0f172a !important;
+}
+
+.VPNavBar .VPNavBarMenu .VPNavBarMenuLink,
+.VPNavBar .VPNavBarMenuLink {
+  color: #475569 !important;
+}
+
+.VPNavBar .VPNavBarMenuLink:hover,
+.VPNavBar .VPNavBarMenuLink.active {
+  color: #6366f1 !important;
+}
+
+/* Site title */
+.VPNavBarTitle a {
+  color: #0f172a !important;
+}
+
+.VPNavBarTitle a:hover {
+  color: #6366f1 !important;
+}
+
+/* Logo — no brightness override needed on white bg */
+.VPNavBarTitle .logo {
+  filter: none;
+}
+
+/* Divider between nav and content — remove white line */
+.VPContent {
+  padding-top: 0 !important;
+}
+
+/* Hide default VitePress language switcher */
+.VPNavBarTranslations {
+  display: none !important;
+}
+
+/* Hide default VitePress footer */
+.VPFooter {
+  display: none !important;
+}
+
+/* Ensure smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Mobile optimization */
+@media (max-width: 640px) {
+  .VPHero .main {
+    padding: 2rem 1.5rem;
+  }
+
+  .VPFeatures {
+    padding: 2rem 1.5rem;
+  }
+}
+
+/* Button touch optimization for mobile */
+.vp-button,
+button,
+a.button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Custom container for hero section */
+.hero-container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Feature cards */
+.feature-card {
+  @apply bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-6;
+}
+
+/* Pricing cards */
+.pricing-card {
+  @apply bg-white rounded-lg shadow-lg p-8 relative;
+}
+
+.pricing-card.featured {
+  @apply border-2 border-primary-600 shadow-xl;
+}
+
+/* Responsive grid utilities */
+.grid-responsive {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
+
+/* Mobile navigation */
+@media (max-width: 768px) {
+  .mobile-nav-open {
+    overflow: hidden;
+  }
+}
+
+/* Wider content for FAQ and guide pages */
+.vp-doc .container,
+.VPDoc .container {
+  max-width: 1280px !important;
+}
+
+.vp-doc .content,
+.VPDoc .content {
+  max-width: 1120px !important;
+}
+
+/* Increase table width for pricing comparison */
+.vp-doc table {
+  max-width: 100%;
+  width: 100%;
+}

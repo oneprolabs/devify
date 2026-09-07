@@ -1,28 +1,47 @@
 # Devify Deploy
 
-`devify-deploy` is the production entrypoint for the hosted Devify stack with
-the public homepage enabled.
+The production entrypoint for the hosted Devify stack with the public homepage
+enabled. It lives in the `devify` repository now; `devify-deploy` was merged in
+and archived.
 
-The application stack itself is maintained by the `devify` repository. This
-repository only keeps the homepage deployment delta, certificate helpers, and a
-single install/upgrade script.
+## What lives where on the deploy host
 
-## Repository Boundary
+Two checkouts of this one repository, at two different refs:
 
-- `devify`: API, worker, scheduler, UI, MySQL, Redis, Nginx app/API config, and
-  Haraka.
-- `devify-deploy`: `devify-home`, homepage Nginx config, production `.env`
-  sample, and deployment automation.
-- `.devify/`: generated local checkout of `devify`; not committed.
+- **the deploy root** — tracks `main`, and holds the runtime state the release
+  must not touch: `.env`, `data/`, `cache/`, `.active_color`,
+  `.rollback_version`. Only `deploy/` is checked out.
+- **`.devify/`** — pinned to the release tag, re-synced by every deploy. Only
+  `docker/` and `deploy/` are checked out, alongside the root files.
 
-## First Install
+Neither carries `devify/`, `ui/` or `home/`. Those build the images; the deploy
+host runs the images. `sync_devify` sets `.devify`'s sparse checkout itself, so
+it converges on its own — including narrowing a full checkout made before this
+was introduced.
+
+## First install
 
 ```bash
-git clone https://github.com/cloud2ai/devify-deploy.git
+git clone --filter=blob:none --sparse \
+    https://github.com/oneprolabs/devify.git devify-deploy
 cd devify-deploy
-cp env.sample .env
+git sparse-checkout set --cone deploy
+
+cp deploy/env.sample .env
 vim .env
 ./deploy/scripts/devify-deploy.sh install
+```
+
+`--cone` is passed explicitly because it is not the default for
+`sparse-checkout set` before git 2.37.
+
+### Narrowing an existing deploy root
+
+A deploy root cloned in full needs no re-clone — the runtime state stays put:
+
+```bash
+cd /path/to/deploy/root
+git sparse-checkout set --cone deploy
 ```
 
 The script will:

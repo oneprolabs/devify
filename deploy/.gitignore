@@ -1,0 +1,67 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.dev
+.env.*
+.env.sample
+
+# Runtime data directory (NOT in version control)
+data/
+data.dev/
+data.*.backup/
+.devify/
+
+# Cache directory
+cache/
+cache.dev/
+
+# SSL Certificates (sensitive)
+data/certs/nginx/
+data/haraka/certs/
+*.crt
+*.key
+*.pem
+
+# Backup files
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Docker volumes
+volumes/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Node modules (if any frontend tooling)
+node_modules/
+
+# Python bytecode (if any Python scripts)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Certbot data
+data/certbot/
+
+# Blue/green runtime state (issue #17)
+.active_color
+.rollback_version

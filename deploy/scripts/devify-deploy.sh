@@ -7,7 +7,7 @@ CORE_DIR="${DEPLOY_ROOT}/.devify"
 ENV_FILE="${DEPLOY_ROOT}/.env"
 ENV_SAMPLE="${DEPLOY_ROOT}/env.sample"
 
-DEVIFY_REPO="${DEVIFY_REPO:-https://github.com/cloud2ai/devify.git}"
+DEVIFY_REPO="${DEVIFY_REPO:-https://github.com/oneprolabs/devify.git}"
 DEVIFY_REF="${DEVIFY_REF:-main}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-devify}"
 # --local: rehearse against the current .devify working tree + already-present
@@ -20,6 +20,7 @@ die() { echo -e "\033[1;31m[devify-deploy] ERROR:\033[0m $*" >&2; exit 1; }
 
 DEVIFY_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify"
 DEVIFY_UI_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify-ui"
+DEVIFY_HOME_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify-home"
 
 # Single-flight lock so two mutating runs (a CI retry overlapping a manual run,
 # two operators) can't race on .active_color, the colored containers, or the
@@ -69,7 +70,7 @@ compose() {
         --project-directory "${CORE_DIR}" \
         -p "${COMPOSE_PROJECT_NAME}" \
         -f "${CORE_DIR}/docker-compose.yml" \
-        -f "${DEPLOY_ROOT}/docker-compose.yml" \
+        -f "${CORE_DIR}/deploy/docker-compose.yml" \
         -f "${CORE_DIR}/docker-compose.bluegreen.yml" \
         "$@"
 }
@@ -151,8 +152,9 @@ sync_nginx_confd() {
     # Blue/green app config, versioned with the synced devify repo.
     cp "${CORE_DIR}/docker/nginx/bluegreen/default.conf" \
         "${confd}/default.conf"
-    # aimychats.com (devify-home) config from this deploy repo.
-    cp "${DEPLOY_ROOT}/docker/nginx/aimychats.com.conf" \
+    # aimychats.com (devify-home) vhost, from the pinned tag alongside
+    # the app config above, so both move together on a rollback.
+    cp "${CORE_DIR}/deploy/docker/nginx/aimychats.com.conf" \
         "${confd}/aimychats.com.conf"
     # Runtime switch file: seed from template only if absent so an existing
     # active color is preserved across upgrades.
@@ -204,7 +206,8 @@ record_rollback_version() {
 # grep exits 1 when a repo only has :latest, which would otherwise abort.
 prune_old_images() {
     local repo
-    for repo in "${DEVIFY_IMAGE_REPO}" "${DEVIFY_UI_IMAGE_REPO}"; do
+    for repo in "${DEVIFY_IMAGE_REPO}" "${DEVIFY_UI_IMAGE_REPO}" \
+                "${DEVIFY_HOME_IMAGE_REPO}"; do
         docker images "${repo}" --format '{{.Tag}}' \
             | grep -vE '^(latest|<none>)$' \
             | sort -rV | tail -n +3 \
@@ -312,7 +315,9 @@ upgrade_stack() {
     acquire_deploy_lock
     check_requirements
     ensure_env
-    # Pull latest devify-deploy scripts and overlay configs (nginx, etc.).
+    # Refresh this script from main. The overlay and nginx configs no
+    # longer live here — they come from CORE_DIR at the pinned tag — so
+    # this now updates the orchestrator alone.
     if [ "${LOCAL_MODE}" != "1" ]; then
         git -C "${DEPLOY_ROOT}" pull --ff-only origin main || true
     fi

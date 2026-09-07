@@ -10,7 +10,7 @@ x-logging: &default-logging
 
 services:
   devify-home:
-    image: registry.cn-beijing.aliyuncs.com/cloud2ai/devify-home:latest
+    image: registry.cn-beijing.aliyuncs.com/oneprolabs/devify-home:${DEVIFY_IMAGE_TAG:-latest}
     container_name: devify-home
     restart: unless-stopped
     logging: *default-logging
@@ -27,7 +27,7 @@ services:
 
   nginx:
     volumes:
-      - ${DEVIFY_DEPLOY_ROOT:?Set DEVIFY_DEPLOY_ROOT}/docker/nginx/aimychats.com.conf:/etc/nginx/conf.d/aimychats.com.conf:ro
+      - ./deploy/docker/nginx/aimychats.com.conf:/etc/nginx/conf.d/aimychats.com.conf:ro
     depends_on:
       devify-home:
         condition: service_healthy

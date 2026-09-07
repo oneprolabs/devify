@@ -178,7 +178,7 @@ jobs:
       # DEVIFY_AUTO_DEPLOY is "true". Leave it unset (or "false") to build the
       # release without touching production — e.g. during the blue/green
       # cutover, deploy manually in a maintenance window
-      # (DEVIFY_REF=<tag> ./scripts/devify-deploy.sh upgrade) — then set it to
+      # (DEVIFY_REF=<tag> ./deploy/scripts/devify-deploy.sh upgrade) — then set it to
       # "true" for hands-off zero-downtime releases. Toggling it needs no
       # workflow edit, just a GitHub Variables change.
       - name: Install SSH Key

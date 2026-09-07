@@ -4,7 +4,8 @@
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Get the project root directory (parent of scripts/)
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+# Two levels up: scripts/ sits under deploy/ in the merged repository.
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 # Set certificate directory
 CERT_DIR="$PROJECT_ROOT/data/certs/nginx"
 EMAIL="your-email@example.com"  # Change this to your email

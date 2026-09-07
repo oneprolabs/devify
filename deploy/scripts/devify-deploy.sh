@@ -2,7 +2,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEPLOY_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Two levels up, not one: this script lives at deploy/scripts/ inside the
+# merged repository, so the deploy root is the repository root itself.
+DEPLOY_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+if [ ! -f "${DEPLOY_ROOT}/deploy/scripts/devify-deploy.sh" ]; then
+    echo "Refusing to run: derived DEPLOY_ROOT=${DEPLOY_ROOT}, which is not a" >&2
+    echo "  devify checkout (expected deploy/scripts/devify-deploy.sh under it)." >&2
+    echo "  Likely cause: this script was moved or symlinked out of deploy/scripts/." >&2
+    echo "  Try: run it in place, as <checkout>/deploy/scripts/devify-deploy.sh" >&2
+    exit 1
+fi
 CORE_DIR="${DEPLOY_ROOT}/.devify"
 ENV_FILE="${DEPLOY_ROOT}/.env"
 # The blue/green sample, not the repository-root one: that is the

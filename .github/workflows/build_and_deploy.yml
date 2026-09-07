@@ -161,12 +161,21 @@ jobs:
           version="${RELEASE_VERSION#v}"
           for image_name in "${IMAGE_NAME}" "${UI_IMAGE_NAME}" "${HOME_IMAGE_NAME}"; do
             image="${ALIYUN_REGISTRY}/${image_name}:${version}"
-            manifest="$(docker buildx imagetools inspect --raw "${image}")"
+            # Resolve through .Image rather than the raw manifest. A
+            # single-platform push is a plain image manifest: it has no
+            # .manifests array for the old jq to walk, and carries no
+            # architecture of its own — that lives in the config blob. So
+            # the previous check failed every amd64-only build, which is
+            # every build since arm64 was dropped. .Image is the resolved
+            # config for a lone platform and a map of them for a manifest
+            # list, and the recursive match below reads both.
+            resolved="$(docker buildx imagetools inspect --format '{{json .Image}}' "${image}")"
             for arch in amd64; do
-              if ! printf '%s' "${manifest}" | jq -e --arg arch "${arch}" \
-                'any(.manifests[]?; .platform.os == "linux" and .platform.architecture == $arch)' \
+              if ! printf '%s' "${resolved}" | jq -e --arg arch "${arch}" \
+                'any(..|objects|select(has("architecture") and has("os"));
+                     .os == "linux" and .architecture == $arch)' \
                 >/dev/null; then
-                echo "Missing linux/${arch} manifest in ${image}" >&2
+                echo "Missing linux/${arch} in ${image}" >&2
                 exit 1
               fi
             done

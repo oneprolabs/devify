@@ -25,15 +25,18 @@ was introduced.
 git clone --filter=blob:none --sparse \
     https://github.com/oneprolabs/devify.git devify-deploy
 cd devify-deploy
-git sparse-checkout set --cone deploy
+git sparse-checkout init --cone
+git sparse-checkout set deploy
 
 cp deploy/env.sample .env
 vim .env
 ./deploy/scripts/devify-deploy.sh install
 ```
 
-`--cone` is passed explicitly because it is not the default for
-`sparse-checkout set` before git 2.37.
+`init --cone` comes first because git only learned `--cone` on
+`sparse-checkout set` in 2.36. Before that — production runs 2.34 — the flag
+is taken as a literal path pattern, which lands the checkout in non-cone mode
+and deletes the root files, `docker-compose.yml` included.
 
 ### Narrowing an existing deploy root
 
@@ -41,7 +44,8 @@ A deploy root cloned in full needs no re-clone — the runtime state stays put:
 
 ```bash
 cd /path/to/deploy/root
-git sparse-checkout set --cone deploy
+git sparse-checkout init --cone
+git sparse-checkout set deploy
 ```
 
 The script will:

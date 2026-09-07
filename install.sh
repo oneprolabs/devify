@@ -1142,7 +1142,14 @@ verify_app_image_platform() {
     linux/arm64|linux/arm64/*) target_arch="arm64" ;;
   esac
 
-  if ! manifest="$(docker manifest inspect "${img}" 2>>"${LOG_FILE:-/dev/null}")"; then
+  # --verbose, not the plain form. A single-platform release is pushed as
+  # a bare image manifest, which carries no architecture or os of its own —
+  # those live in the config blob — so the plain output has nothing for the
+  # scan below to match and every install aborted claiming the image had no
+  # linux image for this host. Every release since arm64 was dropped is
+  # single-platform. --verbose reports a platform block for both shapes.
+  if ! manifest="$(docker manifest inspect --verbose "${img}" \
+      2>>"${LOG_FILE:-/dev/null}")"; then
     log_warn "could not inspect the platform manifest for ${img}; continuing with normal pull retries"
     return 0
   fi

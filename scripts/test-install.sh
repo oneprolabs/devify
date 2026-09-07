@@ -320,6 +320,50 @@ fi
 unset DOCKER_DEFAULT_PLATFORM
 unset -f docker
 
+# The fixture above is a manifest list, which is why these checks stayed
+# green while every install aborted: since arm64 was dropped, releases are
+# pushed as a bare image manifest that carries no architecture at all. This
+# stub answers with the real shapes — the plain form has nothing to match,
+# the --verbose form reports the platform — so a regression to the plain
+# form fails here instead of in front of whoever is installing.
+docker() {
+  local arg verbose=0
+  for arg in "$@"; do
+    [[ "${arg}" == "--verbose" ]] && verbose=1
+  done
+  if [[ "${verbose}" == "1" ]]; then
+    printf '%s\n' '{"Ref":"registry.example/devify:1.5.3","Descriptor":{"mediaType":"application/vnd.oci.image.manifest.v1+json","platform":{"architecture":"amd64","os":"linux"}}}'
+  else
+    printf '%s\n' '{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"digest":"sha256:abc"},"layers":[{"digest":"sha256:def"}]}'
+  fi
+}
+APP_NAME="devify"
+ARCH="amd64"
+DOCKER_DEFAULT_PLATFORM=""
+LOG_FILE=""
+# Command substitution, not a direct call: verify_app_image_platform ends
+# in abort, which exits, and a direct call would take this whole suite with
+# it instead of reporting a failure.
+single_out="$(verify_app_image_platform "registry.example/devify:1.5.3" 2>&1)"
+single_rc=$?
+if [[ "${single_rc}" == "0" ]]; then
+  ok "single-platform release passes the manifest preflight"
+else
+  fail "single-platform release was rejected, so the preflight is not reading --verbose: ${single_out}"
+fi
+ARCH="arm64"
+single_out="$(verify_app_image_platform "registry.example/devify:1.5.3" 2>&1)"
+single_rc=$?
+if [[ "${single_rc}" == "1" ]] && printf '%s\n' "${single_out}" \
+    | grep -Fq "does not provide a linux/arm64 image"; then
+  ok "single-platform release is still rejected for the wrong architecture"
+else
+  fail "single-platform release was accepted for arm64: ${single_out}"
+fi
+ARCH="amd64"
+unset DOCKER_DEFAULT_PLATFORM
+unset -f docker
+
 section "run_compose (Windows path conversion)"
 if [[ "${PLATFORM}" == "windows" ]]; then
   COMPOSE_CMD=(echo)

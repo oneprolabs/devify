@@ -7,6 +7,7 @@ Provides monitoring and metrics functionality for email tasks.
 import logging
 from datetime import timedelta
 from typing import Dict, List, Optional
+from django.conf import settings
 from django.utils import timezone
 from django.db.models import Count, Q, Avg
 from django.core.cache import cache

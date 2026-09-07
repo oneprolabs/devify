@@ -33,6 +33,34 @@ DEVIFY_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify"
 DEVIFY_UI_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify-ui"
 DEVIFY_HOME_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify-home"
 
+# The deploy host runs images, not source. It needs the compose files, the
+# nginx/haraka/mysql config those files bind-mount, and this deploy tree —
+# not devify/, ui/ or home/, which exist only to build the images. Cone-mode
+# sparse checkout always keeps the root files, so the compose YAMLs come
+# along; these are the directories on top of them.
+CORE_SPARSE_DIRS="docker deploy"
+
+# Every path the deploy reads out of CORE_DIR: the files this script opens
+# and the bind-mount sources in the three compose files. Checked after each
+# sync so a wrong CORE_SPARSE_DIRS fails here, naming the file, instead of
+# somewhere later in a container that will not start.
+CORE_REQUIRED_PATHS="
+docker-compose.yml
+docker-compose.bluegreen.yml
+deploy/docker-compose.yml
+deploy/docker/nginx/aimychats.com.conf
+docker/nginx/default.conf
+docker/nginx/bluegreen/default.conf
+docker/nginx/bluegreen/active-upstream.conf.default
+docker/haraka/config/host_list.prod
+docker/haraka/config/plugins.prod
+docker/haraka/config/redis.ini
+docker/haraka/config/tls.ini
+docker/haraka/plugins/raw_email_saver.js
+docker/mysql/etc/my.cnf
+docker/mysql/initdb.d
+"
+
 # Single-flight lock so two mutating runs (a CI retry overlapping a manual run,
 # two operators) can't race on .active_color, the colored containers, or the
 # nginx switch. `set -o noclobber` makes creation atomic; after MAX_WAIT we take
@@ -128,10 +156,19 @@ sync_devify() {
     fi
     if [ ! -d "${CORE_DIR}/.git" ]; then
         rm -rf "${CORE_DIR}"
-        git clone "${DEVIFY_REPO}" "${CORE_DIR}"
+        # blob:none fetches file contents on demand; --sparse starts the
+        # working tree at the root files only.
+        git clone --filter=blob:none --sparse \
+            "${DEVIFY_REPO}" "${CORE_DIR}"
     else
         git -C "${CORE_DIR}" remote set-url origin "${DEVIFY_REPO}"
     fi
+
+    # Idempotent: narrows a full checkout made before this existed, and
+    # re-asserts the set afterwards. --cone is explicit because it is not
+    # the default for `set` before git 2.37.
+    # shellcheck disable=SC2086
+    git -C "${CORE_DIR}" sparse-checkout set --cone ${CORE_SPARSE_DIRS}
 
     git -C "${CORE_DIR}" fetch --tags --force origin
     if git -C "${CORE_DIR}" rev-parse --verify --quiet "origin/${DEVIFY_REF}" >/dev/null; then
@@ -139,6 +176,27 @@ sync_devify() {
     else
         git -C "${CORE_DIR}" checkout --force "${DEVIFY_REF}"
     fi
+
+    verify_core_files
+}
+
+# Guard the sparse set: a directory dropped from CORE_SPARSE_DIRS, or a new
+# bind mount added to a compose file without listing it here, would
+# otherwise surface as a container refusing to start on a bind-mount error.
+verify_core_files() {
+    local path missing=""
+    for path in ${CORE_REQUIRED_PATHS}; do
+        [ -e "${CORE_DIR}/${path}" ] || missing="${missing}    ${path}
+"
+    done
+    [ -z "${missing}" ] && return 0
+    die "The deploy checkout is missing files it needs:
+${missing}  Likely cause: CORE_SPARSE_DIRS (\"${CORE_SPARSE_DIRS}\") no longer covers
+    every path the compose files mount, or a mount was added without
+    listing it in CORE_REQUIRED_PATHS.
+  Try: add the directory to CORE_SPARSE_DIRS in this script, or run
+    git -C ${CORE_DIR} sparse-checkout disable
+    for a full checkout while you sort it out."
 }
 
 prepare_directories() {

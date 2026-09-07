@@ -228,7 +228,7 @@ Requirements:
 
 - Docker with Compose (Docker Desktop is supported on macOS and Windows)
 - Linux: Ubuntu, Debian, Rocky, Alma, or CentOS; Windows: Git Bash
-- `amd64` or `arm64` CPU architecture
+- `amd64` CPU architecture (published images are amd64 only for now)
 - At least 2 GB available memory and 5 GB free disk space (4 GB RAM and 20 GB
   disk are recommended)
 

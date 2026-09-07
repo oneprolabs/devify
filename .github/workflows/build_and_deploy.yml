@@ -63,7 +63,12 @@ jobs:
             USE_MIRROR=false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+          # arm64 is off for now: it is built under QEMU on an x86
+          # runner, where the UI image's `npm ci` has hung for hours
+          # at a time, and no host we deploy to is arm64. Add it back
+          # here — and to the verification below — when the release
+          # needs it, ideally on a native arm runner rather than QEMU.
+          platforms: linux/amd64
           # Aliyun ACR rejects the OCI `empty.v1+json` media type that
           # buildx uses for provenance and SBOM attestations. The image
           # itself pushes fine and then the attestation is denied,
@@ -100,7 +105,12 @@ jobs:
             VITE_SENTRY_RELEASE=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+          # arm64 is off for now: it is built under QEMU on an x86
+          # runner, where the UI image's `npm ci` has hung for hours
+          # at a time, and no host we deploy to is arm64. Add it back
+          # here — and to the verification below — when the release
+          # needs it, ideally on a native arm runner rather than QEMU.
+          platforms: linux/amd64
           # Aliyun ACR rejects the OCI `empty.v1+json` media type that
           # buildx uses for provenance and SBOM attestations. The image
           # itself pushes fine and then the attestation is denied,
@@ -118,7 +128,7 @@ jobs:
           for image_name in "${IMAGE_NAME}" "${UI_IMAGE_NAME}"; do
             image="${ALIYUN_REGISTRY}/${image_name}:${version}"
             manifest="$(docker buildx imagetools inspect --raw "${image}")"
-            for arch in amd64 arm64; do
+            for arch in amd64; do
               if ! printf '%s' "${manifest}" | jq -e --arg arch "${arch}" \
                 'any(.manifests[]?; .platform.os == "linux" and .platform.architecture == $arch)' \
                 >/dev/null; then
@@ -126,7 +136,7 @@ jobs:
                 exit 1
               fi
             done
-            echo "Verified linux/amd64 and linux/arm64 manifests in ${image}"
+            echo "Verified the linux/amd64 manifest in ${image}"
           done
 
       # Auto-deploy gate: the image build/push above always runs on a tag, but

@@ -165,10 +165,30 @@ sync_devify() {
     fi
 
     # Idempotent: narrows a full checkout made before this existed, and
-    # re-asserts the set afterwards. --cone is explicit because it is not
-    # the default for `set` before git 2.37.
+    # re-asserts the set afterwards.
+    #
+    # `init --cone` before `set`, not `set --cone`: git only learned the
+    # --cone flag on `set` in 2.36, and production runs 2.34, where it is
+    # silently taken as a literal path pattern. That lands in non-cone
+    # mode, where a bare "docker" matches any directory of that name at any
+    # depth — ui/docker and home/docker survive — while the root files
+    # match nothing and get removed, taking docker-compose.yml with them.
+    git -C "${CORE_DIR}" sparse-checkout init --cone
     # shellcheck disable=SC2086
-    git -C "${CORE_DIR}" sparse-checkout set --cone ${CORE_SPARSE_DIRS}
+    git -C "${CORE_DIR}" sparse-checkout set ${CORE_SPARSE_DIRS}
+    # Assert the mode rather than trust it. Without this, a git that took
+    # --cone as a pattern fails later in verify_core_files, which blames
+    # CORE_SPARSE_DIRS for a checkout that is simply in the wrong mode.
+    if [ "$(git -C "${CORE_DIR}" config core.sparseCheckoutCone)" != "true" ]; then
+        die "Sparse checkout of ${CORE_DIR} is not in cone mode.
+  Likely cause: this git ($(git --version)) did not accept \`sparse-checkout
+    init --cone\`. Outside cone mode the entries are gitignore patterns, so
+    \"docker\" matches any directory of that name at any depth and the root
+    files match nothing at all — docker-compose.yml would be deleted.
+  Try: upgrade git to 2.25 or newer, or run
+    git -C ${CORE_DIR} sparse-checkout disable
+    to fall back to a full checkout."
+    fi
 
     git -C "${CORE_DIR}" fetch --tags --force origin
     if git -C "${CORE_DIR}" rev-parse --verify --quiet "origin/${DEVIFY_REF}" >/dev/null; then

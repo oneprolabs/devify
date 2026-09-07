@@ -15,6 +15,7 @@ env:
   ALIYUN_REGISTRY: registry.cn-beijing.aliyuncs.com/oneprolabs
   IMAGE_NAME: ${{ vars.IMAGE_NAME }}
   UI_IMAGE_NAME: devify-ui
+  HOME_IMAGE_NAME: devify-home
   VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
   VITE_EMAIL_DOMAIN: ${{ vars.VITE_EMAIL_DOMAIN }}
   VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
@@ -119,13 +120,46 @@ jobs:
           provenance: false
           sbom: false
 
+      - name: Extract metadata for homepage image
+        id: home-meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ env.ALIYUN_REGISTRY }}/${{ env.HOME_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      # The homepage used to live in its own repository and release on its
+      # own tags. It builds here now so that one tag produces the api, ui
+      # and homepage images together and a rollback moves all three back to
+      # the same version. Its Dockerfile copies with paths relative to the
+      # site root, so the context is home/ rather than the repository root.
+      - name: Build and push homepage image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./home
+          file: ./home/Dockerfile
+          push: true
+          tags: ${{ steps.home-meta.outputs.tags }}
+          labels: ${{ steps.home-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          # See the backend image above: Aliyun ACR rejects buildx
+          # attestations, so they are turned off here too.
+          provenance: false
+          sbom: false
+
       - name: Verify published image platforms
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           version="${RELEASE_VERSION#v}"
-          for image_name in "${IMAGE_NAME}" "${UI_IMAGE_NAME}"; do
+          for image_name in "${IMAGE_NAME}" "${UI_IMAGE_NAME}" "${HOME_IMAGE_NAME}"; do
             image="${ALIYUN_REGISTRY}/${image_name}:${version}"
             manifest="$(docker buildx imagetools inspect --raw "${image}")"
             for arch in amd64; do
@@ -169,3 +203,51 @@ jobs:
             cd ~/devify-deploy
             DEVIFY_REF=${{ github.ref_name }} ./scripts/devify-deploy.sh upgrade
             docker system prune -f
+
+  # Docker Hub is a convenience mirror, mainly for installs outside China
+  # that would otherwise pull from Aliyun ACR. It is deliberately a separate
+  # job that copies the already-published manifests rather than a second
+  # push target on the build steps: an expired Docker Hub token then fails
+  # this job alone, and never a production release. It also costs no build
+  # time, since imagetools copies the manifest instead of rebuilding.
+  mirror-to-dockerhub:
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    if: ${{ vars.DOCKERHUB_NAMESPACE != '' }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Aliyun ACR oneprolabs
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-beijing.aliyuncs.com
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Copy release images to Docker Hub
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_VERSION#v}"
+          major_minor="${version%.*}"
+          major="${version%%.*}"
+          for image_name in "${IMAGE_NAME}" "${UI_IMAGE_NAME}" "${HOME_IMAGE_NAME}"; do
+            source="${ALIYUN_REGISTRY}/${image_name}:${version}"
+            target="docker.io/${DOCKERHUB_NAMESPACE}/${image_name}"
+            docker buildx imagetools create \
+              -t "${target}:${version}" \
+              -t "${target}:${major_minor}" \
+              -t "${target}:${major}" \
+              -t "${target}:latest" \
+              "${source}"
+            echo "Mirrored ${source} to ${target}"
+          done

@@ -127,7 +127,7 @@ CSRF_TRUSTED_ORIGINS='https://app.aimychats.com'
 
 ```bash
 cd /home/ubuntu/workspace/devify_workspace/devify-deploy
-./scripts/devify-deploy.sh restart devify-api devify-worker
+./deploy/scripts/devify-deploy.sh restart devify-api devify-worker
 ```
 
 ### 5. 验证配置是否生效
@@ -220,7 +220,7 @@ USE_X_FORWARDED_HOST: True
 
 ```bash
 cd /root/devify-deploy
-./scripts/devify-deploy.sh restart devify-api devify-worker
+./deploy/scripts/devify-deploy.sh restart devify-api devify-worker
 ```
 
 #### 步骤 4：验证 OAuth URL

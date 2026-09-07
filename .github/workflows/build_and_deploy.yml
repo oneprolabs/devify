@@ -210,7 +210,7 @@ jobs:
           script: |
             set -e
             cd ~/devify-deploy
-            DEVIFY_REF=${{ github.ref_name }} ./scripts/devify-deploy.sh upgrade
+            DEVIFY_REF=${{ github.ref_name }} ./deploy/scripts/devify-deploy.sh upgrade
             docker system prune -f
 
   # Docker Hub is a convenience mirror, mainly for installs outside China

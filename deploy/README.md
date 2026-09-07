@@ -22,7 +22,7 @@ git clone https://github.com/cloud2ai/devify-deploy.git
 cd devify-deploy
 cp env.sample .env
 vim .env
-./scripts/devify-deploy.sh install
+./deploy/scripts/devify-deploy.sh install
 ```
 
 The script will:
@@ -37,38 +37,38 @@ The script will:
 ```bash
 cd devify-deploy
 git pull
-./scripts/devify-deploy.sh upgrade
+./deploy/scripts/devify-deploy.sh upgrade
 ```
 
 Deploy a specific `devify` version:
 
 ```bash
-DEVIFY_REF=v1.0.3 ./scripts/devify-deploy.sh upgrade
+DEVIFY_REF=v1.0.3 ./deploy/scripts/devify-deploy.sh upgrade
 ```
 
 Use a custom `devify` repository:
 
 ```bash
-DEVIFY_REPO=https://github.com/cloud2ai/devify.git DEVIFY_REF=main \
-  ./scripts/devify-deploy.sh upgrade
+DEVIFY_REPO=https://github.com/oneprolabs/devify.git DEVIFY_REF=main \
+  ./deploy/scripts/devify-deploy.sh upgrade
 ```
 
 ## Operations
 
 ```bash
-./scripts/devify-deploy.sh status
-./scripts/devify-deploy.sh logs
-./scripts/devify-deploy.sh logs devify-api
-./scripts/devify-deploy.sh restart
-./scripts/devify-deploy.sh stop
-./scripts/devify-deploy.sh start
-./scripts/devify-deploy.sh config
+./deploy/scripts/devify-deploy.sh status
+./deploy/scripts/devify-deploy.sh logs
+./deploy/scripts/devify-deploy.sh logs devify-api
+./deploy/scripts/devify-deploy.sh restart
+./deploy/scripts/devify-deploy.sh stop
+./deploy/scripts/devify-deploy.sh start
+./deploy/scripts/devify-deploy.sh config
 ```
 
 Update `devify`, `devify-deploy/docker-compose.yml`, or `.env`, then rerun:
 
 ```bash
-./scripts/devify-deploy.sh config
+./deploy/scripts/devify-deploy.sh config
 ```
 
 ## Ports

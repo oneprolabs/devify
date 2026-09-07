@@ -5,20 +5,20 @@
 Use `devify-deploy.sh` for install, upgrade, and daily operations:
 
 ```bash
-./scripts/devify-deploy.sh install
-./scripts/devify-deploy.sh upgrade
-./scripts/devify-deploy.sh status
-./scripts/devify-deploy.sh logs
-./scripts/devify-deploy.sh restart
-./scripts/devify-deploy.sh config
+./deploy/scripts/devify-deploy.sh install
+./deploy/scripts/devify-deploy.sh upgrade
+./deploy/scripts/devify-deploy.sh status
+./deploy/scripts/devify-deploy.sh logs
+./deploy/scripts/devify-deploy.sh restart
+./deploy/scripts/devify-deploy.sh config
 ```
 
 Environment overrides:
 
 ```bash
-DEVIFY_REF=v1.0.3 ./scripts/devify-deploy.sh upgrade
-DEVIFY_REPO=https://github.com/cloud2ai/devify.git ./scripts/devify-deploy.sh install
-COMPOSE_PROJECT_NAME=devify ./scripts/devify-deploy.sh status
+DEVIFY_REF=v1.0.3 ./deploy/scripts/devify-deploy.sh upgrade
+DEVIFY_REPO=https://github.com/oneprolabs/devify.git ./deploy/scripts/devify-deploy.sh install
+COMPOSE_PROJECT_NAME=devify ./deploy/scripts/devify-deploy.sh status
 ```
 
 ## Nginx Certificates

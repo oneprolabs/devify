@@ -221,6 +221,23 @@ if [[ "${amd64_builds}" == "3" ]]; then
 else
   fail "release workflow has ${amd64_builds} amd64 build(s), expected 3"
 fi
+# The deploy step SSHes to production and runs this path there. When the
+# orchestrator moved into deploy/ the workflow kept calling ./scripts/, and
+# the release failed with exit 127 after every image had already pushed —
+# there is no earlier signal, because nothing else reads the path. Assert
+# that whatever the workflow invokes actually exists in this tree.
+deploy_script="$(grep -oE '\./[A-Za-z0-9_./-]*devify-deploy\.sh' \
+  .github/workflows/build_and_deploy.yml | sort -u | head -n 1)"
+if [[ -z "${deploy_script}" ]]; then
+  fail "release workflow names no devify-deploy.sh path"
+elif [[ "$(grep -oE '\./[A-Za-z0-9_./-]*devify-deploy\.sh' \
+    .github/workflows/build_and_deploy.yml | sort -u | wc -l)" != "1" ]]; then
+  fail "release workflow names more than one devify-deploy.sh path"
+elif [[ -x "${deploy_script#./}" ]]; then
+  ok "release workflow invokes ${deploy_script}, which exists and is executable"
+else
+  fail "release workflow invokes ${deploy_script}, which is missing or not executable"
+fi
 if grep -Fq "Verify published image platforms" .github/workflows/build_and_deploy.yml; then
   ok "release workflow verifies published image platforms"
 else

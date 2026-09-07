@@ -48,7 +48,7 @@ Consequences that shape this runbook:
    ```
 4. Validate the merged compose without changing anything (safe, no-op):
    ```bash
-   ./scripts/devify-deploy.sh config      # expect: "Compose configuration is valid."
+   ./deploy/scripts/devify-deploy.sh config      # expect: "Compose configuration is valid."
    ```
 5. **Keep CI auto-deploy OFF during the transition.** In the devify repo's
    GitHub → Settings → Variables, leave `DEVIFY_AUTO_DEPLOY` unset (or `false`).
@@ -69,7 +69,7 @@ Do this in a low-traffic / maintenance window and, if possible, put NPM into
 maintenance or expect a brief 502.
 
 ```bash
-DEVIFY_REF=v<VERSION> ./scripts/devify-deploy.sh upgrade
+DEVIFY_REF=v<VERSION> ./deploy/scripts/devify-deploy.sh upgrade
 ```
 Expected log sequence: single-flight lock acquired → first-install detected
 (no color running) → migrate (no-op if already applied) → start **blue** →
@@ -86,7 +86,7 @@ is just the nginx container restart.
 ## 2. Verify
 
 ```bash
-./scripts/devify-deploy.sh status                          # active=blue, healthy
+./deploy/scripts/devify-deploy.sh status                          # active=blue, healthy
 curl -fsS -o /dev/null -w '%{http_code}\n' https://app.aimychats.com/swagger  # backend/color -> 200
 curl -fsS https://aimychats.com/                           # devify-home still served
 ```
@@ -105,7 +105,7 @@ nginx *reload*, not a recreate — invisible to NPM). Trigger via a normal tag
 release (CI runs `devify-deploy.sh upgrade`) or manually:
 
 ```bash
-DEVIFY_REF=v<NEXT_VERSION> ./scripts/devify-deploy.sh upgrade
+DEVIFY_REF=v<NEXT_VERSION> ./deploy/scripts/devify-deploy.sh upgrade
 ```
 While it runs, from another shell hit a **backend** route (so the loop actually
 exercises the color switch, not just the edge) and expect **zero** non-200s:
@@ -116,9 +116,9 @@ while :; do curl -fsS -o /dev/null https://app.aimychats.com/swagger \
 After it lands, drill rollback — must return to the previous version without a
 rebuild, using the pinned `.rollback_version`:
 ```bash
-./scripts/devify-deploy.sh status                          # active=green
-./scripts/devify-deploy.sh rollback                        # -> blue, pinned version
-./scripts/devify-deploy.sh status                          # active=blue
+./deploy/scripts/devify-deploy.sh status                          # active=green
+./deploy/scripts/devify-deploy.sh rollback                        # -> blue, pinned version
+./deploy/scripts/devify-deploy.sh status                          # active=blue
 ```
 Roll forward again when satisfied.
 
@@ -128,7 +128,7 @@ Roll forward again when satisfied.
   GitHub Variables.
 - Releases: push a `v*` tag; CI builds/pushes images and runs
   `devify-deploy.sh upgrade` = a health-gated zero-downtime switch (reload).
-- Rollback anytime: `./scripts/devify-deploy.sh rollback` (seconds, no rebuild).
+- Rollback anytime: `./deploy/scripts/devify-deploy.sh rollback` (seconds, no rebuild).
 - Runtime state on the host (git-ignored): `.active_color`, `.rollback_version`,
   `data/nginx/conf.d/active-upstream.conf`.
 
@@ -140,7 +140,7 @@ and image pull. Use it to deploy a locally-built hotfix or when the registry is
 unreachable:
 
 ```bash
-DEVIFY_REF=v<VERSION> ./scripts/devify-deploy.sh upgrade --local
+DEVIFY_REF=v<VERSION> ./deploy/scripts/devify-deploy.sh upgrade --local
 ```
 It is a **real deploy** (migrate → start idle color → health-gate → switch →
 retire), not a no-op — the only difference from a normal upgrade is where the

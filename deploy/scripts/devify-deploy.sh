@@ -412,7 +412,7 @@ update_home() {
 
 show_usage() {
     cat <<'USAGE'
-Usage: ./scripts/devify-deploy.sh <command> [--local] [args]
+Usage: ./deploy/scripts/devify-deploy.sh <command> [--local] [args]
 
 Commands:
   install      Install the full stack (blue/green) with devify-home
@@ -426,8 +426,8 @@ Commands:
   restart      Restart the deployment stack
   logs         Show logs; extra args are passed to docker compose logs
   manage       Run a Django management command in the devify-api container
-               e.g. ./scripts/devify-deploy.sh manage migrate
-               e.g. ./scripts/devify-deploy.sh manage verify_webhook
+               e.g. ./deploy/scripts/devify-deploy.sh manage migrate
+               e.g. ./deploy/scripts/devify-deploy.sh manage verify_webhook
   config       Sync devify files and validate the composed deployment config
 
 Flags:
@@ -438,7 +438,7 @@ Flags:
                present image tag).
 
 Environment:
-  DEVIFY_REPO             Git repository to sync; default https://github.com/cloud2ai/devify.git
+  DEVIFY_REPO             Git repository to sync; default https://github.com/oneprolabs/devify.git
   DEVIFY_REF              Branch, tag, or commit to deploy; default main
   DEVIFY_IMAGE_TAG        Override the image tag (else derived from DEVIFY_REF)
   COMPOSE_PROJECT_NAME    Compose project name; default devify

@@ -11,7 +11,7 @@ x-logging: &default-logging
 
 services:
   devify-api:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/devify:latest
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:latest
     container_name: devify-api
     restart: unless-stopped
     logging: *default-logging
@@ -47,7 +47,7 @@ services:
       start_period: 60s
 
   devify-worker:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/devify:latest
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:latest
     container_name: devify-worker
     restart: unless-stopped
     stop_grace_period: 60s
@@ -72,7 +72,7 @@ services:
     command: celery
 
   devify-scheduler:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/devify:latest
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:latest
     container_name: devify-scheduler
     restart: unless-stopped
     stop_grace_period: 30s
@@ -93,7 +93,7 @@ services:
     command: celery-beat
 
   devify-ui:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/devify-ui:latest
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify-ui:latest
     build:
       context: ./ui
       dockerfile: Dockerfile
@@ -118,7 +118,7 @@ services:
 
   # Recommend to use nginx proxy manager to manage the outside access
   nginx:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/nginx:latest
+    image: ${DEVIFY_NGINX_IMAGE:-nginx:latest}
     container_name: devify-nginx
     restart: unless-stopped
     logging: *default-logging
@@ -147,7 +147,7 @@ services:
       start_period: 30s
 
   mysql:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/mariadb:11.6
+    image: ${DEVIFY_MYSQL_IMAGE:-mariadb:11.6}
     container_name: devify-mariadb
     restart: unless-stopped
     logging: *default-logging
@@ -168,7 +168,7 @@ services:
       start_period: 30s
 
   redis:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/redis:alpine
+    image: ${DEVIFY_REDIS_IMAGE:-redis:alpine}
     container_name: devify-redis
     restart: unless-stopped
     logging: *default-logging
@@ -186,7 +186,7 @@ services:
       start_period: 10s
 
   haraka:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/haraka:latest
+    image: ${DEVIFY_HARAKA_IMAGE:-instrumentisto/haraka:latest}
     container_name: devify-haraka
     restart: unless-stopped
     logging: *default-logging

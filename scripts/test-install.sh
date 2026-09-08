@@ -238,6 +238,22 @@ elif [[ -x "${deploy_script#./}" ]]; then
 else
   fail "release workflow invokes ${deploy_script}, which is missing or not executable"
 fi
+# Every image reference must stay interpolable. A hardcoded registry in a
+# compose file cannot be redirected by channel, and that is how the four
+# middleware images ended up pinned to ACR for every install, including the
+# ones that had chosen the github channel.
+hardcoded_registry=0
+for compose_file in docker-compose.yml docker-compose.bluegreen.yml \
+    deploy/docker-compose.yml; do
+  if grep -E "^[[:space:]]*image:[[:space:]]*registry\." "${compose_file}" \
+      >/dev/null 2>&1; then
+    fail "${compose_file} hardcodes a registry in an image reference"
+    hardcoded_registry=1
+  fi
+done
+if [[ "${hardcoded_registry}" == "0" ]]; then
+  ok "compose files leave every image reference interpolable"
+fi
 if grep -Fq "Verify published image platforms" .github/workflows/build_and_deploy.yml; then
   ok "release workflow verifies published image platforms"
 else

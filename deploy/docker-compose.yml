@@ -10,7 +10,7 @@ x-logging: &default-logging
 
 services:
   devify-home:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/devify-home:${DEVIFY_IMAGE_TAG:-latest}
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify-home:${DEVIFY_IMAGE_TAG:-latest}
     container_name: devify-home
     restart: unless-stopped
     logging: *default-logging

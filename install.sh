@@ -36,7 +36,11 @@ DEFAULT_HTTP_PORT=8080
 DEFAULT_HTTPS_PORT=10443
 DEFAULT_ADMIN_PORT=19443
 DEFAULT_SMTP_PORT=25
-REGISTRY_GITHUB="registry.cn-beijing.aliyuncs.com/oneprolabs"
+# Our own images live under the same namespace in both registries, so the
+# channel only swaps the prefix. The middleware images do not: Docker Hub
+# serves them from their own upstream paths, and only the ACR namespace
+# carries copies of them. See registry_channel_env below.
+REGISTRY_GITHUB="docker.io/oneprolabs"
 REGISTRY_CN="registry.cn-beijing.aliyuncs.com/oneprolabs"
 INSTALLER_VERSION="0.2.1"
 HEALTH_TIMEOUT=120
@@ -878,6 +882,23 @@ ensure_env_key() {
   fi
 }
 
+# Compose defaults every image to its public path — docker.io/oneprolabs for
+# ours, the upstream project for each middleware image. The cn channel points
+# them all at the ACR namespace, which is the only one carrying copies of the
+# middleware. Written as .env keys rather than patched into the compose file
+# so the reference stays readable and a reinstall can see what it chose.
+registry_channel_env() {
+  local env_file="${INSTALL_DIR}/.env"
+  [[ -f "${env_file}" ]] || return 0
+  ensure_env_key "${env_file}" "DEVIFY_REGISTRY" "${REGISTRY}"
+  if [[ "${CHANNEL}" == "cn" ]]; then
+    ensure_env_key "${env_file}" "DEVIFY_NGINX_IMAGE"  "${REGISTRY_CN}/nginx:latest"
+    ensure_env_key "${env_file}" "DEVIFY_MYSQL_IMAGE"  "${REGISTRY_CN}/mariadb:11.6"
+    ensure_env_key "${env_file}" "DEVIFY_REDIS_IMAGE"  "${REGISTRY_CN}/redis:alpine"
+    ensure_env_key "${env_file}" "DEVIFY_HARAKA_IMAGE" "${REGISTRY_CN}/haraka:latest"
+  fi
+}
+
 generate_env() {
   log_step "Generating configuration"
   local env_file="${INSTALL_DIR}/.env"
@@ -996,8 +1017,9 @@ patch_compose() {
   local haraka_ini="${INSTALL_DIR}/docker/haraka/config/redis.ini"
   local host_list="${INSTALL_DIR}/docker/haraka/config/host_list.prod"
 
-  # registry: cn ACR image refs -> channel registry
-  sed_inplace "${compose}" -E "s|(image:[[:space:]]*)registry\.cn-beijing\.aliyuncs\.com/oneprolabs/(${APP_NAME}(-ui)?)|\1${REGISTRY}/\2|g"
+  # The registry is no longer rewritten here: compose interpolates
+  # DEVIFY_REGISTRY and the four middleware image variables from .env, which
+  # registry_channel_env writes. Only the tag pin below is still textual.
   # pin version-consistent image tags
   sed_inplace "${compose}" -E "s|(image:[[:space:]]*[^ ]+/${APP_NAME}(-ui)?):latest|\1:${IMAGE_TAG}|g"
   # redis authentication
@@ -1431,6 +1453,7 @@ main() {
   fi
   fetch_release_files
   generate_env
+  registry_channel_env
   patch_compose
   generate_certs
   pull_images

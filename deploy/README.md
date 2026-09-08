@@ -166,3 +166,44 @@ DEVIFY_RUNTIME_ROOT="$(pwd)" .devify/scripts/manage-haraka-certs.sh status
 - `docker-compose.yml`: homepage-only Compose override.
 - `docker/nginx/aimychats.com.conf`: homepage Nginx routing.
 - `env.sample`: production environment template for the whole stack.
+
+## Upgrading MariaDB
+
+The database is a single shared service — blue/green does not cover it, so a
+version change is real downtime. Locally, an in-place 11.6.2 → 11.8.9 upgrade
+was ready in 7 seconds on an empty schema; production carries 2.2 GB, so
+expect tens of seconds rather than minutes.
+
+```bash
+# 1. back up first, and check the backup before going further
+TS=$(date +%Y%m%d-%H%M%S)
+docker exec devify-mariadb sh -c \
+  'exec mariadb-dump -uroot -p"$MYSQL_ROOT_PASSWORD" --all-databases \
+     --single-transaction --routines --events --triggers' \
+  | gzip > /apps/devify/backups/devify-full-$TS.sql.gz
+gzip -t /apps/devify/backups/devify-full-$TS.sql.gz
+
+# 2. point .env at the new image, then deploy
+#    DEVIFY_MYSQL_IMAGE=mariadb:11.8
+#    MARIADB_AUTO_UPGRADE=1
+```
+
+`MARIADB_AUTO_UPGRADE` runs `mariadb-upgrade` **on the system tables only** —
+its own log says so: *"The --upgrade-system-tables option was used, user
+tables won't be touched."* The user tables have to be checked separately, and
+this is the step that is easy to assume happened:
+
+```bash
+docker exec devify-mariadb sh -c \
+  'mariadb-check -uroot -p"$MYSQL_ROOT_PASSWORD" --check-upgrade --all-databases'
+```
+
+Every table must report `OK`. Then confirm the schema still matches the code:
+
+```bash
+docker exec devify-api-blue python manage.py migrate --check   # expect 0
+```
+
+Rolling back means restoring the dump onto the previous image. `mariadb-upgrade`
+rewrites system tables, so the running data directory does not go backwards —
+the backup from step 1 is the only way back.

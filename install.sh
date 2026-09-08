@@ -867,7 +867,11 @@ registry_channel_env() {
   ensure_env_key "${env_file}" "DEVIFY_REGISTRY" "${REGISTRY}"
   if [[ "${CHANNEL}" == "cn" ]]; then
     ensure_env_key "${env_file}" "DEVIFY_NGINX_IMAGE"  "${REGISTRY_CN}/nginx:latest"
-    ensure_env_key "${env_file}" "DEVIFY_MYSQL_IMAGE"  "${REGISTRY_CN}/mariadb:11.6"
+    # Left upstream on purpose: the ACR namespace carries no 11.8 copy, and
+    # its 11.6 one is a series that stopped receiving releases in November
+    # 2024. A pull of mariadb:11.8 from inside China took 33s on the
+    # production host, which is not worth staying on an unmaintained
+    # database for. Point this at ACR once a copy is pushed there.
     ensure_env_key "${env_file}" "DEVIFY_REDIS_IMAGE"  "${REGISTRY_CN}/redis:alpine"
     ensure_env_key "${env_file}" "DEVIFY_HARAKA_IMAGE" "${REGISTRY_CN}/haraka:latest"
   fi

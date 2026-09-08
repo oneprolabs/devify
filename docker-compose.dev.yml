@@ -95,7 +95,7 @@ services:
     command: celery-beat
 
   mysql:
-    image: registry.cn-beijing.aliyuncs.com/oneprolabs/mariadb:11.6
+    image: registry.cn-beijing.aliyuncs.com/oneprolabs/mariadb:11.8
     container_name: devify-mariadb-dev
     restart: unless-stopped
     logging: *default-logging

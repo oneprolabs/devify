@@ -491,6 +491,14 @@ rollback_stack() {
     fi
     switch_traffic "${active}" "${target}"
     echo "${target}" > "${DEPLOY_ROOT}/.active_color"
+
+    # The colored services are only half the deploy. Without this the API
+    # returns to ${rbtag} and the workers keep running the version being
+    # rolled away from, against the same database. DEVIFY_IMAGE_TAG is
+    # already exported above, so this recreates them at ${rbtag} too.
+    log "Rolling devify-worker / devify-scheduler back to ${rbtag}..."
+    compose up -d devify-worker devify-scheduler
+
     log "Rolled back: active color is now ${target}. ${active} left running for inspection."
 }
 

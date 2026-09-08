@@ -71,7 +71,12 @@ services:
     container_name: devify-ui-green
     profiles: ["green"]
 
+  # Pinned like the colored services. The base file leaves these on :latest,
+  # which meant a deploy moved them by whatever :latest happened to be and a
+  # rollback could not move them back at all — the API would return to the
+  # previous version while the workers stayed on the new code.
   devify-worker:
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:${DEVIFY_IMAGE_TAG:-latest}
     depends_on: !override
       mysql:
         condition: service_healthy
@@ -79,6 +84,7 @@ services:
         condition: service_healthy
 
   devify-scheduler:
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:${DEVIFY_IMAGE_TAG:-latest}
     depends_on: !override
       mysql:
         condition: service_healthy

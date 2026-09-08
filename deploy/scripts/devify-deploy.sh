@@ -274,6 +274,25 @@ ensure_nginx_certs() {
             echo "Migrated nginx certificates from docker/nginx/certs to data/certs/nginx."
             return
         fi
+        # Generating is right on a first install and wrong on a running
+        # deployment, where it means real certificates went missing. Say so
+        # rather than quietly serving a self-signed pair: this host sits
+        # behind a reverse proxy that terminates TLS to the outside, so
+        # nothing user-visible changes and nobody would notice until a
+        # client checked the chain. .active_color exists only after a
+        # deploy has run, which is what separates the two cases.
+        if [ -f "${DEPLOY_ROOT}/.active_color" ]; then
+            log "WARNING: no nginx certificates in ${DEPLOY_ROOT}/data/certs/nginx,
+  generating a self-signed pair on a deployment that has run before.
+  Likely cause: the certificates were deleted, the data directory was
+    replaced, or a restore missed data/certs/nginx.
+  Effect: nginx serves a self-signed certificate from now on. The reverse
+    proxy in front terminates TLS for external clients, so this is
+    invisible from outside until something validates the chain.
+  Try: restore the real certificate and key into
+    ${DEPLOY_ROOT}/data/certs/nginx and rerun, before this deploy is
+    treated as healthy."
+        fi
         "${SCRIPT_DIR}/generate-self-signed-certs.sh"
     fi
 }

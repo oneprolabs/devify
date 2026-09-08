@@ -133,8 +133,6 @@ PORTS_FROM_EXISTING=0
 ENV_EXISTS=0
 ENV_REDIS_PASSWORD=""
 ADMIN_PASSWORD=""
-SHA256SUMS_CONTENT=""
-SHA256SUMS_FETCHED=0
 
 # ---------------------------------------------------------------------------
 # Colored logging helpers (INSTALL_SPEC §20)
@@ -778,7 +776,6 @@ download_release_file() {
     -o "${out}" -w '%{http_code}' "${url}" 2>/dev/null || true)"
   if [[ "${code}" == "200" ]] || [[ "${code}" == "404" ]]; then
     LAST_HTTP="${code}"
-    [[ "${code}" == "200" ]] && verify_release_file "${rel}" "${out}"
     return 0
   fi
   # slow/failed from github -> switch the whole run to gitee and retry once
@@ -791,32 +788,9 @@ download_release_file() {
       --speed-limit 409600 --speed-time 15 --max-time 120 \
       -o "${out}" -w '%{http_code}' "${url}" 2>/dev/null || true)"
     LAST_HTTP="${code}"
-    [[ "${code}" == "200" ]] && verify_release_file "${rel}" "${out}"
     return 0
   fi
   LAST_HTTP="${code}"; return 1
-}
-
-# Verify a downloaded release file against the SHA256SUMS manifest published in
-# the tag, when one exists. No manifest (or no entry for the file) -> OK.
-verify_release_file() {
-  local rel="$1" out="$2" line="" expected="" actual="" url=""
-  if [[ -z "${SHA256SUMS_CONTENT}" ]]; then
-    if [[ "${SHA256SUMS_FETCHED}" == "1" ]]; then return 0; fi
-    SHA256SUMS_FETCHED=1
-    url="$(release_raw_url "SHA256SUMS")"
-    SHA256SUMS_CONTENT="$(curl -fsSL --max-time 20 "${url}" 2>/dev/null || true)"
-    [[ -z "${SHA256SUMS_CONTENT}" ]] && return 0
-    log_info "Verifying downloaded files against SHA256SUMS"
-  fi
-  line="$(printf '%s\n' "${SHA256SUMS_CONTENT}" | awk -v r="${rel}" '$2 == r {print; exit}')"
-  [[ -z "${line}" ]] && return 0
-  expected="${line%% *}"
-  actual="$(openssl dgst -sha256 "${out}" 2>/dev/null | awk '{print $NF}' || true)"
-  if [[ "${actual}" != "${expected}" ]]; then
-    rm -f "${out}"
-    abort "checksum mismatch for ${rel}: expected ${expected}, got ${actual:-<empty>}; corrupted download"
-  fi
 }
 
 fetch_release_files() {

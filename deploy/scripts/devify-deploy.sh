@@ -12,6 +12,10 @@ if [ ! -f "${DEPLOY_ROOT}/deploy/scripts/devify-deploy.sh" ]; then
     echo "  Try: run it in place, as <checkout>/deploy/scripts/devify-deploy.sh" >&2
     exit 1
 fi
+# Captured at file scope, where "$@" is still the script's own arguments,
+# so self_update can hand them to the replacement process.
+DEVIFY_ARGV=("$@")
+
 CORE_DIR="${DEPLOY_ROOT}/.devify"
 ENV_FILE="${DEPLOY_ROOT}/.env"
 # The blue/green sample, not the repository-root one: that is the
@@ -408,16 +412,46 @@ install_stack() {
     bluegreen_deploy
 }
 
-upgrade_stack() {
-    acquire_deploy_lock
-    check_requirements
-    ensure_env
-    # Refresh this script from main. The overlay and nginx configs no
-    # longer live here — they come from CORE_DIR at the pinned tag — so
-    # this now updates the orchestrator alone.
-    if [ "${LOCAL_MODE}" != "1" ]; then
-        git -C "${DEPLOY_ROOT}" pull --ff-only origin main || true
+# Refresh this script from main, then hand over to the version that was
+# pulled. Bash defines every function while reading down to the `main` call
+# at the bottom of the file, so a running deploy keeps the functions it
+# parsed at startup: without the exec, a change to this script is skipped by
+# the release that ships it and first runs on the one after. That is not
+# only surprising — it means a release can run an old orchestrator against
+# the new tag's compose files, with nothing to say so.
+#
+# Called before acquire_deploy_lock on purpose. exec does not fire EXIT
+# traps, so exec-ing while holding the lock would leave it behind for the
+# replacement process to wait out.
+self_update() {
+    [ "${LOCAL_MODE}" = "1" ] && return 0
+    [ -n "${DEVIFY_SELF_UPDATED:-}" ] && return 0
+
+    local before after
+    before="$(git -C "${DEPLOY_ROOT}" rev-parse HEAD 2>/dev/null || true)"
+    if ! git -C "${DEPLOY_ROOT}" pull --ff-only origin main; then
+        log "WARNING: could not refresh the orchestrator from main.
+  Likely cause: the deploy host cannot reach the git remote right now, or
+    ${DEPLOY_ROOT} has local commits that are not a fast-forward.
+  Effect: this deploy runs the orchestrator already on disk, which may be
+    older than the tag being deployed.
+  Try: git -C ${DEPLOY_ROOT} pull --ff-only origin main, by hand."
+        return 0
     fi
+    after="$(git -C "${DEPLOY_ROOT}" rev-parse HEAD 2>/dev/null || true)"
+    [ "${before}" = "${after}" ] && return 0
+
+    log "Orchestrator updated ${before:0:7} -> ${after:0:7}; restarting with it"
+    export DEVIFY_SELF_UPDATED=1
+    exec "${DEPLOY_ROOT}/deploy/scripts/devify-deploy.sh" \
+        ${DEVIFY_ARGV[@]+"${DEVIFY_ARGV[@]}"}
+}
+
+upgrade_stack() {
+    check_requirements
+    self_update
+    acquire_deploy_lock
+    ensure_env
     sync_devify
     bluegreen_deploy
 }

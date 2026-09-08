@@ -211,7 +211,15 @@ jobs:
             set -e
             cd ~/devify-deploy
             DEVIFY_REF=${{ github.ref_name }} ./deploy/scripts/devify-deploy.sh upgrade
-            docker system prune -f
+            # Scoped to images this repository publishes. `docker system
+            # prune -f` reaches the whole host, and this host also runs
+            # sourcelens — itself blue/green, so a colour it had stopped for
+            # inspection was a stopped container our deploy would delete.
+            # The deploy's own prune_old_images handles version retention;
+            # this only sweeps the dangling layers a moved :latest leaves,
+            # which that function deliberately skips.
+            docker image prune -f \
+              --filter "label=org.opencontainers.image.source=https://github.com/oneprolabs/devify"
 
   # Docker Hub is a convenience mirror, mainly for installs outside China
   # that would otherwise pull from Aliyun ACR. It is deliberately a separate

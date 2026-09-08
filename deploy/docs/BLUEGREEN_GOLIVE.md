@@ -40,6 +40,8 @@ Consequences that shape this runbook:
 ## 0. Pre-flight (no traffic impact)
 
 1. Merge both PRs: `cloud2ai/devify#18` and `cloud2ai/devify-deploy#1`.
+   (Historical. devify-deploy was merged into this repository as `deploy/`
+   and archived; both links now redirect to the oneprolabs org.)
 2. On the host: `cd ~/devify-deploy && git pull --ff-only origin main`.
 3. Record the current running version (your fallback) and back up MySQL:
    ```bash

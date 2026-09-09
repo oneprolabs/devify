@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 
+from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
@@ -41,6 +42,7 @@ from expense.serializers import (
 from expense.services.config_service import (
     get_app_config,
     get_user_config,
+    get_user_config_for_update,
     set_user_enabled,
 )
 from expense.services.scan_scheduler import sync_scan_periodic_task
@@ -102,19 +104,20 @@ class ExpenseConfigAPIView(APIView):
         return _response(_user_config_payload(config))
 
     def patch(self, request):
-        config = get_user_config(request.user)
         payload = dict(request.data or {})
         enabled = payload.pop("enabled", None)
 
-        if payload:
-            serializer = ExpenseUserConfigSerializer(
-                config, data=payload, partial=True
-            )
-            serializer.is_valid(raise_exception=True)
-            config = serializer.save()
+        with transaction.atomic():
+            config = get_user_config_for_update(request.user)
+            if payload:
+                serializer = ExpenseUserConfigSerializer(
+                    config, data=payload, partial=True
+                )
+                serializer.is_valid(raise_exception=True)
+                config = serializer.save()
 
-        if enabled is not None:
-            config = set_user_enabled(config, bool(enabled))
+            if enabled is not None:
+                config = set_user_enabled(config, bool(enabled))
 
         return _response(_user_config_payload(config))
 
@@ -843,4 +846,3 @@ class ExpenseNamingAPIView(APIView):
             )
         ]
         return _response({"template": template, "preview": preview})
-

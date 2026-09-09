@@ -8,8 +8,8 @@ any mailbox they connect, at the same time.
 import pytest
 from django.conf import settings as django_settings
 
+from expense.models import ExpenseUserConfig
 from threadline.models import EmailAlias, EmailMailbox, Settings
-
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -113,6 +113,28 @@ class TestMailboxAPI:
         assert response.status_code == 201
         assert EmailMailbox.objects.filter(user=user).count() == 1
 
+    def test_connecting_an_invoice_mailbox_enables_expense(
+        self, api_client, django_user_model
+    ):
+        user = django_user_model.objects.create_user("invoice-new", password="x")
+        api_client.force_authenticate(user=user)
+
+        response = api_client.post(
+            LIST_URL,
+            {
+                "imap_host": "imap.example.com",
+                "username": "invoice@example.com",
+                "password": "secret",
+                "invoice_only": True,
+            },
+            format="json",
+        )
+
+        config = ExpenseUserConfig.objects.get(user=user)
+        assert response.status_code == 201
+        assert config.enabled is True
+        assert config.enabled_at is not None
+
     def test_the_password_never_comes_back(
         self, api_client, django_user_model
     ):
@@ -153,6 +175,24 @@ class TestMailboxAPI:
 
         assert mailbox.folder == "Archive"
         assert mailbox.password == "secret"
+
+    def test_setting_an_existing_mailbox_to_invoices_enables_expense(
+        self, api_client, django_user_model
+    ):
+        user = django_user_model.objects.create_user("invoice-edit", password="x")
+        mailbox = make_mailbox(user)
+        api_client.force_authenticate(user=user)
+
+        response = api_client.patch(
+            f"{LIST_URL}/{mailbox.uuid}",
+            {"invoice_only": True},
+            format="json",
+        )
+
+        config = ExpenseUserConfig.objects.get(user=user)
+        assert response.status_code == 200
+        assert config.enabled is True
+        assert config.enabled_at is not None
 
     def test_connecting_a_duplicate_is_refused(
         self, api_client, django_user_model
@@ -217,6 +257,126 @@ class TestMailboxAPI:
         assert (
             api_client.get(f"{LIST_URL}/{mailbox.uuid}").status_code == 404
         )
+
+
+class TestMailboxExpenseConcurrency:
+    @pytest.mark.django_db(transaction=True)
+    def test_disabling_expense_wins_over_a_concurrent_mailbox_edit(
+        self, django_user_model
+    ):
+        from concurrent.futures import ThreadPoolExecutor
+        from queue import Queue
+        from threading import Event, current_thread
+        from unittest.mock import patch
+
+        from django.db import close_old_connections, transaction
+        from django.db.models.query import QuerySet
+        from rest_framework.test import APIClient
+
+        from expense.services.config_service import (
+            get_user_config,
+            set_user_enabled,
+        )
+        from threadline.views import email_mailbox as email_mailbox_views
+        from threadline.views.email_mailbox import EmailMailboxDetailAPIView
+
+        user = django_user_model.objects.create_user(
+            "invoice-race", password="x"
+        )
+        mailbox = make_mailbox(user)
+        mailbox.invoice_only = True
+        mailbox.save(update_fields=["invoice_only"])
+        set_user_enabled(get_user_config(user), True)
+
+        disabling_reached_mailbox = Event()
+        edit_stage = Queue()
+        original_update = QuerySet.update
+        original_get_object = EmailMailboxDetailAPIView._get_object
+        original_get_config_for_update = (
+            email_mailbox_views.get_user_config_for_update
+        )
+
+        def signal_mailbox_update(queryset, **kwargs):
+            if (
+                current_thread().name.startswith("disable-expense")
+                and queryset.model is EmailMailbox
+            ):
+                disabling_reached_mailbox.set()
+            return original_update(queryset, **kwargs)
+
+        def signal_mailbox_read(view, request, uuid, *args, **kwargs):
+            result = original_get_object(view, request, uuid, *args, **kwargs)
+            if current_thread().name.startswith("edit-mailbox"):
+                edit_stage.put("mailbox")
+            return result
+
+        def signal_config_lock(user):
+            if current_thread().name.startswith("edit-mailbox"):
+                edit_stage.put("config")
+            return original_get_config_for_update(user)
+
+        def disable_expense():
+            close_old_connections()
+            try:
+                set_user_enabled(get_user_config(user), False)
+            finally:
+                close_old_connections()
+
+        def rename_mailbox():
+            close_old_connections()
+            try:
+                client = APIClient()
+                client.force_authenticate(user=user)
+                return client.patch(
+                    f"{LIST_URL}/{mailbox.uuid}",
+                    {"name": "Renamed"},
+                    format="json",
+                ).status_code
+            finally:
+                close_old_connections()
+
+        disable_pool = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="disable-expense"
+        )
+        edit_pool = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="edit-mailbox"
+        )
+        try:
+            with (
+                patch.object(QuerySet, "update", new=signal_mailbox_update),
+                patch.object(
+                    EmailMailboxDetailAPIView,
+                    "_get_object",
+                    new=signal_mailbox_read,
+                ),
+                patch.object(
+                    email_mailbox_views,
+                    "get_user_config_for_update",
+                    new=signal_config_lock,
+                ),
+            ):
+                with transaction.atomic():
+                    EmailMailbox.objects.select_for_update().get(pk=mailbox.pk)
+                    disable_future = disable_pool.submit(disable_expense)
+                    assert disabling_reached_mailbox.wait(timeout=5)
+                    edit_future = edit_pool.submit(rename_mailbox)
+                    # Release the row only after the edit has reached its
+                    # first ordering boundary. A regressed endpoint reaches
+                    # the stale mailbox read here; the fixed endpoint reaches
+                    # the Expense config lock first.
+                    assert edit_stage.get(timeout=5) in {"config", "mailbox"}
+
+                disable_future.result(timeout=5)
+                assert edit_future.result(timeout=5) == 200
+        finally:
+            disable_pool.shutdown(wait=True)
+            edit_pool.shutdown(wait=True)
+
+        mailbox.refresh_from_db()
+        config = get_user_config(user)
+        assert config.enabled is False
+        assert mailbox.invoice_only is False
+        assert mailbox.name == "Renamed"
 
 
 class TestChannelsRunInParallel:

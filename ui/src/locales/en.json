@@ -897,6 +897,7 @@
     "pauseProcessingHelp": "Mail is still collected but nothing is analysed and no credits are spent. Everything already collected waits and resumes automatically when you lift the pause. Useful right after connecting a mailbox with a lot of history, before your filters are tuned.",
     "invoiceOnly": "Invoices only",
     "invoiceOnlyHelp": "Fetch only mail whose subject or attachment name names an invoice. The rest is never downloaded, processed or charged. An invoice with a neutral subject (rare) needs the expense app's manual backfill.",
+    "invoiceOnlyExpenseLink": "Saving turns on Expense automatically. Turning Expense off later also turns this option off.",
     "mailboxFilterHint": "These filters apply to this mailbox only. Leave one empty to not filter on it.",
     "noFilter": "Empty means no filter",
     "invoiceRuleTitle": "How an email is judged to be an invoice",

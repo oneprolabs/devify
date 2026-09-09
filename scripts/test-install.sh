@@ -231,7 +231,7 @@ deploy_script="$(grep -oE '\./[A-Za-z0-9_./-]*devify-deploy\.sh' \
 if [[ -z "${deploy_script}" ]]; then
   fail "release workflow names no devify-deploy.sh path"
 elif [[ "$(grep -oE '\./[A-Za-z0-9_./-]*devify-deploy\.sh' \
-    .github/workflows/build_and_deploy.yml | sort -u | wc -l)" != "1" ]]; then
+    .github/workflows/build_and_deploy.yml | sort -u | wc -l | tr -d '[:space:]')" != "1" ]]; then
   fail "release workflow names more than one devify-deploy.sh path"
 elif [[ -x "${deploy_script#./}" ]]; then
   ok "release workflow invokes ${deploy_script}, which exists and is executable"

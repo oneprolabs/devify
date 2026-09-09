@@ -2,9 +2,6 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [tool.hatch.build.targets.wheel]
 packages = ["devify"]
 
@@ -62,9 +59,9 @@ dependencies = [
     "dj-stripe>=2.8.0",
     "stripe>=8.0.0,<15.0.0",
     "sentry-sdk[django]>=2.0.0",
-    "agentcore-metering @ git+https://github.com/cloud2ai/agentcore-metering.git",
-    "agentcore-task @ git+https://github.com/cloud2ai/agentcore-task.git",
-    "agentcore-notifier @ git+https://github.com/cloud2ai/agentcore-notifier.git",
+    "agentcore-metering>=0.2.0",
+    "agentcore-task>=0.1.0",
+    "agentcore-notifier>=0.1.0",
 ]
 
 [project.optional-dependencies]

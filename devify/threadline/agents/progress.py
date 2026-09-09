@@ -23,6 +23,8 @@ WORKFLOW_STAGES = (
     "finalize",
 )
 
+INGESTION_METADATA_MARKERS = {"eml_file"}
+
 
 def _bounded_int(value: int | float | None, minimum: int = 0) -> int:
     try:
@@ -33,6 +35,14 @@ def _bounded_int(value: int | float | None, minimum: int = 0) -> int:
 
 def _has_value(value) -> bool:
     return value not in (None, "", [], {})
+
+
+def metadata_requires_extraction(metadata) -> bool:
+    """Return whether metadata is absent or only describes email ingestion."""
+    is_ingestion_metadata = isinstance(
+        metadata, Mapping
+    ) and INGESTION_METADATA_MARKERS.issubset(metadata)
+    return not _has_value(metadata) or is_ingestion_metadata
 
 
 def _attachment_is_pending(attachment) -> bool:
@@ -101,7 +111,7 @@ def estimate_initial_workflow_units(
             ),
             (
                 "metadata",
-                1 if force or not _has_value(email.metadata) else 0,
+                1 if force or metadata_requires_extraction(email.metadata) else 0,
             ),
             ("finalize", 1),
         ]
@@ -171,7 +181,7 @@ def estimate_prepare_workflow_units(
             ),
             (
                 "metadata",
-                1 if force or not _has_value(metadata) else 0,
+                1 if force or metadata_requires_extraction(metadata) else 0,
             ),
             ("finalize", 1),
         ]

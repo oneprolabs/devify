@@ -65,7 +65,9 @@ def subject_terms(user) -> list[str]:
     return kept
 
 
-def should_route_to_invoices(email, attachments=None) -> bool:
+def should_route_to_invoices(
+    email, attachments=None, app_config=None, user_config=None
+) -> bool:
     """
     Decide without spending anything: no model call, no credit, no writes.
 
@@ -73,7 +75,7 @@ def should_route_to_invoices(email, attachments=None) -> bool:
     workflow falls back to normal processing on the same charge - but it
     costs a wasted read, so the rule stays tight.
     """
-    user_config = get_user_config(email.user)
+    user_config = user_config or get_user_config(email.user)
     if not user_config.enabled:
         return False
 
@@ -84,7 +86,8 @@ def should_route_to_invoices(email, attachments=None) -> bool:
     if not keyword_is_deliberate(email, attachments, keywords):
         return False
 
+    app_config = app_config or get_app_config()
     verdict = evaluate_email(
-        email, attachments, get_app_config(), user_config, keywords=keywords
+        email, attachments, app_config, user_config, keywords=keywords
     )
     return verdict.is_candidate

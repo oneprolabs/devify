@@ -22,6 +22,32 @@ from .share_link import ThreadlineShareLinkSerializer
 from relay.models import RelayDelivery, RelayEvent
 
 
+class RetryFlowSerializerMixin:
+    include_retry_flow = False
+
+    def get_fields(self):
+        fields = super().get_fields()
+        if not (
+            self.include_retry_flow
+            or self.context.get("include_retry_flow")
+        ):
+            fields.pop("retry_flow", None)
+        return fields
+
+    def get_retry_flow(self, obj) -> str:
+        """Name the workflow that a retry of this email will enter."""
+        from expense.services.routing import should_route_to_invoices
+
+        target = obj.merged_into if obj.merged_into_id else obj
+        is_expense = should_route_to_invoices(
+            target,
+            attachments=list(target.attachments.all()),
+            app_config=self.context.get("expense_app_config"),
+            user_config=self.context.get("expense_user_config"),
+        )
+        return "expense" if is_expense else "conversation"
+
+
 def _get_latest_share_link(instance):
     """
     Retrieve latest share link, prioritizing prefetched data.
@@ -233,7 +259,9 @@ class EmailMessageMergeChildSerializer(serializers.ModelSerializer):
         return None
 
 
-class EmailMessageSerializer(serializers.ModelSerializer):
+class EmailMessageSerializer(
+    RetryFlowSerializerMixin, serializers.ModelSerializer
+):
     """
     Main serializer for EmailMessage model - used for display
     """
@@ -259,6 +287,7 @@ class EmailMessageSerializer(serializers.ModelSerializer):
     relay_delivery_count = serializers.SerializerMethodField()
     invoice_count = serializers.SerializerMethodField()
     relay_deliveries = serializers.SerializerMethodField()
+    retry_flow = serializers.SerializerMethodField()
 
     class Meta:
         model = EmailMessage
@@ -303,6 +332,7 @@ class EmailMessageSerializer(serializers.ModelSerializer):
             "issue_url",
             "relay_delivery_count",
             "invoice_count",
+            "retry_flow",
             "relay_deliveries",
             "created_at",
             "updated_at",
@@ -617,7 +647,9 @@ class EmailMessageSerializer(serializers.ModelSerializer):
         return None
 
 
-class EmailMessageListSerializer(serializers.ModelSerializer):
+class EmailMessageListSerializer(
+    RetryFlowSerializerMixin, serializers.ModelSerializer
+):
     """
     Lightweight serializer for list views - only essential fields
     """
@@ -641,6 +673,7 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
     relay_delivery_count = serializers.SerializerMethodField()
     invoice_count = serializers.SerializerMethodField()
     relay_deliveries = serializers.SerializerMethodField()
+    retry_flow = serializers.SerializerMethodField()
 
     class Meta:
         model = EmailMessage
@@ -679,6 +712,7 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
             "issue_url",
             "relay_delivery_count",
             "invoice_count",
+            "retry_flow",
             "relay_deliveries",
             "created_at",
         ]
@@ -841,6 +875,18 @@ class EmailMessageListSerializer(serializers.ModelSerializer):
         if obj.merged_into_id and obj.merged_into:
             return obj.merged_into.received_at
         return None
+
+
+class EmailMessageRetryFlowSerializer(EmailMessageSerializer):
+    """Public detail response contract including retry routing."""
+
+    include_retry_flow = True
+
+
+class EmailMessageListRetryFlowSerializer(EmailMessageListSerializer):
+    """Public list response contract including retry routing."""
+
+    include_retry_flow = True
 
 
 class EmailMessageCreateSerializer(serializers.ModelSerializer):

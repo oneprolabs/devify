@@ -604,6 +604,7 @@
   <RetryDialog
     :show="showRetryDialog"
     :status="threadline?.status"
+    :retry-flow="threadline?.retry_flow || 'conversation'"
     @close="showRetryDialog = false"
     @confirm="handleRetry"
   />

@@ -26,6 +26,12 @@ vi.mock('vue-i18n', async () => {
     'common.loading': 'Loading',
     'retry.confirmRetry': 'Retry',
     'retry.dialogTitle': 'Retry Chat Processing',
+    'retry.expenseDialogTitle': 'Retry Expense Processing',
+    'retry.expenseFlowTitle': 'Expense invoice recognition',
+    'retry.expenseFlowDescription': 'Expense will reprocess this email.',
+    'retry.conversationFlowTitle': 'Conversation processing',
+    'retry.conversationFlowDescription':
+      'This email will be reprocessed as a conversation.',
     'retry.forceMode': 'Force Retry',
     'retry.forceModeRequired':
       'Required because this conversation has already completed.',
@@ -46,16 +52,18 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-const mountDialog = async (status) => {
+const mountDialog = async (status, retryFlow = 'conversation') => {
   const wrapper = mount(RetryDialog, {
-    props: { show: true, status },
+    props: { show: true, status, retryFlow },
     global: {
       stubs: {
         BaseButton: {
           template: '<button><slot /></button>'
         },
         BaseModal: {
-          template: '<section><slot /><slot name="footer" /></section>'
+          props: ['title'],
+          template:
+            '<section><h1>{{ title }}</h1><slot /><slot name="footer" /></section>'
         }
       }
     }
@@ -99,5 +107,38 @@ describe('RetryDialog', () => {
     expect(wrapper.emitted('confirm')).toEqual([
       [{ language: 'en-US', scene: 'general', force: true }]
     ])
+  })
+
+  it('explains the Expense flow and disables irrelevant controls', async () => {
+    const wrapper = await mountDialog('failed', 'expense')
+
+    expect(wrapper.text()).toContain('Retry Expense Processing')
+    expect(wrapper.text()).toContain('Expense invoice recognition')
+    expect(wrapper.text()).toContain('Expense will reprocess this email.')
+    expect(wrapper.findAll('select')).toHaveLength(2)
+    expect(
+      wrapper
+        .findAll('select')
+        .every((select) => select.attributes('disabled') !== undefined)
+    ).toBe(true)
+
+    await wrapper.get('button:last-of-type').trigger('click')
+
+    expect(wrapper.emitted('confirm')).toEqual([
+      [{ language: null, scene: null, force: false }]
+    ])
+  })
+
+  it('keeps language and scene active for the conversation flow', async () => {
+    const wrapper = await mountDialog('failed')
+
+    expect(wrapper.text()).toContain('Retry Chat Processing')
+    expect(wrapper.text()).toContain('Conversation processing')
+    expect(wrapper.text()).not.toContain('Expense will reprocess this email.')
+    expect(
+      wrapper
+        .findAll('select')
+        .every((select) => select.attributes('disabled') === undefined)
+    ).toBe(true)
   })
 })

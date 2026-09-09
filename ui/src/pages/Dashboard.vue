@@ -405,6 +405,7 @@
       <RetryDialog
         :show="showRetryDialog"
         :status="retryDialogStatus"
+        :retry-flow="retryDialogFlow"
         @close="showRetryDialog = false"
         @confirm="handleRetryConfirm"
       />
@@ -530,6 +531,9 @@ const retryDialogStatus = computed(() =>
   retryTargets.value.some((item) => item.status === 'success')
     ? 'success'
     : 'failed'
+)
+const retryDialogFlow = computed(
+  () => retryTargets.value[0]?.retry_flow || 'conversation'
 )
 const mergeConfirmMessage = computed(() => {
   const titles = selectedThreadlines.value

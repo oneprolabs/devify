@@ -986,6 +986,11 @@
   },
   "retry": {
     "dialogTitle": "重新处理对话",
+    "expenseDialogTitle": "重新识别发票",
+    "expenseFlowTitle": "发票管家识别流程",
+    "expenseFlowDescription": "这封邮件将由发票管家重新识别。语言和场景仅用于对话总结，因此本次重试不可设置。",
+    "conversationFlowTitle": "对话处理流程",
+    "conversationFlowDescription": "这封邮件将按对话重新处理，并使用下方选择的语言和场景。",
     "language": "处理语言",
     "languageHint": "选择AI处理时使用的语言（留空使用默认设置）",
     "useDefaultLanguage": "使用默认语言",

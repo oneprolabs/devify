@@ -12,7 +12,9 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.urls import reverse
 from django.utils import timezone
+from rest_framework import status
 
 from billing.models import EmailCreditsTransaction, UserCredits
 from billing.services.credits_service import CreditsService
@@ -24,6 +26,11 @@ from threadline.agents.nodes.invoice_node import (
     route_after_invoice,
 )
 from threadline.models import EmailAttachment, EmailMessage
+from threadline.serializers import (
+    EmailMessageListRetryFlowSerializer,
+    EmailMessageRetryFlowSerializer,
+    EmailMessageSerializer,
+)
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
@@ -127,6 +134,87 @@ class TestRoutingRule:
         attach(user, email)
 
         assert should_route_to_invoices(email) is False
+
+
+class TestRetryFlowDisclosure:
+    def _listed_email(self, api_client, user, email):
+        api_client.force_authenticate(user=user)
+        response = api_client.get(reverse("threadlines-list"))
+
+        assert response.status_code == status.HTTP_200_OK
+        return next(
+            item
+            for item in response.data["data"]["list"]
+            if item["uuid"] == str(email.uuid)
+        )
+
+    def test_invoice_retry_is_identified_as_expense_flow(
+        self, api_client, user
+    ):
+        enable_expense(user)
+        email = make_email(user, subject="【电子发票】北京麻六记")
+        attach(user, email)
+
+        item = self._listed_email(api_client, user, email)
+
+        assert item["retry_flow"] == "expense"
+
+    def test_ordinary_retry_is_identified_as_conversation_flow(
+        self, api_client, user
+    ):
+        enable_expense(user)
+        email = make_email(user, subject="周会纪要")
+        attach(user, email)
+
+        item = self._listed_email(api_client, user, email)
+
+        assert item["retry_flow"] == "conversation"
+
+    def test_detail_retry_flow_matches_the_list(self, api_client, user):
+        enable_expense(user)
+        email = make_email(user, subject="【电子发票】详情验收")
+        attach(user, email)
+        api_client.force_authenticate(user=user)
+
+        response = api_client.get(
+            reverse("threadlines-detail", kwargs={"uuid": email.uuid})
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["data"]["retry_flow"] == "expense"
+
+    def test_merged_child_retry_flow_matches_its_canonical_target(
+        self, api_client, user
+    ):
+        enable_expense(user)
+        canonical = make_email(user, subject="周会纪要")
+        child = make_email(user, subject="【电子发票】详情验收")
+        child.merged_into = canonical
+        child.save(update_fields=["merged_into"])
+        attach(user, child)
+        api_client.force_authenticate(user=user)
+
+        response = api_client.get(
+            reverse("threadlines-detail", kwargs={"uuid": child.uuid})
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["data"]["retry_flow"] == "conversation"
+
+    def test_unrelated_serialization_skips_retry_flow_queries(self, user):
+        email = make_email(user, subject="普通邮件")
+
+        with patch(
+            "expense.services.routing.should_route_to_invoices"
+        ) as route:
+            data = EmailMessageSerializer(email, context={}).data
+
+        assert "retry_flow" not in data
+        route.assert_not_called()
+
+    def test_public_response_serializers_keep_retry_flow_in_schema(self):
+        assert "retry_flow" in EmailMessageRetryFlowSerializer().fields
+        assert "retry_flow" in EmailMessageListRetryFlowSerializer().fields
 
 
 class TestRouteAfterInvoice:

@@ -25,6 +25,8 @@ from ..state_machine import EmailStatus
 from ..serializers import (
     EmailMessageSerializer,
     EmailMessageListSerializer,
+    EmailMessageListRetryFlowSerializer,
+    EmailMessageRetryFlowSerializer,
     EmailMessageCreateSerializer,
     EmailMessageUpdateSerializer,
     EmailMessageMergeSerializer,
@@ -160,6 +162,7 @@ class EmailMessageAPIView(BaseAPIView):
             .prefetch_related("relay_events__deliveries")
             .prefetch_related("relay_events__deliveries__subscription")
             .prefetch_related("share_links")
+            .prefetch_related("attachments")
             .filter(merged_into__isnull=True)
             # The invoices an email produced are the record of it having
             # been taken over by Expense; counting them beats a separate
@@ -222,7 +225,7 @@ class EmailMessageAPIView(BaseAPIView):
             ),
         ],
         responses={
-            200: pagination_response(EmailMessageListSerializer),
+            200: pagination_response(EmailMessageListRetryFlowSerializer),
             401: error_response(),
         },
     )
@@ -339,8 +342,20 @@ class EmailMessageAPIView(BaseAPIView):
             total = queryset.count()
             items = queryset[start:end]
 
+            from expense.services.config_service import (
+                get_app_config,
+                get_user_config,
+            )
+
             serializer = EmailMessageListSerializer(
-                items, many=True, context={"request": request}
+                items,
+                many=True,
+                context={
+                    "request": request,
+                    "include_retry_flow": True,
+                    "expense_app_config": get_app_config(),
+                    "expense_user_config": get_user_config(request.user),
+                },
             )
 
             response_data = {
@@ -775,6 +790,7 @@ class EmailMessageDetailAPIView(BaseAPIView):
             .prefetch_related("relay_events__deliveries")
             .prefetch_related("relay_events__deliveries__subscription")
             .prefetch_related("share_links")
+            .prefetch_related("attachments")
             .all()
         )
 
@@ -789,7 +805,7 @@ class EmailMessageDetailAPIView(BaseAPIView):
         summary="Get threadline details",
         description="Get details of a specific threadline by UUID",
         responses={
-            200: response(EmailMessageSerializer),
+            200: response(EmailMessageRetryFlowSerializer),
             404: error_response(),
             401: error_response(),
         },
@@ -801,7 +817,8 @@ class EmailMessageDetailAPIView(BaseAPIView):
         try:
             message = self.get_object(uuid)
             serializer = EmailMessageSerializer(
-                message, context={"request": request}
+                message,
+                context={"request": request, "include_retry_flow": True},
             )
 
             return Response(

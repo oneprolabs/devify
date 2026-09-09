@@ -1,5 +1,9 @@
 <template>
-  <BaseModal :show="show" :title="t('retry.dialogTitle')" @close="handleClose">
+  <BaseModal
+    :show="show"
+    :title="t(isExpenseFlow ? 'retry.expenseDialogTitle' : 'retry.dialogTitle')"
+    @close="handleClose"
+  >
     <div v-if="initializing" class="flex items-center justify-center py-8">
       <div class="text-center">
         <svg
@@ -26,15 +30,40 @@
       </div>
     </div>
     <div v-else class="space-y-5">
+      <div class="rounded-lg border border-line bg-app-sub px-4 py-3">
+        <p class="text-sm font-semibold text-ink">
+          {{
+            t(
+              isExpenseFlow
+                ? 'retry.expenseFlowTitle'
+                : 'retry.conversationFlowTitle'
+            )
+          }}
+        </p>
+        <p
+          id="retry-flow-description"
+          class="mt-1 text-sm leading-relaxed text-ink-3"
+        >
+          {{
+            t(
+              isExpenseFlow
+                ? 'retry.expenseFlowDescription'
+                : 'retry.conversationFlowDescription'
+            )
+          }}
+        </p>
+      </div>
+
       <!-- Language Selector -->
-      <div>
+      <div :class="isExpenseFlow ? 'opacity-50' : ''">
         <label class="block text-sm font-medium text-ink-2 mb-2">
           {{ t('settings.language') }}
         </label>
         <select
           v-model="localLanguage"
           class="input w-full"
-          :disabled="loading"
+          aria-describedby="retry-flow-description"
+          :disabled="loading || isExpenseFlow"
         >
           <option value="">{{ t('retry.useDefaultLanguage') }}</option>
           <option value="en-US">{{ t('settings.languages.en') }}</option>
@@ -44,14 +73,15 @@
       </div>
 
       <!-- Scene Selector -->
-      <div>
+      <div :class="isExpenseFlow ? 'opacity-50' : ''">
         <label class="block text-sm font-medium text-ink-2 mb-2">
           {{ t('settings.scene') }}
         </label>
         <select
           v-model="localScene"
           class="input w-full"
-          :disabled="loading || loadingScenes"
+          aria-describedby="retry-flow-description"
+          :disabled="loading || loadingScenes || isExpenseFlow"
         >
           <option value="" disabled>
             {{ loadingScenes ? t('common.loading') : t('auth.selectScene') }}
@@ -175,6 +205,11 @@ const props = defineProps({
   status: {
     type: String,
     default: ''
+  },
+  retryFlow: {
+    type: String,
+    default: 'conversation',
+    validator: (value) => ['conversation', 'expense'].includes(value)
   }
 })
 
@@ -191,6 +226,7 @@ const localForce = ref(false)
 const scenes = ref([])
 const defaultLanguage = ref('')
 const defaultScene = ref('')
+const isExpenseFlow = computed(() => props.retryFlow === 'expense')
 
 // Check if force retry is required (for success status)
 const forceRequired = computed(() => {
@@ -229,8 +265,8 @@ const handleClose = () => {
 
 const handleRetry = () => {
   emit('confirm', {
-    language: localLanguage.value || null,
-    scene: localScene.value || null,
+    language: isExpenseFlow.value ? null : localLanguage.value || null,
+    scene: isExpenseFlow.value ? null : localScene.value || null,
     force: localForce.value
   })
 }
@@ -246,8 +282,10 @@ watch(
       localLanguage.value = ''
       localScene.value = ''
 
-      // Load defaults and scenes in parallel
-      await Promise.all([loadDefaults(), loadScenes()])
+      if (!isExpenseFlow.value) {
+        // Load defaults and scenes in parallel
+        await Promise.all([loadDefaults(), loadScenes()])
+      }
 
       // Set defaults after loading both preferences and scenes
       // This ensures the select options are populated before setting values
@@ -274,7 +312,9 @@ onMounted(async () => {
     initializing.value = true
     // Set force based on status: if success, force must be true
     localForce.value = forceRequired.value
-    await Promise.all([loadDefaults(), loadScenes()])
+    if (!isExpenseFlow.value) {
+      await Promise.all([loadDefaults(), loadScenes()])
+    }
     // Set defaults after loading both preferences and scenes
     if (defaultLanguage.value) {
       localLanguage.value = defaultLanguage.value

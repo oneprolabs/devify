@@ -380,6 +380,11 @@
   },
   "retry": {
     "dialogTitle": "Reintentar procesamiento de correo",
+    "expenseDialogTitle": "Reintentar procesamiento de Expense",
+    "expenseFlowTitle": "Reconocimiento de facturas de Expense",
+    "expenseFlowDescription": "Expense volverá a procesar este correo. El idioma y la escena solo se aplican a los resúmenes de conversaciones, por lo que no están disponibles para este reintento.",
+    "conversationFlowTitle": "Procesamiento de conversación",
+    "conversationFlowDescription": "Este correo se volverá a procesar como una conversación usando el idioma y la escena seleccionados abajo.",
     "language": "Idioma de procesamiento",
     "languageHint": "Seleccione el idioma para el procesamiento de IA (deje vacío para usar el predeterminado)",
     "useDefaultLanguage": "Usar idioma predeterminado",

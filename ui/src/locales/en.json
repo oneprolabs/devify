@@ -977,6 +977,11 @@
   },
   "retry": {
     "dialogTitle": "Retry Chat Processing",
+    "expenseDialogTitle": "Retry Expense Processing",
+    "expenseFlowTitle": "Expense invoice recognition",
+    "expenseFlowDescription": "This email will be reprocessed by Expense. Language and scene apply only to conversation summaries, so they are unavailable for this retry.",
+    "conversationFlowTitle": "Conversation processing",
+    "conversationFlowDescription": "This email will be reprocessed as a conversation using the language and scene below.",
     "language": "Processing Language",
     "languageHint": "Select the language for AI processing (leave empty to use default)",
     "useDefaultLanguage": "Use default language",

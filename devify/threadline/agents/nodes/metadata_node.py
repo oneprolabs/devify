@@ -12,6 +12,7 @@ from typing import Any, Dict
 from core.tracking import LLMTracker
 from threadline.agents.email_state import EmailState, add_node_error
 from threadline.agents.nodes.base_node import BaseLangGraphNode
+from threadline.agents.progress import metadata_requires_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class MetadataNode(BaseLangGraphNode):
     - Execute LLM processing to generate structured metadata
     - Validate and normalize metadata (type checking for common list fields)
     - Update State with metadata
-    - Skip if metadata already exists (unless force mode)
+    - Skip if extracted metadata already exists (unless force mode)
     - Handle LLM errors gracefully with retries
 
     Note: Metadata field definitions are driven by prompts, not hard-coded.
@@ -117,10 +118,15 @@ class MetadataNode(BaseLangGraphNode):
         )
 
         existing_metadata = state.get("metadata")
+        should_generate_metadata = force or metadata_requires_extraction(
+            existing_metadata
+        )
         text_llm_config_uuid = state.get("text_llm_config_uuid")
 
         try:
-            if not existing_metadata or force:
+            # Email ingestion also stores parser details in ``metadata``.
+            # Those details do not mean that AI metadata was extracted.
+            if should_generate_metadata:
                 logger.info("Generating metadata from summary")
                 self._record_progress_step(
                     self.workflow_stage,

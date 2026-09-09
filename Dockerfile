@@ -56,14 +56,6 @@ COPY pyproject.toml LICENSE README.md /opt/devify/
 
 ARG DEV_MODE=0
 RUN set -eux; \
-    test -f agentcore/agentcore-metering/pyproject.toml; \
-    test -f agentcore/agentcore-task/pyproject.toml; \
-    test -f agentcore/agentcore-notifier/pyproject.toml; \
-    sed -i \
-        -e 's#agentcore-metering @ git+https://github.com/cloud2ai/agentcore-metering.git#agentcore-metering @ file:///opt/devify/agentcore/agentcore-metering#' \
-        -e 's#agentcore-task @ git+https://github.com/cloud2ai/agentcore-task.git#agentcore-task @ file:///opt/devify/agentcore/agentcore-task#' \
-        -e 's#agentcore-notifier @ git+https://github.com/cloud2ai/agentcore-notifier.git#agentcore-notifier @ file:///opt/devify/agentcore/agentcore-notifier#' \
-        pyproject.toml; \
     compile_options=(); \
     if [ "$DEV_MODE" = "1" ]; then \
         compile_options+=(--extra dev); \
@@ -80,28 +72,10 @@ RUN set -eux; \
         --index-url "$PIP_INDEX_URL" \
         --trusted-host "$PIP_TRUSTED_HOST"
 
-# In dev mode, overlay editable agentcore installs when submodules are present
-# so volume-mounted source changes are picked up without rebuilding the image.
-RUN set -eux; \
-    if [ "$DEV_MODE" = "1" ]; then \
-        for d in /opt/devify/agentcore/*/; do \
-            if [ -f "${d}pyproject.toml" ]; then \
-                echo "Dev mode: installing ${d} as editable"; \
-                (cd "$d" && uv pip install \
-                    --python /opt/venv/bin/python \
-                    --index-url "$PIP_INDEX_URL" \
-                    --trusted-host "$PIP_TRUSTED_HOST" \
-                    -e .); \
-            fi; \
-        done; \
-    fi
-
 RUN rm -rf /root/.cache /tmp/* \
     && find /opt/venv -type d -name __pycache__ -prune \
         -exec rm -rf {} + \
     && find /opt/devify -type d -name __pycache__ -prune \
-        -exec rm -rf {} + \
-    && find /opt/devify/agentcore -type d -name build -prune \
         -exec rm -rf {} +
 
 # -----------------------------------------------------------------------------
@@ -150,9 +124,6 @@ RUN rm -rf \
         /usr/local/bin/pip \
         /usr/local/bin/pip3 \
         /usr/local/bin/pip3.12
-
-ARG DEV_MODE=0
-ENV DEV_MODE=${DEV_MODE}
 
 WORKDIR /opt/devify
 

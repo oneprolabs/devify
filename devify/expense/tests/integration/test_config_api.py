@@ -5,7 +5,7 @@ import pytest
 from expense.constants import DEFAULT_SCAN_SCHEDULE
 from expense.models import ExpenseUserConfig
 from expense.services.config_service import get_app_config
-
+from threadline.models import EmailMailbox
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -49,6 +49,38 @@ class TestUserConfigAPI:
         assert data["enabled"] is True
         assert data["enabled_at"] is not None
 
+    def test_disabling_clears_invoice_mode_from_the_users_mailboxes(
+        self, api_client, user, other_user
+    ):
+        config = ExpenseUserConfig.objects.create(user=user, enabled=True)
+        own_mailbox = EmailMailbox.objects.create(
+            user=user,
+            imap_host="imap.example.com",
+            username="mine@example.com",
+            password="secret",
+            invoice_only=True,
+        )
+        other_mailbox = EmailMailbox.objects.create(
+            user=other_user,
+            imap_host="imap.example.com",
+            username="other@example.com",
+            password="secret",
+            invoice_only=True,
+        )
+        api_client.force_authenticate(user=user)
+
+        response = api_client.patch(
+            CONFIG_URL, {"enabled": False}, format="json"
+        )
+
+        config.refresh_from_db()
+        own_mailbox.refresh_from_db()
+        other_mailbox.refresh_from_db()
+        assert response.status_code == 200
+        assert config.enabled is False
+        assert own_mailbox.invoice_only is False
+        assert other_mailbox.invoice_only is True
+
     def test_preferences_are_cleaned_and_deduplicated(self, api_client, user):
         api_client.force_authenticate(user=user)
 
@@ -79,6 +111,96 @@ class TestUserConfigAPI:
         data = api_client.get(CONFIG_URL).data["data"]
 
         assert data["home_city"] == ""
+
+
+class TestUserConfigConcurrency:
+    @pytest.mark.django_db(transaction=True)
+    def test_preference_save_preserves_a_concurrent_enable(
+        self, django_user_model
+    ):
+        from concurrent.futures import ThreadPoolExecutor
+        from queue import Queue
+        from threading import current_thread
+        from unittest.mock import patch
+
+        from django.db import close_old_connections, transaction
+        from django.db.models.query import QuerySet
+        from rest_framework.test import APIClient
+
+        from expense.serializers import ExpenseUserConfigSerializer
+        from expense.services.config_service import (
+            get_user_config,
+            set_user_enabled,
+        )
+
+        user = django_user_model.objects.create_user(
+            "expense-config-race", password="x"
+        )
+        config = get_user_config(user)
+        preference_stage = Queue()
+        original_select_for_update = QuerySet.select_for_update
+        original_save = ExpenseUserConfigSerializer.save
+
+        def signal_config_lock(queryset, *args, **kwargs):
+            if (
+                current_thread().name.startswith("save-preferences")
+                and queryset.model is ExpenseUserConfig
+            ):
+                preference_stage.put("config-lock")
+            return original_select_for_update(queryset, *args, **kwargs)
+
+        def signal_preference_save(serializer, *args, **kwargs):
+            if current_thread().name.startswith("save-preferences"):
+                preference_stage.put("preference-save")
+            return original_save(serializer, *args, **kwargs)
+
+        def save_preferences():
+            close_old_connections()
+            try:
+                client = APIClient()
+                client.force_authenticate(user=user)
+                return client.patch(
+                    CONFIG_URL,
+                    {"home_city": "Shanghai"},
+                    format="json",
+                ).status_code
+            finally:
+                close_old_connections()
+
+        pool = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="save-preferences"
+        )
+        try:
+            with (
+                patch.object(
+                    QuerySet,
+                    "select_for_update",
+                    new=signal_config_lock,
+                ),
+                patch.object(
+                    ExpenseUserConfigSerializer,
+                    "save",
+                    new=signal_preference_save,
+                ),
+            ):
+                with transaction.atomic():
+                    ExpenseUserConfig.objects.select_for_update().get(
+                        pk=config.pk
+                    )
+                    future = pool.submit(save_preferences)
+                    assert preference_stage.get(timeout=5) in {
+                        "config-lock",
+                        "preference-save",
+                    }
+                    set_user_enabled(config, True)
+
+                assert future.result(timeout=5) == 200
+        finally:
+            pool.shutdown(wait=True)
+
+        config.refresh_from_db()
+        assert config.enabled is True
+        assert config.home_city == "Shanghai"
 
 
 class TestAdminConfigAPI:

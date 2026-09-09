@@ -3,12 +3,19 @@
 import logging
 
 from django.conf import settings as django_settings
+from django.contrib.auth.models import User
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from expense.services.config_service import (
+    get_user_config,
+    get_user_config_for_update,
+    set_user_enabled,
+)
 from threadline.models import EmailMailbox
 from threadline.serializers.email_mailbox import EmailMailboxSerializer
 from threadline.utils.email.config import EmailConfigManager
@@ -20,6 +27,11 @@ def _response(data, message="ok", code=200, status_code=status.HTTP_200_OK):
     return Response(
         {"code": code, "message": message, "data": data}, status=status_code
     )
+
+
+def _enable_expense_for_invoice_mailbox(user: User) -> None:
+    """Keep invoice-only mailboxes usable as soon as they are saved."""
+    set_user_enabled(get_user_config(user), True)
 
 
 class EmailMailboxListAPIView(APIView):
@@ -45,7 +57,10 @@ class EmailMailboxListAPIView(APIView):
             data=request.data or {}, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
-        mailbox = serializer.save()
+        with transaction.atomic():
+            if serializer.validated_data.get("invoice_only", False):
+                _enable_expense_for_invoice_mailbox(request.user)
+            mailbox = serializer.save()
         return _response(
             EmailMailboxSerializer(
                 mailbox, context={"request": request}
@@ -61,8 +76,11 @@ class EmailMailboxDetailAPIView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def _get_object(self, request, uuid):
-        return get_object_or_404(EmailMailbox, uuid=uuid, user=request.user)
+    def _get_object(self, request, uuid, *, for_update=False):
+        queryset = EmailMailbox.objects
+        if for_update:
+            queryset = queryset.select_for_update()
+        return get_object_or_404(queryset, uuid=uuid, user=request.user)
 
     def get(self, request, uuid):
         mailbox = self._get_object(request, uuid)
@@ -73,15 +91,21 @@ class EmailMailboxDetailAPIView(APIView):
         )
 
     def patch(self, request, uuid):
-        mailbox = self._get_object(request, uuid)
-        serializer = EmailMailboxSerializer(
-            mailbox,
-            data=request.data,
-            partial=True,
-            context={"request": request},
-        )
-        serializer.is_valid(raise_exception=True)
-        mailbox = serializer.save()
+        with transaction.atomic():
+            expense_config = get_user_config_for_update(request.user)
+            mailbox = self._get_object(request, uuid, for_update=True)
+            serializer = EmailMailboxSerializer(
+                mailbox,
+                data=request.data,
+                partial=True,
+                context={"request": request},
+            )
+            serializer.is_valid(raise_exception=True)
+            if serializer.validated_data.get(
+                "invoice_only", mailbox.invoice_only
+            ):
+                set_user_enabled(expense_config, True)
+            mailbox = serializer.save()
         return _response(
             EmailMailboxSerializer(
                 mailbox, context={"request": request}

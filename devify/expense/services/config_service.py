@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.utils import timezone
 
 from expense.constants import WORKFLOW_KEY
@@ -22,6 +23,13 @@ def get_user_config(user) -> ExpenseUserConfig:
     return config
 
 
+def get_user_config_for_update(user) -> ExpenseUserConfig:
+    """Return the user config locked inside the caller's transaction."""
+    config = get_user_config(user)
+    return ExpenseUserConfig.objects.select_for_update().get(pk=config.pk)
+
+
+@transaction.atomic
 def set_user_enabled(
     config: ExpenseUserConfig, enabled: bool
 ) -> ExpenseUserConfig:
@@ -32,11 +40,18 @@ def set_user_enabled(
     into mail that arrived earlier, so a fresh switch-on cannot silently
     consume credits on a full mailbox history.
     """
+    config = ExpenseUserConfig.objects.select_for_update().get(pk=config.pk)
     if enabled and not config.enabled:
         config.enabled = True
         config.enabled_at = timezone.now()
         config.save(update_fields=["enabled", "enabled_at", "updated_at"])
-    elif not enabled and config.enabled:
-        config.enabled = False
-        config.save(update_fields=["enabled", "updated_at"])
+    elif not enabled:
+        from threadline.models import EmailMailbox
+
+        EmailMailbox.objects.filter(
+            user_id=config.user_id, invoice_only=True
+        ).update(invoice_only=False, updated_at=timezone.now())
+        if config.enabled:
+            config.enabled = False
+            config.save(update_fields=["enabled", "updated_at"])
     return config

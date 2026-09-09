@@ -236,6 +236,12 @@
               <span class="mt-0.5 block text-xs text-ink-3">
                 {{ t('settings.invoiceOnlyHelp') }}
               </span>
+              <span
+                v-if="form.invoice_only"
+                class="mt-1 block text-xs font-medium text-ink-2"
+              >
+                {{ t('settings.invoiceOnlyExpenseLink') }}
+              </span>
             </span>
           </label>
 

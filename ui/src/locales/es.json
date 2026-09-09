@@ -388,6 +388,7 @@
     "useDefaultScene": "Usar escena predeterminada",
     "forceMode": "Forzar reintento",
     "forceModeHint": "El reintento forzado reprocesará la comprensión de imágenes y LLM incluso si los resultados ya existen",
+    "forceModeRequired": "Es obligatorio porque esta conversación ya se completó.",
     "forceModeWarning": "El reintento forzado eliminará todos los registros generados anteriormente, volverá a identificar imágenes y realizará un resumen inteligente.",
     "confirmRetry": "Reintentar",
     "retryButton": "Reintentar",

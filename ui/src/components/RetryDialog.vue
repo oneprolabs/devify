@@ -25,7 +25,7 @@
         <p class="mt-4 text-sm text-ink-2">{{ t('common.loading') }}</p>
       </div>
     </div>
-    <div v-else class="space-y-4">
+    <div v-else class="space-y-5">
       <!-- Language Selector -->
       <div>
         <label class="block text-sm font-medium text-ink-2 mb-2">
@@ -64,27 +64,48 @@
       </div>
 
       <!-- Force Option -->
-      <div class="border-t border-line pt-4">
-        <div class="flex items-center gap-3">
-          <div class="flex items-center flex-shrink-0">
-            <input
-              id="force-retry"
-              v-model="localForce"
-              type="checkbox"
-              class="focus:ring-accent h-4 w-4 text-accent border-line rounded"
-              :disabled="loading || forceRequired"
+      <div class="space-y-3 border-t border-line pt-5">
+        <div
+          v-if="forceRequired"
+          data-testid="force-retry-required"
+          class="flex items-start gap-3"
+        >
+          <svg
+            class="mt-0.5 h-4 w-4 flex-none text-accent"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clip-rule="evenodd"
             />
-          </div>
-          <div class="flex-1 min-w-0">
-            <label
-              for="force-retry"
-              class="block text-sm font-medium text-ink-2 cursor-pointer"
-            >
+          </svg>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-ink-2">
               {{ t('retry.forceMode') }}
-            </label>
+            </p>
+            <p class="mt-1 text-sm leading-relaxed text-ink-3">
+              {{ t('retry.forceModeRequired') }}
+            </p>
           </div>
         </div>
-        <div class="mt-2">
+        <label
+          v-else
+          for="force-retry"
+          class="flex cursor-pointer items-center gap-3 text-sm font-medium text-ink-2"
+        >
+          <input
+            id="force-retry"
+            v-model="localForce"
+            type="checkbox"
+            class="h-4 w-4 flex-none rounded border-line text-accent focus:ring-accent"
+            :disabled="loading"
+          />
+          <span>{{ t('retry.forceMode') }}</span>
+        </label>
+        <div>
           <div
             class="py-3 px-4 sm:px-6 bg-warn-soft border border-warn rounded-md"
           >

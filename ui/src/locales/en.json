@@ -984,6 +984,7 @@
     "useDefaultScene": "Use default scene",
     "forceMode": "Force Retry",
     "forceModeHint": "Force retry will re-process image understanding and LLM even if results already exist",
+    "forceModeRequired": "Required because this conversation has already completed.",
     "forceModeWarning": "Force retry will clear all previously generated records, re-identify images and perform intelligent summarization.",
     "confirmRetry": "Retry",
     "retryButton": "Retry",

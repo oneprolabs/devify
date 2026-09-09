@@ -993,6 +993,7 @@
     "useDefaultScene": "使用默认场景",
     "forceMode": "强制重试",
     "forceModeHint": "强制重试将重新处理图片理解和LLM，即使结果已存在",
+    "forceModeRequired": "此对话已处理完成，因此必须使用强制重试。",
     "forceModeWarning": "强制重试会清理之前所有产生的记录，重新识别和进行智能总结。",
     "confirmRetry": "重试",
     "retryButton": "重试",

@@ -1,6 +1,7 @@
 <template>
   <div ref="root" class="relative">
     <button
+      ref="trigger"
       type="button"
       class="flex items-center gap-1.5 rounded-md border border-line text-ink-2 transition-colors hover:border-ink-4"
       :class="
@@ -8,7 +9,7 @@
           ? 'h-[30px] bg-panel px-[11px] text-xs'
           : 'h-8 px-[11px] text-[calc(12.5px*var(--fs))]'
       "
-      @click="open = !open"
+      @click="toggleOpen"
     >
       {{ label }}
       <svg
@@ -23,21 +24,25 @@
       </svg>
     </button>
 
-    <div
-      v-if="open"
-      class="absolute right-0 z-30 mt-1 min-w-[150px] rounded-md border border-line bg-panel py-1 shadow-soft-md"
-    >
-      <button
-        v-for="option in options"
-        :key="String(option.value)"
-        type="button"
-        class="flex w-full items-center px-3 py-1.5 text-left text-[calc(12.5px*var(--fs))] transition-colors hover:bg-chip"
-        :class="option.value === modelValue ? 'text-accent' : 'text-ink-2'"
-        @click="pick(option.value)"
+    <Teleport to="body">
+      <div
+        v-if="open"
+        data-filter-select-menu
+        class="fixed z-30 min-w-[150px] rounded-md border border-line bg-panel py-1 shadow-soft-md"
+        :style="menuStyle"
       >
-        {{ option.label }}
-      </button>
-    </div>
+        <button
+          v-for="option in options"
+          :key="String(option.value)"
+          type="button"
+          class="flex w-full items-center px-3 py-1.5 text-left text-[calc(12.5px*var(--fs))] transition-colors hover:bg-chip"
+          :class="option.value === modelValue ? 'text-accent' : 'text-ink-2'"
+          @click="pick(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -57,19 +62,61 @@ defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const root = ref(null)
+const trigger = ref(null)
 const open = ref(false)
+const menuStyle = ref({})
+
+const updateMenuPosition = () => {
+  if (!trigger.value || typeof window === 'undefined') return
+
+  const rect = trigger.value.getBoundingClientRect()
+  menuStyle.value = {
+    top: `${rect.bottom + 4}px`,
+    right: `${Math.max(8, window.innerWidth - rect.right)}px`
+  }
+}
+
+const removePositionListeners = () => {
+  if (typeof window === 'undefined') return
+  window.removeEventListener('resize', updateMenuPosition)
+  window.removeEventListener('scroll', updateMenuPosition, true)
+}
+
+const addPositionListeners = () => {
+  if (typeof window === 'undefined') return
+  window.addEventListener('resize', updateMenuPosition)
+  window.addEventListener('scroll', updateMenuPosition, true)
+}
+
+const close = () => {
+  open.value = false
+  removePositionListeners()
+}
+
+const toggleOpen = () => {
+  open.value = !open.value
+  if (open.value) {
+    updateMenuPosition()
+    addPositionListeners()
+  } else {
+    close()
+  }
+}
 
 const pick = (value) => {
   emit('update:modelValue', value)
-  open.value = false
+  close()
 }
 
 const closeOnOutside = (event) => {
   if (open.value && root.value && !root.value.contains(event.target)) {
-    open.value = false
+    close()
   }
 }
 
 onMounted(() => document.addEventListener('click', closeOnOutside))
-onBeforeUnmount(() => document.removeEventListener('click', closeOnOutside))
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeOnOutside)
+  removePositionListeners()
+})
 </script>

@@ -558,6 +558,65 @@ update_home() {
     log "devify-home refreshed."
 }
 
+# The blue/green overlay keeps the base API and UI services on the `single`
+# profile. Resolve their logical names to whichever color currently serves
+# traffic so operational commands do not accidentally target the parked
+# single-service definitions.
+runtime_service_name() {
+    local service="$1" active="$2"
+    case "${service}" in
+        devify-api)
+            echo "devify-api-${active}"
+            ;;
+        devify-ui)
+            echo "devify-ui-${active}"
+            ;;
+        *)
+            echo "${service}"
+            ;;
+    esac
+}
+
+restart_stack() {
+    acquire_deploy_lock
+    check_requirements
+    ensure_env
+    ensure_stack_files
+
+    local active service
+    local services=()
+    active="$(current_color)"
+    for service in "$@"; do
+        services+=("$(runtime_service_name "${service}" "${active}")")
+    done
+
+    if [ "${#services[@]}" -eq 0 ]; then
+        compose --profile "${active}" restart
+    else
+        compose --profile "${active}" restart "${services[@]}"
+    fi
+}
+
+recreate_stack() {
+    acquire_deploy_lock
+    check_requirements
+    ensure_env
+    ensure_stack_files
+
+    local active service
+    local services=()
+    active="$(current_color)"
+    for service in "$@"; do
+        services+=("$(runtime_service_name "${service}" "${active}")")
+    done
+
+    if [ "${#services[@]}" -eq 0 ]; then
+        compose --profile "${active}" up -d --force-recreate
+    else
+        compose --profile "${active}" up -d --force-recreate "${services[@]}"
+    fi
+}
+
 show_usage() {
     cat <<'USAGE'
 Usage: ./deploy/scripts/devify-deploy.sh <command> [--local] [args]
@@ -572,6 +631,7 @@ Commands:
   start        Start the deployment stack
   stop         Stop the deployment stack
   restart      Restart the deployment stack
+  recreate     Force recreate the deployment stack without removing volumes
   logs         Show logs; extra args are passed to docker compose logs
   manage       Run a Django management command in the devify-api container
                e.g. ./deploy/scripts/devify-deploy.sh manage migrate
@@ -642,10 +702,10 @@ main() {
             compose stop "$@"
             ;;
         restart)
-            check_requirements
-            ensure_env
-            ensure_stack_files
-            compose restart "$@"
+            restart_stack "$@"
+            ;;
+        recreate)
+            recreate_stack "$@"
             ;;
         status)
             status_stack

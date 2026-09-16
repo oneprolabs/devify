@@ -384,8 +384,17 @@ const handleSubmit = (event) => {
 }
 
 const setError = (field, message) => {
-  if (errors.value.hasOwnProperty(field)) {
-    errors.value[field] = message
+  // API validation fields use snake_case while the form model uses camelCase.
+  // Normalize both styles so server-side validation is shown on the right
+  // control (especially virtual_email_username during OAuth setup).
+  const fieldMap = {
+    virtual_email_username: 'virtualEmailUsername',
+    confirm_password: 'confirmPassword'
+  }
+  const formField = fieldMap[field] || field
+
+  if (Object.prototype.hasOwnProperty.call(errors.value, formField)) {
+    errors.value[formField] = Array.isArray(message) ? message[0] : message
   }
 }
 

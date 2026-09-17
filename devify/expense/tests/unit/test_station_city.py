@@ -10,10 +10,22 @@ varied between 北京 and 北京市, which downstream counts as two places.
 
 import pytest
 
-from expense.services.extractor import _station_cities, resolve_city
+from expense.services.extractor import (_STATION_CITY_PATH, _station_cities,
+                                        resolve_city)
 
 
 class TestStationList:
+    def test_the_file_is_where_the_code_looks(self):
+        """
+        An unanchored `data` line in .gitignore swallowed this directory
+        once already and the code shipped without the file it reads — which
+        fails silently, since a missing list just falls back to the model.
+        Checking the path exists catches a file that never got committed.
+        """
+        assert _STATION_CITY_PATH.is_file(), (
+            f"{_STATION_CITY_PATH} is missing — check it is not gitignored"
+        )
+
     def test_the_list_is_loaded(self):
         stations = _station_cities()
 

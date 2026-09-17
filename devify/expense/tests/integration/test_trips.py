@@ -11,7 +11,6 @@ from expense.models import ExpenseGroup, Invoice, TripSuggestion
 from expense.services import trips as trip_service
 from threadline.models import EmailMessage
 
-
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
 TRIPS_URL = "/api/v1/apps/expense/trips"
@@ -319,4 +318,3 @@ class TestTravelDateDrivesGrouping:
 
         assert summary["period_start"] == "2026-08-12"
         assert summary["period_end"] == "2026-08-15"
-

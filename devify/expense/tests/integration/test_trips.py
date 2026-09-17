@@ -54,20 +54,29 @@ def seed_trip(user):
 
 
 class TestHomeCity:
-    def test_the_most_frequent_city_wins(self, user):
+    def test_it_is_not_inferred_from_spending(self, user):
+        """
+        The old behaviour was to take the most frequent city of the last 90
+        days. That is backwards for anyone who travels: they spend more in
+        the places they go than at home, so the destination wins and every
+        journey is read in reverse. Unset now means unset.
+        """
         make_invoice(user, "北京", 1, ExpenseCategory.MEALS)
         make_invoice(user, "北京", 2, ExpenseCategory.MEALS)
         make_invoice(user, "上海", 3, ExpenseCategory.MEALS)
 
-        assert trip_service.infer_home_city(user) == "北京"
+        assert trip_service.home_city_for(user) == ""
 
-    def test_an_explicit_setting_wins(self, user):
+    def test_the_configured_city_is_used(self, user):
         make_invoice(user, "北京", 1, ExpenseCategory.MEALS)
 
-        assert trip_service.infer_home_city(user, "深圳") == "深圳"
+        assert trip_service.home_city_for(user, "深圳") == "深圳"
 
-    def test_no_data_gives_no_city(self, user):
-        assert trip_service.infer_home_city(user) == ""
+    def test_the_configured_city_is_normalised(self, user):
+        assert trip_service.home_city_for(user, "北京市") == "北京"
+
+    def test_no_setting_gives_no_city(self, user):
+        assert trip_service.home_city_for(user) == ""
 
 
 class TestDetectTrips:

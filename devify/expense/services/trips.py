@@ -11,11 +11,9 @@ matters more than accuracy here: a claim has to be defensible.
 from __future__ import annotations
 
 import logging
-from collections import Counter
 from datetime import timedelta
 from decimal import Decimal
 
-from django.utils import timezone
 
 from expense.constants import ExpenseCategory
 from expense.models import ExpenseGroup, Invoice, TripSuggestion
@@ -23,7 +21,6 @@ from expense.models import ExpenseGroup, Invoice, TripSuggestion
 logger = logging.getLogger(__name__)
 
 # How far back to look when inferring where someone normally works.
-HOME_CITY_WINDOW_DAYS = 90
 
 # A trip with no return leg is closed this long after its last receipt.
 OPEN_TRIP_TAIL_DAYS = 1
@@ -32,30 +29,42 @@ OPEN_TRIP_TAIL_DAYS = 1
 MIN_TRIP_INVOICES = 2
 
 
-def infer_home_city(user, explicit: str = "") -> str:
-    """
-    Where this person normally spends.
+# Chinese city names arrive with the administrative suffix attached or not,
+# depending on the document: a train ticket says "北京", a taxi receipt says
+# "北京市". Counted as written they are two places, which is how a home of
+# 北京 (11 invoices) lost the vote to 上海 (8) and inverted every trip after
+# it. Every comparison in this module goes through canonical_city.
+CITY_SUFFIXES = ("特别行政区", "自治州", "地区", "省", "市", "县", "区")
 
-    An explicit setting always wins; otherwise the most frequent city in
-    the recent past is the best available signal.
-    """
-    if explicit:
-        return explicit
 
-    since = timezone.now().date() - timedelta(days=HOME_CITY_WINDOW_DAYS)
-    cities = (
-        Invoice.objects.filter(
-            user=user,
-            status=Invoice.Status.EXTRACTED,
-            expense_date__gte=since,
-        )
-        .exclude(city="")
-        .values_list("city", flat=True)
-    )
-    counts = Counter(cities)
-    if not counts:
-        return ""
-    return counts.most_common(1)[0][0]
+def canonical_city(city: str) -> str:
+    """One spelling per city, so counting and comparing agree."""
+    name = (city or "").strip()
+    for suffix in CITY_SUFFIXES:
+        # Only strip a suffix that leaves a name behind — "市" alone is not
+        # a city. Trailing suffix only: the values in play are "北京" and
+        # "北京市", not "北京市朝阳区", and guessing at a district-level
+        # name would be a different job from normalising a spelling.
+        if len(name) > len(suffix) + 1 and name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def home_city_for(user, explicit: str = "") -> str:
+    """
+    The city this person travels out from, as they configured it.
+
+    Deliberately not inferred. This used to fall back to the most frequent
+    city of the last 90 days, which is a bad proxy for home and got it
+    wrong in exactly the case the feature exists for: someone who travels
+    spends more in the places they travel to, so the destination outvotes
+    home. Getting it wrong does not degrade trip detection, it inverts it —
+    every outbound ticket reads as coming home and every return as leaving,
+    so two round trips come back as one trip straddling both plus an
+    unclosed fragment. An empty answer produces no suggestions, which is
+    the honest outcome until the user tells us.
+    """
+    return canonical_city(explicit)
 
 
 def claimable(user):
@@ -78,7 +87,7 @@ def detect_trips(user, home_city: str = "") -> list[dict]:
     A ticket leaving the home city opens a window; the first ticket back
     closes it. Everything spent elsewhere in between belongs to the trip.
     """
-    home = infer_home_city(user, home_city)
+    home = home_city_for(user, home_city)
     if not home:
         # Without a home city there is no "away", so there is nothing to
         # infer. Saying so beats inventing trips from noise.
@@ -97,8 +106,9 @@ def detect_trips(user, home_city: str = "") -> list[dict]:
     open_trip = None
 
     for invoice in long_haul:
-        going_out = bool(invoice.city) and invoice.city != home
-        coming_back = invoice.city == home
+        city = canonical_city(invoice.city)
+        going_out = bool(city) and city != home
+        coming_back = city == home
 
         if open_trip is None:
             if going_out:
@@ -137,7 +147,7 @@ def _fill_trip(trip: dict, invoices, home: str) -> dict:
         if invoice.expense_date
         and start <= invoice.expense_date <= end
         and (
-            invoice.city != home
+            canonical_city(invoice.city) != home
             # The journey home is a trip cost too. Its destination is the
             # home city, so filtering on location alone would drop the
             # return leg and understate the claim.

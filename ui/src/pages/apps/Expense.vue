@@ -60,8 +60,10 @@
             <TripSuggestionCard
               :trips="trips"
               :accepting="acceptingTrip"
+              :home-city="config?.home_city || ''"
               @accept="acceptTrip"
               @dismiss="dismissTrip"
+              @configure="activeTab = 'settings'"
             />
 
             <InvoiceSection

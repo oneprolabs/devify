@@ -1553,7 +1553,7 @@
       "saved": "Saved.",
       "homeCity": "Home city",
       "homeCityPlaceholder": "e.g. Beijing",
-      "homeCityHelp": "Used to tell business travel from everyday spending. Leave blank to infer it from recent invoices.",
+      "homeCityHelp": "Used to tell business travel from everyday spending. Without it there are no trip suggestions: a trip is a journey out of this city and back.",
       "filenameTemplate": "Export filename template",
       "filenameTemplateHelp": "Decides what each file inside the export archive is called.",
       "keywords": "Invoice keywords",

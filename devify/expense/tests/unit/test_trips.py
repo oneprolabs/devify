@@ -30,12 +30,20 @@ class TestCanonicalCity:
             ("上海市", "上海"),
             ("  上海  ", "上海"),
             ("香港特别行政区", "香港"),
+            # 自治区 must be tried before 区 would bite off one character.
+            ("西藏自治区", "西藏"),
+            ("内蒙古自治区", "内蒙古"),
             ("", ""),
             (None, ""),
             # Not a city: nothing would be left behind.
             ("市", "市"),
             # A station is not a city and must not be mistaken for one.
             ("上海虹桥", "上海虹桥"),
+            # A district is not a city either. 西安区 belongs to 辽源 in
+            # Jilin; reducing it to 西安 would let a Xi'an user's home city
+            # swallow the receipt and drop it from their trip.
+            ("西安区", "西安区"),
+            ("朝阳区", "朝阳区"),
         ],
     )
     def test_spelling_collapses(self, raw, expected):

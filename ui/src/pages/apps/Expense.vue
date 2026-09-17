@@ -268,8 +268,16 @@ async function loadConfig() {
   }
 }
 
-function onConfigUpdated(updated) {
+async function onConfigUpdated(updated) {
+  const homeCityChanged = config.value?.home_city !== updated?.home_city
   config.value = updated
+  // Setting a home city is what makes trip detection possible at all, so the
+  // suggestions have to be fetched again here. Without this the prompt card
+  // hides (home city is set now) while trips is still the empty array from
+  // the load before it, and the invoices tab shows neither.
+  if (homeCityChanged) {
+    await loadTrips()
+  }
 }
 
 async function handleToggle(enabled) {

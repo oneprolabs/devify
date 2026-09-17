@@ -1562,7 +1562,7 @@
       "saved": "已保存。",
       "homeCity": "常驻城市",
       "homeCityPlaceholder": "例如：北京",
-      "homeCityHelp": "用于判断哪些消费属于出差。留空则按最近的消费记录自动推断。",
+      "homeCityHelp": "用于判断哪些消费属于出差。不填就不会生成出差建议——出差是按「离开这座城市、再回来」判断的。",
       "filenameTemplate": "导出命名模板",
       "filenameTemplateHelp": "决定导出压缩包里每个文件的名字。",
       "keywords": "发票关键词",

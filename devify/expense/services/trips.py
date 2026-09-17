@@ -14,13 +14,11 @@ import logging
 from datetime import timedelta
 from decimal import Decimal
 
-
 from expense.constants import ExpenseCategory
 from expense.models import ExpenseGroup, Invoice, TripSuggestion
 
 logger = logging.getLogger(__name__)
 
-# How far back to look when inferring where someone normally works.
 
 # A trip with no return leg is closed this long after its last receipt.
 OPEN_TRIP_TAIL_DAYS = 1
@@ -34,7 +32,12 @@ MIN_TRIP_INVOICES = 2
 # "北京市". Counted as written they are two places, which is how a home of
 # 北京 (11 invoices) lost the vote to 上海 (8) and inverted every trip after
 # it. Every comparison in this module goes through canonical_city.
-CITY_SUFFIXES = ("特别行政区", "自治州", "地区", "省", "市", "县", "区")
+# Prefix-free longest-first: 特别行政区 and 自治区 have to be tried before
+# 区 would bite off only its last character. Bare 区 and 县 are deliberately
+# absent — they name a district or county, not a city, and stripping them
+# collides distinct places: 西安区 is part of 辽源 in Jilin, and reducing it
+# to 西安 would let a Xi'an user's home city swallow the receipt.
+CITY_SUFFIXES = ("特别行政区", "自治区", "自治州", "地区", "省", "市")
 
 
 def canonical_city(city: str) -> str:
@@ -113,7 +116,11 @@ def detect_trips(user, home_city: str = "") -> list[dict]:
         if open_trip is None:
             if going_out:
                 open_trip = {
-                    "destination_city": invoice.city,
+                    # Canonical, not raw: this is the dedup key in
+                    # refresh_suggestions, so a differently-spelled duplicate
+                    # opening the same window would otherwise miss the
+                    # already-decided lookup and resurrect a dismissed trip.
+                    "destination_city": city,
                     "start_date": invoice.expense_date,
                     "end_date": invoice.expense_date,
                     "has_return": False,

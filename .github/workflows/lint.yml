@@ -1,0 +1,56 @@
+name: Lint
+
+# Only the Python files this pull request touches. The repository predates
+# any enforced formatting — 234 of its files disagree with isort today — so
+# a whole-tree gate would be one enormous reformat rather than a review of
+# the change in hand. Checking the diff holds new work to the standard and
+# lets the rest converge as it is edited.
+on:
+  pull_request:
+    paths:
+      - '**.py'
+      - '.github/workflows/lint.yml'
+      - 'pyproject.toml'
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # isort and flake8 read the diff against the base branch, so the
+          # merge-base has to be in the clone.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the linters
+        run: pip install "isort>=5.13.0" "flake8>=7.0.0"
+
+      - name: Collect the Python files this PR touches
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # Deleted files would fail to open; migrations are generated.
+          git diff --name-only --diff-filter=d "${BASE_SHA}" "${HEAD_SHA}" \
+            | grep -E '\.py$' \
+            | grep -v '/migrations/' \
+            > changed.txt || true
+          echo "count=$(wc -l < changed.txt)" >> "$GITHUB_OUTPUT"
+          echo "Files to lint:"
+          cat changed.txt
+
+      - name: isort
+        if: steps.changed.outputs.count != '0'
+        run: xargs -r -a changed.txt python -m isort --check-only --diff
+
+      - name: flake8
+        if: steps.changed.outputs.count != '0'
+        run: xargs -r -a changed.txt python -m flake8

@@ -1,0 +1,11 @@
+[flake8]
+# Matches [tool.isort] and [tool.black] in pyproject.toml, which flake8
+# cannot read. E203 and W503 are the two black disagrees with by design.
+max-line-length = 79
+extend-ignore = E203, W503
+exclude =
+    .git,
+    __pycache__,
+    */migrations/*,
+    .venv,
+    node_modules

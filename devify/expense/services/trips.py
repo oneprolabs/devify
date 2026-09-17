@@ -36,8 +36,11 @@ MIN_TRIP_INVOICES = 2
 # 区 would bite off only its last character. Bare 区 and 县 are deliberately
 # absent — they name a district or county, not a city, and stripping them
 # collides distinct places: 西安区 is part of 辽源 in Jilin, and reducing it
-# to 西安 would let a Xi'an user's home city swallow the receipt.
-CITY_SUFFIXES = ("特别行政区", "自治区", "自治州", "地区", "省", "市")
+# to 西安 would let a Xi'an user's home city swallow the receipt. 自治州 and
+# 地区 are absent for a different reason: they are part of the name, not a
+# suffix on it — 巴音郭楞蒙古自治州 shortened to 巴音郭楞蒙古 is not a
+# place, and it is what the trip and its expense group get named.
+CITY_SUFFIXES = ("特别行政区", "自治区", "省", "市")
 
 
 def canonical_city(city: str) -> str:
@@ -83,6 +86,28 @@ def claimable(user):
     )
 
 
+def at_home(invoice, home: str) -> bool:
+    """
+    Whether this receipt was incurred in the user's own city.
+
+    Two readings have to agree with "home", because the station list maps a
+    station to its prefecture-level city: 义乌 is listed under 金华, 昆山南
+    under 苏州. A user who lives in 义乌 and writes that as their home city
+    would otherwise never come home — their return leg would read as another
+    departure, leaving the trip open to swallow every journey after it.
+
+    So a station whose name starts with the home city counts as home too.
+    Station names are built from the city they serve, so 义乌 matches 义乌,
+    昆山 matches 昆山南 and 北京 matches 北京南, while a user who writes the
+    prefecture instead (苏州) is already matched by the looked-up city.
+    """
+    if canonical_city(invoice.city) == home:
+        return True
+    details = invoice.ticket_details or {}
+    station = str(details.get("to_station") or "").strip()
+    return bool(home) and station.startswith(home)
+
+
 def detect_trips(user, home_city: str = "") -> list[dict]:
     """
     Find trips by using long-distance travel as the skeleton.
@@ -110,8 +135,8 @@ def detect_trips(user, home_city: str = "") -> list[dict]:
 
     for invoice in long_haul:
         city = canonical_city(invoice.city)
-        going_out = bool(city) and city != home
-        coming_back = city == home
+        coming_back = at_home(invoice, home)
+        going_out = bool(city) and not coming_back
 
         if open_trip is None:
             if going_out:

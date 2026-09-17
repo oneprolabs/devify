@@ -32,6 +32,11 @@ class Command(BaseCommand):
         try:
             response = requests.get(SOURCE_URL, timeout=30)
             response.raise_for_status()
+            # requests guesses ISO-8859-1 for a text/* response with no
+            # charset, which turns every station name into mojibake that
+            # still parses — non-empty names, no error, a silently ruined
+            # reference file.
+            response.encoding = "utf-8"
         except requests.RequestException as exc:
             raise CommandError(
                 f"Could not fetch the station list.\n"
@@ -84,6 +89,19 @@ class Command(BaseCommand):
         for name in moved:
             self.stdout.write(
                 f"  {name}: {current[name]} -> {stations[name]}"
+            )
+
+        # A partial upstream change can still yield parseable records, so
+        # size is the check that a good file is not overwritten by a bad
+        # one. Losing a tenth of the network at once is not a real edit.
+        if current and len(removed) > len(current) // 10:
+            raise CommandError(
+                f"Refusing to write: {len(removed)} of {len(current)} "
+                f"stations disappeared.\n"
+                f"  Likely cause: 12306 changed the format and only part "
+                f"of the file parsed.\n"
+                f"  Try: read {SOURCE_URL} and check the field positions "
+                f"in this command."
             )
 
         if options["dry_run"]:

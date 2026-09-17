@@ -15,7 +15,8 @@ import pytest
 from django.utils import timezone
 
 from expense.models import Invoice
-from expense.services.trips import canonical_city, detect_trips, home_city_for
+from expense.services.trips import (at_home, canonical_city, detect_trips,
+                                    home_city_for)
 from threadline.models import EmailMessage
 
 
@@ -122,3 +123,37 @@ class TestDetectTrips:
         _invoice(user, 10, "北京")  # a return with nothing open
 
         assert detect_trips(user, "北京") == []
+
+
+@pytest.mark.django_db
+class TestAtHome:
+    """
+    The station list maps a station to its prefecture-level city, so a
+    county-level home never matches the looked-up city. 义乌 is listed
+    under 金华; without the station check a resident of 义乌 would never
+    come home, and their trip would stay open and swallow the next one.
+    """
+
+    def test_the_looked_up_city_matches(self, user):
+        invoice = _invoice(user, 9, "苏州")
+        invoice.ticket_details = {"to_station": "昆山南"}
+
+        assert at_home(invoice, "苏州") is True
+
+    def test_a_county_level_home_matches_its_station(self, user):
+        invoice = _invoice(user, 9, "金华")
+        invoice.ticket_details = {"to_station": "义乌"}
+
+        assert at_home(invoice, "义乌") is True
+
+    def test_a_directional_station_matches_its_city(self, user):
+        invoice = _invoice(user, 9, "北京")
+        invoice.ticket_details = {"to_station": "北京南"}
+
+        assert at_home(invoice, "北京") is True
+
+    def test_somewhere_else_is_not_home(self, user):
+        invoice = _invoice(user, 9, "上海")
+        invoice.ticket_details = {"to_station": "上海虹桥"}
+
+        assert at_home(invoice, "北京") is False

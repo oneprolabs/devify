@@ -157,11 +157,29 @@ def _station_cities() -> dict:
             return json.load(handle)
     except (OSError, ValueError):
         logger.warning(
-            "Station list at %s is missing or unreadable; a train ticket's "
-            "city will fall back to whatever the model read.",
+            "Station list at %s is missing or unreadable. Every train "
+            "ticket now takes the city the model read, which is the "
+            "second reading this lookup exists to replace — expect the "
+            "spelling to vary and trip grouping to suffer.",
             _STATION_CITY_PATH,
         )
         return {}
+
+
+def _station_key(value) -> str:
+    """
+    The name as the list spells it.
+
+    Not one of the 3384 entries ends in 站, but a ticket layout may print
+    "北京南站" and a model may read it back that way. Without this the
+    lookup misses, and a missed lookup on a long-haul ticket leaves the city
+    empty — which in trip detection is neither leaving nor coming home, so
+    the leg cannot open or close a trip at all.
+    """
+    name = str(value or "").strip()
+    if len(name) > 2 and name.endswith("站"):
+        return name[:-1]
+    return name
 
 
 def resolve_city(ticket_details: dict, model_city: str) -> str:
@@ -179,7 +197,7 @@ def resolve_city(ticket_details: dict, model_city: str) -> str:
     — every other kind of receipt, and any station not in it.
     """
     if isinstance(ticket_details, dict):
-        station = str(ticket_details.get("to_station") or "").strip()
+        station = _station_key(ticket_details.get("to_station"))
         if station:
             city = _station_cities().get(station)
             if city:

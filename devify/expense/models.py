@@ -95,7 +95,10 @@ class ExpenseUserConfig(models.Model):
         max_length=64,
         blank=True,
         verbose_name=_("Home City"),
-        help_text=_("Leave blank to infer from recent invoices"),
+        help_text=_(
+            "Where trips start and end. Blank means no trip "
+            "suggestions: a trip is a journey out of this city and back"
+        ),
     )
     sender_allowlist = models.JSONField(
         default=list, blank=True, verbose_name=_("Sender Allowlist")

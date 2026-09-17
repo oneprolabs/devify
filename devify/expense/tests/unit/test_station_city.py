@@ -36,6 +36,20 @@ class TestStationList:
     def test_every_station_names_a_city(self):
         assert all(name and city for name, city in _station_cities().items())
 
+    def test_no_city_is_mangled_by_the_canonical_form(self):
+        """
+        Suggestion names come from these values through canonical_city, so
+        a value it truncates becomes a group named after a non-place.
+        """
+        from expense.services.trips import canonical_city
+
+        mangled = sorted(
+            c for c in set(_station_cities().values())
+            if canonical_city(c) != c and not c.endswith("市")
+        )
+
+        assert mangled == []
+
     def test_cities_are_spelled_without_a_suffix(self):
         """
         The list is also what makes the spelling consistent, so a value out
@@ -59,6 +73,23 @@ class TestResolveCity:
 
     def test_surrounding_space_does_not_break_the_lookup(self):
         assert resolve_city({"to_station": "  杭州东  "}, "") == "杭州"
+
+    @pytest.mark.parametrize(
+        "station,expected",
+        [("北京南站", "北京"), ("上海虹桥站", "上海"), ("  杭州东站 ", "杭州")],
+    )
+    def test_a_trailing_station_character_still_matches(
+        self, station, expected
+    ):
+        """
+        Not one of the 3384 entries ends in 站, but tickets print it and
+        models read it back. A miss here leaves the city empty, and an
+        empty city on a long-haul ticket neither opens nor closes a trip.
+        """
+        assert resolve_city({"to_station": station}, "") == expected
+
+    def test_a_bare_station_character_is_not_stripped_to_nothing(self):
+        assert resolve_city({"to_station": "站"}, "上海") == "上海"
 
     @pytest.mark.parametrize(
         "ticket_details",

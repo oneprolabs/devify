@@ -118,6 +118,53 @@ compose() {
         "$@"
 }
 
+# How many times one image is worth retrying, and how long to wait between.
+PULL_ATTEMPTS=3
+PULL_BACKOFF_SECONDS=5
+
+
+# Pull one image at a time, retrying each.
+#
+# `compose pull` fetches every service in parallel, and the registry's auth
+# service resets the connection under that load — it blocked two releases
+# before this was written, on a host where the same images pull cleanly one
+# after another. install.sh has always pulled serially with retries for the
+# same reason; this is the blue/green path catching up.
+#
+# Arguments are passed through to `compose config --images`, so a service
+# name narrows it and a bare call covers the whole stack. Profiled services
+# need their --profile flag, which is what PULL_COMPOSE_ARGS carries.
+pull_images_serially() {
+    local images image attempt
+    # shellcheck disable=SC2086
+    images="$(compose ${PULL_COMPOSE_ARGS:-} config --images "$@" \
+        | sort -u)"
+    [ -n "${images}" ] || return 0
+
+    for image in ${images}; do
+        attempt=1
+        while :; do
+            if docker pull "${image}" >/dev/null 2>&1; then
+                log "Pulled ${image}"
+                break
+            fi
+            if [ "${attempt}" -ge "${PULL_ATTEMPTS}" ]; then
+                die "Could not pull ${image} after ${PULL_ATTEMPTS} attempts.
+  Likely cause: the registry refused or reset the connection — its auth
+    service does this under load, which is why images are pulled one at a
+    time here.
+  Try: docker pull ${image}
+    on this host to see the error, and check the registry credentials in
+    ${ENV_FILE} if it is an authentication failure."
+            fi
+            log "Pull of ${image} failed (attempt ${attempt}); retrying..."
+            attempt=$((attempt + 1))
+            sleep "${PULL_BACKOFF_SECONDS}"
+        done
+    done
+}
+
+
 # Blue/green helpers (current_color/other_color/wait_for_healthy/switch_traffic)
 DEPLOY_PATH="${DEPLOY_ROOT}"
 # shellcheck source=./lib/deploy-common.sh
@@ -343,7 +390,7 @@ bluegreen_deploy() {
     sync_nginx_confd
     # Local mode rehearses against already-present images and skips the pull.
     if [ "${LOCAL_MODE}" != "1" ]; then
-        compose pull
+        pull_images_serially
     fi
 
     # Foundational stateful services first (idempotent no-op if already up).
@@ -364,11 +411,11 @@ bluegreen_deploy() {
         log "Active color: ${current}; deploying idle color: ${next}"
     fi
 
-    # Explicitly pull the deploy color: the bare `compose pull` above skips
+    # Explicitly pull the deploy color: the whole-stack pull above skips
     # profiled services, and a moving :latest already present locally is not
     # re-pulled otherwise, so a deploy could silently run a stale image.
     if [ "${LOCAL_MODE}" != "1" ]; then
-        compose --profile "${next}" pull \
+        PULL_COMPOSE_ARGS="--profile ${next}" pull_images_serially \
             "devify-api-${next}" "devify-ui-${next}"
     fi
 
@@ -550,7 +597,7 @@ update_home() {
     ensure_stack_files
     if [ "${LOCAL_MODE}" != "1" ]; then
         log "Pulling devify-home image..."
-        compose pull devify-home
+        pull_images_serially devify-home
     fi
     log "Recreating devify-home under compose management..."
     compose up -d devify-home
@@ -627,7 +674,7 @@ main() {
             ensure_env
             sync_devify
             prepare_directories
-            compose pull "$@"
+            pull_images_serially "$@"
             ;;
         start)
             check_requirements

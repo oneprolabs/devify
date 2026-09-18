@@ -1540,7 +1540,10 @@
       "freeNote": "Trip grouping is pure rule work: no model call, no credits.",
       "acceptFailed": "That did not work. Please try again.",
       "confident": "High confidence",
-      "unsure": "Outbound leg only, no return ticket found - check the dates"
+      "unsure": "Outbound leg only, no return ticket found - check the dates",
+      "needsHomeCityTitle": "Set your home city to detect trips",
+      "needsHomeCityBody": "A trip is a journey out of your home city and back, so we need to know where home is. This used to be guessed from your spending, but people spend more where they travel than where they live, so the guess tended to name the destination — and read every journey backwards.",
+      "needsHomeCityAction": "Open settings"
     },
     "tabsSettings": "Settings",
     "disabledHint": "The expense app is off. Turn it on in Settings and invoices will be read as mail arrives and shown here; mail from before that can be backfilled by hand.",
@@ -1550,7 +1553,7 @@
       "saved": "Saved.",
       "homeCity": "Home city",
       "homeCityPlaceholder": "e.g. Beijing",
-      "homeCityHelp": "Used to tell business travel from everyday spending. Leave blank to infer it from recent invoices.",
+      "homeCityHelp": "Used to tell business travel from everyday spending. Without it there are no trip suggestions: a trip is a journey out of this city and back.",
       "filenameTemplate": "Export filename template",
       "filenameTemplateHelp": "Decides what each file inside the export archive is called.",
       "keywords": "Invoice keywords",

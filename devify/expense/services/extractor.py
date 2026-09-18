@@ -8,9 +8,12 @@ back as a clean negative instead of a hallucinated invoice.
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
+from pathlib import Path
 
 from core.tracking import LLMTracker
 from expense.constants import INVOICE_TYPE_CATEGORY_MAP, ExpenseCategory
@@ -139,6 +142,69 @@ def resolve_expense_date(ticket_details: dict, issue_date):
     return issue_date
 
 
+_STATION_CITY_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "data"
+    / "railway_station_city.json"
+)
+
+
+@lru_cache(maxsize=1)
+def _station_cities() -> dict:
+    """12306's own station list, station name to city. See data/README.md."""
+    try:
+        with _STATION_CITY_PATH.open(encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        logger.warning(
+            "Station list at %s is missing or unreadable. Every train "
+            "ticket now takes the city the model read, which is the "
+            "second reading this lookup exists to replace — expect the "
+            "spelling to vary and trip grouping to suffer.",
+            _STATION_CITY_PATH,
+        )
+        return {}
+
+
+def _station_key(value) -> str:
+    """
+    The name as the list spells it.
+
+    Not one of the 3384 entries ends in 站, but a ticket layout may print
+    "北京南站" and a model may read it back that way. Without this the
+    lookup misses, and a missed lookup on a long-haul ticket leaves the city
+    empty — which in trip detection is neither leaving nor coming home, so
+    the leg cannot open or close a trip at all.
+    """
+    name = str(value or "").strip()
+    if len(name) > 2 and name.endswith("站"):
+        return name[:-1]
+    return name
+
+
+def resolve_city(ticket_details: dict, model_city: str) -> str:
+    """
+    Where the money was spent, looked up rather than judged.
+
+    A train ticket names its destination station, and that station belongs
+    to exactly one city — so asking the model for `city` as well was asking
+    it to answer a question the document had already answered, on the one
+    field trip grouping runs on. The lookup also spells the city the same
+    way every time, which the model did not: 北京 and 北京市 both occur in
+    production and are counted as two different places downstream.
+
+    The model still answers for everything the station list does not cover
+    — every other kind of receipt, and any station not in it.
+    """
+    if isinstance(ticket_details, dict):
+        station = _station_key(ticket_details.get("to_station"))
+        if station:
+            city = _station_cities().get(station)
+            if city:
+                return city
+    return _clean_text(model_city, 64)
+
+
 def _clean_text(value, limit: int) -> str:
     return str(value or "").strip()[:limit]
 
@@ -222,7 +288,7 @@ def normalize(raw: dict) -> dict:
         "tax_amount": tax,
         "amount_excl_tax": excl,
         "currency": _clean_text(raw.get("currency"), 8) or "CNY",
-        "city": _clean_text(raw.get("city"), 64),
+        "city": resolve_city(ticket_details, raw.get("city")),
         "category": category,
         "category_source": category_source,
         "items": items if isinstance(items, list) else [],

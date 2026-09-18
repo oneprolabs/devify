@@ -233,7 +233,10 @@ tmp
 .vscode
 
 staticfiles
-data
+# Anchored: the runtime data directory is at the repository root. Unanchored
+# this swallowed devify/expense/data/, which is checked-in reference data,
+# and the code shipped without the file it reads.
+/data
 data.dev
 cache.dev
 

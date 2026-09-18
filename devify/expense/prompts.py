@@ -43,7 +43,9 @@ Rules:
   - taxi: city, start_at, end_at, distance
   - hotel: city, check_in, check_out, nights
 - "city" is where the expense happened, which is what trip grouping uses.
-  For a train or flight, use the destination.
+  For a train or flight, use the destination. Read "to_station" carefully
+  too: a train's city is looked up from the station where the station is
+  known, and falls back to your "city" where it is not.
 - "confidence" is how certain you are that the fields are read correctly.
 """
 

@@ -1,5 +1,24 @@
 <template>
-  <BaseCard v-if="trips.length">
+  <!-- No home city, no trips: the detection needs a city to travel out from
+       and no longer guesses one. Without this the card simply would not
+       render and there would be nothing to tell the user why. -->
+  <BaseCard v-if="!homeCity">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h2 class="text-lg font-semibold text-ink">
+          {{ t('expense.trips.needsHomeCityTitle') }}
+        </h2>
+        <p class="mt-1 max-w-prose text-sm text-ink-3">
+          {{ t('expense.trips.needsHomeCityBody') }}
+        </p>
+      </div>
+      <BaseButton size="sm" @click="$emit('configure')">
+        {{ t('expense.trips.needsHomeCityAction') }}
+      </BaseButton>
+    </div>
+  </BaseCard>
+
+  <BaseCard v-else-if="trips.length">
     <div class="space-y-3">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -93,10 +112,14 @@ defineProps({
   accepting: {
     type: String,
     default: ''
+  },
+  homeCity: {
+    type: String,
+    default: ''
   }
 })
 
-defineEmits(['accept', 'dismiss'])
+defineEmits(['accept', 'dismiss', 'configure'])
 
 const { t } = useI18n()
 const open = ref(true)

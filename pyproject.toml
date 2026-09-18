@@ -159,5 +159,17 @@ exclude_lines = [
 [tool.coverage.html]
 directory = "htmlcov"
 
-# Note: Code quality tools (black, isort, mypy) configurations removed
-# Install them separately if needed: pip install black isort mypy
+# Line length is 79 because that is what the code already does: of 65,000
+# lines outside migrations and tests, 348 exceed it and the 99th percentile
+# sits at 78. Picking a formatter default instead would have reformatted
+# the tree to match the tool rather than the other way round.
+[tool.isort]
+profile = "black"
+line_length = 79
+known_first_party = [
+    "accounts", "billing", "core", "expense", "relay", "threadline",
+]
+
+[tool.black]
+line-length = 79
+target-version = ["py312"]

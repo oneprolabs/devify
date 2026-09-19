@@ -366,6 +366,10 @@ class InvoiceUpdateSerializer(serializers.ModelSerializer):
             "invoice_no",
             "invoice_code",
             "issue_date",
+            # Trip grouping runs on this one. A model that misreads it puts
+            # the receipt on the wrong trip, and until now the only field
+            # that could move it was not correctable from anywhere.
+            "expense_date",
             "seller_name",
             "seller_tax_id",
             "buyer_name",

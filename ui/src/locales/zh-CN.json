@@ -1445,7 +1445,9 @@
         "total_amount": "价税合计",
         "tax_amount": "税额",
         "amount_excl_tax": "不含税金额",
-        "city": "消费城市"
+        "city": "消费城市",
+        "expense_date": "消费日期",
+        "summary_line": "商品明细"
       },
       "sources": {
         "rule": "按票种自动判定",
@@ -1487,7 +1489,11 @@
       "originalFailed": "原件加载失败。",
       "failed": "识别失败",
       "failedTitle": "这张没能读出来",
-      "failedHint": "多半是原件本身的问题——文件里没有可读的文字层，或者版式不是标准发票。可以点上面的原件自己核对；确认无误的话，直接手工填写下面的字段即可。"
+      "failedHint": "多半是原件本身的问题——文件里没有可读的文字层，或者版式不是标准发票。可以点上面的原件自己核对；确认无误的话，直接手工填写下面的字段即可。",
+      "expenseDateHint": "出差归集按这一天，改了会重新归组",
+      "filedTitle": "归档状态",
+      "filedDefault": "已归档",
+      "filedNote": "不计入报销，仅留存。"
     },
     "groups": {
       "title": "报销组",

@@ -54,15 +54,30 @@
         </p>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label v-for="field in textFields" :key="field.key" class="block">
-            <span class="mb-1 block text-xs text-ink-3">
+          <label
+            v-for="field in textFields"
+            :key="field.key"
+            class="block"
+            :class="field.wide ? 'sm:col-span-2' : ''"
+          >
+            <!-- An empty field on a recognised invoice is something the
+                 reader has to fill in, so it is coloured like the work it
+                 is rather than left to be spotted. -->
+            <span
+              class="mb-1 block text-xs"
+              :class="isBlank(field.key) ? 'text-warn' : 'text-ink-3'"
+            >
               {{ t(`expense.invoices.fields.${field.key}`) }}
             </span>
             <input
               v-model="form[field.key]"
               :type="field.type || 'text'"
-              class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              class="w-full rounded-lg border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              :class="isBlank(field.key) ? 'border-warn' : 'border-line'"
             />
+            <span v-if="field.hint" class="mt-1 block text-xs text-ink-4">
+              {{ t(`expense.invoices.${field.hint}`) }}
+            </span>
           </label>
 
           <label class="block">
@@ -87,9 +102,37 @@
           </label>
         </div>
 
+        <div v-if="invoice.summary_line" class="space-y-1">
+          <span class="block text-xs text-ink-3">
+            {{ t('expense.invoices.fields.summary_line') }}
+          </span>
+          <p class="text-sm leading-relaxed text-ink-2">
+            {{ invoice.summary_line }}
+          </p>
+        </div>
+
         <p class="text-xs leading-relaxed text-ink-3">
           {{ t('expense.invoices.learnHint') }}
         </p>
+
+        <!-- Filed invoices say so on the row; without this the drawer was
+             silent about it, so opening one to ask why it is not in a
+             group answered nothing. -->
+        <div v-if="invoice.disposition === 'filed'" class="space-y-2">
+          <p class="text-sm font-semibold text-ink">
+            {{ t('expense.invoices.filedTitle') }}
+          </p>
+          <div
+            class="flex items-center gap-2 rounded-lg border border-line bg-panel-sub p-3"
+          >
+            <span class="rounded-full bg-chip px-2 py-0.5 text-xs text-ink-2">
+              {{ invoice.filed_reason || t('expense.invoices.filedDefault') }}
+            </span>
+            <span class="text-xs text-ink-3">
+              {{ t('expense.invoices.filedNote') }}
+            </span>
+          </div>
+        </div>
 
         <div
           v-if="invoice.status === 'failed' && invoice.error_message"
@@ -190,7 +233,11 @@
           {{ t('expense.invoices.reextract') }}
         </BaseButton>
 
-        <BaseButton size="sm" :loading="saving" @click="$emit('save', form)">
+        <BaseButton
+          size="sm"
+          :loading="saving"
+          @click="$emit('save', buildPayload())"
+        >
           {{ t('common.save') }}
         </BaseButton>
       </footer>
@@ -227,18 +274,45 @@ defineEmits(['close', 'save', 'reextract'])
 
 const { t } = useI18n()
 
+// Ordered as the design canvas draws it — who issued it, who it is for,
+// when, how much, what for — rather than the order the fields happened to
+// be declared in. `wide` spans both columns for the two long names.
+//
+// expense_date is here because the list shows it and the drawer did not,
+// and it is the worse thing to be missing: trip grouping runs on it, so a
+// misread date puts a receipt on the wrong trip with no way to correct it
+// from here. summary_line is shown too, below the grid rather than in it —
+// the server derives it from items and ticket_details, so an input would
+// take an edit and quietly drop it.
 const textFields = [
-  { key: 'invoice_no' },
-  { key: 'issue_date', type: 'date' },
-  { key: 'seller_name' },
+  { key: 'seller_name', wide: true },
   { key: 'seller_tax_id' },
-  { key: 'buyer_name' },
+  { key: 'invoice_no' },
+  { key: 'buyer_name', wide: true },
   { key: 'buyer_tax_id' },
+  { key: 'city' },
+  { key: 'expense_date', type: 'date', hint: 'expenseDateHint' },
+  { key: 'issue_date', type: 'date' },
   { key: 'total_amount' },
   { key: 'tax_amount' },
-  { key: 'amount_excl_tax' },
-  { key: 'city' }
+  { key: 'amount_excl_tax' }
 ]
+
+// Blank on a recognised invoice means the model found nothing there, which
+// is a field to fill rather than a field that is simply empty.
+const isBlank = (key) => !String(form[key] ?? '').trim()
+
+// An empty date input holds '', which the API rejects outright ("Date has
+// wrong format") - so an invoice missing a date could not be saved at all,
+// not even to correct a different field. Blank means "unknown", which is
+// null.
+function buildPayload() {
+  const payload = { ...form }
+  textFields.forEach((field) => {
+    if (field.type === 'date' && isBlank(field.key)) payload[field.key] = null
+  })
+  return payload
+}
 
 const categories = [
   'transport_long',

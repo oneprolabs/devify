@@ -1436,7 +1436,9 @@
         "total_amount": "Total",
         "tax_amount": "Tax",
         "amount_excl_tax": "Excluding tax",
-        "city": "City"
+        "city": "City",
+        "expense_date": "Spent on",
+        "summary_line": "Line items"
       },
       "sources": {
         "rule": "From the ticket type",
@@ -1478,7 +1480,11 @@
       "originalFailed": "Could not load the original.",
       "failed": "Not read",
       "failedTitle": "This one could not be read",
-      "failedHint": "Usually the file itself: no readable text layer, or a layout that is not a standard invoice. Check the original above; if it looks fine, fill the fields in by hand."
+      "failedHint": "Usually the file itself: no readable text layer, or a layout that is not a standard invoice. Check the original above; if it looks fine, fill the fields in by hand.",
+      "expenseDateHint": "Trips are grouped by this date; changing it regroups the invoice",
+      "filedTitle": "Filed",
+      "filedDefault": "Filed",
+      "filedNote": "Kept on record, left out of claims."
     },
     "groups": {
       "title": "Reimbursement groups",

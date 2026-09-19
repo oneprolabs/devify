@@ -10,7 +10,6 @@ from expense.constants import ExpenseCategory
 from expense.models import CategoryRule, ExpenseGroup, Invoice
 from threadline.models import EmailAttachment, EmailMessage
 
-
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
 LIST_URL = "/api/v1/apps/expense/invoices"

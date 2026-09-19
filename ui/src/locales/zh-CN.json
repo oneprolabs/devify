@@ -1494,7 +1494,29 @@
       "filedTitle": "归档状态",
       "filedNote": "不计入报销，仅留存。",
       "unfile": "撤销归档",
-      "reextractWithCost": "重新识别 · {credits} 点"
+      "reextractWithCost": "重新识别 · {credits} 点",
+      "ticketFields": {
+        "train_no": "车次",
+        "seat_class": "席别",
+        "seat_no": "座位号",
+        "from_station": "出发",
+        "to_station": "到达",
+        "passenger": "乘车人",
+        "passenger_phone": "手机号",
+        "depart_at": "发车时间",
+        "city": "城市",
+        "start_at": "起点时间",
+        "end_at": "终点时间",
+        "from_address": "上车地点",
+        "to_address": "下车地点",
+        "distance": "里程",
+        "car_type": "车型",
+        "service_provider": "服务商",
+        "trip_count": "行程数",
+        "check_in": "入住",
+        "check_out": "离店",
+        "nights": "间夜"
+      }
     },
     "groups": {
       "title": "报销组",

@@ -60,7 +60,7 @@
         </button>
       </header>
 
-      <div class="flex-1 space-y-[17px] px-5 py-[18px]">
+      <div class="flex flex-1 flex-col gap-[17px] px-5 py-[18px]">
         <p
           v-if="invoice.needs_review"
           class="rounded-lg border border-warn bg-warn-soft px-[13px] py-[11px] text-[calc(11.5px*var(--fs))] leading-[1.6] text-warn"
@@ -260,7 +260,7 @@
             class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-[7px] rounded-lg bg-panel-sub px-[13px] py-3 text-[calc(11.5px*var(--fs))] sm:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
           >
             <template v-for="(value, key) in invoice.ticket_details" :key="key">
-              <dt class="text-ink-3">{{ key }}</dt>
+              <dt class="text-ink-3">{{ ticketLabel(key) }}</dt>
               <dd class="truncate text-ink">{{ value }}</dd>
             </template>
           </dl>
@@ -335,7 +335,7 @@ const props = defineProps({
 
 defineEmits(['close', 'save', 'reextract', 'unfile'])
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 // Ordered as the design canvas draws it — who issued it, who it is for,
 // when, how much, what for — rather than the order the fields happened to
@@ -363,6 +363,14 @@ const textFields = [
 
 // Blank on a recognised invoice means the model found nothing there, which
 // is a field to fill rather than a field that is simply empty.
+// ticket_details keys come straight off the model's JSON, so the block
+// was printing "passenger" and "train_no" at the reader. Anything not in
+// the table falls back to the raw key rather than disappearing.
+const ticketLabel = (key) => {
+  const path = `expense.invoices.ticketFields.${key}`
+  return te(path) ? t(path) : key
+}
+
 const isBlank = (key) => !String(form[key] ?? '').trim()
 
 // An empty date input holds '', which the API rejects outright ("Date has

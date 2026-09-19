@@ -1485,7 +1485,29 @@
       "filedTitle": "Filed",
       "filedNote": "Kept on record, left out of claims.",
       "unfile": "Undo filing",
-      "reextractWithCost": "Read again · {credits} credit"
+      "reextractWithCost": "Read again · {credits} credit",
+      "ticketFields": {
+        "train_no": "Train",
+        "seat_class": "Class",
+        "seat_no": "Seat",
+        "from_station": "From",
+        "to_station": "To",
+        "passenger": "Passenger",
+        "passenger_phone": "Phone",
+        "depart_at": "Departs",
+        "city": "City",
+        "start_at": "Started",
+        "end_at": "Ended",
+        "from_address": "Pick-up",
+        "to_address": "Drop-off",
+        "distance": "Distance",
+        "car_type": "Car",
+        "service_provider": "Provider",
+        "trip_count": "Trips",
+        "check_in": "Check-in",
+        "check_out": "Check-out",
+        "nights": "Nights"
+      }
     },
     "groups": {
       "title": "Reimbursement groups",

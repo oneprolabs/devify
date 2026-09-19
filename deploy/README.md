@@ -83,6 +83,7 @@ DEVIFY_REPO=https://github.com/oneprolabs/devify.git DEVIFY_REF=main \
 ./deploy/scripts/devify-deploy.sh logs
 ./deploy/scripts/devify-deploy.sh logs devify-api
 ./deploy/scripts/devify-deploy.sh restart
+./deploy/scripts/devify-deploy.sh recreate
 ./deploy/scripts/devify-deploy.sh stop
 ./deploy/scripts/devify-deploy.sh start
 ./deploy/scripts/devify-deploy.sh config

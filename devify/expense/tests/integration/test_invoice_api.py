@@ -394,4 +394,3 @@ class TestClaimedFilter:
         api_client.force_authenticate(user=user)
 
         assert len(self._numbers(api_client)) == 2
-

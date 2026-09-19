@@ -457,4 +457,3 @@ class GroupItemsSerializer(serializers.Serializer):
     invoice_uuids = serializers.ListField(
         child=serializers.UUIDField(), allow_empty=False
     )
-

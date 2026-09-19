@@ -1,6 +1,13 @@
 <template>
   <!-- The list narrows to this while the drawer is open: enough to recognise
-       a conversation and pick the next one, nothing more. -->
+       a conversation and pick the next one, nothing more.
+
+       No selection checkbox on purpose. Merging is a list-management task,
+       not a reading one — it needs several rows compared side by side and a
+       confirmation step, none of which fits 328px beside an open
+       conversation. The card is a <button>, so a checkbox inside it would
+       also nest one control in another. Closing the drawer returns the full
+       toolbar, which is where merging belongs. -->
   <button
     type="button"
     class="flex w-full flex-col gap-[5px] border-b border-line-soft border-l-2 py-[11px] pr-3.5 text-left transition-colors"

@@ -44,25 +44,35 @@
                 <path d="M20 20l-4.5-4.5" stroke-linecap="round" />
               </svg>
             </button>
-            <button
-              type="button"
-              class="flex h-7 w-7 items-center justify-center rounded-md border border-line transition-colors hover:border-ink-4"
-              :class="hasFilters ? 'text-accent' : 'text-ink-2'"
-              :aria-label="t('chats.statusAll')"
-              @click="cycleStatusFilter"
-            >
-              <svg
-                class="h-3.5 w-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-              >
-                <path d="M4 6h16M7 12h10M10 18h4" stroke-linecap="round" />
-              </svg>
-            </button>
           </div>
+        </div>
+
+        <!-- Filters get their own row rather than an icon in the header:
+             at 328px two selects fit side by side, and a select shows the
+             value it is on. The icon that used to sit up there cycled five
+             states with no label, so reaching one meant clicking until the
+             rows looked right. -->
+        <div class="flex items-center gap-1.5 border-b border-line px-3.5 py-2">
+          <FilterSelect
+            v-model="statusFilter"
+            :label="railStatusLabel"
+            :options="railStatusOptions"
+            size="sm"
+          />
+          <FilterSelect
+            v-model="rangeFilter"
+            :label="railDateRangeLabel"
+            :options="railRangeOptions"
+            size="sm"
+          />
+          <button
+            v-if="hasFilters"
+            type="button"
+            class="ml-auto flex-none rounded-md px-1.5 py-1 text-[calc(11px*var(--fs))] text-ink-3 transition-colors hover:text-ink"
+            @click="clearFilters"
+          >
+            {{ t('todos.filters.clearAll') }}
+          </button>
         </div>
 
         <div v-if="railSearchOpen" class="border-b border-line px-3.5 py-2">
@@ -460,6 +470,7 @@ import ChatRow from '@/components/chats/ChatRow.vue'
 import ChatCard from '@/components/chats/ChatCard.vue'
 import ChatPager from '@/components/chats/ChatPager.vue'
 import ChatRailCard from '@/components/chats/ChatRailCard.vue'
+import FilterSelect from '@/components/ui/FilterSelect.vue'
 import ThreadlineDetailPanel from '@/components/threadline/detail/ThreadlineDetailPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
@@ -693,12 +704,38 @@ const handleDrawerKeys = (event) => {
   }
 }
 
-// The rail has no room for a status menu, so its filter button cycles.
-const cycleStatusFilter = () => {
-  const order = ['', 'fetched', 'processing', 'failed', 'success']
-  const at = order.indexOf(statusFilter.value)
-  statusFilter.value = order[(at + 1) % order.length]
-}
+// The rail's own copies of the toolbar's filters. Same values and the same
+// component, so the two views agree and switching between them keeps what
+// was filtered; only the labels are shorter, because 328px holds two of
+// these side by side and not much else.
+const railStatusOptions = computed(() => [
+  { value: '', label: t('chats.filterAll') },
+  { value: 'fetched', label: t('chats.statePending') },
+  { value: 'processing', label: t('chats.stateProcessing') },
+  { value: 'success', label: t('chats.stateCompleted') },
+  { value: 'failed', label: t('chats.stateFailed') }
+])
+
+// Not railRangeLabel: that name is already the pagination range shown at
+// the foot of the rail ("1-20 of 1284"), which is a different range.
+const railRangeOptions = computed(() => [
+  { value: '7', label: t('chats.range7') },
+  { value: '30', label: t('chats.range30') },
+  { value: '90', label: t('chats.range90') },
+  { value: '', label: t('chats.rangeAll') }
+])
+
+const railStatusLabel = computed(
+  () =>
+    railStatusOptions.value.find((o) => o.value === statusFilter.value)
+      ?.label || t('chats.filterAll')
+)
+
+const railDateRangeLabel = computed(
+  () =>
+    railRangeOptions.value.find((o) => o.value === rangeFilter.value)?.label ||
+    t('chats.rangeAll')
+)
 
 const clearFilters = () => {
   searchQuery.value = ''

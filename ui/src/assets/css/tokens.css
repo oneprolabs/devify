@@ -102,9 +102,9 @@
   --c-n900: 230 234 240;
 }
 
-/* Type scale multiplier. The canvas is drawn at `standard`; the app ships
-   one step up because 12px body copy is tight for sustained reading. Only
-   font sizes multiply by this — the grid keeps the canvas's measurements. */
+/* Type scale multiplier. `standard` is the canvas scale and the default;
+   `large` is a step up for readers who want it. Only font sizes multiply by
+   this — the grid keeps the canvas's measurements. */
 :root {
   --fs: 1;
 }

@@ -3,9 +3,11 @@ import { computed, ref } from 'vue'
 /**
  * How large the interface type is.
  *
- * The canvas is drawn at a compact scale — 12px body, 11px meta — which is
- * tight for sustained reading, so the app ships one step larger and keeps
- * the canvas size available as "standard" for anyone comparing against it.
+ * The canvas is drawn at a compact scale — 12px body, 11px meta — and that
+ * is what ships. An earlier pass defaulted to the step above it, reasoning
+ * that 12px is tight for sustained reading; the cost was that every page
+ * stood 8% off its artboard, which made comparing the two useless and hid
+ * real drift inside the gap. "large" stays a step for anyone who wants it.
  *
  * The chosen step lands on `<html data-font-size>`, which sets `--fs` in
  * tokens.css. Only type multiplies by it; widths, padding and row heights
@@ -14,7 +16,7 @@ import { computed, ref } from 'vue'
 
 const STORAGE_KEY = 'ui-font-size'
 const SIZES = ['standard', 'large']
-const DEFAULT_SIZE = 'large'
+const DEFAULT_SIZE = 'standard'
 
 const readStored = () => {
   try {

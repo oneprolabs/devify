@@ -3,6 +3,7 @@ import { usePlanName } from '@/composables/usePlanName'
 import { billingApi } from '@/api/billing'
 import { chatApi } from '@/api/chat'
 import { todosApi } from '@/api/todos'
+import { expenseApi } from '@/api/expense'
 
 /**
  * Plan name, credit balance and the two nav counts for the app shell.
@@ -16,17 +17,19 @@ const credits = ref(null)
 const subscription = ref(null)
 const chatStats = ref(null)
 const todoStats = ref(null)
+const expenseStats = ref(null)
 let loadPromise = null
 
 const unwrap = (response) => response?.data?.data ?? response?.data ?? null
 
 async function load() {
-  const [subscriptionRes, creditsRes, chatRes, todoRes] =
+  const [subscriptionRes, creditsRes, chatRes, todoRes, expenseRes] =
     await Promise.allSettled([
       billingApi.getCurrentSubscription(),
       billingApi.getUserCredits(),
       chatApi.getThreadlineStats(),
-      todosApi.getTodoStats()
+      todosApi.getTodoStats(),
+      expenseApi.getStats()
     ])
 
   if (subscriptionRes.status === 'fulfilled') {
@@ -40,6 +43,13 @@ async function load() {
   }
   if (todoRes.status === 'fulfilled') {
     todoStats.value = unwrap(todoRes.value)
+  }
+  // The app is switched off for most accounts, in which case this 404s and
+  // the badge simply does not appear.
+  // expenseApi already unwraps; the others hand back the axios response,
+  // so putting this one through unwrap() again would null it out.
+  if (expenseRes.status === 'fulfilled') {
+    expenseStats.value = expenseRes.value
   }
 }
 
@@ -73,11 +83,15 @@ export function useAccountSummary() {
   })
   // The server names plans in English; the sidebar shows the localised tier.
   const planName = computed(() =>
-    planLabel(subscription.value?.plan_slug, subscription.value?.plan_name || '')
+    planLabel(
+      subscription.value?.plan_slug,
+      subscription.value?.plan_name || ''
+    )
   )
   // The sidebar badges: conversations still waiting, and todos still open.
   const pendingChats = computed(() => chatStats.value?.pending ?? 0)
   const openTodos = computed(() => todoStats.value?.incomplete ?? 0)
+  const unfiledInvoices = computed(() => expenseStats.value?.unfiled ?? 0)
 
   return {
     credits,
@@ -85,6 +99,7 @@ export function useAccountSummary() {
     planName,
     pendingChats,
     openTodos,
+    unfiledInvoices,
     availableCredits,
     totalCredits,
     creditsPercentage,

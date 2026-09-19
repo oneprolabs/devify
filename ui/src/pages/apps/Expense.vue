@@ -4,37 +4,35 @@
       :parent="{ to: '/apps', label: t('apps.centerTitle') }"
       :title="t('expense.pageTitle')"
       :count="headerSummary"
-    />
-
-    <!-- Three resources, not three states: an invoice's status is a filter
-         inside the first one. -->
-    <div
-      class="flex h-11 flex-shrink-0 items-center gap-[26px] border-b border-line px-4 md:px-5"
-      role="tablist"
     >
-      <button
-        v-for="tab in tabs"
-        :key="tab.value"
-        type="button"
-        role="tab"
-        class="font-display flex h-11 items-center text-[calc(13px*var(--fs))] transition-colors"
-        :class="
-          activeTab === tab.value
-            ? '-mb-px border-b-2 border-accent font-semibold text-accent'
-            : 'font-medium text-ink-3 hover:text-ink-2'
-        "
-        :aria-selected="activeTab === tab.value"
-        @click="activeTab = tab.value"
+      <!-- Three resources, not three states: an invoice's status is a filter
+           inside the first one. The artboard puts them at the right end of
+           the title row as one segmented control, not on a tab row of their
+           own: they pick what the page is about, and a second horizontal
+           band under the title reads like a second level of navigation. -->
+      <div
+        class="ml-auto flex h-8 flex-none items-center overflow-hidden rounded-md border border-line"
+        role="tablist"
       >
-        {{ tab.label }}
-        <span
-          v-if="tab.count"
-          class="ml-[7px] font-mono text-[calc(10.5px*var(--fs))] text-ink-4"
+        <button
+          v-for="(tab, index) in tabs"
+          :key="tab.value"
+          type="button"
+          role="tab"
+          class="font-display flex h-8 items-center px-3.5 text-[calc(12.5px*var(--fs))] transition-colors"
+          :aria-selected="activeTab === tab.value"
+          :class="[
+            activeTab === tab.value
+              ? 'bg-accent-soft font-medium text-accent'
+              : 'text-ink-2 hover:bg-chip',
+            index ? 'border-l border-line' : ''
+          ]"
+          @click="activeTab = tab.value"
         >
-          {{ tab.count }}
-        </span>
-      </button>
-    </div>
+          {{ tab.label }}
+        </button>
+      </div>
+    </PageHeader>
 
     <div class="min-h-0 flex-1 overflow-y-auto">
       <div class="flex flex-col" :class="bodyClass">

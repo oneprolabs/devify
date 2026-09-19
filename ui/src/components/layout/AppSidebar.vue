@@ -37,7 +37,9 @@
         <span class="font-display text-xs font-semibold tracking-wide">
           {{ t('apps.centerTitle') }}
         </span>
-        <span class="ml-auto font-mono text-[calc(10.5px*var(--fs))] text-ink-4">
+        <span
+          class="ml-auto font-mono text-[calc(10.5px*var(--fs))] text-ink-4"
+        >
           {{ appLinks.length }}
         </span>
       </router-link>
@@ -98,8 +100,12 @@
         class="flex flex-col gap-2 rounded-[10px] border border-line bg-panel p-3"
       >
         <div class="flex items-baseline justify-between">
-          <span class="text-[calc(11.5px*var(--fs))] text-ink-2">{{ t('nav.credits') }}</span>
-          <span class="font-mono text-[calc(12.5px*var(--fs))] font-medium text-ink">
+          <span class="text-[calc(11.5px*var(--fs))] text-ink-2">{{
+            t('nav.credits')
+          }}</span>
+          <span
+            class="font-mono text-[calc(12.5px*var(--fs))] font-medium text-ink"
+          >
             {{ availableCredits
             }}<span class="text-ink-3"> / {{ totalCredits }}</span>
           </span>
@@ -145,6 +151,7 @@ const {
   creditsPercentage,
   pendingChats,
   openTodos,
+  unfiledInvoices,
   ensureLoaded
 } = useAccountSummary()
 
@@ -159,7 +166,8 @@ const appLinks = computed(() => [
     to: '/apps/expense',
     match: '/apps/expense',
     label: t('apps.expenseName'),
-    icon: IconExpense
+    icon: IconExpense,
+    count: unfiledInvoices.value
   },
   {
     to: '/todos',

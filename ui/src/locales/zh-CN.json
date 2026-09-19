@@ -1492,8 +1492,31 @@
       "failedHint": "多半是原件本身的问题——文件里没有可读的文字层，或者版式不是标准发票。可以点上面的原件自己核对；确认无误的话，直接手工填写下面的字段即可。",
       "expenseDateHint": "出差归集按这一天，改了会重新归组",
       "filedTitle": "归档状态",
-      "filedDefault": "已归档",
-      "filedNote": "不计入报销，仅留存。"
+      "filedNote": "不计入报销，仅留存。",
+      "unfile": "撤销归档",
+      "reextractWithCost": "重新识别 · {credits} 点",
+      "ticketFields": {
+        "train_no": "车次",
+        "seat_class": "席别",
+        "seat_no": "座位号",
+        "from_station": "出发",
+        "to_station": "到达",
+        "passenger": "乘车人",
+        "passenger_phone": "手机号",
+        "depart_at": "发车时间",
+        "city": "城市",
+        "start_at": "起点时间",
+        "end_at": "终点时间",
+        "from_address": "上车地点",
+        "to_address": "下车地点",
+        "distance": "里程",
+        "car_type": "车型",
+        "service_provider": "服务商",
+        "trip_count": "行程数",
+        "check_in": "入住",
+        "check_out": "离店",
+        "nights": "间夜"
+      }
     },
     "groups": {
       "title": "报销组",

@@ -1492,8 +1492,9 @@
       "failedHint": "多半是原件本身的问题——文件里没有可读的文字层，或者版式不是标准发票。可以点上面的原件自己核对；确认无误的话，直接手工填写下面的字段即可。",
       "expenseDateHint": "出差归集按这一天，改了会重新归组",
       "filedTitle": "归档状态",
-      "filedDefault": "已归档",
-      "filedNote": "不计入报销，仅留存。"
+      "filedNote": "不计入报销，仅留存。",
+      "unfile": "撤销归档",
+      "reextractWithCost": "重新识别 · {credits} 点"
     },
     "groups": {
       "title": "报销组",

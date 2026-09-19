@@ -6,24 +6,26 @@
       class="relative z-10 flex h-full w-full max-w-xl flex-col overflow-y-auto bg-panel shadow-xl"
     >
       <header
-        class="flex items-start justify-between gap-4 border-b border-line p-5"
+        class="flex items-start justify-between gap-3 border-b border-line px-5 pb-[13px] pt-4"
       >
         <div class="min-w-0">
-          <h2 class="truncate text-lg font-semibold text-ink">
+          <h2
+            class="truncate text-[calc(15px*var(--fs))] font-semibold -tracking-[0.01em] text-ink"
+          >
             {{ form.seller_name || t('expense.invoices.untitled') }}
           </h2>
-          <p class="mt-1 truncate text-xs text-ink-3">
+          <p class="mt-1 truncate text-[calc(11.5px*var(--fs))] text-ink-3">
             {{ invoice.email_subject }}
           </p>
         </div>
         <button
           type="button"
-          class="rounded-lg p-1 text-ink-4 hover:bg-chip hover:text-ink-2"
+          class="flex h-7 w-7 flex-none items-center justify-center rounded-md text-ink-3 hover:bg-chip hover:text-ink-2"
           :aria-label="t('common.close')"
           @click="$emit('close')"
         >
           <svg
-            class="h-5 w-5"
+            class="h-[15px] w-[15px]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -38,10 +40,10 @@
         </button>
       </header>
 
-      <div class="flex-1 space-y-5 p-5">
+      <div class="flex-1 space-y-[17px] px-5 py-[18px]">
         <p
           v-if="invoice.needs_review"
-          class="rounded-lg border border-warn bg-warn-soft p-3 text-xs text-warn"
+          class="rounded-lg border border-warn bg-warn-soft px-[13px] py-[11px] text-[calc(11.5px*var(--fs))] leading-[1.6] text-warn"
         >
           {{ t('expense.invoices.reviewHint') }}
         </p>
@@ -53,7 +55,7 @@
           {{ error }}
         </p>
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-[13px] sm:grid-cols-2">
           <label
             v-for="field in textFields"
             :key="field.key"
@@ -64,7 +66,7 @@
                  reader has to fill in, so it is coloured like the work it
                  is rather than left to be spotted. -->
             <span
-              class="mb-1 block text-xs"
+              class="mb-[5px] block text-[calc(10.5px*var(--fs))]"
               :class="isBlank(field.key) ? 'text-warn' : 'text-ink-3'"
             >
               {{ t(`expense.invoices.fields.${field.key}`) }}
@@ -72,27 +74,34 @@
             <input
               v-model="form[field.key]"
               :type="field.type || 'text'"
-              class="w-full rounded-lg border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              class="h-[34px] w-full rounded-md border bg-panel px-[11px] text-[calc(12.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
               :class="isBlank(field.key) ? 'border-warn' : 'border-line'"
             />
-            <span v-if="field.hint" class="mt-1 block text-xs text-ink-4">
+            <span
+              v-if="field.hint"
+              class="mt-[5px] block text-[calc(10.5px*var(--fs))] text-ink-4"
+            >
               {{ t(`expense.invoices.${field.hint}`) }}
             </span>
           </label>
 
           <label class="block">
-            <span class="mb-1 block text-xs text-ink-3">
+            <span
+              class="mb-[5px] block text-[calc(10.5px*var(--fs))] text-ink-3"
+            >
               {{ t('expense.invoices.category') }}
             </span>
             <select
               v-model="form.category"
-              class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
+              class="h-[34px] w-full rounded-md border border-line bg-panel px-[11px] text-[calc(12.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
             >
               <option v-for="key in categories" :key="key" :value="key">
                 {{ t(`expense.categories.${key}`) }}
               </option>
             </select>
-            <span class="mt-1 block text-xs text-ink-4">
+            <span
+              class="mt-[5px] block text-[calc(10.5px*var(--fs))] text-ink-4"
+            >
               {{
                 t(
                   `expense.invoices.sources.${invoice.category_source || 'model'}`
@@ -102,16 +111,16 @@
           </label>
         </div>
 
-        <div v-if="invoice.summary_line" class="space-y-1">
-          <span class="block text-xs text-ink-3">
+        <div v-if="invoice.summary_line" class="space-y-[5px]">
+          <span class="block text-[calc(10.5px*var(--fs))] text-ink-3">
             {{ t('expense.invoices.fields.summary_line') }}
           </span>
-          <p class="text-sm leading-relaxed text-ink-2">
+          <p class="text-[calc(12.5px*var(--fs))] leading-[1.6] text-ink-2">
             {{ invoice.summary_line }}
           </p>
         </div>
 
-        <p class="text-xs leading-relaxed text-ink-3">
+        <p class="text-[calc(11px*var(--fs))] leading-[1.7] text-ink-3">
           {{ t('expense.invoices.learnHint') }}
         </p>
 
@@ -119,18 +128,33 @@
              silent about it, so opening one to ask why it is not in a
              group answered nothing. -->
         <div v-if="invoice.disposition === 'filed'" class="space-y-2">
-          <p class="text-sm font-semibold text-ink">
+          <p class="text-[calc(12.5px*var(--fs))] font-semibold text-ink">
             {{ t('expense.invoices.filedTitle') }}
           </p>
           <div
-            class="flex items-center gap-2 rounded-lg border border-line bg-panel-sub p-3"
+            class="flex items-center gap-[9px] rounded-lg border border-line bg-panel-sub px-[13px] py-3"
           >
-            <span class="rounded-full bg-chip px-2 py-0.5 text-xs text-ink-2">
-              {{ invoice.filed_reason || t('expense.invoices.filedDefault') }}
+            <span
+              class="flex-none rounded-full bg-chip px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-ink-2"
+            >
+              {{
+                t(
+                  `expense.invoices.filedReasons.${
+                    invoice.filed_reason || 'other'
+                  }`
+                )
+              }}
             </span>
-            <span class="text-xs text-ink-3">
+            <span class="text-[calc(11.5px*var(--fs))] text-ink-3">
               {{ t('expense.invoices.filedNote') }}
             </span>
+            <button
+              type="button"
+              class="ml-auto flex-none text-[calc(11.5px*var(--fs))] text-accent hover:underline"
+              @click="$emit('unfile', invoice)"
+            >
+              {{ t('expense.invoices.unfile') }}
+            </button>
           </div>
         </div>
 
@@ -150,13 +174,13 @@
         </div>
 
         <div class="space-y-2">
-          <h3 class="text-sm font-medium text-ink">
+          <h3 class="text-[calc(12.5px*var(--fs))] font-semibold text-ink">
             {{ t('expense.invoices.original') }}
           </h3>
 
           <p
             v-if="!invoice.has_file"
-            class="rounded-lg border border-line bg-app-sub p-3 text-xs text-ink-3"
+            class="rounded-lg border border-line bg-panel-sub px-[13px] py-3 text-[calc(11.5px*var(--fs))] text-ink-3"
           >
             {{ t('expense.invoices.originalMissing') }}
           </p>
@@ -189,16 +213,16 @@
 
           <div
             v-else
-            class="space-y-2 rounded-lg border border-line bg-app-sub p-3"
+            class="space-y-[5px] rounded-lg border border-line bg-panel-sub px-[13px] py-3"
           >
-            <p class="text-xs text-ink-3">
+            <p class="text-[calc(11.5px*var(--fs))] text-ink-3">
               {{ t('expense.invoices.originalNotViewable') }}
             </p>
             <a
               v-if="fileUrl"
               :href="fileUrl"
               :download="invoice.filename || 'invoice'"
-              class="text-xs text-accent hover:underline"
+              class="text-[calc(11.5px*var(--fs))] text-accent hover:underline"
             >
               {{ t('expense.invoices.originalDownload') }}
             </a>
@@ -209,20 +233,22 @@
           v-if="invoice.ticket_details && hasTicketDetails"
           class="space-y-2"
         >
-          <h3 class="text-sm font-medium text-ink">
+          <h3 class="text-[calc(12.5px*var(--fs))] font-semibold text-ink">
             {{ t('expense.invoices.ticketDetails') }}
           </h3>
-          <dl class="grid grid-cols-2 gap-2 rounded-lg bg-app-sub p-3 text-xs">
+          <dl
+            class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-[7px] rounded-lg bg-panel-sub px-[13px] py-3 text-[calc(11.5px*var(--fs))] sm:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
+          >
             <template v-for="(value, key) in invoice.ticket_details" :key="key">
               <dt class="text-ink-3">{{ key }}</dt>
-              <dd class="text-ink">{{ value }}</dd>
+              <dd class="truncate text-ink">{{ value }}</dd>
             </template>
           </dl>
         </div>
       </div>
 
       <footer
-        class="flex flex-wrap items-center justify-between gap-3 border-t border-line p-5"
+        class="flex flex-wrap items-center justify-between gap-[10px] border-t border-line px-5 py-[14px]"
       >
         <BaseButton
           size="sm"
@@ -230,7 +256,11 @@
           :loading="reextracting"
           @click="$emit('reextract', invoice)"
         >
-          {{ t('expense.invoices.reextract') }}
+          {{
+            t('expense.invoices.reextractWithCost', {
+              credits: costPerEmail
+            })
+          }}
         </BaseButton>
 
         <BaseButton
@@ -256,6 +286,13 @@ const props = defineProps({
     type: Object,
     required: true
   },
+  // The canvas puts the price on the button rather than in a toast
+  // after the fact: spending is the decision, and it is made before
+  // the click.
+  costPerEmail: {
+    type: Number,
+    default: 1
+  },
   saving: {
     type: Boolean,
     default: false
@@ -270,7 +307,7 @@ const props = defineProps({
   }
 })
 
-defineEmits(['close', 'save', 'reextract'])
+defineEmits(['close', 'save', 'reextract', 'unfile'])
 
 const { t } = useI18n()
 

@@ -1483,8 +1483,9 @@
       "failedHint": "Usually the file itself: no readable text layer, or a layout that is not a standard invoice. Check the original above; if it looks fine, fill the fields in by hand.",
       "expenseDateHint": "Trips are grouped by this date; changing it regroups the invoice",
       "filedTitle": "Filed",
-      "filedDefault": "Filed",
-      "filedNote": "Kept on record, left out of claims."
+      "filedNote": "Kept on record, left out of claims.",
+      "unfile": "Undo filing",
+      "reextractWithCost": "Read again · {credits} credit"
     },
     "groups": {
       "title": "Reimbursement groups",

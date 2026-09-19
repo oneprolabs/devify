@@ -59,11 +59,7 @@
           }}
         </span>
         <div class="flex flex-wrap gap-2">
-          <BaseButton
-            size="sm"
-            variant="secondary"
-            @click="selectedUuids = []"
-          >
+          <BaseButton size="sm" variant="secondary" @click="selectedUuids = []">
             {{ t('expense.invoices.clearSelection') }}
           </BaseButton>
           <BaseButton
@@ -126,10 +122,12 @@
     :invoice="selected"
     :saving="saving"
     :reextracting="reextracting"
+    :cost-per-email="costPerEmail"
     :error="drawerError"
     @close="selected = null"
     @save="save"
     @reextract="reextract"
+    @unfile="unfile"
   />
 </template>
 
@@ -158,6 +156,12 @@ const groupOpen = ref(false)
 const fileOpen = ref(false)
 const filing = ref(false)
 const filedNotice = ref(null)
+defineProps({
+  // What one re-extraction costs. Policy-driven, not a constant, so the
+  // button shows the number the server would actually charge.
+  costPerEmail: { type: Number, default: 1 }
+})
+
 const selected = ref(null)
 const saving = ref(false)
 const reextracting = ref(false)
@@ -229,6 +233,22 @@ async function save(form) {
   drawerError.value = ''
   try {
     selected.value = await expenseApi.updateInvoice(selected.value.uuid, form)
+    await load()
+  } catch (err) {
+    drawerError.value = readError(err, 'expense.invoices.saveFailed')
+  } finally {
+    saving.value = false
+  }
+}
+
+// The list can file an invoice away but the drawer had no way back, so a
+// receipt filed by mistake had to be hunted down again in the Filed tab.
+async function unfile(invoice) {
+  saving.value = true
+  drawerError.value = ''
+  try {
+    await expenseApi.restoreInvoices([invoice.uuid])
+    selected.value = await expenseApi.getInvoice(invoice.uuid)
     await load()
   } catch (err) {
     drawerError.value = readError(err, 'expense.invoices.saveFailed')

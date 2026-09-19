@@ -68,6 +68,7 @@
 
             <InvoiceSection
               ref="invoiceSection"
+              :cost-per-email="config?.cost_credits_per_email ?? 1"
               @rescanned="refreshData"
               @grouped="groupSection?.load()"
             />

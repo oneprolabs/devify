@@ -90,12 +90,28 @@
         </div>
       </div>
 
-      <div class="pt-3">
-        <InvoiceMonthList
-          v-model="selectedUuids"
-          :invoices="invoices"
-          selectable
-          @select="open"
+      <div class="flex min-h-0">
+        <div class="min-w-0 flex-1 pt-3">
+          <InvoiceMonthList
+            v-model="selectedUuids"
+            :invoices="invoices"
+            selectable
+            @select="open"
+          />
+        </div>
+
+        <InvoiceDetailDrawer
+          v-if="selected && isWide"
+          variant="panel"
+          :invoice="selected"
+          :saving="saving"
+          :reextracting="reextracting"
+          :cost-per-email="costPerEmail"
+          :error="drawerError"
+          @close="selected = null"
+          @save="save"
+          @reextract="reextract"
+          @unfile="unfile"
         />
       </div>
     </div>
@@ -118,7 +134,7 @@
   />
 
   <InvoiceDetailDrawer
-    v-if="selected"
+    v-if="selected && !isWide"
     :invoice="selected"
     :saving="saving"
     :reextracting="reextracting"
@@ -132,7 +148,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
@@ -161,6 +177,16 @@ defineProps({
   // button shows the number the server would actually charge.
   costPerEmail: { type: Number, default: 1 }
 })
+
+// Below this the list and a 576px panel cannot share the width, so the
+// detail falls back to the sheet. Same line the conversation list uses.
+const WIDE = window.matchMedia('(min-width: 1180px)')
+const isWide = ref(WIDE.matches)
+const syncWide = (event) => {
+  isWide.value = event.matches
+}
+onMounted(() => WIDE.addEventListener('change', syncWide))
+onBeforeUnmount(() => WIDE.removeEventListener('change', syncWide))
 
 const selected = ref(null)
 const saving = ref(false)

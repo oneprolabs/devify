@@ -1,9 +1,29 @@
 <template>
-  <div class="fixed inset-0 z-40 flex justify-end" @click.self="$emit('close')">
-    <div class="absolute inset-0 bg-ink-3 bg-opacity-50"></div>
+  <!-- The canvas draws this as a column beside the list, not a sheet over
+       it: checking an invoice means reading the row it came from, and a
+       scrim puts that behind glass. Clicking another row swaps the panel.
+       Below the breakpoint the two cannot share the width, so there it
+       falls back to the overlay it used to be. -->
+  <div
+    :class="
+      variant === 'panel'
+        ? 'flex min-h-0 w-[576px] flex-none flex-col border-l border-line bg-panel'
+        : 'fixed inset-0 z-40 flex justify-end'
+    "
+    @click.self="variant !== 'panel' && $emit('close')"
+  >
+    <div
+      v-if="variant !== 'panel'"
+      class="absolute inset-0 bg-ink-3 bg-opacity-50"
+    ></div>
 
     <aside
-      class="relative z-10 flex h-full w-full max-w-xl flex-col overflow-y-auto bg-panel shadow-xl"
+      :class="[
+        'flex flex-col overflow-y-auto bg-panel',
+        variant === 'panel'
+          ? 'min-h-0 flex-1'
+          : 'relative z-10 h-full w-full max-w-xl shadow-xl'
+      ]"
     >
       <header
         class="flex items-start justify-between gap-3 border-b border-line px-5 pb-[13px] pt-4"
@@ -285,6 +305,12 @@ const props = defineProps({
   invoice: {
     type: Object,
     required: true
+  },
+  // 'panel' sits in the page flow beside the list; 'overlay' is the sheet
+  // used below the breakpoint where both cannot fit.
+  variant: {
+    type: String,
+    default: 'overlay'
   },
   // The canvas puts the price on the button rather than in a toast
   // after the fact: spending is the decision, and it is made before

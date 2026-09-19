@@ -1,92 +1,100 @@
 <template>
-  <div class="space-y-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h2 class="text-lg font-semibold text-ink">
-          {{ t('expense.groups.title') }}
-        </h2>
-        <p class="mt-1 text-sm text-ink-3">
-          {{ t('expense.groups.subtitle') }}
-        </p>
+  <!-- The artboard lays this out as a workbench, not a list: a 300px rail
+       of batches on the left and one batch in full on the right. A batch is
+       something you work through invoice by invoice, and the old shape made
+       you expand a row to see any of it. -->
+  <div class="flex min-h-0 flex-1">
+    <div class="flex w-[300px] flex-none flex-col border-r border-line">
+      <div
+        class="flex h-12 flex-none items-center gap-2 border-b border-line px-3.5"
+      >
+        <FilterSelect
+          v-model="filter"
+          :label="filterLabel"
+          :options="filterOptions"
+          size="sm"
+        />
+        <button
+          type="button"
+          class="ml-auto flex h-[30px] flex-none items-center gap-1.5 rounded-md bg-accent px-3 text-[calc(12px*var(--fs))] font-medium text-accent-on"
+          @click="creating ? null : (naming = true)"
+        >
+          <svg
+            class="h-[13px] w-[13px]"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" stroke-linecap="round" />
+          </svg>
+          {{ t('expense.groups.create') }}
+        </button>
       </div>
 
-      <div class="flex gap-2">
+      <div v-if="naming" class="flex-none border-b border-line p-3.5">
         <input
+          ref="nameInput"
           v-model="newName"
           type="text"
-          class="rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none"
+          class="h-[30px] w-full rounded-md border border-line bg-panel px-[11px] text-[calc(12px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
           :placeholder="t('expense.groups.namePlaceholder')"
           @keyup.enter="create"
+          @keyup.esc="naming = false"
         />
-        <BaseButton size="sm" :loading="creating" @click="create">
-          {{ t('expense.groups.create') }}
-        </BaseButton>
       </div>
-    </div>
 
-    <FilterChips v-model="filter" :options="filterOptions" />
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <p
+          v-if="!visible.length"
+          class="px-3.5 py-6 text-center text-[calc(12px*var(--fs))] text-ink-3"
+        >
+          {{ t('expense.groups.empty') }}
+        </p>
 
-    <p
-      v-if="error"
-      class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
-    >
-      {{ error }}
-    </p>
-
-    <BaseCard>
-      <p v-if="!visible.length" class="py-6 text-center text-sm text-ink-3">
-        {{ t('expense.groups.empty') }}
-      </p>
-
-      <ul v-else class="divide-y divide-line-soft">
-        <li
+        <button
           v-for="group in visible"
           :key="group.uuid"
-          class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+          type="button"
+          class="flex w-full flex-col gap-[5px] border-b border-line-soft border-l-2 px-3.5 py-3 text-left"
+          :class="
+            selected?.uuid === group.uuid
+              ? 'border-l-accent bg-accent-soft'
+              : 'border-l-transparent hover:bg-chip'
+          "
+          @click="open(group)"
         >
-          <button type="button" class="min-w-0 text-left" @click="open(group)">
-            <p class="truncate text-sm font-medium text-ink">
-              {{ group.name }}
-              <span
-                v-if="group.status !== 'draft'"
-                class="ml-1 rounded-full bg-chip px-2 py-0.5 text-[calc(11px*var(--fs))] text-ink-2"
-              >
-                {{ t(`expense.groups.statuses.${group.status}`) }}
-              </span>
-            </p>
-            <p class="mt-0.5 text-xs text-ink-3">
-              {{
-                t('expense.groups.line', {
-                  count: group.invoice_count,
-                  amount: group.total_amount
-                })
-              }}
-              <span v-if="group.trip_type === 'business_trip'">
-                · {{ t('expense.groups.businessTrip') }}
-              </span>
-            </p>
-          </button>
-
-          <div class="flex gap-2">
-            <BaseButton size="sm" variant="outline" @click="open(group)">
-              {{
-                selected?.uuid === group.uuid
-                  ? t('common.collapse')
-                  : t('common.expand')
-              }}
-            </BaseButton>
-            <BaseButton
-              size="sm"
-              variant="outline"
-              :loading="exporting === group.uuid"
-              @click="exportGroup(group)"
+          <div class="flex min-w-0 items-center gap-[7px]">
+            <span
+              class="truncate text-[calc(13px*var(--fs))] font-medium text-ink"
             >
-              {{ t('expense.groups.export') }}
-            </BaseButton>
+              {{ group.name }}
+            </span>
+            <span
+              v-if="group.trip_type === 'business_trip'"
+              class="font-mono flex-none rounded-sm border border-accent px-[5px] py-px text-[calc(9.5px*var(--fs))] text-accent"
+            >
+              {{ t('expense.groups.businessTrip') }}
+            </span>
+            <span
+              class="font-mono ml-auto flex-none rounded-sm bg-panel-sub px-1.5 py-0.5 text-[calc(9.5px*var(--fs))]"
+              :class="group.status === 'draft' ? 'text-warn' : 'text-ink-3'"
+            >
+              {{ t(`expense.groups.statuses.${group.status}`) }}
+            </span>
           </div>
-        </li>
-      </ul>
-    </BaseCard>
+          <span class="font-mono text-[calc(11px*var(--fs))] text-ink-3">
+            {{
+              t('expense.groups.line', {
+                count: group.invoice_count,
+                amount: group.total_amount
+              })
+            }}
+          </span>
+        </button>
+      </div>
+    </div>
 
     <GroupDetailPanel
       v-if="selected && summary"
@@ -95,12 +103,20 @@
       :sections="sections"
       :removing="removing"
       :exporting="exporting === selected.uuid"
+      :settling="settling"
       :error="detailError"
-      @close="close"
       @remove="removeInvoice"
       @move="startMove"
       @export="exportGroup"
+      @settle="markReimbursed"
     />
+
+    <div
+      v-else
+      class="flex flex-1 items-center justify-center text-[calc(12px*var(--fs))] text-ink-3"
+    >
+      {{ error || t('expense.groups.pickOne') }}
+    </div>
   </div>
 
   <AddToGroupDialog
@@ -115,10 +131,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseCard from '@/components/ui/BaseCard.vue'
+import FilterSelect from '@/components/ui/FilterSelect.vue'
 import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
-import FilterChips from '@/components/expense/FilterChips.vue'
 import GroupDetailPanel from '@/components/expense/GroupDetailPanel.vue'
 import { expenseApi } from '@/api/expense'
 import apiConfig from '@/config/api'
@@ -137,6 +151,9 @@ const creating = ref(false)
 const exporting = ref('')
 const error = ref('')
 const detailError = ref('')
+const settling = ref(false)
+const naming = ref(false)
+const nameInput = ref(null)
 
 const LIVE_STATES = ['draft', 'submitted']
 
@@ -151,29 +168,16 @@ const visible = computed(() => {
 })
 
 const filterOptions = computed(() => [
-  {
-    value: 'live',
-    label: t('expense.groups.filters.live'),
-    count: groups.value.filter((group) => LIVE_STATES.includes(group.status))
-      .length
-  },
-  {
-    value: 'reimbursed',
-    label: t('expense.groups.filters.reimbursed'),
-    count: groups.value.filter((group) => group.status === 'reimbursed').length
-  },
-  {
-    value: 'all',
-    label: t('expense.groups.filters.all'),
-    count: groups.value.length
-  }
+  { value: 'live', label: t('expense.groups.filters.live') },
+  { value: 'reimbursed', label: t('expense.groups.filters.reimbursed') },
+  { value: 'all', label: t('expense.groups.filters.all') }
 ])
 
-function close() {
-  selected.value = null
-  summary.value = null
-  sections.value = []
-}
+const filterLabel = computed(
+  () =>
+    filterOptions.value.find((option) => option.value === filter.value)
+      ?.label || t('expense.groups.filters.live')
+)
 
 function readError(err, fallbackKey) {
   return err?.response?.data?.message || t(fallbackKey)
@@ -193,9 +197,11 @@ async function create() {
   creating.value = true
   error.value = ''
   try {
-    await expenseApi.createGroup({ name })
+    const created = await expenseApi.createGroup({ name })
     newName.value = ''
+    naming.value = false
     await load()
+    if (created?.uuid) await loadDetail(created.uuid)
   } catch (err) {
     error.value = readError(err, 'expense.groups.createFailed')
   } finally {
@@ -214,10 +220,7 @@ async function loadDetail(uuid) {
 }
 
 async function open(group) {
-  if (selected.value?.uuid === group.uuid) {
-    close()
-    return
-  }
+  if (selected.value?.uuid === group.uuid) return
   error.value = ''
   detailError.value = ''
   try {
@@ -239,6 +242,22 @@ async function removeInvoice(invoice) {
     detailError.value = readError(err, 'expense.groups.createFailed')
   } finally {
     removing.value = ''
+  }
+}
+
+// Marking a batch reimbursed is the last thing that happens to it, and the
+// artboard puts it beside the export rather than in a menu.
+async function markReimbursed(group) {
+  settling.value = true
+  detailError.value = ''
+  try {
+    await expenseApi.updateGroup(group.uuid, { status: 'reimbursed' })
+    await loadDetail(group.uuid)
+    await load()
+  } catch (err) {
+    detailError.value = readError(err, 'expense.groups.createFailed')
+  } finally {
+    settling.value = false
   }
 }
 
@@ -269,6 +288,12 @@ function exportGroup(group) {
   }, 1500)
 }
 
-onMounted(load)
+// The right-hand side needs something in it, and the first live batch is
+// what the reader came for.
+onMounted(async () => {
+  await load()
+  const first = visible.value[0]
+  if (first) await open(first)
+})
 defineExpose({ load })
 </script>

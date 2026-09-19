@@ -10,7 +10,6 @@ from expense.constants import ExpenseCategory
 from expense.models import CategoryRule, ExpenseGroup, Invoice
 from threadline.models import EmailAttachment, EmailMessage
 
-
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
 LIST_URL = "/api/v1/apps/expense/invoices"
@@ -162,6 +161,40 @@ class TestInvoiceDetail:
         assert response.status_code == 200
         assert invoice.seller_name == "滴滴出行科技有限公司"
         assert invoice.total_amount == Decimal("130.00")
+
+    def test_the_expense_date_can_be_corrected(self, api_client, user):
+        """Trip grouping runs on this date, so it has to be correctable."""
+        invoice = make_invoice(user)
+        api_client.force_authenticate(user=user)
+
+        response = api_client.patch(
+            f"{LIST_URL}/{invoice.uuid}",
+            {"expense_date": "2026-03-04"},
+            format="json",
+        )
+
+        invoice.refresh_from_db()
+        assert response.status_code == 200
+        assert str(invoice.expense_date) == "2026-03-04"
+
+    def test_an_unknown_date_is_saved_as_null(self, api_client, user):
+        """
+        The drawer sends every field it shows. A date the model never read
+        has no value to send, and that must not block saving the rest.
+        """
+        invoice = make_invoice(user)
+        api_client.force_authenticate(user=user)
+
+        response = api_client.patch(
+            f"{LIST_URL}/{invoice.uuid}",
+            {"expense_date": None, "seller_name": "高德打车"},
+            format="json",
+        )
+
+        invoice.refresh_from_db()
+        assert response.status_code == 200
+        assert invoice.expense_date is None
+        assert invoice.seller_name == "高德打车"
 
     def test_status_cannot_be_edited_by_hand(self, api_client, user):
         invoice = make_invoice(user)
@@ -361,4 +394,3 @@ class TestClaimedFilter:
         api_client.force_authenticate(user=user)
 
         assert len(self._numbers(api_client)) == 2
-

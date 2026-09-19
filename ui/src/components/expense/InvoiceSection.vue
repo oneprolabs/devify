@@ -59,11 +59,7 @@
           }}
         </span>
         <div class="flex flex-wrap gap-2">
-          <BaseButton
-            size="sm"
-            variant="secondary"
-            @click="selectedUuids = []"
-          >
+          <BaseButton size="sm" variant="secondary" @click="selectedUuids = []">
             {{ t('expense.invoices.clearSelection') }}
           </BaseButton>
           <BaseButton
@@ -94,12 +90,28 @@
         </div>
       </div>
 
-      <div class="pt-3">
-        <InvoiceMonthList
-          v-model="selectedUuids"
-          :invoices="invoices"
-          selectable
-          @select="open"
+      <div class="flex min-h-0">
+        <div class="min-w-0 flex-1 pt-3">
+          <InvoiceMonthList
+            v-model="selectedUuids"
+            :invoices="invoices"
+            selectable
+            @select="open"
+          />
+        </div>
+
+        <InvoiceDetailDrawer
+          v-if="selected && isWide"
+          variant="panel"
+          :invoice="selected"
+          :saving="saving"
+          :reextracting="reextracting"
+          :cost-per-email="costPerEmail"
+          :error="drawerError"
+          @close="selected = null"
+          @save="save"
+          @reextract="reextract"
+          @unfile="unfile"
         />
       </div>
     </div>
@@ -122,19 +134,21 @@
   />
 
   <InvoiceDetailDrawer
-    v-if="selected"
+    v-if="selected && !isWide"
     :invoice="selected"
     :saving="saving"
     :reextracting="reextracting"
+    :cost-per-email="costPerEmail"
     :error="drawerError"
     @close="selected = null"
     @save="save"
     @reextract="reextract"
+    @unfile="unfile"
   />
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
@@ -158,6 +172,22 @@ const groupOpen = ref(false)
 const fileOpen = ref(false)
 const filing = ref(false)
 const filedNotice = ref(null)
+defineProps({
+  // What one re-extraction costs. Policy-driven, not a constant, so the
+  // button shows the number the server would actually charge.
+  costPerEmail: { type: Number, default: 1 }
+})
+
+// Below this the list and a 576px panel cannot share the width, so the
+// detail falls back to the sheet. Same line the conversation list uses.
+const WIDE = window.matchMedia('(min-width: 1180px)')
+const isWide = ref(WIDE.matches)
+const syncWide = (event) => {
+  isWide.value = event.matches
+}
+onMounted(() => WIDE.addEventListener('change', syncWide))
+onBeforeUnmount(() => WIDE.removeEventListener('change', syncWide))
+
 const selected = ref(null)
 const saving = ref(false)
 const reextracting = ref(false)
@@ -229,6 +259,22 @@ async function save(form) {
   drawerError.value = ''
   try {
     selected.value = await expenseApi.updateInvoice(selected.value.uuid, form)
+    await load()
+  } catch (err) {
+    drawerError.value = readError(err, 'expense.invoices.saveFailed')
+  } finally {
+    saving.value = false
+  }
+}
+
+// The list can file an invoice away but the drawer had no way back, so a
+// receipt filed by mistake had to be hunted down again in the Filed tab.
+async function unfile(invoice) {
+  saving.value = true
+  drawerError.value = ''
+  try {
+    await expenseApi.restoreInvoices([invoice.uuid])
+    selected.value = await expenseApi.getInvoice(invoice.uuid)
     await load()
   } catch (err) {
     drawerError.value = readError(err, 'expense.invoices.saveFailed')

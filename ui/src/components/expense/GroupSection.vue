@@ -17,7 +17,7 @@
         <button
           type="button"
           class="ml-auto flex h-[30px] flex-none items-center gap-1.5 rounded-md bg-accent px-3 text-[calc(12px*var(--fs))] font-medium text-accent-on"
-          @click="creating ? null : (naming = true)"
+          @click="startNaming"
         >
           <svg
             class="h-[13px] w-[13px]"
@@ -88,7 +88,7 @@
             {{
               t('expense.groups.line', {
                 count: group.invoice_count,
-                amount: group.total_amount
+                amount: formatAmount(group.total_amount)
               })
             }}
           </span>
@@ -129,12 +129,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FilterSelect from '@/components/ui/FilterSelect.vue'
 import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
 import GroupDetailPanel from '@/components/expense/GroupDetailPanel.vue'
 import { expenseApi } from '@/api/expense'
+import { formatAmount } from '@/utils/formatting'
 import apiConfig from '@/config/api'
 
 const { t } = useI18n()
@@ -189,6 +190,14 @@ async function load() {
   } catch (err) {
     error.value = readError(err, 'expense.loadFailed')
   }
+}
+
+// The field appears on demand, so it has to take the caret with it —
+// otherwise the button opens an input the reader then has to click.
+async function startNaming() {
+  naming.value = true
+  await nextTick()
+  nameInput.value?.focus()
 }
 
 async function create() {

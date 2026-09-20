@@ -136,6 +136,7 @@ import ScanRunList from '@/components/expense/ScanRunList.vue'
 import TripSuggestionCard from '@/components/expense/TripSuggestionCard.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 import { expenseApi } from '@/api/expense'
+import { formatAmount } from '@/utils/formatting'
 
 const { t } = useI18n()
 
@@ -149,13 +150,6 @@ const headerSummary = computed(() => {
     amount: formatAmount(stats.value.amount ?? 0)
   })
 })
-
-function formatAmount(amount) {
-  return new Intl.NumberFormat('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amount)
-}
 
 async function loadStats() {
   try {

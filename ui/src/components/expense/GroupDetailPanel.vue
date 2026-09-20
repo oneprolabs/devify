@@ -118,7 +118,7 @@
             {{
               t('expense.groups.line', {
                 count: section.count,
-                amount: section.amount
+                amount: formatAmount(section.amount)
               })
             }}
           </span>
@@ -150,7 +150,7 @@
           <span
             class="font-mono w-[84px] flex-none text-right text-[calc(12.5px*var(--fs))] font-medium text-ink"
           >
-            ¥{{ invoice.total_amount }}
+            ¥{{ formatAmount(invoice.total_amount) }}
           </span>
           <span class="flex w-[96px] flex-none justify-end gap-1.5">
             <button
@@ -180,6 +180,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import { formatAmount } from '@/utils/formatting'
 
 const props = defineProps({
   group: { type: Object, required: true },
@@ -198,8 +199,8 @@ const copied = ref(false)
 
 const stats = computed(() => [
   { key: 'invoiceCount', value: props.summary.invoice_count },
-  { key: 'totalAmount', value: `¥${props.summary.total_amount}` },
-  { key: 'taxAmount', value: `¥${props.summary.tax_amount}` },
+  { key: 'totalAmount', value: `¥${formatAmount(props.summary.total_amount)}` },
+  { key: 'taxAmount', value: `¥${formatAmount(props.summary.tax_amount)}` },
   { key: 'amountInWords', value: props.summary.total_amount_cn }
 ])
 

@@ -34,8 +34,8 @@
       </div>
     </PageHeader>
 
-    <div class="min-h-0 flex-1 overflow-y-auto">
-      <div class="flex flex-col" :class="bodyClass">
+    <div class="flex min-h-0 flex-1" :class="scrollClass">
+      <div class="flex min-h-0 flex-1 flex-col" :class="bodyClass">
         <SkeletonRows v-if="loading" :count="5" />
 
         <template v-else>
@@ -55,27 +55,41 @@
           <!-- Invoices: everything the app found, filtered by where each
                one is headed rather than split across another row of tabs -->
           <template v-else-if="activeTab === 'invoices'">
-            <TripSuggestionCard
-              :trips="trips"
-              :accepting="acceptingTrip"
-              :home-city="config?.home_city || ''"
-              @accept="acceptTrip"
-              @dismiss="dismissTrip"
-              @configure="activeTab = 'settings'"
-            />
-
             <InvoiceSection
               ref="invoiceSection"
               :cost-per-email="config?.cost_credits_per_email ?? 1"
               @rescanned="refreshData"
               @grouped="groupSection?.load()"
-            />
+            >
+              <!-- Both of these belong to the list, not to the page: they
+                   scroll with it and leave the detail panel its full
+                   height. -->
+              <template #before>
+                <div
+                  v-if="trips.length || !config?.home_city"
+                  class="px-4 pt-3.5 md:px-5"
+                >
+                  <TripSuggestionCard
+                    :trips="trips"
+                    :accepting="acceptingTrip"
+                    :home-city="config?.home_city || ''"
+                    @accept="acceptTrip"
+                    @dismiss="dismissTrip"
+                    @configure="activeTab = 'settings'"
+                  />
+                </div>
+              </template>
 
-            <PendingLinkList
-              :links="links"
-              :releasing="releasing"
-              @release="releaseLink"
-            />
+              <template #after>
+                <div v-if="links.length" class="px-4 pb-4 md:px-5">
+                  <PendingLinkList
+                    :links="links"
+                    :releasing="releasing"
+                    @release="releaseLink"
+                  />
+                </div>
+              </template>
+            </InvoiceSection>
           </template>
 
           <!-- Groups: one group is one real claim form -->
@@ -171,7 +185,13 @@ const activeTab = ref('invoices')
 // The invoice tab runs edge to edge, like the canvas; the other two keep
 // the padded card layout they are drawn with.
 const bodyClass = computed(() =>
-  activeTab.value === 'invoices' ? '' : 'gap-3.5 p-4 md:p-5'
+  activeTab.value === 'settings' ? 'gap-3.5 p-4 md:p-5' : ''
+)
+
+// Invoices and groups put a full-height panel beside a scrolling column,
+// so the scrolling happens inside them rather than around them.
+const scrollClass = computed(() =>
+  activeTab.value === 'settings' ? 'overflow-y-auto' : 'overflow-hidden'
 )
 
 const tabs = computed(() => [

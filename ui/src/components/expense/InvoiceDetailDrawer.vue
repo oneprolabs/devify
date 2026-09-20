@@ -13,7 +13,9 @@
     :class="
       variant === 'panel'
         ? 'flex min-h-0 w-[576px] flex-none flex-col border-l border-line bg-panel 2xl:w-[48%] 2xl:max-w-[860px]'
-        : 'fixed inset-0 z-40 flex justify-end'
+        : // z-50, not z-40: the phone's tab bar is z-40 too and would
+          // otherwise paint over this sheet's save button.
+          'fixed inset-0 z-50 flex justify-end'
     "
     @click.self="variant !== 'panel' && $emit('close')"
   >
@@ -301,7 +303,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { expenseApi } from '@/api/expense'
@@ -338,9 +340,17 @@ const props = defineProps({
   }
 })
 
-defineEmits(['close', 'save', 'reextract', 'unfile'])
+const emit = defineEmits(['close', 'save', 'reextract', 'unfile'])
 
 const { t, te } = useI18n()
+
+// A sheet over the page should close on Escape; the inline panel should
+// not, because there Escape would dismiss something nothing covers.
+const onKeydown = (event) => {
+  if (event.key === 'Escape' && props.variant !== 'panel') emit('close')
+}
+onMounted(() => document.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
 
 // Ordered as the design canvas draws it — who issued it, who it is for,
 // when, how much, what for — rather than the order the fields happened to

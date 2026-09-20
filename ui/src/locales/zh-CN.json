@@ -64,7 +64,8 @@
     "expand": "展开",
     "today": "今天",
     "yesterday": "昨天",
-    "typeToConfirm": "请输入「{phrase}」以确认："
+    "typeToConfirm": "请输入「{phrase}」以确认：",
+    "more": "更多"
   },
   "virtualEmail": {
     "yourAddress": "您的AI智能邮箱"
@@ -1573,7 +1574,8 @@
       "byCategory": "按分类分组，对应报销单上的每一行。",
       "copyHint": "复制后直接粘进公司报销单",
       "remove": "移出",
-      "moveTo": "移到其他组"
+      "moveTo": "移到其他组",
+      "perLineShort": "报销单上的一行"
     },
     "trips": {
       "title": "检测到 {count} 次出差",

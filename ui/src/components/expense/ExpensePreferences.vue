@@ -1,53 +1,62 @@
 <template>
-  <BaseCard>
-    <div class="space-y-5">
-      <div>
-        <h2 class="text-lg font-semibold text-ink">
-          {{ t('expense.prefs.title') }}
-        </h2>
-        <p class="mt-1 text-sm text-ink-3">
-          {{ t('expense.prefs.subtitle') }}
-        </p>
+  <!-- The artboard sets each setting out as a row: what it is and what it
+       affects on the left, the control on the right. A phone has no room
+       for two columns, so there the label and its explanation sit above
+       the control instead. -->
+  <!-- flex-none: this sits in a flex column, and without it the card
+       is squeezed down to its header. -->
+  <div class="flex-none overflow-hidden rounded-[9px] border border-line">
+    <div class="border-b border-line bg-panel-sub px-4 py-3">
+      <h2 class="text-[calc(13px*var(--fs))] font-semibold text-ink">
+        {{ t('expense.prefs.title') }}
+      </h2>
+      <p class="mt-0.5 text-[calc(11.5px*var(--fs))] text-ink-3">
+        {{ t('expense.prefs.subtitle') }}
+      </p>
+    </div>
+
+    <p
+      v-if="error"
+      class="border-b border-line-soft bg-bad-soft px-4 py-3 text-[calc(12px*var(--fs))] text-bad"
+    >
+      {{ error }}
+    </p>
+    <p
+      v-else-if="saved"
+      class="border-b border-line-soft bg-ok-soft px-4 py-3 text-[calc(12px*var(--fs))] text-ok"
+    >
+      {{ t('expense.prefs.saved') }}
+    </p>
+
+    <div
+      v-for="row in rows"
+      :key="row.key"
+      class="grid gap-2 border-b border-line-soft px-4 py-3.5 md:grid-cols-[240px_minmax(0,1fr)] md:gap-6"
+    >
+      <div class="flex flex-col gap-1">
+        <span class="text-[calc(12.5px*var(--fs))] font-medium text-ink">
+          {{ t(`expense.prefs.${row.key}`) }}
+        </span>
+        <span class="text-[calc(11px*var(--fs))] leading-[1.6] text-ink-3">
+          {{ t(`expense.prefs.${row.key}Help`) }}
+        </span>
       </div>
 
-      <p
-        v-if="error"
-        class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
-      >
-        {{ error }}
-      </p>
-      <p
-        v-else-if="saved"
-        class="rounded-lg border border-ok bg-ok-soft p-3 text-sm text-ok"
-      >
-        {{ t('expense.prefs.saved') }}
-      </p>
+      <div class="flex min-w-0 flex-col gap-1.5">
+        <input
+          v-if="row.key === 'homeCity'"
+          v-model="form.home_city"
+          type="text"
+          class="w-full rounded-md border border-line bg-panel px-[11px] py-2 text-[calc(12.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
+          :placeholder="t('expense.prefs.homeCityPlaceholder')"
+        />
 
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <label class="block">
-          <span class="mb-1 block text-sm font-medium text-ink-2">
-            {{ t('expense.prefs.homeCity') }}
-          </span>
-          <input
-            v-model="form.home_city"
-            type="text"
-            class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            :placeholder="t('expense.prefs.homeCityPlaceholder')"
-          />
-          <span class="mt-1 block text-xs text-ink-3">
-            {{ t('expense.prefs.homeCityHelp') }}
-          </span>
-        </label>
-
-        <div class="block">
-          <span class="mb-1 block text-sm font-medium text-ink-2">
-            {{ t('expense.prefs.filenameTemplate') }}
-          </span>
+        <template v-else-if="row.key === 'filenameTemplate'">
           <div
-            class="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2"
+            class="flex items-center justify-between gap-3 rounded-md border border-line px-[11px] py-2"
           >
             <span
-              class="truncate font-mono text-xs text-ink-2"
+              class="font-mono truncate text-[calc(11.5px*var(--fs))] text-ink-2"
               :title="namingSample"
             >
               {{ namingSample || t('expense.prefs.filenameLoading') }}
@@ -56,56 +65,39 @@
               {{ t('common.edit') }}
             </BaseButton>
           </div>
-          <span class="mt-1 block text-xs text-ink-3">
-            {{ t('expense.prefs.filenameTemplateHelp') }}
-          </span>
-        </div>
-      </div>
+        </template>
 
-      <label class="block">
-        <span class="mb-1 block text-sm font-medium text-ink-2">
-          {{ t('expense.prefs.keywords') }}
-        </span>
         <textarea
+          v-else-if="row.key === 'keywords'"
           v-model="keywordsText"
-          class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          class="w-full rounded-md border border-line bg-panel px-[11px] py-2 text-[calc(12.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
           rows="3"
           :placeholder="t('expense.prefs.keywordsPlaceholder')"
         />
-        <span class="mt-1 block text-xs text-ink-3">
-          {{ t('expense.prefs.keywordsHelp') }}
-        </span>
+
+        <textarea
+          v-else
+          v-model="sendersText"
+          class="w-full rounded-md border border-line bg-panel px-[11px] py-2 text-[calc(12.5px*var(--fs))] text-ink focus:border-accent focus:outline-none focus:ring-0"
+          rows="3"
+          :placeholder="t('expense.prefs.sendersPlaceholder')"
+        />
+
         <span
-          class="mt-2 block rounded-md bg-app-sub p-2 text-xs leading-relaxed text-ink-3"
+          v-if="row.key === 'keywords'"
+          class="rounded-md bg-panel-sub p-2 text-[calc(11px*var(--fs))] leading-[1.7] text-ink-3"
         >
           {{ t('expense.prefs.keywordsScope') }}
         </span>
-      </label>
-
-      <div>
-        <label class="block">
-          <span class="mb-1 block text-sm font-medium text-ink-2">
-            {{ t('expense.prefs.senders') }}
-          </span>
-          <textarea
-            v-model="sendersText"
-            class="w-full rounded-lg border border-line px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            rows="3"
-            :placeholder="t('expense.prefs.sendersPlaceholder')"
-          />
-          <span class="mt-1 block text-xs text-ink-3">
-            {{ t('expense.prefs.sendersHelp') }}
-          </span>
-        </label>
-      </div>
-
-      <div class="flex justify-end">
-        <BaseButton :loading="saving" @click="save">
-          {{ t('common.save') }}
-        </BaseButton>
       </div>
     </div>
-  </BaseCard>
+
+    <div class="flex justify-end px-4 py-3">
+      <BaseButton :loading="saving" @click="save">
+        {{ t('common.save') }}
+      </BaseButton>
+    </div>
+  </div>
 
   <FilenameTemplateDialog
     v-if="namingOpen"
@@ -118,7 +110,6 @@
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseCard from '@/components/ui/BaseCard.vue'
 import FilenameTemplateDialog from '@/components/expense/FilenameTemplateDialog.vue'
 import { expenseApi } from '@/api/expense'
 
@@ -132,6 +123,14 @@ const props = defineProps({
 const emit = defineEmits(['updated'])
 
 const { t } = useI18n()
+
+// One row per setting, in the artboard's order.
+const rows = [
+  { key: 'homeCity' },
+  { key: 'filenameTemplate' },
+  { key: 'keywords' },
+  { key: 'senders' }
+]
 
 const form = reactive({ home_city: '' })
 const namingOpen = ref(false)

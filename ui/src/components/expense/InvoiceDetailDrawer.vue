@@ -3,11 +3,16 @@
        it: checking an invoice means reading the row it came from, and a
        scrim puts that behind glass. Clicking another row swaps the panel.
        Below the breakpoint the two cannot share the width, so there it
-       falls back to the overlay it used to be. -->
+       falls back to the overlay it used to be.
+
+       576px is the artboard's number at its own 1440 width, which is 48%
+       of the content area. Past that the panel keeps the proportion rather
+       than the pixel count, or it would shrink to a strip on a wide screen;
+       it stops growing at 860 so the fields do not stretch. -->
   <div
     :class="
       variant === 'panel'
-        ? 'flex min-h-0 w-[576px] flex-none flex-col border-l border-line bg-panel'
+        ? 'flex min-h-0 w-[576px] flex-none flex-col border-l border-line bg-panel 2xl:w-[48%] 2xl:max-w-[860px]'
         : 'fixed inset-0 z-40 flex justify-end'
     "
     @click.self="variant !== 'panel' && $emit('close')"

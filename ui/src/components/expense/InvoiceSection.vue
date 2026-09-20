@@ -1,97 +1,109 @@
 <template>
-  <div class="flex flex-col">
-    <!-- The canvas runs these bands edge to edge, separated by hairlines,
-         rather than boxing the list in a card. -->
-    <div class="flex-shrink-0 px-4 pt-3.5 md:px-5">
-      <FilterChips v-model="stage" :options="stageOptions" />
-    </div>
+  <!-- The artboard keeps the toolbar inside the list column, so the detail
+       panel runs from under the page header to the bottom. Hanging the
+       filters across the full width instead left the panel starting
+       halfway down the page, short and stranded. -->
+  <div class="flex min-h-0 flex-1">
+    <div class="flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <slot name="before" />
 
-    <div class="flex flex-col">
-      <div
-        class="flex flex-col gap-3.5 border-b border-line px-4 pb-4 pt-3.5 md:px-5"
-      >
-        <InvoiceFilters v-model="filters" :buyers="buyers" />
-
-        <p
-          v-if="error"
-          class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
-        >
-          {{ error }}
-        </p>
-
-        <!-- Filing something away is silent by nature: the row simply
-             leaves the list. This says where it went and offers the way
-             back, so the action never feels like a deletion. -->
-        <div
-          v-if="filedNotice"
-          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ok bg-ok-soft p-3"
-        >
-          <div>
-            <p class="text-sm font-medium text-ok">
-              {{
-                t('expense.invoices.filedNotice', { count: filedNotice.count })
-              }}
-            </p>
-            <p class="mt-0.5 text-xs text-ok">
-              {{ t('expense.invoices.filedNoticeHint') }}
-            </p>
-          </div>
-          <div class="flex gap-2">
-            <BaseButton size="sm" variant="secondary" @click="undoFiling">
-              {{ t('common.undo') }}
-            </BaseButton>
-            <BaseButton size="sm" @click="stage = 'filed'">
-              {{ t('expense.invoices.goToFiled') }}
-            </BaseButton>
-          </div>
-        </div>
+      <!-- The canvas runs these bands edge to edge, separated by hairlines,
+           rather than boxing the list in a card. -->
+      <div class="flex-shrink-0 px-4 pt-3.5 md:px-5">
+        <FilterChips v-model="stage" :options="stageOptions" />
       </div>
 
-      <div
-        v-if="selectedUuids.length"
-        class="mx-4 mt-3.5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-accent bg-accent-soft px-3.5 py-2.5 md:mx-5"
-      >
-        <span class="text-sm text-accent">
-          {{
-            t('expense.invoices.selectedCount', {
-              count: selectedUuids.length
-            })
-          }}
-        </span>
-        <div class="flex flex-wrap gap-2">
-          <BaseButton size="sm" variant="secondary" @click="selectedUuids = []">
-            {{ t('expense.invoices.clearSelection') }}
-          </BaseButton>
-          <BaseButton
-            v-if="stage === 'filed'"
-            size="sm"
-            :loading="filing"
-            @click="restoreSelected"
+      <div class="flex flex-col">
+        <div
+          class="flex flex-col gap-3.5 border-b border-line px-4 pb-4 pt-3.5 md:px-5"
+        >
+          <InvoiceFilters v-model="filters" :buyers="buyers" />
+
+          <p
+            v-if="error"
+            class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
           >
-            {{ t('expense.invoices.restore') }}
-          </BaseButton>
-          <template v-else>
+            {{ error }}
+          </p>
+
+          <!-- Filing something away is silent by nature: the row simply
+             leaves the list. This says where it went and offers the way
+             back, so the action never feels like a deletion. -->
+          <div
+            v-if="filedNotice"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ok bg-ok-soft p-3"
+          >
+            <div>
+              <p class="text-sm font-medium text-ok">
+                {{
+                  t('expense.invoices.filedNotice', {
+                    count: filedNotice.count
+                  })
+                }}
+              </p>
+              <p class="mt-0.5 text-xs text-ok">
+                {{ t('expense.invoices.filedNoticeHint') }}
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <BaseButton size="sm" variant="secondary" @click="undoFiling">
+                {{ t('common.undo') }}
+              </BaseButton>
+              <BaseButton size="sm" @click="stage = 'filed'">
+                {{ t('expense.invoices.goToFiled') }}
+              </BaseButton>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="selectedUuids.length"
+          class="mx-4 mt-3.5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-accent bg-accent-soft px-3.5 py-2.5 md:mx-5"
+        >
+          <span class="text-sm text-accent">
+            {{
+              t('expense.invoices.selectedCount', {
+                count: selectedUuids.length
+              })
+            }}
+          </span>
+          <div class="flex flex-wrap gap-2">
             <BaseButton
               size="sm"
               variant="secondary"
-              :loading="filing"
-              @click="fileOpen = true"
+              @click="selectedUuids = []"
             >
-              {{ t('expense.invoices.fileAway') }}
+              {{ t('expense.invoices.clearSelection') }}
             </BaseButton>
-            <BaseButton size="sm" @click="groupOpen = true">
-              {{
-                stage === 'claiming'
-                  ? t('expense.groups.moveAction')
-                  : t('expense.groups.addAction')
-              }}
+            <BaseButton
+              v-if="stage === 'filed'"
+              size="sm"
+              :loading="filing"
+              @click="restoreSelected"
+            >
+              {{ t('expense.invoices.restore') }}
             </BaseButton>
-          </template>
+            <template v-else>
+              <BaseButton
+                size="sm"
+                variant="secondary"
+                :loading="filing"
+                @click="fileOpen = true"
+              >
+                {{ t('expense.invoices.fileAway') }}
+              </BaseButton>
+              <BaseButton size="sm" @click="groupOpen = true">
+                {{
+                  stage === 'claiming'
+                    ? t('expense.groups.moveAction')
+                    : t('expense.groups.addAction')
+                }}
+              </BaseButton>
+            </template>
+          </div>
         </div>
-      </div>
 
-      <div class="flex min-h-0">
-        <div class="min-w-0 flex-1 pt-3">
+        <div class="pt-3">
           <InvoiceMonthList
             v-model="selectedUuids"
             :invoices="invoices"
@@ -99,22 +111,24 @@
             @select="open"
           />
         </div>
-
-        <InvoiceDetailDrawer
-          v-if="selected && isWide"
-          variant="panel"
-          :invoice="selected"
-          :saving="saving"
-          :reextracting="reextracting"
-          :cost-per-email="costPerEmail"
-          :error="drawerError"
-          @close="selected = null"
-          @save="save"
-          @reextract="reextract"
-          @unfile="unfile"
-        />
       </div>
+
+      <slot name="after" />
     </div>
+
+    <InvoiceDetailDrawer
+      v-if="selected && isWide"
+      variant="panel"
+      :invoice="selected"
+      :saving="saving"
+      :reextracting="reextracting"
+      :cost-per-email="costPerEmail"
+      :error="drawerError"
+      @close="selected = null"
+      @save="save"
+      @reextract="reextract"
+      @unfile="unfile"
+    />
   </div>
 
   <FileAwayDialog

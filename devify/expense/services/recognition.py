@@ -69,6 +69,28 @@ def already_charged(email) -> EmailCreditsTransaction | None:
     ).first()
 
 
+def is_hotel_folio(fields: dict) -> bool:
+    """
+    A hotel bill wearing an invoice's clothes.
+
+    A 结账单 states what a stay cost and carries no 发票号码 and no
+    发票代码, because it is not an invoice - the hotel's 增值税发票 is,
+    and it arrives separately. The model reads the folio as a receipt and
+    returns is_invoice, so the same stay is counted twice: once claimable,
+    once not. Every genuine hotel invoice in the data carries a number, so
+    a hotel document missing both identifiers is the folio.
+
+    Kept narrow on purpose. Other kinds do legitimately arrive without a
+    number - a taxi itinerary, a train ticket read by a lossy OCR - and
+    those the duplicate collapse already folds into the numbered copy.
+    """
+    if (fields.get("invoice_type") or "") != "hotel":
+        return False
+    return not (fields.get("invoice_no") or "").strip() and not (
+        fields.get("invoice_code") or ""
+    ).strip()
+
+
 def build_dedup_key(fields: dict, attachment, source_file=None) -> str:
     """
     Prefer the invoice number; fall back to the file's own fingerprint.
@@ -313,7 +335,7 @@ def _persist(
         )
     )
 
-    if unreadable or not fields.get("is_invoice"):
+    if unreadable or not fields.get("is_invoice") or is_hotel_folio(fields):
         # "Not an invoice" and "an invoice we could not read" deserve
         # different answers: the first is settled, the second is worth
         # retrying, and only the second should look like something went

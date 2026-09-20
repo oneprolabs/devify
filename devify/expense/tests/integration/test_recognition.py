@@ -154,6 +154,51 @@ class TestBillingRule:
         assert stats["credits_consumed"] == 0
         assert EmailCreditsTransaction.objects.count() == 0
 
+    def test_a_hotel_folio_is_not_an_invoice(self, user):
+        """
+        A 结账单 states what a stay cost but cannot be claimed; the hotel's
+        VAT invoice can, and arrives beside it. Read as an invoice, the
+        stay is counted twice.
+        """
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        folio = invoice_fields(
+            invoice_type="hotel",
+            invoice_no="",
+            invoice_code="",
+            seller_name="桔子上海陆家嘴东方路酒店",
+            tax_amount=Decimal("0.00"),
+            amount_excl_tax=Decimal("0.00"),
+            total_amount=Decimal("1177.44"),
+        )
+
+        with stub_decode(), patch(EXTRACT_PATH, return_value=folio):
+            stats = recognize_email(email)
+
+        assert stats["not_invoice"] == 1
+        assert Invoice.objects.get().status == "not_invoice"
+        assert stats["credits_consumed"] == 0
+
+    def test_a_numbered_hotel_invoice_is_kept(self, user):
+        """The guard is for folios, not for every hotel document."""
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email)
+
+        real = invoice_fields(
+            invoice_type="hotel",
+            invoice_no="26312000005739224866",
+            seller_name="上海侣境酒店管理有限公司",
+            total_amount=Decimal("623.92"),
+        )
+
+        with stub_decode(), patch(EXTRACT_PATH, return_value=real):
+            recognize_email(email)
+
+        assert Invoice.objects.get().status == "extracted"
+
     def test_failed_extraction_is_free(self, user):
         give_credits(user, 10)
         email = make_email(user)
@@ -392,7 +437,6 @@ class TestExpenseDate:
         invoice = Invoice.objects.get(email_message=email)
         assert invoice.issue_date == date(2026, 8, 6)
         assert invoice.expense_date == date(2026, 7, 20)
-
 
 
 class TestSameEmailCopies:

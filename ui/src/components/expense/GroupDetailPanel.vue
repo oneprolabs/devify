@@ -1,182 +1,224 @@
 <template>
-  <BaseCard>
-    <div class="space-y-5">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0">
-          <h3 class="text-base font-semibold text-ink">
+  <!-- One batch in full, filling the right of the workbench. The artboard
+       orders it deliberately: the claim-form figures come before the
+       invoices, because copying those four numbers into the company's form
+       is what the reader actually came to do. -->
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <div
+      class="flex flex-none items-start gap-3 border-b border-line px-5 pb-[13px] pt-4"
+    >
+      <div class="flex min-w-0 flex-col gap-1">
+        <div class="flex min-w-0 items-center gap-2">
+          <h3
+            class="truncate text-[calc(15px*var(--fs))] font-semibold -tracking-[0.01em] text-ink"
+          >
             {{ group.name }}
           </h3>
-          <p class="mt-1 text-sm text-ink-3">
-            {{
-              t('expense.groups.line', {
-                count: group.invoice_count,
-                amount: group.total_amount
-              })
-            }}
-            <template v-if="group.period_start">
-              · {{ group.period_start }} ~ {{ group.period_end }}
-            </template>
-          </p>
+          <span
+            v-if="group.trip_type === 'business_trip'"
+            class="font-mono flex-none rounded-sm border border-accent px-[5px] py-px text-[calc(9.5px*var(--fs))] text-accent"
+          >
+            {{ t('expense.groups.businessTrip') }}
+          </span>
+          <span
+            class="font-mono flex-none rounded-sm px-1.5 py-0.5 text-[calc(9.5px*var(--fs))]"
+            :class="
+              group.status === 'draft'
+                ? 'bg-warn-soft text-warn'
+                : 'bg-panel-sub text-ink-3'
+            "
+          >
+            {{ t(`expense.groups.statuses.${group.status}`) }}
+          </span>
         </div>
-        <BaseButton size="sm" variant="secondary" @click="$emit('close')">
-          {{ t('common.collapse') }}
-        </BaseButton>
+        <span class="text-[calc(12px*var(--fs))] text-ink-3">
+          {{ t('expense.groups.byCategory') }}
+        </span>
       </div>
 
-      <p
-        v-if="error"
-        class="rounded-lg border border-bad bg-bad-soft p-3 text-sm text-bad"
-      >
-        {{ error }}
-      </p>
-
-      <!-- One scrolling panel rather than sub-tabs: a claim is small
-           enough to read whole, and the figures and the invoices they
-           come from are checked against each other. -->
-      <section>
-        <h4
-          class="border-b border-line-soft pb-2 text-xs font-medium uppercase tracking-wide text-ink-3"
+      <div class="ml-auto flex flex-none items-center gap-2">
+        <BaseButton
+          v-if="group.status === 'draft'"
+          size="sm"
+          variant="outline"
+          :loading="settling"
+          @click="$emit('settle', group)"
         >
-          {{ t('expense.groups.formFields') }}
-        </h4>
-        <GroupSummaryPanel v-if="summary" :summary="summary" class="mt-3" />
-      </section>
-
-      <section>
-        <div
-          class="flex items-center justify-between border-b border-line-soft pb-2"
+          {{ t('expense.groups.markReimbursed') }}
+        </BaseButton>
+        <BaseButton
+          size="sm"
+          :loading="exporting"
+          @click="$emit('export', group)"
         >
-          <h4 class="text-xs font-medium uppercase tracking-wide text-ink-3">
-            {{ t('expense.groups.viewItems') }}
-          </h4>
-          <p class="text-xs text-ink-4">
-            {{ t('expense.groups.sectionsHint') }}
-          </p>
-        </div>
-
-        <p v-if="!sections.length" class="py-6 text-center text-sm text-ink-3">
-          {{ t('expense.groups.noInvoices') }}
-        </p>
-
-        <!-- A claim form is filled one category at a time, so the invoices
-             are laid out the way the form asks for them. -->
-        <div v-for="section in sections" :key="section.category" class="mt-4">
-          <div class="flex items-baseline justify-between">
-            <strong class="text-sm text-ink">{{ section.label }}</strong>
-            <span class="text-xs tabular-nums text-ink-3">
-              {{
-                t('expense.groups.sectionSummary', {
-                  count: section.count,
-                  amount: section.amount
-                })
-              }}
-            </span>
-          </div>
-
-          <div
-            v-for="invoice in section.invoices"
-            :key="invoice.uuid"
-            class="flex items-center justify-between gap-3 border-b border-line-soft py-2 last:border-0"
-          >
-            <div class="min-w-0">
-              <p class="truncate text-sm text-ink">
-                {{ invoice.seller_name || t('expense.invoices.untitled') }}
-              </p>
-              <p class="mt-0.5 truncate text-xs text-ink-3">
-                {{ invoice.expense_date || invoice.issue_date || '-' }}
-                <template v-if="invoice.summary_line">
-                  · {{ invoice.summary_line }}
-                </template>
-              </p>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-sm tabular-nums text-ink">
-                ¥{{ invoice.total_amount }}
-              </span>
-              <BaseButton
-                size="sm"
-                variant="outline"
-                @click="$emit('move', invoice)"
-              >
-                {{ t('expense.groups.moveItem') }}
-              </BaseButton>
-              <BaseButton
-                size="sm"
-                variant="secondary"
-                :loading="removing === invoice.uuid"
-                @click="$emit('remove', invoice)"
-              >
-                {{ t('expense.groups.removeItem') }}
-              </BaseButton>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h4
-          class="border-b border-line-soft pb-2 text-xs font-medium uppercase tracking-wide text-ink-3"
-        >
-          {{ t('expense.groups.exportSection') }}
-        </h4>
-        <div
-          class="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3"
-        >
-          <div>
-            <p class="text-sm font-medium text-ink">
-              {{ t('expense.groups.exportZip') }}
-            </p>
-            <p class="mt-0.5 text-xs text-ink-3">
-              {{ t('expense.groups.exportZipHint') }}
-            </p>
-          </div>
-          <BaseButton
-            size="sm"
-            :loading="exporting"
-            @click="$emit('export', group)"
-          >
-            {{ t('expense.groups.export') }}
-          </BaseButton>
-        </div>
-      </section>
+          {{ t('expense.groups.export') }}
+        </BaseButton>
+      </div>
     </div>
-  </BaseCard>
+
+    <!-- The four numbers the claim form asks for, and one button that puts
+         all of them on the clipboard. -->
+    <div
+      class="mx-5 mt-4 flex flex-none flex-wrap items-center gap-7 rounded-[9px] border border-line bg-panel-sub px-4 py-3.5"
+    >
+      <div
+        v-for="stat in stats"
+        :key="stat.key"
+        class="flex flex-col gap-[3px]"
+      >
+        <span class="text-[calc(10.5px*var(--fs))] text-ink-3">
+          {{ t(`expense.groups.${stat.key}`) }}
+        </span>
+        <span
+          class="font-mono font-medium text-ink"
+          :class="
+            stat.key === 'amountInWords'
+              ? 'text-[calc(13px*var(--fs))] font-normal'
+              : 'text-[calc(17px*var(--fs))]'
+          "
+        >
+          {{ stat.value }}
+        </span>
+      </div>
+
+      <div class="ml-auto flex flex-col items-end gap-1.5">
+        <BaseButton size="sm" variant="outline" @click="copyAll">
+          {{
+            copied ? t('expense.groups.copied') : t('expense.groups.copyAll')
+          }}
+        </BaseButton>
+        <span class="text-[calc(10.5px*var(--fs))] text-ink-4">
+          {{ t('expense.groups.copyHint') }}
+        </span>
+      </div>
+    </div>
+
+    <p
+      v-if="error"
+      class="mx-5 mt-3 flex-none rounded-lg border border-bad bg-bad-soft px-[13px] py-[11px] text-[calc(11.5px*var(--fs))] text-bad"
+    >
+      {{ error }}
+    </p>
+
+    <div
+      class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 pb-5 pt-4"
+    >
+      <div
+        v-for="section in sections"
+        :key="section.category"
+        class="flex-none overflow-hidden rounded-[9px] border border-line"
+      >
+        <div
+          class="flex h-[34px] items-center gap-2 border-b border-line bg-panel-sub px-[13px]"
+        >
+          <span class="text-[calc(11.5px*var(--fs))] font-semibold text-ink">
+            {{ section.label }}
+          </span>
+          <span class="font-mono text-[calc(10.5px*var(--fs))] text-ink-4">
+            {{
+              t('expense.groups.line', {
+                count: section.count,
+                amount: formatAmount(section.amount)
+              })
+            }}
+          </span>
+          <span class="ml-auto text-[calc(11px*var(--fs))] text-ink-3">
+            {{ t('expense.groups.perLine') }}
+          </span>
+        </div>
+
+        <div
+          v-for="invoice in section.invoices"
+          :key="invoice.uuid"
+          class="flex items-center gap-3 border-b border-line-soft px-[13px] py-[11px] last:border-b-0"
+        >
+          <span
+            class="min-w-0 flex-1 truncate text-[calc(12.5px*var(--fs))] text-ink"
+          >
+            {{ invoice.seller_name || t('expense.invoices.untitled') }}
+          </span>
+          <span
+            class="font-mono hidden w-[150px] flex-none truncate text-[calc(10.5px*var(--fs))] text-ink-4 lg:block"
+          >
+            {{ invoice.invoice_no }}
+          </span>
+          <span
+            class="font-mono w-[52px] flex-none text-[calc(11px*var(--fs))] text-ink-3"
+          >
+            {{ shortDate(invoice.expense_date || invoice.issue_date) }}
+          </span>
+          <span
+            class="font-mono w-[84px] flex-none text-right text-[calc(12.5px*var(--fs))] font-medium text-ink"
+          >
+            ¥{{ formatAmount(invoice.total_amount) }}
+          </span>
+          <span class="flex w-[96px] flex-none justify-end gap-1.5">
+            <button
+              type="button"
+              class="text-[calc(11px*var(--fs))] text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
+              :disabled="removing === invoice.uuid"
+              @click="$emit('remove', invoice)"
+            >
+              {{ t('expense.groups.remove') }}
+            </button>
+            <span class="text-[calc(11px*var(--fs))] text-ink-4">·</span>
+            <button
+              type="button"
+              class="text-[calc(11px*var(--fs))] text-ink-3 transition-colors hover:text-ink"
+              @click="$emit('move', invoice)"
+            >
+              {{ t('expense.groups.moveTo') }}
+            </button>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseCard from '@/components/ui/BaseCard.vue'
-import GroupSummaryPanel from '@/components/expense/GroupSummaryPanel.vue'
+import { formatAmount } from '@/utils/formatting'
 
-defineProps({
-  group: {
-    type: Object,
-    required: true
-  },
-  summary: {
-    type: Object,
-    default: null
-  },
-  sections: {
-    type: Array,
-    default: () => []
-  },
-  removing: {
-    type: String,
-    default: ''
-  },
-  exporting: {
-    type: Boolean,
-    default: false
-  },
-  error: {
-    type: String,
-    default: ''
-  }
+const props = defineProps({
+  group: { type: Object, required: true },
+  summary: { type: Object, required: true },
+  sections: { type: Array, default: () => [] },
+  removing: { type: String, default: '' },
+  exporting: { type: Boolean, default: false },
+  settling: { type: Boolean, default: false },
+  error: { type: String, default: '' }
 })
 
-defineEmits(['close', 'remove', 'move', 'export'])
+defineEmits(['remove', 'move', 'export', 'settle'])
 
 const { t } = useI18n()
+const copied = ref(false)
+
+const stats = computed(() => [
+  { key: 'invoiceCount', value: props.summary.invoice_count },
+  { key: 'totalAmount', value: `¥${formatAmount(props.summary.total_amount)}` },
+  { key: 'taxAmount', value: `¥${formatAmount(props.summary.tax_amount)}` },
+  { key: 'amountInWords', value: props.summary.total_amount_cn }
+])
+
+function shortDate(value) {
+  return value ? value.slice(5) : '-'
+}
+
+async function copyAll() {
+  try {
+    await navigator.clipboard.writeText(props.summary.text_block || '')
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  } catch {
+    // Clipboard access can be refused; nothing is lost, the figures are
+    // on screen.
+    copied.value = false
+  }
+}
 </script>

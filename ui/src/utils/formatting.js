@@ -62,3 +62,14 @@ export function formatDuration(seconds) {
   const mins = minutes % 60
   return `${hours}h ${mins}m`
 }
+
+// Amounts read as money everywhere they appear, so they carry the group
+// separators the artboards draw: ¥3,204.00, not ¥3204.00.
+export function formatAmount(amount) {
+  const value = Number(amount)
+  if (!Number.isFinite(value)) return String(amount ?? '')
+  return new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value)
+}

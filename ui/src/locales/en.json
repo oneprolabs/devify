@@ -1557,7 +1557,14 @@
         "live": "In progress",
         "reimbursed": "Reimbursed",
         "all": "All"
-      }
+      },
+      "pickOne": "Pick a batch on the left",
+      "markReimbursed": "Mark reimbursed",
+      "perLine": "One line on the claim form",
+      "byCategory": "Grouped by category — one line each on the claim form.",
+      "copyHint": "Paste straight into the company form",
+      "remove": "Remove",
+      "moveTo": "Move"
     },
     "trips": {
       "title": "{count} business trips detected",

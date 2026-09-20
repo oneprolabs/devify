@@ -1566,7 +1566,14 @@
         "live": "进行中",
         "reimbursed": "已报销",
         "all": "全部"
-      }
+      },
+      "pickOne": "从左边选一个报销组",
+      "markReimbursed": "标记已报销",
+      "perLine": "这一行对应报销单上的一行",
+      "byCategory": "按分类分组，对应报销单上的每一行。",
+      "copyHint": "复制后直接粘进公司报销单",
+      "remove": "移出",
+      "moveTo": "移到其他组"
     },
     "trips": {
       "title": "检测到 {count} 次出差",

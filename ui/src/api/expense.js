@@ -123,6 +123,12 @@ export const expenseApi = {
       .then(extractData)
   },
 
+  updateGroup(uuid, payload) {
+    return apiClient
+      .patch(`/v1/apps/expense/groups/${uuid}`, payload)
+      .then(extractData)
+  },
+
   getGroup(uuid) {
     return apiClient.get(`/v1/apps/expense/groups/${uuid}`).then(extractData)
   },

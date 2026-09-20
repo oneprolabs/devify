@@ -4,7 +4,10 @@
        something you work through invoice by invoice, and the old shape made
        you expand a row to see any of it. -->
   <div class="flex min-h-0 flex-1">
-    <div class="flex w-[300px] flex-none flex-col border-r border-line">
+    <div
+      class="flex flex-col border-line md:w-[300px] md:flex-none md:border-r"
+      :class="selected && !isWide ? 'hidden' : 'w-full'"
+    >
       <div
         class="flex h-12 flex-none items-center gap-2 border-b border-line px-3.5"
       >
@@ -105,6 +108,8 @@
       :exporting="exporting === selected.uuid"
       :settling="settling"
       :error="detailError"
+      :can-go-back="!isWide"
+      @back="selected = null"
       @remove="removeInvoice"
       @move="startMove"
       @export="exportGroup"
@@ -112,7 +117,7 @@
     />
 
     <div
-      v-else
+      v-else-if="isWide"
       class="flex flex-1 items-center justify-center text-[calc(12px*var(--fs))] text-ink-3"
     >
       {{ error || t('expense.groups.pickOne') }}
@@ -129,7 +134,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FilterSelect from '@/components/ui/FilterSelect.vue'
 import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
@@ -153,6 +158,16 @@ const exporting = ref('')
 const error = ref('')
 const detailError = ref('')
 const settling = ref(false)
+
+// The rail and a batch cannot share 390px, so a phone shows the list and
+// then the batch, the way the artboard splits them into two screens.
+const WIDE = window.matchMedia('(min-width: 768px)')
+const isWide = ref(WIDE.matches)
+const syncWide = (event) => {
+  isWide.value = event.matches
+}
+onMounted(() => WIDE.addEventListener('change', syncWide))
+onBeforeUnmount(() => WIDE.removeEventListener('change', syncWide))
 const naming = ref(false)
 const nameInput = ref(null)
 
@@ -302,7 +317,7 @@ function exportGroup(group) {
 onMounted(async () => {
   await load()
   const first = visible.value[0]
-  if (first) await open(first)
+  if (first && isWide.value) await open(first)
 })
 defineExpose({ load })
 </script>

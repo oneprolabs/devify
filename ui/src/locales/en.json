@@ -64,7 +64,8 @@
     "expand": "Expand",
     "today": "Today",
     "yesterday": "Yesterday",
-    "typeToConfirm": "Type “{phrase}” to confirm:"
+    "typeToConfirm": "Type “{phrase}” to confirm:",
+    "more": "More"
   },
   "virtualEmail": {
     "yourAddress": "Your AI Email"
@@ -1564,7 +1565,8 @@
       "byCategory": "Grouped by category — one line each on the claim form.",
       "copyHint": "Paste straight into the company form",
       "remove": "Remove",
-      "moveTo": "Move"
+      "moveTo": "Move",
+      "perLineShort": "One claim line"
     },
     "trips": {
       "title": "{count} business trips detected",

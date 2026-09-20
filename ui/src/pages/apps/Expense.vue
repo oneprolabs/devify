@@ -5,37 +5,23 @@
       :title="t('expense.pageTitle')"
       :count="headerSummary"
     >
-      <!-- Three resources, not three states: an invoice's status is a filter
-           inside the first one. The artboard puts them at the right end of
-           the title row as one segmented control, not on a tab row of their
-           own: they pick what the page is about, and a second horizontal
-           band under the title reads like a second level of navigation. -->
-      <div
-        class="ml-auto flex h-8 flex-none items-center overflow-hidden rounded-md border border-line"
-        role="tablist"
-      >
-        <button
-          v-for="(tab, index) in tabs"
-          :key="tab.value"
-          type="button"
-          role="tab"
-          class="font-display flex h-8 items-center px-3.5 text-[calc(12.5px*var(--fs))] transition-colors"
-          :aria-selected="activeTab === tab.value"
-          :class="[
-            activeTab === tab.value
-              ? 'bg-accent-soft font-medium text-accent'
-              : 'text-ink-2 hover:bg-chip',
-            index ? 'border-l border-line' : ''
-          ]"
-          @click="activeTab = tab.value"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
+      <ExpenseTabs
+        v-model="activeTab"
+        :tabs="tabs"
+        class="ml-auto hidden md:flex"
+      />
     </PageHeader>
 
+    <!-- Under the header and full width on a phone, where the title row
+         cannot hold them. -->
+    <div class="flex-none border-b border-line px-4 py-3 md:hidden">
+      <ExpenseTabs v-model="activeTab" :tabs="tabs" full />
+    </div>
+
     <div class="flex min-h-0 flex-1" :class="scrollClass">
-      <div class="flex min-h-0 flex-1 flex-col" :class="bodyClass">
+      <!-- min-w-0: without it this flex child keeps min-width:auto and
+           is pushed wider than the viewport by the widest row inside. -->
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col" :class="bodyClass">
         <SkeletonRows v-if="loading" :count="5" />
 
         <template v-else>
@@ -139,6 +125,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
+import ExpenseTabs from '@/components/expense/ExpenseTabs.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import ExpenseEnableCard from '@/components/expense/ExpenseEnableCard.vue'
 import ExpensePreferences from '@/components/expense/ExpensePreferences.vue'

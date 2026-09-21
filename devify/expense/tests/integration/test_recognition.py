@@ -20,7 +20,6 @@ from expense.services.decoder import DecodedSource, DecodeMode
 from expense.services.recognition import Outcome, recognize_email
 from threadline.models import EmailAttachment, EmailMessage
 
-
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
 EXTRACT_PATH = "expense.services.recognition.extract"

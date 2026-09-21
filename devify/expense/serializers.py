@@ -314,6 +314,33 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
     )
     file_content_type = serializers.SerializerMethodField()
     has_file = serializers.SerializerMethodField()
+    related_documents = serializers.SerializerMethodField()
+
+    def get_related_documents(self, obj) -> list:
+        """
+        The other documents that turned out to be about this expense.
+
+        An email carries the invoice and things that explain it - a hotel
+        folio, a ride's itinerary, the same invoice as OFD and XML. The
+        duplicate collapse folds them into this row and they then had
+        nowhere to be seen, which threw away what the attachment said.
+        Listed here, the invoice stays the subject and the rest is behind
+        it rather than gone.
+        """
+        return [
+            {
+                "uuid": str(copy.uuid),
+                "filename": (
+                    copy.email_attachment.filename
+                    if copy.email_attachment
+                    else ""
+                ),
+                "invoice_type": copy.invoice_type,
+                "disposition": copy.disposition,
+                "has_file": bool(copy.email_attachment_id),
+            }
+            for copy in obj.duplicates.all().order_by("id")
+        ]
 
     class Meta(InvoiceListSerializer.Meta):
         fields = InvoiceListSerializer.Meta.fields + [
@@ -328,6 +355,7 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
             "file_content_type",
             "has_file",
             "duplicate_of_uuid",
+            "related_documents",
             "error_message",
             "updated_at",
         ]

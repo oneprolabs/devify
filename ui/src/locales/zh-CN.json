@@ -1456,7 +1456,7 @@
         "model": "由模型判定",
         "user": "你手动设置"
       },
-      "notClaimable": "只有已识别的发票可以加入报销组",
+      "notClaimable": "不可报销",
       "selectedCount": "已选 {count} 张",
       "clearSelection": "取消选择",
       "buyer": "抬头",
@@ -1517,7 +1517,8 @@
         "check_in": "入住",
         "check_out": "离店",
         "nights": "间夜"
-      }
+      },
+      "relatedTitle": "随附材料"
     },
     "groups": {
       "title": "报销组",
@@ -1619,7 +1620,8 @@
       "claiming": "报销中",
       "reimbursed": "已报销",
       "filed": "已归档",
-      "all": "全部"
+      "all": "全部",
+      "supporting": "随附材料"
     },
     "naming": {
       "title": "导出文件名设置",

@@ -1447,7 +1447,7 @@
         "model": "Proposed by the model",
         "user": "Set by you"
       },
-      "notClaimable": "Only recognized invoices can be claimed",
+      "notClaimable": "Not claimable",
       "selectedCount": "{count} selected",
       "clearSelection": "Clear",
       "buyer": "Billing title",
@@ -1508,7 +1508,8 @@
         "check_in": "Check-in",
         "check_out": "Check-out",
         "nights": "Nights"
-      }
+      },
+      "relatedTitle": "Came with it"
     },
     "groups": {
       "title": "Reimbursement groups",
@@ -1610,7 +1611,8 @@
       "claiming": "In a claim",
       "reimbursed": "Reimbursed",
       "filed": "Filed",
-      "all": "All"
+      "all": "All",
+      "supporting": "Came with"
     },
     "naming": {
       "title": "Export filename",

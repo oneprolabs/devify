@@ -45,7 +45,9 @@
         <span v-else></span>
 
         <div class="flex min-w-0 flex-1 flex-col gap-[3px]">
-          <p class="truncate text-[calc(13.5px*var(--fs))] font-medium text-ink">
+          <p
+            class="truncate text-[calc(13.5px*var(--fs))] font-medium text-ink"
+          >
             {{ invoice.seller_name || t('expense.invoices.untitled') }}
           </p>
           <p
@@ -112,10 +114,14 @@
         </div>
 
         <div class="flex w-[170px] flex-none flex-col items-end gap-[3px]">
-          <p class="font-mono text-[calc(13.5px*var(--fs))] font-medium text-ink">
+          <p
+            class="font-mono text-[calc(13.5px*var(--fs))] font-medium text-ink"
+          >
             {{ formatAmount(invoice) }}
           </p>
-          <p class="text-right font-mono text-[calc(11px*var(--fs))] text-ink-3">
+          <p
+            class="text-right font-mono text-[calc(11px*var(--fs))] text-ink-3"
+          >
             {{ t('expense.invoices.spentOn') }}
             <b class="text-ink-2">{{ shortDate(effectiveDate(invoice)) }}</b>
             <template v-if="showsBothDates(invoice)">
@@ -196,11 +202,11 @@ const months = computed(() => {
     }))
 })
 
-// Only a recognized invoice can be claimed; duplicates and failures stay
-// visible but not selectable, so the reason is obvious before the server
-// has to explain it.
+// Only a recognized invoice can be claimed; duplicates, failures and the
+// documents that merely came with an invoice stay visible but not
+// selectable, so the reason is obvious before the server has to explain it.
 function isClaimable(invoice) {
-  return invoice.status === 'extracted'
+  return invoice.status === 'extracted' && invoice.disposition !== 'supporting'
 }
 
 function toggleOne(invoice, checked) {

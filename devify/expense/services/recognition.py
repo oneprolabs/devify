@@ -80,6 +80,10 @@ def is_hotel_folio(fields: dict) -> bool:
     once not. Every genuine hotel invoice in the data carries a number, so
     a hotel document missing both identifiers is the folio.
 
+    The folio is kept, not discarded: it is what the attachment said, and
+    a reader chasing a stay should be able to open it. It is marked as a
+    supporting document instead, so it shows but never counts.
+
     Kept narrow on purpose. Other kinds do legitimately arrive without a
     number - a taxi itinerary, a train ticket read by a lossy OCR - and
     those the duplicate collapse already folds into the numbered copy.
@@ -335,7 +339,7 @@ def _persist(
         )
     )
 
-    if unreadable or not fields.get("is_invoice") or is_hotel_folio(fields):
+    if unreadable or not fields.get("is_invoice"):
         # "Not an invoice" and "an invoice we could not read" deserve
         # different answers: the first is settled, the second is worth
         # retrying, and only the second should look like something went
@@ -394,6 +398,11 @@ def _persist(
         "needs_review": fields["needs_review"],
         "error_message": "",
     }
+
+    # A folio explains a stay; the hotel's invoice is what gets claimed. It
+    # stays visible and keeps its file, but never counts toward a claim.
+    if is_hotel_folio(fields):
+        payload["disposition"] = Invoice.Disposition.SUPPORTING
 
     if existing:
         payload["status"] = Invoice.Status.DUPLICATE

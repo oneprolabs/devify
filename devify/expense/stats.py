@@ -14,9 +14,11 @@ def expense_stats(user) -> dict:
     "Unfiled" is the number worth acting on: an extracted invoice that
     belongs to no group is one nobody has claimed yet.
     """
+    # Supporting documents are read and kept, but they are not money to
+    # claim, so they stay out of every figure the header quotes.
     extracted = Invoice.objects.filter(
         user=user, status=Invoice.Status.EXTRACTED
-    )
+    ).exclude(disposition=Invoice.Disposition.SUPPORTING)
     total_amount = extracted.aggregate(total=Sum("total_amount"))["total"]
 
     return {

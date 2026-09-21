@@ -175,11 +175,13 @@ class TestBillingRule:
         )
 
         with stub_decode(), patch(EXTRACT_PATH, return_value=folio):
-            stats = recognize_email(email)
+            recognize_email(email)
 
-        assert stats["not_invoice"] == 1
-        assert Invoice.objects.get().status == "not_invoice"
-        assert stats["credits_consumed"] == 0
+        # Kept and readable — it is what the attachment said — but never
+        # counted: it cannot go in a claim and no figure includes it.
+        invoice = Invoice.objects.get()
+        assert invoice.status == "extracted"
+        assert invoice.disposition == "supporting"
 
     def test_a_numbered_hotel_invoice_is_kept(self, user):
         """The guard is for folios, not for every hotel document."""
@@ -197,7 +199,9 @@ class TestBillingRule:
         with stub_decode(), patch(EXTRACT_PATH, return_value=real):
             recognize_email(email)
 
-        assert Invoice.objects.get().status == "extracted"
+        invoice = Invoice.objects.get()
+        assert invoice.status == "extracted"
+        assert invoice.disposition == "to_claim"
 
     def test_failed_extraction_is_free(self, user):
         give_credits(user, 10)

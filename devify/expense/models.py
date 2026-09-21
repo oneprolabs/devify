@@ -237,6 +237,11 @@ class Invoice(models.Model):
     class Disposition(models.TextChoices):
         TO_CLAIM = "to_claim", _("To Claim")
         FILED = "filed", _("Filed, Not Claimed")
+        # A document that came with an invoice and explains it - a hotel
+        # folio, an itinerary - but is not itself claimable. Kept and shown
+        # rather than discarded: it is what the attachment actually said,
+        # and a reader looking for the stay should find it.
+        SUPPORTING = "supporting", _("Supporting Document")
 
     class CategorySource(models.TextChoices):
         RULE = "rule", _("Ticket Type Rule")

@@ -231,6 +231,17 @@ const stageOptions = computed(() => [
     label: t('expense.stages.filed'),
     count: counts.value.filed
   },
+  // Only offered once something is in it: most accounts never see a
+  // document that came with an invoice without being one.
+  ...(counts.value.supporting
+    ? [
+        {
+          value: 'supporting',
+          label: t('expense.stages.supporting'),
+          count: counts.value.supporting
+        }
+      ]
+    : []),
   { value: 'all', label: t('expense.stages.all'), count: counts.value.all }
 ])
 

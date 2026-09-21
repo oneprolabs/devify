@@ -401,8 +401,20 @@ def _persist(
 
     # A folio explains a stay; the hotel's invoice is what gets claimed. It
     # stays visible and keeps its file, but never counts toward a claim.
+    #
+    # Written both ways, not only on a match: re-reading a document has to
+    # be able to undo this. A bad scan typed "hotel" with no number is
+    # demoted, and if the reader corrects it and reads it again the row
+    # must come back rather than stay quietly out of every total. Filing
+    # is the user's own decision and is left alone.
     if is_hotel_folio(fields):
         payload["disposition"] = Invoice.Disposition.SUPPORTING
+    else:
+        current = Invoice.objects.filter(**lookup).values_list(
+            "disposition", flat=True
+        ).first()
+        if current != Invoice.Disposition.FILED:
+            payload["disposition"] = Invoice.Disposition.TO_CLAIM
 
     if existing:
         payload["status"] = Invoice.Status.DUPLICATE

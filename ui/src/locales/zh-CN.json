@@ -1456,7 +1456,7 @@
         "model": "由模型判定",
         "user": "你手动设置"
       },
-      "notClaimable": "不可报销",
+      "notClaimable": "只有已识别的发票可以加入报销组",
       "selectedCount": "已选 {count} 张",
       "clearSelection": "取消选择",
       "buyer": "抬头",
@@ -1518,7 +1518,8 @@
         "check_out": "离店",
         "nights": "间夜"
       },
-      "relatedTitle": "随附材料"
+      "relatedTitle": "随附材料",
+      "notClaimableSupporting": "随附材料不能报销——能报的是它旁边那张发票"
     },
     "groups": {
       "title": "报销组",

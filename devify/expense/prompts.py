@@ -31,13 +31,14 @@ Return a single JSON object and nothing else. Use this shape exactly:
 Rules:
 - Decide "is_invoice" first. If the document is not an invoice, a receipt or
   a travel itinerary, return {"is_invoice": false} and stop. Do not guess.
-- Some documents arrive next to an invoice but cannot be claimed in its
-  place. Return {"is_invoice": false} for a hotel 结账单 / 水单 / 预授权单 /
-  账单明细, for a 订单详情 or 支付凭证, and for any 对账单. A hotel's claimable
-  document is its 增值税发票, which usually arrives in the same email; the
-  folio repeats the same money and would be counted twice. Note that an
-  itinerary is not in this group: 航空运输电子客票行程单 and the railway's
-  电子客票 are themselves what gets claimed.
+- A hotel 结账单 / 水单 / 预授权单 is read like any other document: type it
+  "hotel" and leave "invoice_no" and "invoice_code" empty, because a folio
+  has neither. Do not copy a number off the 增值税发票 printed beside it.
+  What happens to it afterwards is decided downstream - the folio is kept
+  and shown, and the hotel's invoice is the one that gets claimed - so
+  read it faithfully rather than judging it.
+- A 对账单, a 订单详情 and a 支付凭证 are not expense documents at all:
+  {"is_invoice": false} for those.
 - "total_amount" is the amount actually paid (价税合计 on a VAT invoice).
 - Leave a field as "" or 0 when the document does not show it. Never invent
   a value, and never carry a number over from a different field.

@@ -327,19 +327,23 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
         Listed here, the invoice stays the subject and the rest is behind
         it rather than gone.
         """
+        copies = obj.duplicates.select_related(
+            "email_attachment", "source_file"
+        ).order_by("id")
         return [
             {
                 "uuid": str(copy.uuid),
-                "filename": (
-                    copy.email_attachment.filename
-                    if copy.email_attachment
-                    else ""
-                ),
+                # Same reading as the invoice's own file: a document
+                # fetched from a link has no attachment but still has a
+                # file, and an attachment row can exist with nothing saved.
+                "filename": getattr(self._source(copy), "filename", "") or "",
                 "invoice_type": copy.invoice_type,
                 "disposition": copy.disposition,
-                "has_file": bool(copy.email_attachment_id),
+                "has_file": bool(
+                    getattr(self._source(copy), "file_path", "")
+                ),
             }
-            for copy in obj.duplicates.all().order_by("id")
+            for copy in copies
         ]
 
     class Meta(InvoiceListSerializer.Meta):

@@ -154,7 +154,7 @@ class TestBillingRule:
         assert stats["credits_consumed"] == 0
         assert EmailCreditsTransaction.objects.count() == 0
 
-    def test_a_hotel_folio_is_not_an_invoice(self, user):
+    def test_a_hotel_folio_is_kept_as_supporting(self, user):
         """
         A 结账单 states what a stay cost but cannot be claimed; the hotel's
         VAT invoice can, and arrives beside it. Read as an invoice, the

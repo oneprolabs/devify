@@ -1447,7 +1447,7 @@
         "model": "Proposed by the model",
         "user": "Set by you"
       },
-      "notClaimable": "Not claimable",
+      "notClaimable": "Only recognized invoices can be claimed",
       "selectedCount": "{count} selected",
       "clearSelection": "Clear",
       "buyer": "Billing title",
@@ -1509,7 +1509,8 @@
         "check_out": "Check-out",
         "nights": "Nights"
       },
-      "relatedTitle": "Came with it"
+      "relatedTitle": "Came with it",
+      "notClaimableSupporting": "A supporting document cannot be claimed — the invoice beside it can"
     },
     "groups": {
       "title": "Reimbursement groups",

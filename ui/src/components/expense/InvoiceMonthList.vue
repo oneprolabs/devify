@@ -35,9 +35,7 @@
           class="mt-0.5 h-[17px] w-[17px] flex-none rounded-sm border-line text-accent focus:ring-accent disabled:opacity-40"
           :checked="modelValue.includes(invoice.uuid)"
           :disabled="!isClaimable(invoice)"
-          :title="
-            isClaimable(invoice) ? '' : t('expense.invoices.notClaimable')
-          "
+          :title="isClaimable(invoice) ? '' : notClaimableReason(invoice)"
           :aria-label="invoice.seller_name"
           @click.stop
           @change="toggleOne(invoice, $event.target.checked)"
@@ -99,6 +97,12 @@
               class="rounded-full bg-bad-soft px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-bad"
             >
               {{ t('expense.invoices.failed') }}
+            </span>
+            <span
+              v-if="invoice.disposition === 'supporting'"
+              class="rounded-full bg-chip px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-ink-3"
+            >
+              {{ t('expense.stages.supporting') }}
             </span>
             <span
               v-if="invoice.disposition === 'filed'"
@@ -196,7 +200,11 @@ const months = computed(() => {
               month: String(Number(key.slice(5)))
             }),
       invoices,
+      // A supporting document is money already counted on the invoice
+      // it came with, so it stays out of the subtotal — otherwise the
+      // months no longer add up to what the header says.
       amount: invoices
+        .filter((invoice) => invoice.disposition !== 'supporting')
         .reduce((sum, invoice) => sum + Number(invoice.total_amount || 0), 0)
         .toFixed(2)
     }))
@@ -205,6 +213,14 @@ const months = computed(() => {
 // Only a recognized invoice can be claimed; duplicates, failures and the
 // documents that merely came with an invoice stay visible but not
 // selectable, so the reason is obvious before the server has to explain it.
+// Two reasons a row cannot be picked, and they are not the same thing:
+// a supporting document is recognised, it just is not the claimable copy.
+function notClaimableReason(invoice) {
+  return invoice.disposition === 'supporting'
+    ? t('expense.invoices.notClaimableSupporting')
+    : t('expense.invoices.notClaimable')
+}
+
 function isClaimable(invoice) {
   return invoice.status === 'extracted' && invoice.disposition !== 'supporting'
 }

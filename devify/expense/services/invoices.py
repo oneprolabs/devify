@@ -70,7 +70,9 @@ def by_stage(queryset, stage: str):
         )
     if stage == "supporting":
         return queryset.filter(
-            disposition=Invoice.Disposition.SUPPORTING
+            disposition=Invoice.Disposition.SUPPORTING,
+            in_live_group=False,
+            in_settled_group=False,
         )
     return queryset
 

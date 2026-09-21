@@ -183,6 +183,12 @@
               {{ t('expense.invoices.unfile') }}
             </button>
           </div>
+          <p
+            v-if="relatedError"
+            class="rounded-lg border border-bad bg-bad-soft px-[13px] py-2 text-[calc(11.5px*var(--fs))] text-bad"
+          >
+            {{ relatedError }}
+          </p>
         </div>
 
         <div
@@ -464,15 +470,29 @@ const relatedDocuments = computed(() => props.invoice.related_documents || [])
 
 // Opened in a tab rather than inlined: these are secondary, and the panel
 // already carries one preview.
+const relatedError = ref('')
+
 async function openRelated(doc) {
   if (!doc.has_file) return
+  relatedError.value = ''
+  // The tab is claimed inside the click, before any await: opened after
+  // one, it is no longer a user gesture and Safari blocks it, which the
+  // reader sees as the link doing nothing.
+  const tab = window.open('', '_blank', 'noopener')
   try {
     const blob = await expenseApi.getInvoiceFile(doc.uuid)
     const url = URL.createObjectURL(blob)
-    window.open(url, '_blank', 'noopener')
+    if (tab) {
+      tab.location = url
+    } else {
+      window.open(url, '_blank', 'noopener')
+    }
     setTimeout(() => URL.revokeObjectURL(url), 60000)
   } catch (err) {
-    fileError.value =
+    tab?.close()
+    // Its own line, not the preview's: writing into fileError replaced
+    // the invoice's own preview with this error.
+    relatedError.value =
       err?.response?.data?.message || t('expense.invoices.originalFailed')
   }
 }

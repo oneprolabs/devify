@@ -14,6 +14,8 @@ import logging
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db import transaction
+
 from expense.constants import ExpenseCategory
 from expense.models import ExpenseGroup, Invoice, TripSuggestion
 
@@ -74,13 +76,21 @@ def home_city_for(user, explicit: str = "") -> str:
 
 
 def claimable(user):
-    """Invoices eligible for grouping, oldest first."""
+    """
+    Invoices eligible for grouping, oldest first.
+
+    A supporting document is read and kept but cannot be claimed, so a
+    trip built from one would quote a total nobody can file: accepting it
+    fails in the group service, and the folio a hotel sends alongside its
+    invoice is exactly the document that would land here.
+    """
     return list(
         Invoice.objects.filter(
             user=user,
             status=Invoice.Status.EXTRACTED,
             expense_date__isnull=False,
         )
+        .exclude(disposition=Invoice.Disposition.SUPPORTING)
         .exclude(group_items__isnull=False)
         .order_by("expense_date", "id")
     )
@@ -251,8 +261,15 @@ def refresh_suggestions(user, home_city: str = "") -> int:
     return created
 
 
+@transaction.atomic
 def accept(suggestion: TripSuggestion, name: str = "") -> ExpenseGroup:
-    """Turn a suggestion into a real group the user can file."""
+    """
+    Turn a suggestion into a real group the user can file.
+
+    Atomic because the group is created before its invoices go in: if one
+    of them turns out not to be claimable, an un-atomic accept leaves an
+    empty group behind and the next attempt names itself "... (2)".
+    """
     from expense.services.groups import add_invoices
 
     label = name or (

@@ -1,7 +1,7 @@
 """Integration tests for reimbursement groups, summaries and export."""
 
 import zipfile
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -12,7 +12,6 @@ from expense.models import ExpenseGroup, ExpenseGroupItem, Invoice
 from expense.services import export as export_service
 from expense.services import groups as group_service
 from threadline.models import EmailAttachment, EmailMessage
-
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -372,3 +371,60 @@ class TestGroupAPI:
         assert (
             api_client.get(f"{GROUPS_URL}/{group.uuid}").status_code == 404
         )
+
+
+@pytest.mark.django_db
+class TestSupportingDocumentsLeaveAClaim:
+    """
+    Adding a supporting document to a group is refused, so the only way one
+    gets in is by being demoted after it joined - a folio read a second
+    time. A claim must not go on quoting money nobody can claim.
+    """
+
+    def test_it_is_taken_out_of_a_draft(self, user):
+        keeper = make_invoice(user, total_amount=Decimal("100.00"))
+        folio = make_invoice(user, total_amount=Decimal("623.92"))
+        group = make_group(user, name="上海出差")
+        group_service.add_invoices(group, [str(keeper.uuid), str(folio.uuid)])
+        group.refresh_from_db()
+        assert group.total_amount == Decimal("723.92")
+
+        folio.disposition = Invoice.Disposition.SUPPORTING
+        folio.save(update_fields=["disposition"])
+        dropped = group_service.drop_from_live_groups(folio)
+
+        group.refresh_from_db()
+        assert dropped == [str(group.uuid)]
+        assert group.invoice_count == 1
+        assert group.total_amount == Decimal("100.00")
+        assert not ExpenseGroupItem.objects.filter(invoice=folio).exists()
+
+    def test_a_reimbursed_claim_is_left_as_it_was_filed(self, user):
+        """That group is a record of what happened, not a draft."""
+        folio = make_invoice(user, total_amount=Decimal("623.92"))
+        group = make_group(user, name="已报销的那次")
+        group_service.add_invoices(group, [str(folio.uuid)])
+        group.status = ExpenseGroup.Status.REIMBURSED
+        group.save(update_fields=["status"])
+
+        folio.disposition = Invoice.Disposition.SUPPORTING
+        folio.save(update_fields=["disposition"])
+        dropped = group_service.drop_from_live_groups(folio)
+
+        assert dropped == []
+        assert ExpenseGroupItem.objects.filter(invoice=folio).exists()
+
+    def test_the_claim_figures_ignore_one_that_lingers(self, user):
+        """A second line, for whatever the first one misses."""
+        keeper = make_invoice(user, total_amount=Decimal("100.00"))
+        folio = make_invoice(user, total_amount=Decimal("623.92"))
+        group = make_group(user, name="上海出差")
+        group_service.add_invoices(group, [str(keeper.uuid), str(folio.uuid)])
+
+        Invoice.objects.filter(pk=folio.pk).update(
+            disposition=Invoice.Disposition.SUPPORTING
+        )
+
+        assert group_service.group_invoices(group) == [keeper]
+        summary = group_service.build_summary(group)
+        assert summary["total_amount"] == "100.00"

@@ -286,8 +286,9 @@
               <span
                 v-if="doc.disposition === 'supporting'"
                 class="font-mono flex-none rounded-sm bg-panel-sub px-1.5 py-0.5 text-[calc(9.5px*var(--fs))] text-ink-3"
+                :title="t('expense.invoices.notClaimableSupporting')"
               >
-                {{ t('expense.invoices.notClaimable') }}
+                {{ t('expense.stages.supporting') }}
               </span>
               <span
                 v-if="doc.has_file"

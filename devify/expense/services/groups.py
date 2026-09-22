@@ -49,10 +49,13 @@ def claimable_invoices(user, uuids):
             _("Unknown invoices: %(items)s") % {"items": ", ".join(missing)}
         )
 
+    # A supporting document explains an expense without being the thing
+    # that is claimed, so it is refused here rather than counted in a group.
     unusable = [
         invoice
         for invoice in invoices
         if invoice.status != Invoice.Status.EXTRACTED
+        or invoice.disposition == Invoice.Disposition.SUPPORTING
     ]
     if unusable:
         raise GroupError(

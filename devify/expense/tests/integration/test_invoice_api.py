@@ -394,3 +394,66 @@ class TestClaimedFilter:
         api_client.force_authenticate(user=user)
 
         assert len(self._numbers(api_client)) == 2
+
+
+@pytest.mark.django_db
+class TestSupportingDocuments:
+    """
+    A hotel folio is read, kept and readable, but it is not the claimable
+    copy - the invoice beside it is. Everything that adds money up has to
+    agree on that, or the two halves of the app quote different totals.
+    """
+
+    def test_it_is_left_out_of_every_figure(self, user):
+        from expense.services.invoices import stage_counts
+        from expense.stats import expense_stats
+
+        make_invoice(user, total_amount=Decimal("100.00"))
+        before_stats = expense_stats(user)
+        before_stages = stage_counts(user)
+
+        make_invoice(
+            user,
+            invoice_no="",
+            total_amount=Decimal("623.92"),
+            disposition=Invoice.Disposition.SUPPORTING,
+        )
+
+        after_stats = expense_stats(user)
+        after_stages = stage_counts(user)
+
+        assert after_stats["amount"] == before_stats["amount"]
+        assert after_stats["unfiled"] == before_stats["unfiled"]
+        assert after_stages["todo"] == before_stages["todo"]
+        assert after_stages["supporting"] == before_stages["supporting"] + 1
+
+    def test_it_cannot_be_claimed(self, user):
+        from expense.services.groups import GroupError, claimable_invoices
+
+        folio = make_invoice(
+            user,
+            invoice_no="",
+            disposition=Invoice.Disposition.SUPPORTING,
+        )
+
+        with pytest.raises(GroupError):
+            claimable_invoices(user, [str(folio.uuid)])
+
+    def test_the_invoice_lists_what_came_with_it(self, api_client, user):
+        """The folio is reachable from the invoice rather than discarded."""
+        invoice = make_invoice(user)
+        folio = make_invoice(
+            user,
+            invoice_no="",
+            status=Invoice.Status.DUPLICATE,
+            duplicate_of=invoice,
+            disposition=Invoice.Disposition.SUPPORTING,
+        )
+        api_client.force_authenticate(user=user)
+
+        response = api_client.get(f"{LIST_URL}/{invoice.uuid}")
+
+        listed = [
+            item["uuid"] for item in response.data["data"]["related_documents"]
+        ]
+        assert str(folio.uuid) in listed

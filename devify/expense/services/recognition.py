@@ -69,6 +69,32 @@ def already_charged(email) -> EmailCreditsTransaction | None:
     ).first()
 
 
+def is_hotel_folio(fields: dict) -> bool:
+    """
+    A hotel bill wearing an invoice's clothes.
+
+    A 结账单 states what a stay cost and carries no 发票号码 and no
+    发票代码, because it is not an invoice - the hotel's 增值税发票 is,
+    and it arrives separately. The model reads the folio as a receipt and
+    returns is_invoice, so the same stay is counted twice: once claimable,
+    once not. Every genuine hotel invoice in the data carries a number, so
+    a hotel document missing both identifiers is the folio.
+
+    The folio is kept, not discarded: it is what the attachment said, and
+    a reader chasing a stay should be able to open it. It is marked as a
+    supporting document instead, so it shows but never counts.
+
+    Kept narrow on purpose. Other kinds do legitimately arrive without a
+    number - a taxi itinerary, a train ticket read by a lossy OCR - and
+    those the duplicate collapse already folds into the numbered copy.
+    """
+    if (fields.get("invoice_type") or "") != "hotel":
+        return False
+    return not (fields.get("invoice_no") or "").strip() and not (
+        fields.get("invoice_code") or ""
+    ).strip()
+
+
 def build_dedup_key(fields: dict, attachment, source_file=None) -> str:
     """
     Prefer the invoice number; fall back to the file's own fingerprint.
@@ -372,6 +398,23 @@ def _persist(
         "needs_review": fields["needs_review"],
         "error_message": "",
     }
+
+    # A folio explains a stay; the hotel's invoice is what gets claimed. It
+    # stays visible and keeps its file, but never counts toward a claim.
+    #
+    # Written both ways, not only on a match: re-reading a document has to
+    # be able to undo this. A bad scan typed "hotel" with no number is
+    # demoted, and if the reader corrects it and reads it again the row
+    # must come back rather than stay quietly out of every total. Filing
+    # is the user's own decision and is left alone.
+    if is_hotel_folio(fields):
+        payload["disposition"] = Invoice.Disposition.SUPPORTING
+    else:
+        current = Invoice.objects.filter(**lookup).values_list(
+            "disposition", flat=True
+        ).first()
+        if current != Invoice.Disposition.FILED:
+            payload["disposition"] = Invoice.Disposition.TO_CLAIM
 
     if existing:
         payload["status"] = Invoice.Status.DUPLICATE

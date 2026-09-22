@@ -35,9 +35,7 @@
           class="mt-0.5 h-[17px] w-[17px] flex-none rounded-sm border-line text-accent focus:ring-accent disabled:opacity-40"
           :checked="modelValue.includes(invoice.uuid)"
           :disabled="!isClaimable(invoice)"
-          :title="
-            isClaimable(invoice) ? '' : t('expense.invoices.notClaimable')
-          "
+          :title="isClaimable(invoice) ? '' : notClaimableReason(invoice)"
           :aria-label="invoice.seller_name"
           @click.stop
           @change="toggleOne(invoice, $event.target.checked)"
@@ -45,7 +43,9 @@
         <span v-else></span>
 
         <div class="flex min-w-0 flex-1 flex-col gap-[3px]">
-          <p class="truncate text-[calc(13.5px*var(--fs))] font-medium text-ink">
+          <p
+            class="truncate text-[calc(13.5px*var(--fs))] font-medium text-ink"
+          >
             {{ invoice.seller_name || t('expense.invoices.untitled') }}
           </p>
           <p
@@ -99,6 +99,12 @@
               {{ t('expense.invoices.failed') }}
             </span>
             <span
+              v-if="invoice.disposition === 'supporting'"
+              class="rounded-full bg-chip px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-ink-3"
+            >
+              {{ t('expense.stages.supporting') }}
+            </span>
+            <span
               v-if="invoice.disposition === 'filed'"
               class="rounded-full bg-ok-soft px-[9px] py-0.5 text-[calc(10.5px*var(--fs))] text-ok"
             >
@@ -112,10 +118,14 @@
         </div>
 
         <div class="flex w-[170px] flex-none flex-col items-end gap-[3px]">
-          <p class="font-mono text-[calc(13.5px*var(--fs))] font-medium text-ink">
+          <p
+            class="font-mono text-[calc(13.5px*var(--fs))] font-medium text-ink"
+          >
             {{ formatAmount(invoice) }}
           </p>
-          <p class="text-right font-mono text-[calc(11px*var(--fs))] text-ink-3">
+          <p
+            class="text-right font-mono text-[calc(11px*var(--fs))] text-ink-3"
+          >
             {{ t('expense.invoices.spentOn') }}
             <b class="text-ink-2">{{ shortDate(effectiveDate(invoice)) }}</b>
             <template v-if="showsBothDates(invoice)">
@@ -190,17 +200,29 @@ const months = computed(() => {
               month: String(Number(key.slice(5)))
             }),
       invoices,
+      // A supporting document is money already counted on the invoice
+      // it came with, so it stays out of the subtotal — otherwise the
+      // months no longer add up to what the header says.
       amount: invoices
+        .filter((invoice) => invoice.disposition !== 'supporting')
         .reduce((sum, invoice) => sum + Number(invoice.total_amount || 0), 0)
         .toFixed(2)
     }))
 })
 
-// Only a recognized invoice can be claimed; duplicates and failures stay
-// visible but not selectable, so the reason is obvious before the server
-// has to explain it.
+// Only a recognized invoice can be claimed; duplicates, failures and the
+// documents that merely came with an invoice stay visible but not
+// selectable, so the reason is obvious before the server has to explain it.
+// Two reasons a row cannot be picked, and they are not the same thing:
+// a supporting document is recognised, it just is not the claimable copy.
+function notClaimableReason(invoice) {
+  return invoice.disposition === 'supporting'
+    ? t('expense.invoices.notClaimableSupporting')
+    : t('expense.invoices.notClaimable')
+}
+
 function isClaimable(invoice) {
-  return invoice.status === 'extracted'
+  return invoice.status === 'extracted' && invoice.disposition !== 'supporting'
 }
 
 function toggleOne(invoice, checked) {

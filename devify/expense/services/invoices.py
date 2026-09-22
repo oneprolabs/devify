@@ -68,6 +68,12 @@ def by_stage(queryset, stage: str):
             in_live_group=False,
             in_settled_group=False,
         )
+    if stage == "supporting":
+        return queryset.filter(
+            disposition=Invoice.Disposition.SUPPORTING,
+            in_live_group=False,
+            in_settled_group=False,
+        )
     return queryset
 
 
@@ -79,7 +85,13 @@ def stage_counts(user) -> dict:
     base = Invoice.objects.filter(user=user, status=Invoice.Status.EXTRACTED)
     counts = {
         stage: by_stage(base, stage).count()
-        for stage in ("todo", "claiming", "reimbursed", "filed")
+        for stage in (
+            "todo",
+            "claiming",
+            "reimbursed",
+            "filed",
+            "supporting",
+        )
     }
     counts["all"] = base.count()
     return counts

@@ -9,6 +9,7 @@ from django.utils import timezone
 from expense.constants import ExpenseCategory
 from expense.models import ExpenseGroup, Invoice, TripSuggestion
 from expense.services import trips as trip_service
+from expense.services.groups import GroupError
 from threadline.models import EmailMessage
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
@@ -318,3 +319,58 @@ class TestTravelDateDrivesGrouping:
 
         assert summary["period_start"] == "2026-08-12"
         assert summary["period_end"] == "2026-08-15"
+
+
+@pytest.mark.django_db
+class TestSupportingDocumentsStayOut:
+    """
+    A folio is read and kept, but it is not money anybody can claim.
+
+    Letting one into a trip inflates the total the card quotes and then
+    makes the trip impossible to accept, because the group service refuses
+    the document the trip is partly built from.
+    """
+
+    def test_a_supporting_document_is_not_trip_material(self, user):
+        seed_trip(user)
+        folio = make_invoice(
+            user,
+            "上海",
+            13,
+            ExpenseCategory.ACCOMMODATION,
+            invoice_no="",
+            total_amount=Decimal("623.92"),
+            disposition=Invoice.Disposition.SUPPORTING,
+        )
+
+        candidates = trip_service.claimable(user)
+
+        assert folio not in candidates
+
+    def test_accepting_a_trip_leaves_no_empty_group_behind(self, user):
+        """
+        The group is created before its invoices go in, so a refusal has to
+        take the group with it or the next attempt names itself "... (2)".
+        """
+        seed_trip(user)
+        trip_service.refresh_suggestions(user, "北京")
+        suggestion = TripSuggestion.objects.get()
+        suggestion.invoice_ids = list(suggestion.invoice_ids) + [
+            str(
+                make_invoice(
+                    user,
+                    "上海",
+                    13,
+                    ExpenseCategory.ACCOMMODATION,
+                    invoice_no="",
+                    disposition=Invoice.Disposition.SUPPORTING,
+                ).uuid
+            )
+        ]
+        suggestion.save(update_fields=["invoice_ids"])
+
+        before = ExpenseGroup.objects.count()
+        with pytest.raises(GroupError):
+            trip_service.accept(suggestion)
+
+        assert ExpenseGroup.objects.count() == before

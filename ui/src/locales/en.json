@@ -1508,7 +1508,9 @@
         "check_in": "Check-in",
         "check_out": "Check-out",
         "nights": "Nights"
-      }
+      },
+      "relatedTitle": "Came with it",
+      "notClaimableSupporting": "A supporting document cannot be claimed — the invoice beside it can"
     },
     "groups": {
       "title": "Reimbursement groups",
@@ -1610,7 +1612,8 @@
       "claiming": "In a claim",
       "reimbursed": "Reimbursed",
       "filed": "Filed",
-      "all": "All"
+      "all": "All",
+      "supporting": "Came with"
     },
     "naming": {
       "title": "Export filename",

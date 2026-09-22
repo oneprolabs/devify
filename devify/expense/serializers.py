@@ -314,6 +314,37 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
     )
     file_content_type = serializers.SerializerMethodField()
     has_file = serializers.SerializerMethodField()
+    related_documents = serializers.SerializerMethodField()
+
+    def get_related_documents(self, obj) -> list:
+        """
+        The other documents that turned out to be about this expense.
+
+        An email carries the invoice and things that explain it - a hotel
+        folio, a ride's itinerary, the same invoice as OFD and XML. The
+        duplicate collapse folds them into this row and they then had
+        nowhere to be seen, which threw away what the attachment said.
+        Listed here, the invoice stays the subject and the rest is behind
+        it rather than gone.
+        """
+        copies = obj.duplicates.select_related(
+            "email_attachment", "source_file"
+        ).order_by("id")
+        return [
+            {
+                "uuid": str(copy.uuid),
+                # Same reading as the invoice's own file: a document
+                # fetched from a link has no attachment but still has a
+                # file, and an attachment row can exist with nothing saved.
+                "filename": getattr(self._source(copy), "filename", "") or "",
+                "invoice_type": copy.invoice_type,
+                "disposition": copy.disposition,
+                "has_file": bool(
+                    getattr(self._source(copy), "file_path", "")
+                ),
+            }
+            for copy in copies
+        ]
 
     class Meta(InvoiceListSerializer.Meta):
         fields = InvoiceListSerializer.Meta.fields + [
@@ -328,6 +359,7 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
             "file_content_type",
             "has_file",
             "duplicate_of_uuid",
+            "related_documents",
             "error_message",
             "updated_at",
         ]

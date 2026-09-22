@@ -183,6 +183,12 @@
               {{ t('expense.invoices.unfile') }}
             </button>
           </div>
+          <p
+            v-if="relatedError"
+            class="rounded-lg border border-bad bg-bad-soft px-[13px] py-2 text-[calc(11.5px*var(--fs))] text-bad"
+          >
+            {{ relatedError }}
+          </p>
         </div>
 
         <div
@@ -253,6 +259,43 @@
             >
               {{ t('expense.invoices.originalDownload') }}
             </a>
+          </div>
+        </div>
+
+        <!-- What else the email carried about this expense. The invoice is
+             the subject and stays above; these explain it and would
+             otherwise be thrown away by the duplicate collapse. -->
+        <div v-if="relatedDocuments.length" class="space-y-2">
+          <h3 class="text-[calc(12.5px*var(--fs))] font-semibold text-ink">
+            {{ t('expense.invoices.relatedTitle') }}
+          </h3>
+          <div class="overflow-hidden rounded-lg border border-line">
+            <button
+              v-for="doc in relatedDocuments"
+              :key="doc.uuid"
+              type="button"
+              class="flex w-full items-center gap-2.5 border-b border-line-soft px-[13px] py-2.5 text-left last:border-b-0 hover:bg-chip disabled:cursor-default disabled:hover:bg-transparent"
+              :disabled="!doc.has_file"
+              @click="openRelated(doc)"
+            >
+              <span
+                class="min-w-0 flex-1 truncate text-[calc(11.5px*var(--fs))] text-ink-2"
+              >
+                {{ doc.filename || t('expense.invoices.untitled') }}
+              </span>
+              <span
+                v-if="doc.disposition === 'supporting'"
+                class="font-mono flex-none rounded-sm bg-panel-sub px-1.5 py-0.5 text-[calc(9.5px*var(--fs))] text-ink-3"
+              >
+                {{ t('expense.invoices.notClaimable') }}
+              </span>
+              <span
+                v-if="doc.has_file"
+                class="flex-none text-[calc(11px*var(--fs))] text-accent"
+              >
+                {{ t('expense.invoices.originalDownload') }}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -422,6 +465,37 @@ function load(invoice) {
 }
 
 watch(() => props.invoice, load, { immediate: true })
+
+const relatedDocuments = computed(() => props.invoice.related_documents || [])
+
+// Opened in a tab rather than inlined: these are secondary, and the panel
+// already carries one preview.
+const relatedError = ref('')
+
+async function openRelated(doc) {
+  if (!doc.has_file) return
+  relatedError.value = ''
+  // The tab is claimed inside the click, before any await: opened after
+  // one, it is no longer a user gesture and Safari blocks it, which the
+  // reader sees as the link doing nothing.
+  const tab = window.open('', '_blank', 'noopener')
+  try {
+    const blob = await expenseApi.getInvoiceFile(doc.uuid)
+    const url = URL.createObjectURL(blob)
+    if (tab) {
+      tab.location = url
+    } else {
+      window.open(url, '_blank', 'noopener')
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  } catch (err) {
+    tab?.close()
+    // Its own line, not the preview's: writing into fileError replaced
+    // the invoice's own preview with this error.
+    relatedError.value =
+      err?.response?.data?.message || t('expense.invoices.originalFailed')
+  }
+}
 
 const hasTicketDetails = computed(
   () => Object.keys(props.invoice.ticket_details || {}).length > 0

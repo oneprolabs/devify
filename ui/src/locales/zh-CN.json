@@ -1517,7 +1517,9 @@
         "check_in": "入住",
         "check_out": "离店",
         "nights": "间夜"
-      }
+      },
+      "relatedTitle": "随附材料",
+      "notClaimableSupporting": "随附材料不能报销——能报的是它旁边那张发票"
     },
     "groups": {
       "title": "报销组",
@@ -1619,7 +1621,8 @@
       "claiming": "报销中",
       "reimbursed": "已报销",
       "filed": "已归档",
-      "all": "全部"
+      "all": "全部",
+      "supporting": "随附材料"
     },
     "naming": {
       "title": "导出文件名设置",

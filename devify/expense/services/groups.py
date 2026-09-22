@@ -199,13 +199,50 @@ def remove_invoices(group: ExpenseGroup, uuids) -> int:
     return removed
 
 
+def drop_from_live_groups(invoice: Invoice) -> list[str]:
+    """
+    Take an invoice out of the claims still being prepared.
+
+    ``add_invoices`` refuses a supporting document, so the only way one
+    reaches a group is by becoming supporting after it joined - a folio
+    read a second time, say. Left there it would keep padding the figures
+    the reader copies onto the claim form, which is the exact mistake this
+    is meant to prevent.
+
+    A reimbursed group is not touched. That one is a record of what was
+    already filed, and quietly restating it would rewrite history rather
+    than correct it.
+    """
+    from expense.services.invoices import LIVE_GROUP_STATES
+
+    items = list(
+        ExpenseGroupItem.objects.filter(
+            invoice=invoice, group__status__in=LIVE_GROUP_STATES
+        ).select_related("group")
+    )
+    groups = {item.group.uuid: item.group for item in items}
+    if not items:
+        return []
+
+    ExpenseGroupItem.objects.filter(
+        id__in=[item.id for item in items]
+    ).delete()
+    for group in groups.values():
+        recalculate(group)
+
+    return [str(uuid) for uuid in groups]
+
+
 def recalculate(group: ExpenseGroup) -> ExpenseGroup:
     """Refresh the cached totals and the period the group covers."""
+    # Same reading as group_invoices: a supporting document does not add
+    # to a claim, so it does not add to the cached totals either.
     invoices = [
         item.invoice
         for item in ExpenseGroupItem.objects.filter(
             group=group
         ).select_related("invoice")
+        if item.invoice.disposition != Invoice.Disposition.SUPPORTING
     ]
 
     group.invoice_count = len(invoices)
@@ -264,12 +301,21 @@ def category_breakdown(invoices) -> list[dict]:
 
 
 def group_invoices(group: ExpenseGroup) -> list[Invoice]:
-    """The group's invoices in the order the user arranged them."""
+    """
+    The group's invoices in the order the user arranged them.
+
+    Supporting documents are skipped even if one is still a member. They
+    are dropped from live groups the moment they are demoted, so this is
+    a second line rather than the first - but the figures a reader copies
+    onto a claim form are the wrong place to find out that the first one
+    was missed.
+    """
     return [
         item.invoice
         for item in ExpenseGroupItem.objects.filter(group=group)
         .select_related("invoice")
         .order_by("sort_order", "id")
+        if item.invoice.disposition != Invoice.Disposition.SUPPORTING
     ]
 
 
@@ -315,7 +361,19 @@ def build_summary(group: ExpenseGroup) -> dict:
     """
     invoices = group_invoices(group)
 
-    total = group.total_amount or Decimal("0")
+    # Counted from the members rather than read off the cached columns.
+    # These four numbers are what a reader copies onto the company's form,
+    # and the rows listed under them come from the same list - a cache that
+    # has gone stale would have them disagreeing with each other on the one
+    # screen where that matters most.
+    total = sum(
+        (invoice.total_amount or Decimal("0") for invoice in invoices),
+        Decimal("0"),
+    )
+    tax_total = sum(
+        (invoice.tax_amount or Decimal("0") for invoice in invoices),
+        Decimal("0"),
+    )
     breakdown = category_breakdown(invoices)
     numbers = [
         invoice.invoice_no for invoice in invoices if invoice.invoice_no
@@ -329,10 +387,10 @@ def build_summary(group: ExpenseGroup) -> dict:
             group.period_start.isoformat() if group.period_start else ""
         ),
         "period_end": group.period_end.isoformat() if group.period_end else "",
-        "invoice_count": group.invoice_count,
+        "invoice_count": len(invoices),
         "total_amount": str(total),
         "total_amount_cn": to_chinese_amount(total),
-        "tax_amount": str(group.tax_amount or Decimal("0")),
+        "tax_amount": str(tax_total),
         "currency": "CNY",
         "category_breakdown": breakdown,
         "invoice_numbers": numbers,

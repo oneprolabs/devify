@@ -440,6 +440,22 @@ def _persist(
     if invoice.status == Invoice.Status.EXTRACTED:
         absorb_unnumbered_copies(invoice)
 
+    # Reading a document again can demote it, and it may already be sitting
+    # in a claim somebody is preparing. Adding one there is refused, so
+    # leaving it would be the only way a claim could quote money that
+    # cannot be claimed.
+    if invoice.disposition == Invoice.Disposition.SUPPORTING:
+        from expense.services.groups import drop_from_live_groups
+
+        dropped = drop_from_live_groups(invoice)
+        if dropped:
+            logger.info(
+                "Invoice %s became a supporting document and left "
+                "group(s) %s",
+                invoice.uuid,
+                ", ".join(dropped),
+            )
+
     return invoice, (
         "duplicate"
         if invoice.status == Invoice.Status.DUPLICATE

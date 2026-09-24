@@ -114,6 +114,7 @@
       @move="startMove"
       @export="exportGroup"
       @settle="markReimbursed"
+      @open="openInvoice"
     />
 
     <div
@@ -123,6 +124,17 @@
       {{ error || t('expense.groups.pickOne') }}
     </div>
   </div>
+
+  <!-- Opened over the workbench: the group is the context you came from
+         and the one you go back to, so it stays where it was. -->
+  <InvoiceDetailDrawer
+    v-if="openedInvoice"
+    :invoice="openedInvoice"
+    :saving="savingInvoice"
+    :error="invoiceError"
+    @close="openedInvoice = null"
+    @save="saveInvoice"
+  />
 
   <AddToGroupDialog
     v-if="moving"
@@ -139,6 +151,7 @@ import { useI18n } from 'vue-i18n'
 import FilterSelect from '@/components/ui/FilterSelect.vue'
 import AddToGroupDialog from '@/components/expense/AddToGroupDialog.vue'
 import GroupDetailPanel from '@/components/expense/GroupDetailPanel.vue'
+import InvoiceDetailDrawer from '@/components/expense/InvoiceDetailDrawer.vue'
 import { expenseApi } from '@/api/expense'
 import { formatAmount } from '@/utils/formatting'
 import apiConfig from '@/config/api'
@@ -158,6 +171,9 @@ const exporting = ref('')
 const error = ref('')
 const detailError = ref('')
 const settling = ref(false)
+const openedInvoice = ref(null)
+const savingInvoice = ref(false)
+const invoiceError = ref('')
 
 // The rail and a batch cannot share 390px, so a phone shows the list and
 // then the batch, the way the artboard splits them into two screens.
@@ -282,6 +298,35 @@ async function markReimbursed(group) {
     detailError.value = readError(err, 'expense.groups.createFailed')
   } finally {
     settling.value = false
+  }
+}
+
+// Reading a claim line by line raises questions about single invoices,
+// and the answer is the invoice itself.
+async function openInvoice(invoice) {
+  invoiceError.value = ''
+  try {
+    openedInvoice.value = await expenseApi.getInvoice(invoice.uuid)
+  } catch (err) {
+    detailError.value = readError(err, 'expense.loadFailed')
+  }
+}
+
+async function saveInvoice(form) {
+  savingInvoice.value = true
+  invoiceError.value = ''
+  try {
+    openedInvoice.value = await expenseApi.updateInvoice(
+      openedInvoice.value.uuid,
+      form
+    )
+    // An edited amount changes what the claim adds up to.
+    await loadDetail(selected.value.uuid)
+    await load()
+  } catch (err) {
+    invoiceError.value = readError(err, 'expense.invoices.saveFailed')
+  } finally {
+    savingInvoice.value = false
   }
 }
 

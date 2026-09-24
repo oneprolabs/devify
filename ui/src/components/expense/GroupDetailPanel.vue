@@ -166,7 +166,18 @@
           :key="invoice.uuid"
           class="border-b border-line-soft last:border-b-0"
         >
-          <div class="flex items-center gap-3 px-[13px] py-[11px]">
+          <!-- Checking a claim line by line means wanting to see the
+               invoice behind one: the original, the fields, whether the
+               amount is what the row says. Without this the only way
+               there was to leave the group, find it in the list and
+               search for it again. -->
+          <div
+            class="flex cursor-pointer items-center gap-3 px-[13px] py-[11px] transition-colors hover:bg-panel-sub"
+            role="button"
+            tabindex="0"
+            @click="$emit('open', invoice)"
+            @keyup.enter="$emit('open', invoice)"
+          >
             <!-- One line of columns is what 1440 affords. A phone stacks the
                  seller over its number and date instead, and moves the two
                  corrections behind the overflow dots. -->
@@ -207,7 +218,7 @@
                 type="button"
                 class="text-[calc(11px*var(--fs))] text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
                 :disabled="removing === invoice.uuid"
-                @click="$emit('remove', invoice)"
+                @click.stop="$emit('remove', invoice)"
               >
                 {{ t('expense.groups.remove') }}
               </button>
@@ -215,7 +226,7 @@
               <button
                 type="button"
                 class="text-[calc(11px*var(--fs))] text-ink-3 transition-colors hover:text-ink"
-                @click="$emit('move', invoice)"
+                @click.stop="$emit('move', invoice)"
               >
                 {{ t('expense.groups.moveTo') }}
               </button>
@@ -226,7 +237,9 @@
               class="flex-none text-ink-3 transition-colors hover:text-ink md:hidden"
               :aria-label="t('common.more')"
               :aria-expanded="openRow === invoice.uuid"
-              @click="openRow = openRow === invoice.uuid ? '' : invoice.uuid"
+              @click.stop="
+                openRow = openRow === invoice.uuid ? '' : invoice.uuid
+              "
             >
               <svg
                 class="h-4 w-4"
@@ -251,14 +264,14 @@
               type="button"
               class="text-[calc(12px*var(--fs))] text-ink-2 disabled:opacity-50"
               :disabled="removing === invoice.uuid"
-              @click="$emit('remove', invoice)"
+              @click.stop="$emit('remove', invoice)"
             >
               {{ t('expense.groups.remove') }}
             </button>
             <button
               type="button"
               class="text-[calc(12px*var(--fs))] text-ink-2"
-              @click="$emit('move', invoice)"
+              @click.stop="$emit('move', invoice)"
             >
               {{ t('expense.groups.moveTo') }}
             </button>
@@ -311,7 +324,7 @@ const props = defineProps({
   canGoBack: { type: Boolean, default: false }
 })
 
-defineEmits(['remove', 'move', 'export', 'settle', 'back'])
+defineEmits(['remove', 'move', 'export', 'settle', 'back', 'open'])
 
 const { t } = useI18n()
 const copied = ref(false)

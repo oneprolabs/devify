@@ -81,6 +81,101 @@ def _read_pdf_text(document, max_pages: int) -> str:
     return "\n".join(part for part in parts if part)
 
 
+PDF_PARTY_TAX_IDS = re.compile(r"([0-9A-Z]{15,20})\s+([0-9A-Z]{15,20})")
+PDF_SINGLE_TAX_ID = re.compile(r"[0-9A-Z]{15,20}")
+PDF_LABELED_PARTY = re.compile(
+    r"名称[:：]\s*([^\s]+)\s*统一社会信用代码/纳税人识别号[:：]\s*"
+    r"([0-9A-Z]{15,20})"
+)
+PDF_LABELED_TAX_ID = re.compile(
+    r"统一社会信用代码/纳税人识别号[:：]\s*([0-9A-Z]{15,20})"
+)
+
+
+def _pdf_declared_parties(text: str) -> dict:
+    """Read the two columns of a Chinese electronic invoice when unambiguous.
+
+    Some PDFs place the labels before the values in their text layer. The
+    buyer and seller then appear side by side on one line, followed by their
+    tax IDs on the next. Their left-to-right positions settle the roles even
+    when the model cannot associate the detached labels with the values.
+    """
+    has_buyer_label = re.search(
+        r"购\s*(?:名称：\s*)?买\s*方\s*信\s*息", text
+    )
+    has_seller_label = re.search(r"销\s*售\s*方\s*信\s*息", text)
+    if not (has_buyer_label and has_seller_label):
+        return {}
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for index in range(1, len(lines)):
+        tax_ids = PDF_PARTY_TAX_IDS.fullmatch(lines[index])
+        if not tax_ids or tax_ids.group(1) == tax_ids.group(2):
+            continue
+        names = re.split(r"\s+", lines[index - 1])
+        if len(names) != 2 or any(len(name) < 3 for name in names):
+            continue
+        if names[0] == names[1]:
+            continue
+        return {
+            "buyer_name": names[0],
+            "seller_name": names[1],
+            "buyer_tax_id": tax_ids.group(1),
+            "seller_tax_id": tax_ids.group(2),
+        }
+
+    # Other generators serialize each column as a name/tax-ID pair. The
+    # printed invoice still places the buyer before the seller, although
+    # detached labels in the text layer may appear in either order.
+    for index in range(len(lines) - 3):
+        buyer_name, buyer_tax_id, seller_name, seller_tax_id = lines[
+            index : index + 4
+        ]
+        if not (
+            PDF_SINGLE_TAX_ID.fullmatch(buyer_tax_id)
+            and PDF_SINGLE_TAX_ID.fullmatch(seller_tax_id)
+        ):
+            continue
+        if buyer_tax_id == seller_tax_id or buyer_name == seller_name:
+            continue
+        if any(
+            len(name) < 3 or PDF_SINGLE_TAX_ID.fullmatch(name)
+            for name in (buyer_name, seller_name)
+        ):
+            continue
+        return {
+            "buyer_name": buyer_name,
+            "seller_name": seller_name,
+            "buyer_tax_id": buyer_tax_id,
+            "seller_tax_id": seller_tax_id,
+        }
+
+    # Some text layers keep a name with its tax ID, and others put both
+    # names on one line while the tax IDs follow their separate labels.
+    pairs = PDF_LABELED_PARTY.findall(text)
+    if len(pairs) >= 2 and pairs[0] != pairs[1]:
+        return {
+            "buyer_name": pairs[0][0],
+            "seller_name": pairs[1][0],
+            "buyer_tax_id": pairs[0][1],
+            "seller_tax_id": pairs[1][1],
+        }
+
+    for line in lines:
+        names = re.fullmatch(r"名称[:：]\s*(\S+)\s+名称[:：]\s*(\S+)", line)
+        if not names or names.group(1) == names.group(2):
+            continue
+        tax_ids = PDF_LABELED_TAX_ID.findall(text)
+        if len(tax_ids) >= 2 and tax_ids[0] != tax_ids[1]:
+            return {
+                "buyer_name": names.group(1),
+                "seller_name": names.group(2),
+                "buyer_tax_id": tax_ids[0],
+                "seller_tax_id": tax_ids[1],
+            }
+    return {}
+
+
 def _render_pdf_images(document, max_pages: int) -> list[tuple[str, bytes]]:
     import io
 
@@ -110,6 +205,7 @@ def decode_pdf(path: str, max_pages: int = 3) -> DecodedSource:
                 text=text,
                 page_count=page_count,
                 decoder="pdf_text_layer",
+                fields=_pdf_declared_parties(text),
             )
 
         images = _render_pdf_images(document, max_pages)
@@ -556,7 +652,6 @@ def decode_ofd(path: str, max_pages: int = 3) -> DecodedSource:
         decoder="ofd_xml",
         fields=declared,
     )
-
 
 
 def _xml_lines(element, prefix: str = "") -> list[str]:

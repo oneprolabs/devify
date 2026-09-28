@@ -2,6 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,7 +14,6 @@ from expense.services.extractor import (
     resolve_category,
     resolve_expense_date,
 )
-
 
 pytestmark = pytest.mark.unit
 
@@ -133,6 +133,40 @@ class TestNormalize:
         assert normalize(raw_invoice(currency=""))["currency"] == "CNY"
 
 
+def test_pdf_party_columns_override_reversed_model_reading(monkeypatch):
+    from expense.services import extractor
+    from expense.services.decoder import DecodedSource, DecodeMode
+
+    decoded = DecodedSource(
+        mode=DecodeMode.TEXT,
+        text="电子发票",
+        fields={
+            "buyer_name": "北京万云博华科技中心（有限合伙）",
+            "buyer_tax_id": "91110105MA01UYHY0T",
+            "seller_name": "旅程（广州）汽车服务有限公司",
+            "seller_tax_id": "91440101MA9W4G0D42",
+        },
+    )
+    monkeypatch.setattr(
+        extractor,
+        "call_model",
+        lambda *args: raw_invoice(
+            seller_name="北京万云博华科技中心（有限合伙）",
+            seller_tax_id="91110105MA01UYHY0T",
+            buyer_name="",
+            buyer_tax_id="",
+        ),
+    )
+    email = SimpleNamespace(subject="发票", sender="", received_at=None)
+
+    result = extractor.extract(decoded, email, "invoice.pdf", "model", "test")
+
+    assert result["seller_name"] == "旅程（广州）汽车服务有限公司"
+    assert result["seller_tax_id"] == "91440101MA9W4G0D42"
+    assert result["buyer_name"] == "北京万云博华科技中心（有限合伙）"
+    assert result["buyer_tax_id"] == "91110105MA01UYHY0T"
+
+
 class TestResolveExpenseDate:
     def test_a_travel_date_wins_over_the_issue_date(self):
         # A July journey invoiced in August belongs to July.
@@ -184,7 +218,6 @@ class TestNormalizeExpenseDate:
         result = normalize(raw_invoice(issue_date="2026-08-12"))
 
         assert result["expense_date"] == date(2026, 8, 12)
-
 
 
 class TestModelFallback:

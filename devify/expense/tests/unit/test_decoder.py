@@ -14,7 +14,6 @@ from expense.services.decoder import (
     decode_xml,
 )
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -138,6 +137,120 @@ class TestDecodePdf:
         assert decoded.decoder == "pdf_text_layer"
         assert "25117000000012345678" in decoded.text
         assert decoded.images == []
+
+    def test_detached_party_labels_follow_pdf_columns(
+        self, monkeypatch, tmp_path
+    ):
+        from expense.services import decoder
+
+        text = (
+            "电子发票（普通发票）\n购\n买\n方\n信\n息\n"
+            "销\n售\n方\n信\n息\n名称：\n"
+            "北京万云博华科技中心（有限合伙） 旅程（广州）汽车服务有限公司\n"
+            "91110105MA01UYHY0T 91440101MA9W4G0D42\n"
+        )
+        monkeypatch.setattr(
+            decoder, "_read_pdf_text", lambda document, pages: text
+        )
+        target = tmp_path / "invoice.pdf"
+        target.write_bytes(build_pdf(None))
+
+        decoded = decode_pdf(str(target))
+
+        assert decoded.fields == {
+            "buyer_name": "北京万云博华科技中心（有限合伙）",
+            "seller_name": "旅程（广州）汽车服务有限公司",
+            "buyer_tax_id": "91110105MA01UYHY0T",
+            "seller_tax_id": "91440101MA9W4G0D42",
+        }
+
+    def test_ambiguous_party_columns_are_left_to_model(
+        self, monkeypatch, tmp_path
+    ):
+        from expense.services import decoder
+
+        text = (
+            "电子发票（普通发票）\n购买方信息\n销售方信息\n"
+            "北京万云博华科技中心（有限合伙）\n"
+            "91110105MA01UYHY0T 91440101MA9W4G0D42\n"
+        )
+        monkeypatch.setattr(
+            decoder, "_read_pdf_text", lambda document, pages: text
+        )
+        target = tmp_path / "invoice.pdf"
+        target.write_bytes(build_pdf(None))
+
+        assert decode_pdf(str(target)).fields == {}
+
+    def test_serialized_party_pairs_follow_printed_invoice_order(
+        self, monkeypatch, tmp_path
+    ):
+        from expense.services import decoder
+
+        text = (
+            "电子发票（增值税专用发票）\n销\n售\n方\n信\n息\n"
+            "购 名称：\n买\n方\n信\n息\n26312000005868770176\n2026年09月16日\n"
+            "北京万云博华科技中心（有限合伙）\n91110105MA01UYHY0T\n"
+            "上海侣境酒店管理有限公司\n91310115MA1K4RWA8Q\n"
+            "项目名称 规格型号 单 位 数 量 单 价 金 额\n"
+        )
+        monkeypatch.setattr(
+            decoder, "_read_pdf_text", lambda document, pages: text
+        )
+        target = tmp_path / "invoice.pdf"
+        target.write_bytes(build_pdf(None))
+
+        decoded = decode_pdf(str(target))
+
+        assert decoded.fields == {
+            "buyer_name": "北京万云博华科技中心（有限合伙）",
+            "seller_name": "上海侣境酒店管理有限公司",
+            "buyer_tax_id": "91110105MA01UYHY0T",
+            "seller_tax_id": "91310115MA1K4RWA8Q",
+        }
+
+    @pytest.mark.parametrize(
+        "party_text,seller,seller_tax_id",
+        [
+            (
+                "购\n买\n方\n信\n息\n名称：北京万云博华科技中心（有限合伙）\n"
+                "统一社会信用代码/纳税人识别号:91110105MA01UYHY0T\n"
+                "销\n售\n方\n信\n息\n名称：北京利通出行科技有限公司\n"
+                "统一社会信用代码/纳税人识别号:91110105MA04FJ266K",
+                "北京利通出行科技有限公司",
+                "91110105MA04FJ266K",
+            ),
+            (
+                "名称：北京万云博华科技中心（有限合伙） "
+                "名称：泉盛三餐饮管理（北京）有限公司\n"
+                "购\n买\n方\n信\n息\n"
+                "统一社会信用代码/纳税人识别号：91110105MA01UYHY0T\n"
+                "销\n售\n方\n信\n息\n"
+                "统一社会信用代码/纳税人识别号：91110105051359750Q",
+                "泉盛三餐饮管理（北京）有限公司",
+                "91110105051359750Q",
+            ),
+        ],
+    )
+    def test_labeled_party_layouts(
+        self, monkeypatch, tmp_path, party_text, seller, seller_tax_id
+    ):
+        from expense.services import decoder
+
+        monkeypatch.setattr(
+            decoder, "_read_pdf_text", lambda document, pages: party_text
+        )
+        target = tmp_path / "invoice.pdf"
+        target.write_bytes(build_pdf(None))
+
+        decoded = decode_pdf(str(target))
+
+        assert decoded.fields == {
+            "buyer_name": "北京万云博华科技中心（有限合伙）",
+            "seller_name": seller,
+            "buyer_tax_id": "91110105MA01UYHY0T",
+            "seller_tax_id": seller_tax_id,
+        }
 
     def test_page_without_text_is_rendered(self, tmp_path):
         target = tmp_path / "scan.pdf"
@@ -451,7 +564,6 @@ class TestDecodeXml:
         assert decoded.decoder == "xml"
 
 
-
 class TestZipArchives:
     """
     Rail operators deliver a ticket as a zip.
@@ -487,7 +599,9 @@ class TestZipArchives:
         assert "pdf" in decoded.decoder
 
     def test_the_decoder_is_named_through_the_archive(self, tmp_path):
-        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")})
+        path = self._archive(
+            tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")}
+        )
 
         decoded = decode_source(path, filename="invoice.zip")
 
@@ -514,13 +628,17 @@ class TestZipArchives:
         from expense.services import decoder as decoder_module
 
         monkeypatch.setattr(decoder_module, "MAX_ZIP_MEMBER_BYTES", 10)
-        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")})
+        path = self._archive(
+            tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")}
+        )
 
         with pytest.raises(DecodeError, match="too large"):
             decode_source(path, filename="invoice.zip")
 
     def test_the_content_type_routes_it_too(self, tmp_path):
-        path = self._archive(tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")})
+        path = self._archive(
+            tmp_path, {"ticket.pdf": build_pdf("Ticket 2611911001")}
+        )
 
         decoded = decode_source(
             path, content_type="application/zip", filename="anything"

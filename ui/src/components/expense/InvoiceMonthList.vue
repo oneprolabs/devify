@@ -36,7 +36,12 @@
           :checked="modelValue.includes(invoice.uuid)"
           :disabled="!isClaimable(invoice)"
           :title="isClaimable(invoice) ? '' : notClaimableReason(invoice)"
-          :aria-label="invoice.seller_name"
+          :aria-label="
+            invoice.seller_name ||
+            (invoice.invoice_type === 'train'
+              ? t('expense.invoices.railTicket')
+              : t('expense.invoices.untitled'))
+          "
           @click.stop
           @change="toggleOne(invoice, $event.target.checked)"
         />
@@ -46,7 +51,12 @@
           <p
             class="truncate text-[calc(13.5px*var(--fs))] font-medium text-ink"
           >
-            {{ invoice.seller_name || t('expense.invoices.untitled') }}
+            {{
+              invoice.seller_name ||
+              (invoice.invoice_type === 'train'
+                ? t('expense.invoices.railTicket')
+                : t('expense.invoices.untitled'))
+            }}
           </p>
           <p
             v-if="invoice.buyer_name"

@@ -1430,6 +1430,8 @@
       "duplicate": "重复",
       "needsReview": "待复核",
       "untitled": "未识别销售方",
+      "railTicket": "铁路电子客票",
+      "railSellerHint": "这类客票未列销售方时无需填写；请以原始票据为准。",
       "reviewHint": "金额不自洽或识别置信度偏低，请核对后保存。",
       "learnHint": "改过分类后，同一销售方的下一张发票会自动归到这里，不再重新判断。",
       "ticketDetails": "票据信息",

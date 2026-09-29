@@ -118,6 +118,31 @@ def build_ofd_with_index(path, fields, extra_text=""):
         )
 
 
+RAILWAY_RECORD = """<RailwayInvoice>
+<TypeOfVoucher>电子发票（铁路电子客票）</TypeOfVoucher>
+<ElectronicInvoiceRailwayETicketNumber>26319166100012419979</ElectronicInvoiceRailwayETicketNumber>
+<DateOfIssue>2026-09-16</DateOfIssue>
+<NameOfPurchaser>北京万云博华科技中心(有限合伙)</NameOfPurchaser>
+<UnifiedSocialCreditCodeOfPurchaser>91110105MA01UYHY0T</UnifiedSocialCreditCodeOfPurchaser>
+<Fare>661.00</Fare>
+<TaxAmount>54.58</TaxAmount>
+<TotalAmountExcludingTax>606.42</TotalAmountExcludingTax>
+</RailwayInvoice>"""
+
+
+def build_railway_ofd(path, record=RAILWAY_RECORD):
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("OFD.xml", "<OFD/>")
+        archive.writestr(
+            "Doc_0/Pages/Page_0/Content.xml",
+            "<Page><TextCode>电子发票（铁路电子客票）</TextCode></Page>",
+        )
+        archive.writestr(
+            "Doc_0/Attachs/rai_issuer_20260916_26319166100012419979.xml",
+            record,
+        )
+
+
 def build_png(path):
     from PIL import Image
 
@@ -285,6 +310,67 @@ class TestDecodePdf:
         urls = decode_pdf(str(target)).image_data_urls()
 
         assert urls[0].startswith("data:image/png;base64,")
+
+
+class TestRailwayAccountingRecord:
+    def test_ofd_declares_the_fields_it_actually_contains(self, tmp_path):
+        target = tmp_path / "ticket.ofd"
+        build_railway_ofd(target)
+
+        decoded = decode_ofd(str(target))
+
+        assert decoded.fields == {
+            "invoice_no": "26319166100012419979",
+            "issue_date": "2026-09-16",
+            "buyer_name": "北京万云博华科技中心(有限合伙)",
+            "buyer_tax_id": "91110105MA01UYHY0T",
+            "total_amount": "661.00",
+            "tax_amount": "54.58",
+            "amount_excl_tax": "606.42",
+        }
+        assert "seller_name" not in decoded.fields
+
+    def test_repeated_fares_are_not_taken_as_the_invoice_total(self, tmp_path):
+        target = tmp_path / "ticket.ofd"
+        record = RAILWAY_RECORD.replace(
+            "</RailwayInvoice>", "<Fare>100.00</Fare></RailwayInvoice>"
+        )
+        build_railway_ofd(target, record)
+
+        assert "total_amount" not in decode_ofd(str(target)).fields
+
+    def test_zip_pdf_inherits_matching_ofd_record(self, tmp_path):
+        ofd = tmp_path / "26319166100012419979.ofd"
+        build_railway_ofd(ofd)
+        target = tmp_path / "ticket.zip"
+        with zipfile.ZipFile(target, "w") as archive:
+            archive.writestr(
+                "26319166100012419979.pdf",
+                build_pdf(
+                    "RAILWAY INVOICE NUMBER 26319166100012419979 "
+                    "TOTAL AMOUNT 661.00"
+                ),
+            )
+            archive.write(ofd, ofd.name)
+
+        decoded = decode_source(str(target), filename="ticket.zip")
+
+        assert decoded.decoder == "zip:pdf_text_layer"
+        assert decoded.fields["tax_amount"] == "54.58"
+        assert decoded.fields["amount_excl_tax"] == "606.42"
+
+    def test_zip_ignores_a_record_for_another_invoice(self, tmp_path):
+        ofd = tmp_path / "26319166100012419979.ofd"
+        build_railway_ofd(ofd)
+        target = tmp_path / "ticket.zip"
+        with zipfile.ZipFile(target, "w") as archive:
+            archive.writestr(
+                ofd.with_suffix(".pdf").name,
+                build_pdf("RAILWAY INVOICE NUMBER 00000000000000000000"),
+            )
+            archive.write(ofd, ofd.name)
+
+        assert decode_source(str(target), filename="ticket.zip").fields == {}
 
 
 class TestOfdFieldIndex:

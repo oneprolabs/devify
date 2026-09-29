@@ -11,6 +11,7 @@ default path.
 from __future__ import annotations
 
 import base64
+import io
 import logging
 import mimetypes
 import re
@@ -343,6 +344,61 @@ def _ofd_declared_fields(archive) -> dict:
     return fields
 
 
+RAILWAY_XML_FIELDS = {
+    "ElectronicInvoiceRailwayETicketNumber": "invoice_no",
+    "DateOfIssue": "issue_date",
+    "NameOfPurchaser": "buyer_name",
+    "UnifiedSocialCreditCodeOfPurchaser": "buyer_tax_id",
+    "Fare": "total_amount",
+    "TaxAmount": "tax_amount",
+    "TotalAmountExcludingTax": "amount_excl_tax",
+}
+MAX_RAILWAY_XML_BYTES = 1024 * 1024
+
+
+def _railway_declared_fields(archive) -> dict:
+    """Read the railway e-ticket's embedded accounting record, if present."""
+    from xml.etree import ElementTree
+
+    name = next(
+        (
+            item
+            for item in archive.namelist()
+            if re.search(r"(?:^|/)rai_issuer_[^/]+\.xml$", item, re.I)
+        ),
+        None,
+    )
+    if not name:
+        return {}
+    if archive.getinfo(name).file_size > MAX_RAILWAY_XML_BYTES:
+        return {}
+    with archive.open(name) as source:
+        record = source.read(MAX_RAILWAY_XML_BYTES + 1)
+    if len(record) > MAX_RAILWAY_XML_BYTES:
+        return {}
+    root = ElementTree.fromstring(record)
+    values = {}
+    for element in root.iter():
+        value = (element.text or "").strip()
+        if value:
+            values.setdefault(element.tag.rsplit("}", 1)[-1], []).append(value)
+
+    def single_value(tag):
+        matches = values.get(tag, [])
+        return matches[0] if len(matches) == 1 else ""
+
+    if single_value("TypeOfVoucher") != "电子发票（铁路电子客票）":
+        return {}
+    invoice_no = single_value("ElectronicInvoiceRailwayETicketNumber")
+    if not re.fullmatch(r"\d{20}", invoice_no):
+        return {}
+    return {
+        field: single_value(tag)
+        for tag, field in RAILWAY_XML_FIELDS.items()
+        if single_value(tag)
+    }
+
+
 # An OFD page states its size in millimetres; this many pixels per
 # millimetre gives a page a vision model can read without producing an
 # image too large to send.
@@ -611,6 +667,10 @@ def decode_ofd(path: str, max_pages: int = 3) -> DecodedSource:
             declared = _ofd_declared_fields(archive)
         except Exception:  # pragma: no cover - a broken index is not fatal
             logger.warning("OFD field index unreadable in %s", path)
+        try:
+            declared.update(_railway_declared_fields(archive))
+        except Exception:
+            logger.warning("Railway OFD record unreadable in %s", path)
 
         names = [
             name
@@ -767,6 +827,28 @@ def decode_zip(path: str, max_pages: int = 3) -> DecodedSource:
                 payload = source.read(MAX_ZIP_MEMBER_BYTES + 1)
             if len(payload) > MAX_ZIP_MEMBER_BYTES:
                 raise DecodeError("Archive member is too large to read")
+
+            railway_fields = {}
+            if suffix == "pdf":
+                stem = best.filename.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                for info in members:
+                    ofd_name = info.filename.rsplit("/", 1)[-1].lower()
+                    if ofd_name != f"{stem}.ofd".lower():
+                        continue
+                    if info.file_size > MAX_ZIP_MEMBER_BYTES:
+                        break
+                    try:
+                        with archive.open(info) as source:
+                            ofd_payload = source.read(MAX_ZIP_MEMBER_BYTES + 1)
+                        if len(ofd_payload) > MAX_ZIP_MEMBER_BYTES:
+                            break
+                        with zipfile.ZipFile(io.BytesIO(ofd_payload)) as ofd:
+                            railway_fields = _railway_declared_fields(ofd)
+                    except Exception:
+                        logger.warning(
+                            "Railway OFD record unreadable in %s", path
+                        )
+                    break
     except DecodeError:
         raise
     except zipfile.BadZipFile as exc:
@@ -779,6 +861,8 @@ def decode_zip(path: str, max_pages: int = 3) -> DecodedSource:
             handle.name, filename=best.filename, max_pages=max_pages
         )
 
+    if railway_fields and railway_fields["invoice_no"] in decoded.text:
+        decoded.fields.update(railway_fields)
     decoded.decoder = f"zip:{decoded.decoder}"
     return decoded
 

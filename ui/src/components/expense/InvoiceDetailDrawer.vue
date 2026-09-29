@@ -39,7 +39,12 @@
           <h2
             class="truncate text-[calc(15px*var(--fs))] font-semibold -tracking-[0.01em] text-ink"
           >
-            {{ form.seller_name || t('expense.invoices.untitled') }}
+            {{
+              form.seller_name ||
+              (invoice.invoice_type === 'train'
+                ? t('expense.invoices.railTicket')
+                : t('expense.invoices.untitled'))
+            }}
           </h2>
           <p class="mt-1 truncate text-[calc(11.5px*var(--fs))] text-ink-3">
             {{ invoice.email_subject }}
@@ -109,6 +114,16 @@
               class="mt-[5px] block text-[calc(10.5px*var(--fs))] text-ink-4"
             >
               {{ t(`expense.invoices.${field.hint}`) }}
+            </span>
+            <span
+              v-if="
+                invoice.invoice_type === 'train' &&
+                field.key === 'seller_name' &&
+                !form.seller_name
+              "
+              class="mt-[5px] block text-[calc(10.5px*var(--fs))] text-ink-4"
+            >
+              {{ t('expense.invoices.railSellerHint') }}
             </span>
           </label>
 
@@ -430,7 +445,15 @@ const ticketLabel = (key) => {
   return te(path) ? t(path) : key
 }
 
-const isBlank = (key) => !String(form[key] ?? '').trim()
+const isBlank = (key) => {
+  if (
+    props.invoice.invoice_type === 'train' &&
+    (key === 'seller_name' || key === 'seller_tax_id')
+  ) {
+    return false
+  }
+  return !String(form[key] ?? '').trim()
+}
 
 // An empty date input holds '', which the API rejects outright ("Date has
 // wrong format") - so an invoice missing a date could not be saved at all,

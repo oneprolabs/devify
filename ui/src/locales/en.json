@@ -1421,6 +1421,8 @@
       "duplicate": "Duplicate",
       "needsReview": "Review",
       "untitled": "Seller not recognized",
+      "railTicket": "Rail e-ticket",
+      "railSellerHint": "Leave this blank when the original rail ticket does not name a seller.",
       "reviewHint": "The amounts do not add up, or the read was low-confidence. Check the fields before saving.",
       "learnHint": "Once you correct a category, the next invoice from this seller goes there automatically.",
       "ticketDetails": "Ticket details",

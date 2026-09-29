@@ -167,6 +167,43 @@ def test_pdf_party_columns_override_reversed_model_reading(monkeypatch):
     assert result["buyer_tax_id"] == "91110105MA01UYHY0T"
 
 
+def test_railway_record_overrides_zero_tax_breakdown(monkeypatch):
+    from expense.services import extractor
+    from expense.services.decoder import DecodedSource, DecodeMode
+
+    decoded = DecodedSource(
+        mode=DecodeMode.TEXT,
+        text="电子发票（铁路电子客票）",
+        fields={
+            "total_amount": "661.00",
+            "tax_amount": "54.58",
+            "amount_excl_tax": "606.42",
+            "buyer_name": "北京万云博华科技中心(有限合伙)",
+        },
+    )
+    monkeypatch.setattr(
+        extractor,
+        "call_model",
+        lambda *args: raw_invoice(
+            invoice_type="train",
+            total_amount=661,
+            tax_amount=0,
+            amount_excl_tax=0,
+            seller_name="",
+        ),
+    )
+    email = SimpleNamespace(subject="铁路发票", sender="", received_at=None)
+
+    result = extractor.extract(decoded, email, "ticket.zip", "model", "test")
+
+    assert result["total_amount"] == Decimal("661.00")
+    assert result["tax_amount"] == Decimal("54.58")
+    assert result["amount_excl_tax"] == Decimal("606.42")
+    assert result["buyer_name"] == "北京万云博华科技中心(有限合伙)"
+    assert result["seller_name"] == ""
+    assert result["needs_review"] is False
+
+
 class TestResolveExpenseDate:
     def test_a_travel_date_wins_over_the_issue_date(self):
         # A July journey invoiced in August belongs to July.

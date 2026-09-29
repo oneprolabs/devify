@@ -187,7 +187,12 @@
               <span
                 class="truncate text-[calc(12.5px*var(--fs))] text-ink md:flex-1"
               >
-                {{ invoice.seller_name || t('expense.invoices.untitled') }}
+                {{
+                  invoice.seller_name ||
+                  (invoice.invoice_type === 'train'
+                    ? t('expense.invoices.railTicket')
+                    : t('expense.invoices.untitled'))
+                }}
               </span>
               <span
                 class="font-mono truncate text-[calc(10px*var(--fs))] text-ink-4 md:hidden"

@@ -267,4 +267,4 @@ VITE_APP_TITLE=AimyChats
 
 ## 许可证
 
-MIT License
+[Apache License 2.0](LICENSE)

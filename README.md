@@ -74,7 +74,7 @@ Devify exists to solve that gap.
 - 📬 **Built-in inbound email** — Haraka SMTP server with auto-assigned per-user addresses
 - 🖥️ **Management console** — configure providers, models, notifications, and scheduled tasks from the UI
 - 🐳 **One-command deployment** — full stack (API, worker, scheduler, UI, MySQL, Redis, Nginx, Haraka) via Docker Compose
-- 🔓 **Open core** — Apache-2.0 licensed platform with a separately licensed billing module
+- 🔓 **Open source** — Apache-2.0 licensed platform, including the billing module
 
 ## 🎯 Purpose and Scenarios
 
@@ -385,7 +385,7 @@ For HTTPS, use a reverse proxy such as Nginx Proxy Manager, Traefik, or Caddy.
 ```text
 devify/              # Django backend, split by domain
 ├── accounts/        # Authentication and user profiles
-├── billing/         # Billing module (commercial license)
+├── billing/         # Billing module (Apache-2.0)
 ├── threadline/      # Threadline conversation workflow
 └── ...
 ui/                  # Vue 3 frontend (Vite)
@@ -421,7 +421,7 @@ See [CLAUDE.md](CLAUDE.md) for the full repository guidelines.
 
 ## 🏢 Open Source & Commercial Editions
 
-This repository contains the **self-hosted Devify platform** with an Apache-2.0 open core and a separately licensed billing module.
+This repository contains the **self-hosted Devify platform**, including its billing module, under Apache License 2.0.
 
 Commercial SaaS version: [aimychats.com](https://aimychats.com)
 
@@ -431,18 +431,10 @@ Core difference at a glance:
 |---|---|---|
 | Hosting | Self-managed deployment | Managed hosting |
 | Email collection | IMAP-based | Dedicated email, real-time SMTP |
-| Extras | Open core | Additional operational features |
+| Extras | Open-source platform | Additional operational features |
 
 ## 📜 Licensing
 
-Devify uses a mixed licensing structure:
+Devify, including the billing module, is licensed under the [Apache License 2.0](LICENSE). It may be used, modified, distributed, and operated commercially, including as a hosted service, under that license. No separate billing authorization is required.
 
-- core platform: `Apache License 2.0`
-- billing module: separate `Devify Billing Commercial License`
-
-Billing follows one simple rule:
-
-- internal company use is allowed
-- external operation is prohibited without separate authorization
-
-See [LICENSE](LICENSE), [LICENSES.md](LICENSES.md), [TRADEMARKS.md](TRADEMARKS.md), and [devify/billing/COMMERCIAL-LICENSE.md](devify/billing/COMMERCIAL-LICENSE.md).
+See [LICENSES.md](LICENSES.md) for repository licensing details and [TRADEMARKS.md](TRADEMARKS.md) for trademark information.

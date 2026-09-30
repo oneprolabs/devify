@@ -74,7 +74,7 @@ Devify 就是为了填补这个缺口而存在的。
 - 📬 **内置入站邮件** — Haraka SMTP 服务器，为每个用户自动分配专属邮箱地址
 - 🖥️ **管理控制台** — 在 UI 中配置模型供应商、通知渠道和定时任务
 - 🐳 **一键部署** — Docker Compose 启动完整技术栈（API、Worker、调度器、UI、MySQL、Redis、Nginx、Haraka）
-- 🔓 **开放内核** — 平台核心采用 Apache-2.0 协议，计费模块单独授权
+- 🔓 **开源平台** — 平台及计费模块均采用 Apache-2.0 协议
 
 ## 🎯 定位与使用场景
 
@@ -314,7 +314,7 @@ AI 服务现在主要通过管理控制台配置，而不是一组固定的 `.en
 ```text
 devify/              # Django 后端，按业务域划分
 ├── accounts/        # 认证与用户档案
-├── billing/         # 计费模块（商业许可）
+├── billing/         # 计费模块（Apache-2.0）
 ├── threadline/      # Threadline 对话工作流
 └── ...
 ui/                  # Vue 3 前端（Vite）
@@ -350,7 +350,7 @@ cd ui && npm run lint               # 检查并自动修复
 
 ## 🏢 开源版与商业版
 
-本仓库包含**自托管版 Devify 平台**：开放内核采用 Apache-2.0 协议，计费模块单独授权。
+本仓库包含**自托管版 Devify 平台**，包括计费模块，均采用 Apache License 2.0 协议。
 
 商业 SaaS 版本：[aimychats.com](https://aimychats.com)
 
@@ -360,18 +360,10 @@ cd ui && npm run lint               # 检查并自动修复
 |---|---|---|
 | 托管方式 | 自行部署管理 | 托管服务 |
 | 邮件收集 | 基于 IMAP | 专属邮箱、实时 SMTP |
-| 附加能力 | 开放内核 | 更多运营功能 |
+| 附加能力 | 开源平台 | 更多运营功能 |
 
 ## 📜 许可证
 
-Devify 采用混合许可结构：
+Devify（包括计费模块）采用 [Apache License 2.0](LICENSE) 协议。可按该协议使用、修改、分发以及商业运营（包括提供托管服务），无需另行取得计费模块授权。
 
-- 平台核心：`Apache License 2.0`
-- 计费模块：独立的 `Devify Billing Commercial License`
-
-计费模块遵循一条简单规则：
-
-- 允许公司内部使用
-- 未经单独授权，禁止对外运营
-
-详见 [LICENSE](LICENSE)、[LICENSES.md](LICENSES.md)、[TRADEMARKS.md](TRADEMARKS.md) 和 [devify/billing/COMMERCIAL-LICENSE.md](devify/billing/COMMERCIAL-LICENSE.md)。
+仓库许可说明见 [LICENSES.md](LICENSES.md)，商标信息见 [TRADEMARKS.md](TRADEMARKS.md)。

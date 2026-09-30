@@ -10,7 +10,7 @@
   },
   "keywords": ["devify", "documentation", "vitepress"],
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "devDependencies": {
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",

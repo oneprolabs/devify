@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Devify is an AI Agent-powered personal productivity platform that leverages intelligent automation to enhance daily work efficiency.",
   "type": "module",
-  "license": "SEE LICENSE",
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

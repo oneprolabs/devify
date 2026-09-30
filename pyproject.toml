@@ -8,12 +8,10 @@ packages = ["devify"]
 [project]
 name = "devify"
 version = "0.1.0"
-description = "Devify is an enterprise-grade AI conversation intelligence platform with an Apache-2.0 open core and a separately licensed billing module."
+description = "Devify is an Apache-2.0-licensed AI conversation intelligence platform with billing."
 authors = [{name = "Ray Sun", email = "xiaoquqi@gmail.com"}]
 readme = "README.md"
 requires-python = ">=3.11"
-# Root package metadata uses the repository's primary license file.
-# Billing-related code is separately licensed; see LICENSES.md.
 license = { file = "LICENSE" }
 dependencies = [
     "django==5.1.4",

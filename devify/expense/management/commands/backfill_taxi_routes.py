@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand
 from expense.constants import ExpenseCategory
 from expense.models import Invoice
 from expense.services.decoder import DecodeError, decode_source
-from expense.services.taxi_route import merge_route, parse_amap_itinerary
+from expense.services.taxi_route import merge_route
 
 
 class Command(BaseCommand):
@@ -50,9 +50,9 @@ class Command(BaseCommand):
                     try:
                         route = merge_route(
                             route,
-                            parse_amap_itinerary(
-                                decode_source(path, "application/pdf").text
-                            ),
+                            decode_source(
+                                path, "application/pdf"
+                            ).route_details,
                         )
                     except DecodeError:
                         continue

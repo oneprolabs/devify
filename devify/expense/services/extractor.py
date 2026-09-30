@@ -20,7 +20,7 @@ from expense.constants import INVOICE_TYPE_CATEGORY_MAP, ExpenseCategory
 from expense.models import Invoice
 from expense.prompts import CONTEXT_TEMPLATE, EXTRACTION_PROMPT
 from expense.services.decoder import DecodeMode
-from expense.services.taxi_route import normalize_route, parse_amap_itinerary
+from expense.services.taxi_route import normalize_route
 from threadline.utils.llm import parse_json_response
 
 logger = logging.getLogger(__name__)
@@ -327,9 +327,8 @@ def extract(decoded, email, filename: str, model_uuid: str, node_name: str):
     if (
         normalized.get("is_invoice")
         and normalized.get("category") == ExpenseCategory.TRANSPORT_LOCAL
-        and decoded.mode == DecodeMode.TEXT
     ):
-        route = parse_amap_itinerary(decoded.text)
+        route = getattr(decoded, "route_details", {})
         if route:
             details = dict(normalized["ticket_details"])
             for key, value in route.items():

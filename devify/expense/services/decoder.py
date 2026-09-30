@@ -20,6 +20,8 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from expense.services.taxi_route import parse_amap_pdf_route
+
 logger = logging.getLogger(__name__)
 
 # Below this, a PDF "text layer" is page furniture rather than an invoice.
@@ -58,6 +60,7 @@ class DecodedSource:
     # returns. A 全电 OFD names which drawn object holds which field, so
     # those values are known exactly rather than read back off the page.
     fields: dict = field(default_factory=dict)
+    route_details: dict = field(default_factory=dict)
 
     @property
     def is_empty(self) -> bool:
@@ -130,7 +133,7 @@ def _pdf_declared_parties(text: str) -> dict:
     # detached labels in the text layer may appear in either order.
     for index in range(len(lines) - 3):
         buyer_name, buyer_tax_id, seller_name, seller_tax_id = lines[
-            index : index + 4
+            index: index + 4
         ]
         if not (
             PDF_SINGLE_TAX_ID.fullmatch(buyer_tax_id)
@@ -207,6 +210,7 @@ def decode_pdf(path: str, max_pages: int = 3) -> DecodedSource:
                 page_count=page_count,
                 decoder="pdf_text_layer",
                 fields=_pdf_declared_parties(text),
+                route_details=parse_amap_pdf_route(document, text),
             )
 
         images = _render_pdf_images(document, max_pages)

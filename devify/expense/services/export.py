@@ -22,7 +22,7 @@ from expense.constants import (
     INVOICE_TYPE_LABELS_CN,
     ExpenseCategory,
 )
-from expense.models import ExpenseGroupItem
+from expense.models import ExpenseGroupItem, Invoice
 from expense.services import naming
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,15 @@ def plan_export(group, template: str = "", by_category: bool = True):
     total_bytes = 0
     missing = 0
 
+    copies_by_invoice = {}
+    invoice_ids = [invoice.id for invoice in invoices]
+    for copy in (
+        Invoice.objects.filter(duplicate_of_id__in=invoice_ids)
+        .select_related("email_attachment", "source_file")
+        .order_by("id")
+    ):
+        copies_by_invoice.setdefault(copy.duplicate_of_id, []).append(copy)
+
     for index, invoice in enumerate(invoices, start=1):
         filename = naming.render(
             invoice, template, taken, index=index
@@ -110,8 +119,44 @@ def plan_export(group, template: str = "", by_category: bool = True):
                 "arcname": arcname,
                 "path": path,
                 "size": size,
+                "supporting": False,
             }
         )
+
+        for copy in copies_by_invoice.get(invoice.id, []):
+            source = copy.email_attachment or copy.source_file
+            original = getattr(source, "filename", "") or "附件"
+            stem = naming.sanitize(os.path.splitext(original)[0]) or "附件"
+            extension = naming.extension_for(copy)
+            prefix = os.path.splitext(filename)[0][:50]
+            limit = naming.MAX_FILENAME_CHARS - len(extension)
+            body = f"{prefix}_附件_{stem}"[:limit]
+            copy_name = f"{body}{extension}"
+            suffix = 2
+            while copy_name in taken:
+                cut = limit - len(str(suffix)) - 1
+                copy_name = f"{body[:cut]}-{suffix}{extension}"
+                suffix += 1
+            taken.add(copy_name)
+
+            copy_path = source_path(copy)
+            if not copy_path:
+                missing += 1
+            copy_size = os.path.getsize(copy_path) if copy_path else 0
+            total_bytes += copy_size
+            entries.append(
+                {
+                    "index": index,
+                    "invoice": invoice,
+                    "filename": copy_name,
+                    "arcname": (
+                        f"{folder}/{copy_name}" if by_category else copy_name
+                    ),
+                    "path": copy_path,
+                    "size": copy_size,
+                    "supporting": True,
+                }
+            )
 
     if len(entries) > MAX_FILES:
         raise ExportError(
@@ -137,6 +182,8 @@ def build_manifest(entries) -> str:
     writer.writerow(MANIFEST_HEADERS)
 
     for entry in entries:
+        if entry["supporting"]:
+            continue
         invoice = entry["invoice"]
         category = invoice.category or ExpenseCategory.OTHER
         writer.writerow(

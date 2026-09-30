@@ -7,6 +7,7 @@ from uuid import UUID
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
+from expense.constants import ExpenseCategory
 from expense.models import (
     ExpenseAppConfig,
     ExpenseGroup,
@@ -16,6 +17,7 @@ from expense.models import (
     InvoiceSourceFile,
     TripSuggestion,
 )
+from expense.services.taxi_route import merge_route, normalize_route
 
 
 def _validate_string_list(value, field_label):
@@ -210,6 +212,24 @@ TICKET_LINE_KEYS = (
 )
 
 
+def visible_ticket_details(invoice) -> dict:
+    details = (
+        invoice.ticket_details
+        if isinstance(invoice.ticket_details, dict)
+        else {}
+    )
+    if invoice.category != ExpenseCategory.TRANSPORT_LOCAL:
+        return details
+
+    result = normalize_route(details)
+    if not result.get("from_address") or not result.get("to_address"):
+        for copy in invoice.duplicates.all():
+            result = merge_route(result, copy.ticket_details)
+            if result.get("from_address") and result.get("to_address"):
+                break
+    return result
+
+
 def summarize_invoice(invoice) -> str:
     """
     The one line that tells a person what they are looking at.
@@ -225,14 +245,27 @@ def summarize_invoice(invoice) -> str:
         if isinstance(item, dict) and item.get("name"):
             parts.append(str(item["name"]).strip())
 
-    details = (
-        invoice.ticket_details
-        if isinstance(invoice.ticket_details, dict)
-        else {}
-    )
-    route = [details.get(key) for key in ("from_station", "from_city")]
+    details = visible_ticket_details(invoice)
+    trips = details.get("trips")
+    if isinstance(trips, list) and len(trips) > 1:
+        routes = [
+            f"{trip['from']} → {trip['to']}"
+            for trip in trips[:2]
+            if isinstance(trip, dict) and trip.get("from") and trip.get("to")
+        ]
+        if routes:
+            parts.append("；".join(routes))
+            if len(trips) > 2:
+                parts.append(f"共 {len(trips)} 段行程")
+    route = [
+        details.get(key)
+        for key in ("from_station", "from_address", "from_city")
+    ]
     origin = next((value for value in route if value), "")
-    arrive = [details.get(key) for key in ("to_station", "to_city")]
+    arrive = [
+        details.get(key)
+        for key in ("to_station", "to_address", "to_city")
+    ]
     destination = next((value for value in arrive if value), "")
     if origin and destination:
         parts.append(f"{origin} → {destination}")
@@ -315,6 +348,10 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
     file_content_type = serializers.SerializerMethodField()
     has_file = serializers.SerializerMethodField()
     related_documents = serializers.SerializerMethodField()
+    ticket_details = serializers.SerializerMethodField()
+
+    def get_ticket_details(self, obj) -> dict:
+        return visible_ticket_details(obj)
 
     def get_related_documents(self, obj) -> list:
         """

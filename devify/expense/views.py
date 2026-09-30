@@ -325,7 +325,7 @@ class ExpenseInvoiceListAPIView(APIView):
                 | Q(buyer_name__icontains=term)
             )
 
-        rows = queryset.select_related("email_message")[:200]
+        rows = queryset.select_related("email_message").prefetch_related("duplicates")[:200]
         return _response(
             {
                 "invoices": InvoiceListSerializer(rows, many=True).data,

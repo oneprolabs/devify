@@ -1512,6 +1512,8 @@
         "end_at": "终点时间",
         "from_address": "上车地点",
         "to_address": "下车地点",
+        "trips": "行程路线",
+        "service_type": "服务类型",
         "distance": "里程",
         "car_type": "车型",
         "service_provider": "服务商",

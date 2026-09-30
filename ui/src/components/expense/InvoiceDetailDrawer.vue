@@ -153,6 +153,25 @@
           </label>
         </div>
 
+        <div
+          v-if="invoice.ticket_details && hasTicketDetails"
+          class="space-y-2"
+        >
+          <h3 class="text-[calc(12.5px*var(--fs))] font-semibold text-ink">
+            {{ t('expense.invoices.ticketDetails') }}
+          </h3>
+          <dl
+            class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-[7px] rounded-lg bg-panel-sub px-[13px] py-3 text-[calc(11.5px*var(--fs))] sm:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
+          >
+            <template v-for="(value, key) in invoice.ticket_details" :key="key">
+              <dt class="text-ink-3">{{ ticketLabel(key) }}</dt>
+              <dd class="min-w-0 break-words text-ink">
+                {{ ticketValue(key, value) }}
+              </dd>
+            </template>
+          </dl>
+        </div>
+
         <div v-if="invoice.summary_line" class="space-y-[5px]">
           <span class="block text-[calc(10.5px*var(--fs))] text-ink-3">
             {{ t('expense.invoices.fields.summary_line') }}
@@ -314,23 +333,6 @@
             </button>
           </div>
         </div>
-
-        <div
-          v-if="invoice.ticket_details && hasTicketDetails"
-          class="space-y-2"
-        >
-          <h3 class="text-[calc(12.5px*var(--fs))] font-semibold text-ink">
-            {{ t('expense.invoices.ticketDetails') }}
-          </h3>
-          <dl
-            class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-[7px] rounded-lg bg-panel-sub px-[13px] py-3 text-[calc(11.5px*var(--fs))] sm:grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
-          >
-            <template v-for="(value, key) in invoice.ticket_details" :key="key">
-              <dt class="text-ink-3">{{ ticketLabel(key) }}</dt>
-              <dd class="truncate text-ink">{{ value }}</dd>
-            </template>
-          </dl>
-        </div>
       </div>
 
       <footer
@@ -443,6 +445,15 @@ const textFields = [
 const ticketLabel = (key) => {
   const path = `expense.invoices.ticketFields.${key}`
   return te(path) ? t(path) : key
+}
+
+const ticketValue = (key, value) => {
+  if (key === 'trips' && Array.isArray(value)) {
+    return value
+      .map((trip) => `${trip.from || '?'} → ${trip.to || '?'}`)
+      .join('；')
+  }
+  return value
 }
 
 const isBlank = (key) => {

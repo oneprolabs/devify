@@ -564,6 +564,10 @@ class TestTravelDate:
                 invoice_no="",
                 issue_date=billed_on,
                 expense_date=travelled_on,
+                ticket_details={
+                    "from_address": "上海虹桥站",
+                    "to_address": "酒店",
+                },
             ),
         ]
         with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
@@ -572,6 +576,10 @@ class TestTravelDate:
         assert Invoice.objects.get(status="extracted").expense_date == (
             travelled_on
         )
+        assert Invoice.objects.get(status="extracted").ticket_details == {
+            "from_address": "上海虹桥站",
+            "to_address": "酒店",
+        }
 
     def test_it_works_when_the_itinerary_is_read_first(self, user):
         give_credits(user, 10)
@@ -586,6 +594,10 @@ class TestTravelDate:
                 invoice_no="",
                 issue_date=billed_on,
                 expense_date=travelled_on,
+                ticket_details={
+                    "start_location": "机场",
+                    "end_location": "办公楼",
+                },
             ),
             invoice_fields(
                 invoice_no="INV-2",
@@ -599,6 +611,9 @@ class TestTravelDate:
         assert Invoice.objects.get(status="extracted").expense_date == (
             travelled_on
         )
+        assert Invoice.objects.get(status="extracted").ticket_details[
+            "from_address"
+        ] == "机场"
 
     def test_a_date_the_invoice_already_knows_is_not_overwritten(self, user):
         give_credits(user, 10)

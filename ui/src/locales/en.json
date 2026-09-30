@@ -1503,6 +1503,8 @@
         "end_at": "Ended",
         "from_address": "Pick-up",
         "to_address": "Drop-off",
+        "trips": "Routes",
+        "service_type": "Service type",
         "distance": "Distance",
         "car_type": "Car",
         "service_provider": "Provider",

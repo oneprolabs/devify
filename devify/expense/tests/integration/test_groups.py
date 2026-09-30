@@ -212,6 +212,40 @@ class TestSummary:
 
 
 class TestExport:
+    def test_archive_includes_itinerary_without_counting_it_twice(
+        self, user, tmp_path
+    ):
+        group = make_group(user)
+        invoice = make_invoice(user)
+        attach_file(user, invoice, tmp_path, "发票.pdf")
+        itinerary = make_invoice(
+            user,
+            invoice_no="",
+            status=Invoice.Status.DUPLICATE,
+            duplicate_of=invoice,
+        )
+        attach_file(user, itinerary, tmp_path, "行程单.pdf")
+        group_service.add_invoices(group, [str(invoice.uuid)])
+
+        plan = export_service.plan_export(group)
+        assert len(plan["entries"]) == 2
+        assert any("行程单" in entry["filename"] for entry in plan["entries"])
+        assert all(
+            "/" not in entry["arcname"]
+            for entry in export_service.plan_export(
+                group, by_category=False
+            )["entries"]
+        )
+
+        archive_path = export_service.write_archive(group)
+        with zipfile.ZipFile(archive_path) as archive:
+            names = archive.namelist()
+            manifest = archive.read("manifest.csv").decode("utf-8-sig")
+
+        assert len(names) == 3  # manifest, invoice and itinerary
+        assert any("行程单" in name for name in names)
+        assert manifest.count(invoice.invoice_no) == 1
+
     def test_the_archive_contains_the_files_and_a_manifest(
         self, user, tmp_path
     ):
@@ -273,6 +307,25 @@ class TestExport:
     def test_a_missing_original_is_counted_not_fatal(self, user):
         group = make_group(user)
         invoice = make_invoice(user)
+        group_service.add_invoices(group, [str(invoice.uuid)])
+
+        plan = export_service.plan_export(group)
+
+        assert plan["missing_files"] == 1
+
+    def test_missing_itinerary_is_counted_in_preview(self, user, tmp_path):
+        group = make_group(user)
+        invoice = make_invoice(user)
+        attach_file(user, invoice, tmp_path)
+        itinerary = make_invoice(
+            user,
+            invoice_no="",
+            status=Invoice.Status.DUPLICATE,
+            duplicate_of=invoice,
+        )
+        attach_file(user, itinerary, tmp_path, "行程单.pdf")
+        itinerary.email_attachment.file_path = str(tmp_path / "missing.pdf")
+        itinerary.email_attachment.save(update_fields=["file_path"])
         group_service.add_invoices(group, [str(invoice.uuid)])
 
         plan = export_service.plan_export(group)

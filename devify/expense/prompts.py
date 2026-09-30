@@ -48,7 +48,11 @@ Rules:
     passenger
   - flight_itinerary: flight_no, from_city, to_city, depart_at, cabin,
     passenger, fuel_fee, caac_fee
-  - taxi: city, start_at, end_at, distance
+  - taxi or ride itinerary: city, start_at, end_at, distance,
+    from_address (起点/上车地点), to_address (终点/下车地点).
+    For several rides in one itinerary, include trips as a list of
+    {"from": "", "to": "", "start_at": "", "amount": 0} objects. Copy the
+    printed places exactly; leave an address blank if it cannot be read.
   - hotel: city, check_in, check_out, nights
 - "city" is where the expense happened, which is what trip grouping uses.
   For a train or flight, use the destination. Read "to_station" carefully

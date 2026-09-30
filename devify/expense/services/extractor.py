@@ -20,6 +20,7 @@ from expense.constants import INVOICE_TYPE_CATEGORY_MAP, ExpenseCategory
 from expense.models import Invoice
 from expense.prompts import CONTEXT_TEMPLATE, EXTRACTION_PROMPT
 from expense.services.decoder import DecodeMode
+from expense.services.taxi_route import normalize_route, parse_amap_itinerary
 from threadline.utils.llm import parse_json_response
 
 logger = logging.getLogger(__name__)
@@ -268,6 +269,11 @@ def normalize(raw: dict) -> dict:
     ticket_details = raw.get("ticket_details")
     if not isinstance(ticket_details, dict):
         ticket_details = {}
+    if (
+        raw.get("category") == ExpenseCategory.TRANSPORT_LOCAL
+        or raw.get("invoice_type") == "taxi"
+    ):
+        ticket_details = normalize_route(ticket_details)
     issue_date = _to_date(raw.get("issue_date"))
 
     invoice_no = _clean_text(raw.get("invoice_no"), 64)
@@ -318,5 +324,17 @@ def extract(decoded, email, filename: str, model_uuid: str, node_name: str):
     if declared and raw.get("is_invoice"):
         raw = {**raw, **declared}
     normalized = normalize(raw)
+    if (
+        normalized.get("is_invoice")
+        and normalized.get("category") == ExpenseCategory.TRANSPORT_LOCAL
+        and decoded.mode == DecodeMode.TEXT
+    ):
+        route = parse_amap_itinerary(decoded.text)
+        if route:
+            details = dict(normalized["ticket_details"])
+            for key, value in route.items():
+                if not details.get(key):
+                    details[key] = value
+            normalized["ticket_details"] = details
     normalized["raw_extraction"] = raw
     return normalized

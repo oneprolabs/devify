@@ -23,6 +23,7 @@ from django.utils import timezone
 from billing.models import EmailCreditsTransaction
 from billing.services.config_service import get_credit_policy
 from billing.services.credits_service import CreditsService
+from expense.constants import ExpenseCategory
 from expense.models import Invoice, InvoiceSourceFile
 from expense.services.candidate_filter import (
     SkipReason,
@@ -40,6 +41,7 @@ from expense.services.link_fetcher import (
     fetch_link,
 )
 from expense.services.link_picker import pick_invoice_links
+from expense.services.taxi_route import merge_route
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +178,7 @@ def absorb_unnumbered_copies(invoice: Invoice) -> int:
                 "issue_date": copy.issue_date,
             },
         )
+        lift_taxi_route(invoice, copy.ticket_details)
         copy.status = Invoice.Status.DUPLICATE
         copy.duplicate_of = invoice
         copy.dedup_key = None
@@ -208,6 +211,15 @@ def lift_travel_date(invoice: Invoice, fields: dict) -> None:
 
     invoice.expense_date = travelled
     invoice.save(update_fields=["expense_date", "updated_at"])
+
+
+def lift_taxi_route(invoice: Invoice, details: dict) -> None:
+    if invoice.category != ExpenseCategory.TRANSPORT_LOCAL:
+        return
+    merged = merge_route(invoice.ticket_details, details)
+    if merged != invoice.ticket_details:
+        invoice.ticket_details = merged
+        invoice.save(update_fields=["ticket_details", "updated_at"])
 
 
 def _model_for(decoded, app_config) -> str:
@@ -422,6 +434,7 @@ def _persist(
         # The duplicate must not claim the key the original already holds.
         payload["dedup_key"] = None
         lift_travel_date(existing, fields)
+        lift_taxi_route(existing, fields["ticket_details"])
 
     try:
         with transaction.atomic():

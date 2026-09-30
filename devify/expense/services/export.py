@@ -88,8 +88,9 @@ def plan_export(group, template: str = "", by_category: bool = True):
     missing = 0
 
     copies_by_invoice = {}
+    invoice_ids = [invoice.id for invoice in invoices]
     for copy in (
-        Invoice.objects.filter(duplicate_of_id__in=[row.id for row in invoices])
+        Invoice.objects.filter(duplicate_of_id__in=invoice_ids)
         .select_related("email_attachment", "source_file")
         .order_by("id")
     ):
@@ -133,7 +134,8 @@ def plan_export(group, template: str = "", by_category: bool = True):
             copy_name = f"{body}{extension}"
             suffix = 2
             while copy_name in taken:
-                copy_name = f"{body[:limit - len(str(suffix)) - 1]}-{suffix}{extension}"
+                cut = limit - len(str(suffix)) - 1
+                copy_name = f"{body[:cut]}-{suffix}{extension}"
                 suffix += 1
             taken.add(copy_name)
 

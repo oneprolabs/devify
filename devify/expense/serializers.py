@@ -8,7 +8,6 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from expense.constants import ExpenseCategory
-from expense.services.taxi_route import merge_route, normalize_route
 from expense.models import (
     ExpenseAppConfig,
     ExpenseGroup,
@@ -18,6 +17,7 @@ from expense.models import (
     InvoiceSourceFile,
     TripSuggestion,
 )
+from expense.services.taxi_route import merge_route, normalize_route
 
 
 def _validate_string_list(value, field_label):

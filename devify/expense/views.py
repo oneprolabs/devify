@@ -27,8 +27,8 @@ from expense.models import (
 )
 from expense.serializers import (
     ExpenseAppConfigSerializer,
-    ExpenseUserConfigSerializer,
     ExpenseGroupSerializer,
+    ExpenseUserConfigSerializer,
     GroupItemsSerializer,
     InvoiceDetailSerializer,
     InvoiceListSerializer,
@@ -39,20 +39,20 @@ from expense.serializers import (
     ScanRequestSerializer,
     TripSuggestionSerializer,
 )
+from expense.services import export as export_service
+from expense.services import groups as group_service
+from expense.services import invoices as invoice_service
+from expense.services import naming
+from expense.services import trips as trip_service
+from expense.services.classification import remember_correction
 from expense.services.config_service import (
     get_app_config,
     get_user_config,
     get_user_config_for_update,
     set_user_enabled,
 )
-from expense.services.scan_scheduler import sync_scan_periodic_task
-from expense.services import export as export_service
-from expense.services import invoices as invoice_service
-from expense.services import groups as group_service
-from expense.services import trips as trip_service
-from expense.services import naming
 from expense.services.naming import FIELD_DEFS, FIELD_KEYS
-from expense.services.classification import remember_correction
+from expense.services.scan_scheduler import sync_scan_periodic_task
 from expense.services.scanner import preview_scan, start_scan
 
 logger = logging.getLogger(__name__)
@@ -325,7 +325,9 @@ class ExpenseInvoiceListAPIView(APIView):
                 | Q(buyer_name__icontains=term)
             )
 
-        rows = queryset.select_related("email_message").prefetch_related("duplicates")[:200]
+        rows = queryset.select_related("email_message").prefetch_related(
+            "duplicates"
+        )[:200]
         return _response(
             {
                 "invoices": InvoiceListSerializer(rows, many=True).data,

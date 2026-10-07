@@ -123,6 +123,8 @@ export function useRelayEditor({ reloadAll, activeTab }) {
   function buildEditorTestSignature() {
     return JSON.stringify({
       target_type: editorForm.target_type || 'feishu_bitable',
+      name: editorForm.name || '',
+      enabled: Boolean(editorForm.enabled),
       language: editorForm.language || 'Chinese',
       strategies: {
         auto_merge_strategy: editorForm.strategies.auto_merge_strategy || 'new',
@@ -442,6 +444,22 @@ export function useRelayEditor({ reloadAll, activeTab }) {
           url: editorForm.jiraConfig.url || '',
           username: editorForm.jiraConfig.username || '',
           api_token: editorForm.jiraConfig.api_token || ''
+        },
+        fields: {
+          // The test delivery creates a real draft issue, so it must receive
+          // the same project and issue defaults as the eventual save payload.
+          project_key_config: {
+            jira_field: 'project',
+            default: editorForm.jiraConfig.project_key || ''
+          },
+          issue_type_config: {
+            jira_field: 'issuetype',
+            default: editorForm.jiraConfig.issue_type_default || 'Task'
+          },
+          priority_config: {
+            jira_field: 'priority',
+            default: editorForm.jiraConfig.priority_default || 'Medium'
+          }
         }
       }
     }
@@ -695,6 +713,10 @@ export function useRelayEditor({ reloadAll, activeTab }) {
   }
 
   async function runTest(subscriptionId) {
+    // Capture the exact draft that is sent to the server. If a user edits the
+    // form while the test is running, the returned success must not approve
+    // those newer, untested values.
+    const testedSignature = editorCurrentSignature.value
     testing.value = true
     try {
       const payload = buildTestPayload()
@@ -704,7 +726,7 @@ export function useRelayEditor({ reloadAll, activeTab }) {
         payload.subscription_id = targetSubscriptionId
       }
       const data = await relayApi.testSubscription(payload)
-      editorTestSignature.value = editorCurrentSignature.value
+      editorTestSignature.value = testedSignature
       showSuccess(t('relay.testSuccess'))
       return data
     } catch (error) {

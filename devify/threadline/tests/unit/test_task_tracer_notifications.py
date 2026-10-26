@@ -1,19 +1,50 @@
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+import pytest
+from django.core.cache import cache
+from django.test import override_settings
 
 from threadline.utils.task_tracer import TaskTracer
 
+LOCMEM_CACHE = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "task-tracer-tests",
+    }
+}
 
-def test_fail_task_queues_threadline_failure_notification(monkeypatch):
+
+@pytest.fixture
+def failure_notifications(monkeypatch):
+    """Capture queued failure notifications and isolate the cache."""
+    delay_mock = Mock()
+    notification_task = (
+        "threadline.tasks.notifications"
+        ".send_threadline_failure_notification.delay"
+    )
+    monkeypatch.setattr(notification_task, delay_mock)
+    # Clear inside the override: clearing outside would hit the real cache and
+    # leave keys behind in the shared LocMem store between tests.
+    with override_settings(CACHES=LOCMEM_CACHE):
+        cache.clear()
+        yield delay_mock
+        cache.clear()
+
+
+def _failing_tracer(monkeypatch, task_type="HARAKA_CLEANUP"):
+    tracer = TaskTracer(task_type)
+    monkeypatch.setattr(tracer, "_sync_agentcore_update", Mock())
+    return tracer
+
+
+@override_settings(CACHES=LOCMEM_CACHE)
+def test_fail_task_queues_threadline_failure_notification(
+    monkeypatch, failure_notifications
+):
     tracer = TaskTracer("HARAKA_CLEANUP")
     sync_mock = Mock()
-    delay_mock = Mock()
 
     monkeypatch.setattr(tracer, "_sync_agentcore_update", sync_mock)
-    monkeypatch.setattr(
-        "threadline.tasks.notifications.send_threadline_failure_notification.delay",
-        delay_mock,
-    )
 
     tracer.fail_task(
         {
@@ -24,8 +55,8 @@ def test_fail_task_queues_threadline_failure_notification(monkeypatch):
     )
 
     sync_mock.assert_called_once()
-    delay_mock.assert_called_once()
-    args = delay_mock.call_args.args
+    failure_notifications.assert_called_once()
+    args = failure_notifications.call_args.args
     assert args[0] == "HARAKA_CLEANUP"
     assert args[1]["cleanup_type"] == "HARAKA_CLEANUP"
     assert args[2] == "boom"
@@ -128,3 +159,82 @@ def test_email_merge_does_not_sync_user_facing_progress(monkeypatch):
         )
 
     fake_message.set_processing_progress.assert_not_called()
+
+
+@override_settings(
+    CACHES=LOCMEM_CACHE,
+    THREADLINE_ALERT_COOLDOWN_SECONDS=900,
+    THREADLINE_INFRA_ALERT_COOLDOWN_SECONDS=3600,
+)
+def test_repeated_failure_alert_is_suppressed_within_cooldown(
+    monkeypatch, failure_notifications
+):
+    tracer = _failing_tracer(monkeypatch)
+
+    tracer.fail_task({"errors": 1}, "boom")
+    tracer.fail_task({"errors": 1}, "boom")
+    tracer.fail_task({"errors": 1}, "boom")
+
+    failure_notifications.assert_called_once()
+
+
+@override_settings(
+    CACHES=LOCMEM_CACHE,
+    THREADLINE_ALERT_COOLDOWN_SECONDS=0,
+    THREADLINE_INFRA_ALERT_COOLDOWN_SECONDS=3600,
+)
+def test_zero_cooldown_disables_throttling(monkeypatch, failure_notifications):
+    tracer = _failing_tracer(monkeypatch)
+
+    tracer.fail_task({"errors": 1}, "boom")
+    tracer.fail_task({"errors": 1}, "boom")
+
+    assert failure_notifications.call_count == 2
+
+
+@override_settings(
+    CACHES=LOCMEM_CACHE,
+    THREADLINE_ALERT_COOLDOWN_SECONDS=900,
+    THREADLINE_INFRA_ALERT_COOLDOWN_SECONDS=3600,
+)
+def test_infrastructure_errors_use_their_own_cooldown(
+    monkeypatch, failure_notifications
+):
+    tracer = _failing_tracer(monkeypatch)
+
+    assert tracer._failure_cooldown_seconds(
+        "(2006, 'Server has gone away')"
+    ) == 3600
+    assert tracer._failure_cooldown_seconds("mailbox rejected login") == 900
+
+
+@override_settings(CACHES=LOCMEM_CACHE, THREADLINE_ALERT_COOLDOWN_SECONDS=900)
+def test_alert_is_sent_when_cache_is_unavailable(
+    monkeypatch, failure_notifications
+):
+    class BrokenCache:
+        def add(self, *args, **kwargs):
+            raise ConnectionError("redis down")
+
+    monkeypatch.setattr("django.core.cache.cache", BrokenCache())
+
+    tracer = _failing_tracer(monkeypatch)
+    tracer.fail_task({"errors": 1}, "boom")
+
+    failure_notifications.assert_called_once()
+
+
+@override_settings(CACHES=LOCMEM_CACHE, THREADLINE_ALERT_COOLDOWN_SECONDS=900)
+def test_cooldown_is_scoped_per_task_type(
+    monkeypatch, failure_notifications
+):
+    haraka = _failing_tracer(monkeypatch, "HARAKA_CLEANUP")
+    imap = _failing_tracer(monkeypatch, "IMAP_EMAIL_FETCH")
+
+    haraka.fail_task({"user_id": 1}, "boom")
+    # A different mailbox failing is the same alert for ops: drop it.
+    haraka.fail_task({"user_id": 2}, "boom")
+    # Other task types keep their own window.
+    imap.fail_task({"user_id": 1}, "boom")
+
+    assert failure_notifications.call_count == 2

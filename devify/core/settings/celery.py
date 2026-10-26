@@ -52,6 +52,22 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 CELERY_TASK_TIME_LIMIT = 3600
 CELERY_TASK_SOFT_TIME_LIMIT = 3000
 
+# Per-task overrides. A single stuck mailbox must not occupy a worker slot for
+# the global hour: fetches are cut off much earlier so the rest of the queue
+# keeps moving and beat does not build up a backlog behind them.
+CELERY_TASK_ANNOTATIONS = {
+    "threadline.tasks.email_fetch.imap_email_fetch": {
+        "time_limit": int(os.getenv("IMAP_FETCH_TIME_LIMIT", "600")),
+        "soft_time_limit": int(os.getenv("IMAP_FETCH_SOFT_TIME_LIMIT", "540")),
+    },
+    "threadline.tasks.email_fetch.haraka_email_fetch": {
+        "time_limit": int(os.getenv("HARAKA_FETCH_TIME_LIMIT", "600")),
+        "soft_time_limit": int(
+            os.getenv("HARAKA_FETCH_SOFT_TIME_LIMIT", "540")
+        ),
+    },
+}
+
 # Task result expiration (keep results for 7 days)
 CELERY_RESULT_EXPIRES = 604800
 

@@ -109,6 +109,41 @@ ATTACHMENT_BASE_URL = os.getenv('ATTACHMENT_BASE_URL', '')
 TASK_TIMEOUT_MINUTES = int(os.getenv('TASK_TIMEOUT_MINUTES', '10'))
 
 # ============================
+# Failure Notification Throttling
+# ============================
+
+# THREADLINE_ALERT_COOLDOWN_SECONDS: Minimum gap between two failure alerts
+# for the same task type (and user, when known).
+# - Use Case: Prevent a single broken mailbox or workflow from posting the
+#   same chat alert hundreds of times in a row
+# - Unit: Seconds
+# - Default: 900 (15 minutes); set to 0 to disable throttling
+THREADLINE_ALERT_COOLDOWN_SECONDS = int(
+    os.getenv('THREADLINE_ALERT_COOLDOWN_SECONDS', '900')
+)
+
+# THREADLINE_INFRA_ALERT_COOLDOWN_SECONDS: Same as above, but for
+# infrastructure failures (database/Redis network errors) which tend to arrive
+# in floods.
+# - Unit: Seconds
+# - Default: 3600 (1 hour); set to 0 to disable throttling
+THREADLINE_INFRA_ALERT_COOLDOWN_SECONDS = int(
+    os.getenv('THREADLINE_INFRA_ALERT_COOLDOWN_SECONDS', '3600')
+)
+
+# THREADLINE_SCHEDULER_DISPATCH_GUARD_SECONDS: Minimum gap between two runs of
+# the same scheduler entry point.
+# - Use Case: Celery beat keeps publishing while workers are blocked, and the
+#   backlog replays hundreds of scheduling runs at once when they recover.
+#   This collapses such a drain into one dispatch per interval.
+# - Unit: Seconds
+# - Default: 45 (below the 1-minute beat interval, with margin for jitter);
+#   0 disables it
+THREADLINE_SCHEDULER_DISPATCH_GUARD_SECONDS = int(
+    os.getenv('THREADLINE_SCHEDULER_DISPATCH_GUARD_SECONDS', '45')
+)
+
+# ============================
 # Email Cleanup and Retention Policy
 # ============================
 
@@ -191,4 +226,3 @@ MAX_USER_MAILBOXES = int(os.getenv('MAX_USER_MAILBOXES', '5'))
 STUCK_EMAIL_MAX_AGE_HOURS = int(
     os.getenv('STUCK_EMAIL_MAX_AGE_HOURS', '48')
 )
-

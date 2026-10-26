@@ -25,6 +25,36 @@ _current_task_tracer: ContextVar["TaskTracer | None"] = ContextVar(
     default=None,
 )
 
+# Failure notifications are throttled per task type. A worker backlog that
+# drains, a database outage or a broken mailbox produces the same failure
+# hundreds of times in a row, and every one of them used to become a chat
+# message. The window keeps the first alert and drops the rest.
+DEFAULT_ALERT_COOLDOWN_SECONDS = 900
+DEFAULT_INFRA_ALERT_COOLDOWN_SECONDS = 3600
+
+# Infrastructure failures say nothing about the business flow and are the
+# ones that arrive in floods, so they get a much longer window.
+INFRA_ERROR_MARKERS = (
+    "operationalerror",
+    "interfaceerror",
+    "server has gone away",
+    "unknown mysql server host",
+    "can't connect to mysql",
+    "too many connections",
+    "connection refused",
+    "connection reset",
+    "connection timed out",
+    "timed out",
+    "timeout",
+    "redis",
+    "kombu",
+)
+
+
+def _is_infrastructure_error(error_msg: str) -> bool:
+    text = (error_msg or "").lower()
+    return any(marker in text for marker in INFRA_ERROR_MARKERS)
+
 
 def _normalize_metadata(details) -> Dict:
     if isinstance(details, dict):
@@ -611,10 +641,73 @@ class TaskTracer:
             )
             return False
 
+    def _failure_cooldown_seconds(self, error_msg: str) -> int:
+        from django.conf import settings
+
+        if _is_infrastructure_error(error_msg):
+            raw = getattr(
+                settings,
+                "THREADLINE_INFRA_ALERT_COOLDOWN_SECONDS",
+                DEFAULT_INFRA_ALERT_COOLDOWN_SECONDS,
+            )
+        else:
+            raw = getattr(
+                settings,
+                "THREADLINE_ALERT_COOLDOWN_SECONDS",
+                DEFAULT_ALERT_COOLDOWN_SECONDS,
+            )
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return DEFAULT_ALERT_COOLDOWN_SECONDS
+
+    def _should_suppress_failure_notification(
+        self, details: Dict, error_msg: str
+    ) -> bool:
+        """
+        Drop repeated alerts for the same task type inside a cooldown window.
+
+        Uses the cache (Redis in production) rather than the database so a
+        database outage cannot disable throttling. Cache errors fail open:
+        losing an alert silently is worse than an extra message.
+        """
+        window = self._failure_cooldown_seconds(error_msg)
+        if window <= 0:
+            return False
+
+        user_id = details.get("user_id")
+        # One key per task type: every failure alert goes to the same ops
+        # channel, so keying by user would still flood it when many mailboxes
+        # fail at once.
+        key = f"threadline:failure_alert:{self.task_type}"
+        try:
+            from django.core.cache import cache
+
+            if cache.add(key, 1, timeout=window):
+                return False
+            logger.info(
+                "Suppressed duplicate failure notification "
+                "task_type=%s user_id=%s window=%ss error=%s",
+                self.task_type,
+                user_id,
+                window,
+                error_msg,
+            )
+            return True
+        except Exception as exc:
+            logger.debug(
+                "Failure notification cooldown unavailable, sending: %s",
+                exc,
+            )
+            return False
+
     def _queue_failure_notification(
         self, details: Dict, error_msg: str
     ) -> None:
         if self._should_skip_failure_notification(details):
+            return
+
+        if self._should_suppress_failure_notification(details, error_msg):
             return
 
         try:

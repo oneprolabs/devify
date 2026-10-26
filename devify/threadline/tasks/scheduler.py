@@ -21,6 +21,52 @@ from threadline.utils.task_tracer import TaskTracer, use_task_tracer
 
 logger = logging.getLogger(__name__)
 
+# Celery beat keeps publishing while a worker is blocked. Redis holds every
+# copy, and when the worker frees up the whole backlog runs back to back:
+# one scheduling run per minute becomes hundreds of runs in a few minutes,
+# and each of them fans out to a full fetch. A short cache key collapses
+# such a drain into one run per interval.
+DEFAULT_DISPATCH_GUARD_SECONDS = 45
+
+
+def _claim_dispatch_slot(name: str) -> bool:
+    """
+    Return True when this run may dispatch work.
+
+    Fails open: if the cache is unreachable, dispatch rather than stop
+    scheduled work.
+    """
+    raw = getattr(
+        settings,
+        "THREADLINE_SCHEDULER_DISPATCH_GUARD_SECONDS",
+        DEFAULT_DISPATCH_GUARD_SECONDS,
+    )
+    try:
+        window = int(raw)
+    except (TypeError, ValueError):
+        window = DEFAULT_DISPATCH_GUARD_SECONDS
+    if window <= 0:
+        return True
+    try:
+        from django.core.cache import cache
+
+        return bool(
+            cache.add(f"threadline:dispatch:{name}", 1, timeout=window)
+        )
+    except Exception as exc:
+        logger.debug("Scheduler dispatch guard unavailable: %s", exc)
+        return True
+
+
+def _skip_recent_dispatch(name: str) -> dict | None:
+    if _claim_dispatch_slot(name):
+        return None
+    logger.info(
+        "Skipping %s: a run was already dispatched within the guard window",
+        name,
+    )
+    return {"status": "skipped", "reason": "recent_dispatch"}
+
 
 @shared_task
 @prevent_duplicate_task(
@@ -42,6 +88,10 @@ def schedule_email_fetch():
     3. Task lock mechanism (TASK_TIMEOUT_MINUTES converted to seconds)
     4. Error handling and monitoring
     """
+    skipped = _skip_recent_dispatch("email_fetch")
+    if skipped:
+        return skipped
+
     tracer = TaskTracer(
         "EMAIL_FETCH_SCHEDULER",
         module="threadline",
@@ -123,6 +173,10 @@ def schedule_haraka_cleanup():
     This task schedules the cleanup of Haraka email files from all directories.
     It runs independently of the main email processing workflow.
     """
+    skipped = _skip_recent_dispatch("haraka_cleanup")
+    if skipped:
+        return skipped
+
     tracer = TaskTracer(
         "HARAKA_CLEANUP",
         module="threadline",
@@ -158,6 +212,10 @@ def schedule_share_link_cleanup():
 
     Deactivates expired share links to ensure stale URLs are not accessible.
     """
+    skipped = _skip_recent_dispatch("share_link_cleanup")
+    if skipped:
+        return skipped
+
     tracer = TaskTracer(
         "SHARE_LINK_CLEANUP",
         module="threadline",
@@ -196,6 +254,10 @@ def schedule_reset_stuck_processing_emails(
     """
     Reset emails stuck in FETCHED or PROCESSING state.
     """
+    skipped = _skip_recent_dispatch("stuck_email_reset")
+    if skipped:
+        return skipped
+
     tracer = TaskTracer(
         "STUCK_EMAIL_RESET",
         module="threadline",
@@ -321,6 +383,10 @@ def schedule_email_task_cleanup():
     """
     Clean up old EmailTask records.
     """
+    skipped = _skip_recent_dispatch("email_task_cleanup")
+    if skipped:
+        return skipped
+
     tracer = TaskTracer(
         "TASK_CLEANUP",
         module="threadline",

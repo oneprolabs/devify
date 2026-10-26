@@ -22,6 +22,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_URL = os.getenv('DATABASE_URL')
 DB_OPTIONS = {}
 
+# Connection/read/write timeouts are tunable so a slow or unreachable database
+# fails fast instead of pinning every worker process for minutes.
+DB_CONNECT_TIMEOUT = int(os.getenv('DB_CONNECT_TIMEOUT', '10'))
+DB_READ_TIMEOUT = int(os.getenv('DB_READ_TIMEOUT', '300'))
+DB_WRITE_TIMEOUT = int(os.getenv('DB_WRITE_TIMEOUT', '300'))
+
 if not DATABASE_URL:
     db_engine = os.getenv('DB_ENGINE', 'sqlite')
 
@@ -39,9 +45,9 @@ if not DATABASE_URL:
         # MySQL/MariaDB specific options
         DB_OPTIONS = {
             'charset': 'utf8mb4',
-            'connect_timeout': 60,
-            'read_timeout': 300,
-            'write_timeout': 300,
+            'connect_timeout': DB_CONNECT_TIMEOUT,
+            'read_timeout': DB_READ_TIMEOUT,
+            'write_timeout': DB_WRITE_TIMEOUT,
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         }
     elif db_engine == 'postgresql':

@@ -1,21 +1,21 @@
 import logging
 from datetime import timedelta
 
+from agentcore_task.adapters.django import prevent_duplicate_task
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
-from agentcore_task.adapters.django import prevent_duplicate_task
 from threadline.models import EmailMessage, EmailTask
+from threadline.services.processing_control import paused_user_ids
+from threadline.state_machine import EmailStatus
 from threadline.tasks.cleanup import (
     EmailCleanupManager,
     EmailTaskCleanupManager,
     ShareLinkCleanupManager,
 )
-from threadline.tasks.email_fetch import imap_email_fetch, haraka_email_fetch
-from threadline.services.processing_control import paused_user_ids
+from threadline.tasks.email_fetch import haraka_email_fetch, imap_email_fetch
 from threadline.tasks.email_workflow import process_email_workflow
-from threadline.state_machine import EmailStatus
 from threadline.utils.task_cleanup import cleanup_stale_tasks
 from threadline.utils.task_tracer import TaskTracer, use_task_tracer
 
@@ -372,7 +372,9 @@ def schedule_reset_stuck_emails(timeout_minutes=30):
     """
     Backward-compatible alias for schedule_reset_stuck_processing_emails.
     """
-    return schedule_reset_stuck_processing_emails(timeout_minutes=timeout_minutes)
+    return schedule_reset_stuck_processing_emails(
+        timeout_minutes=timeout_minutes
+    )
 
 
 @shared_task

@@ -226,4 +226,3 @@ MAX_USER_MAILBOXES = int(os.getenv('MAX_USER_MAILBOXES', '5'))
 STUCK_EMAIL_MAX_AGE_HOURS = int(
     os.getenv('STUCK_EMAIL_MAX_AGE_HOURS', '48')
 )
-

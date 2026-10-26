@@ -8,13 +8,13 @@ from agentcore only.
 
 from __future__ import annotations
 
-import math
 import logging
+import math
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
-from uuid import uuid4
 from typing import Dict, Optional
+from uuid import uuid4
 
 from celery import current_task
 from django.utils import timezone
@@ -745,7 +745,8 @@ class TaskTracer:
         context = self.context_summary(data)
         if progress_fields:
             logger.info(
-                "%s progress step=%s percent=%s current_step=%s total_steps=%s message=%s",
+                "%s progress step=%s percent=%s current_step=%s "
+                "total_steps=%s message=%s",
                 context,
                 log_entry.get("progress_step", action),
                 log_entry.get("progress_percent"),

@@ -2,26 +2,23 @@
 Unit tests for stuck email scheduler behavior.
 """
 
-from datetime import timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.core.cache import cache
 from django.test import TestCase, override_settings
-from django.utils import timezone
 
-from threadline.models import EmailMessage
 from threadline.tasks.scheduler import (
     _claim_dispatch_slot,
     _skip_recent_dispatch,
     schedule_email_fetch,
+    schedule_email_task_cleanup,
     schedule_haraka_cleanup,
     schedule_reset_stuck_processing_emails,
     schedule_share_link_cleanup,
-    schedule_email_task_cleanup,
 )
 
-from ..fixtures.factories import EmailMessageFactory, UserFactory
+from ..fixtures.factories import UserFactory
 
 LOCMEM_CACHE = {
     "default": {
@@ -43,7 +40,9 @@ class StuckEmailSchedulerTest(TestCase):
             self.assertTrue(callable(schedule_reset_stuck_emails))
         except ImportError:
             # Function doesn't exist in this version - test passes by absence
-            self.skipTest("schedule_reset_stuck_emails not available in this version")
+            self.skipTest(
+                "schedule_reset_stuck_emails not available in this version"
+            )
 
 
 @pytest.fixture
@@ -125,4 +124,3 @@ def test_all_schedulers_share_the_dispatch_guard(locmem_cache, task, name):
 
     assert result == {"status": "skipped", "reason": "recent_dispatch"}
     tracer_mock.assert_not_called()
-

@@ -28,6 +28,47 @@ export function extractResponseData(response) {
   return response.data
 }
 
+const GENERIC_ERROR_MESSAGES = new Set([
+  'failed',
+  'failure',
+  'error',
+  'success'
+])
+
+/**
+ * Pick the most specific human-readable message out of a DRF / unified error
+ * payload. Returns an empty string when nothing meaningful is present.
+ */
+function pickErrorMessage(body) {
+  if (!body || typeof body !== 'object') {
+    return ''
+  }
+
+  const detail = body.detail
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail.trim()
+  }
+
+  if (Array.isArray(body.non_field_errors) && body.non_field_errors.length) {
+    return String(body.non_field_errors[0])
+  }
+
+  // Field-specific DRF errors, e.g. { email: ["Already exists."] }
+  const firstFieldError = Object.values(body).find(
+    (value) => Array.isArray(value) && value.length > 0
+  )
+  if (firstFieldError) {
+    return String(firstFieldError[0])
+  }
+
+  const message = typeof body.message === 'string' ? body.message.trim() : ''
+  if (message && !GENERIC_ERROR_MESSAGES.has(message.toLowerCase())) {
+    return message
+  }
+
+  return ''
+}
+
 /**
  * Extract error message from API error response
  * @param {Object} error - Axios error object
@@ -38,34 +79,30 @@ export function extractErrorMessage(
   error,
   defaultMessage = 'An error occurred'
 ) {
-  if (error.response?.data) {
-    const data = error.response.data
+  const body = error?.response?.data
 
-    // Handle unified error format
-    if (data.message) {
-      return data.message
+  if (typeof body === 'string' && body.trim()) {
+    return body.trim()
+  }
+
+  if (body && typeof body === 'object') {
+    // Unified envelope: { code, message, data: { detail: ... } }
+    if (typeof body.data === 'string' && body.data.trim()) {
+      return body.data.trim()
     }
 
-    // Handle DRF error format
-    if (data.detail) {
-      return data.detail
+    const nested = pickErrorMessage(body.data)
+    if (nested) {
+      return nested
     }
 
-    // Handle validation errors
-    if (data.non_field_errors && Array.isArray(data.non_field_errors)) {
-      return data.non_field_errors[0]
-    }
-
-    // Handle field-specific errors
-    const firstFieldError = Object.values(data).find(
-      (value) => Array.isArray(value) && value.length > 0
-    )
-    if (firstFieldError) {
-      return firstFieldError[0]
+    const direct = pickErrorMessage(body)
+    if (direct) {
+      return direct
     }
   }
 
-  return error.message || defaultMessage
+  return error?.message || defaultMessage
 }
 
 /**

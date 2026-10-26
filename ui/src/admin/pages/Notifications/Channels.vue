@@ -263,12 +263,15 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{
-              t('notificationManagement.channels.name')
-            }}</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ t('notificationManagement.channels.name') }}
+              <span class="text-red-500">*</span>
+            </label>
             <input
               v-model="form.name"
               type="text"
+              required
+              maxlength="255"
               class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
               :placeholder="
                 t('notificationManagement.channels.namePlaceholder')
@@ -767,6 +770,7 @@
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
+import { extractErrorMessage } from '@/utils/api'
 import { notificationsAdminApi } from '@/admin/api'
 import AdminLayout from '@/admin/layout/AdminLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -1151,8 +1155,14 @@ async function loadList() {
 }
 
 async function submitForm() {
-  saving.value = true
   formMessage.value = ''
+  formMessageSuccess.value = false
+  const name = form.name.trim()
+  if (!name) {
+    formMessage.value = t('notificationManagement.channels.nameRequired')
+    return
+  }
+  saving.value = true
   try {
     let config
     if (form.channel_type === 'webhook') {
@@ -1192,7 +1202,7 @@ async function submitForm() {
     }
     const payload = {
       channel_type: form.channel_type,
-      name: form.name.trim(),
+      name,
       is_active: form.is_active,
       config
     }
@@ -1207,9 +1217,7 @@ async function submitForm() {
     loadList()
   } catch (e) {
     showError(
-      e?.response?.data?.detail ||
-        e?.message ||
-        t('notificationManagement.channels.saveFailed')
+      extractErrorMessage(e, t('notificationManagement.channels.saveFailed'))
     )
   } finally {
     saving.value = false
@@ -1232,9 +1240,7 @@ async function doDelete() {
     loadList()
   } catch (e) {
     showError(
-      e?.response?.data?.detail ||
-        e?.message ||
-        t('notificationManagement.channels.saveFailed')
+      extractErrorMessage(e, t('notificationManagement.channels.saveFailed'))
     )
   } finally {
     deleting.value = false

@@ -42,11 +42,11 @@ from email_validator import EmailNotValidError, validate_email
 from flanker import mime
 from PIL import Image, UnidentifiedImageError
 
-from .image import EmailImageProcessor
 from ...file_type_detector import (
     FileTypeDetector,
     get_supported_file_types,
 )
+from .image import EmailImageProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -372,14 +372,16 @@ class EmailFlankerParser:
 
         # Log the number of parts in the email message for debugging
         logger.debug(
-            "Processing email message, parts: %d", len(list(message.walk()))
+            "Processing email message, parts: %d",
+            len(list(message.walk(with_self=True))),
         )
 
         # Extract all text parts
         text_parts = []
         html_parts = []
 
-        for part in message.walk():
+        # Single-part mail stores its body on the root message itself.
+        for part in message.walk(with_self=True):
             # Extract common variables for debugging and processing
             content_type = f"{part.content_type.main}/{part.content_type.sub}"
             content_disposition = (
@@ -525,7 +527,7 @@ class EmailFlankerParser:
                     part.body, part.content_type.sub, filename
                 )
 
-                # Check if it's an image using both MIME type and file signature
+                # Check both MIME type and file signature for images.
                 is_image_by_mime = part.content_type.main == "image"
                 is_image_by_signature = detected_type.startswith("image/")
                 is_image = is_image_by_mime or is_image_by_signature
@@ -737,7 +739,7 @@ class EmailFlankerParser:
                 flags=re.IGNORECASE,
             )
 
-            # Step 3: Remove all remaining HTML tags but preserve image placeholders
+            # Step 3: Remove HTML tags but preserve image placeholders
             text_content = re.sub(r"<[^>]+>", "", html_content)
 
             # Step 4: Decode HTML entities

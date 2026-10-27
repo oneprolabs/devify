@@ -7,10 +7,10 @@ It operates purely on State without database access.
 
 import logging
 from typing import Any, Dict, List
+from zoneinfo import ZoneInfo
 
 from dateutil import parser as date_parser
 from django.utils import timezone
-from zoneinfo import ZoneInfo
 
 from core.tracking import LLMTracker
 from threadline.agents.email_state import EmailState, add_node_error
@@ -218,9 +218,15 @@ class SummaryNode(BaseLangGraphNode):
 
         context_parts = [
             f"Subject: {subject}",
+            f"Received at: {state.get('received_at') or 'Unknown'}",
             f"Processing Timestamp (UTC): {current_utc_str}",
             f"User Timezone: {user_timezone}",
             (f"Processing Timestamp ({user_timezone}): " f"{local_time_str}"),
+            (
+                "The processing timestamp is not the receipt date. "
+                "Use Received at for when this email arrived; do not "
+                "invent a receipt date when it is unknown."
+            ),
             (
                 "Important: Dates and times discussed in the following "
                 "content should be interpreted using the provided user "

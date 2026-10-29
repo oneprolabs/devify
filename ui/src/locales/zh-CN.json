@@ -1738,6 +1738,16 @@
     "messageId": "消息 ID",
     "addEvidence": "添加证据",
     "otherEventId": "另一个事件 ID",
-    "addRelation": "添加关系"
+    "addRelation": "添加关系",
+    "operationsWorkspace": "查看此空间的导入和分析任务状态。",
+    "uploads": "导入",
+    "uploadsHint": "查看聊天包上传和解析进度。",
+    "analysisJobs": "分析任务",
+    "analysisJobsHint": "查看记录生成和分析执行状态。",
+    "noOperations": "暂无任务",
+    "noOperationsBody": "开始上传或分析后，状态会显示在这里。",
+    "unknownSource": "未知来源",
+    "duplicates": "重复",
+    "attempts": "次尝试"
   }
 }

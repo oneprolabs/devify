@@ -1729,6 +1729,16 @@
     "messageId": "Message ID",
     "addEvidence": "Add evidence",
     "otherEventId": "Other event ID",
-    "addRelation": "Add relation"
+    "addRelation": "Add relation",
+    "operationsWorkspace": "Track imports and analysis jobs for this space.",
+    "uploads": "Imports",
+    "uploadsHint": "Uploaded chat packages and parser progress.",
+    "analysisJobs": "Analysis jobs",
+    "analysisJobsHint": "Note generation and analysis execution status.",
+    "noOperations": "Nothing to track",
+    "noOperationsBody": "Uploads and analysis jobs will appear here after work starts.",
+    "unknownSource": "unknown source",
+    "duplicates": "duplicates",
+    "attempts": "attempts"
   }
 }

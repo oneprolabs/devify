@@ -2,6 +2,7 @@ from django.db import transaction
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -45,6 +46,18 @@ def _authorized_space(user, space_id, *, lock=False):
     if not SpacePermissionService.can_upload(user, space):
         return None
     return space
+
+
+def _authorized_space_for_read(user, space_id):
+    space = get_object_or_404(Space, pk=space_id)
+    if not SpacePermissionService.can_read(user, space):
+        return None, None
+    takeover = None
+    if getattr(user, "is_staff", False):
+        takeover = SpaceTakeover.objects.filter(
+            space=space, admin=user, active=True
+        ).first()
+    return space, takeover
 
 
 def _visible_batch(user, batch_id, *, lock=False):
@@ -130,6 +143,45 @@ def _enqueue_parse(batch):
 
 class UploadBatchCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, space_id):
+        space, takeover = _authorized_space_for_read(request.user, space_id)
+        if space is None:
+            return Response({"detail": "Space not found."}, status=404)
+        batches = UploadBatch.objects.filter(space=space).order_by(
+            "-created_at", "-id"
+        )
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            batches = batches.filter(status=status_filter)
+        paginator = PageNumberPagination()
+        paginator.page_size = 25
+        paginator.page_size_query_param = "page_size"
+        paginator.max_page_size = 100
+        page = paginator.paginate_queryset(batches, request, view=self)
+        data = UploadBatchSerializer(page, many=True).data
+        if takeover:
+            audit_space_action(
+                actor=request.user,
+                space=space,
+                action="chat.upload_list_viewed",
+                resource_type="upload_batch",
+                metadata={"takeover_id": takeover.pk},
+            )
+        return Response(
+            {
+                "data": {
+                    "list": data,
+                    "pagination": {
+                        "total": paginator.page.paginator.count,
+                        "page": paginator.page.number,
+                        "page_size": paginator.get_page_size(request),
+                        "next": paginator.get_next_link(),
+                        "previous": paginator.get_previous_link(),
+                    },
+                }
+            }
+        )
 
     @transaction.atomic
     def post(self, request, space_id):

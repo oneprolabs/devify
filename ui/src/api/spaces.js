@@ -50,6 +50,18 @@ export const spacesApi = {
     return api.get(`/v1/reports/${reportId}`)
   },
 
+  getUploads(spaceId, params = {}) {
+    return api.get(`/v1/spaces/${spaceId}/chat/uploads`, { params })
+  },
+
+  getAnalysisJobs(spaceId, params = {}) {
+    return api.get(`/v1/spaces/${spaceId}/analysis-jobs`, { params })
+  },
+
+  retryAnalysisJob(jobId) {
+    return api.post(`/v1/analysis-jobs/${jobId}/retry`)
+  },
+
   createNote(spaceId, data) {
     return api.post(`/v1/spaces/${spaceId}/notes`, data)
   },

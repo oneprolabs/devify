@@ -547,6 +547,16 @@
     "messageId": "ID del mensaje",
     "addEvidence": "Añadir evidencia",
     "otherEventId": "ID del otro evento",
-    "addRelation": "Añadir relación"
+    "addRelation": "Añadir relación",
+    "operationsWorkspace": "Controla las importaciones y tareas de análisis de este espacio.",
+    "uploads": "Importaciones",
+    "uploadsHint": "Paquetes subidos y progreso del parser.",
+    "analysisJobs": "Tareas de análisis",
+    "analysisJobsHint": "Estado de generación de notas y análisis.",
+    "noOperations": "Nada que mostrar",
+    "noOperationsBody": "Las cargas y tareas aparecerán aquí al comenzar.",
+    "unknownSource": "fuente desconocida",
+    "duplicates": "duplicados",
+    "attempts": "intentos"
   }
 }

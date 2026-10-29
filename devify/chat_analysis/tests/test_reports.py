@@ -52,7 +52,7 @@ def test_report_snapshot_freezes_event_and_note_content():
         },
         format="json",
     )
-    assert response.status_code == 201
+    assert response.status_code == 202
     report_id = response.data["data"]["id"]
     report = Report.objects.get(pk=report_id)
     assert report.content["event_count"] == 1
@@ -97,7 +97,7 @@ def test_report_request_key_is_idempotent_and_conflicts_on_changed_input():
         format="json",
     )
 
-    assert first.status_code == 201
+    assert first.status_code == 202
     assert second.status_code == 200
     assert second.data["data"]["id"] == first.data["data"]["id"]
     assert conflict.status_code == 409

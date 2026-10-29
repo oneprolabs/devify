@@ -4,6 +4,14 @@ export const spacesApi = {
   createSpace(data) {
     return api.post('/v1/spaces', data)
   },
+
+  getInvitations() {
+    return api.get('/v1/spaces/invitations')
+  },
+
+  getOwnerlessSpaces() {
+    return api.get('/v1/admin/spaces/ownerless')
+  },
   getSpaces() {
     return api.get('/v1/spaces')
   },

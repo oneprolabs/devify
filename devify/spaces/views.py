@@ -125,6 +125,7 @@ class SpaceInvitationListAPIView(APIView):
         data = [
             {
                 "space_id": membership.space_id,
+                "user_id": membership.user_id,
                 "space_name": membership.space.name,
                 "space_slug": membership.space.slug,
                 "role": membership.role,

@@ -13,6 +13,16 @@
           >
             {{ t('spaces.create') }}
           </button>
+          <router-link to="/spaces/invitations" class="space-refresh">
+            {{ t('spaces.invitations') }}
+          </router-link>
+          <router-link
+            v-if="userStore.isAdmin"
+            to="/spaces/admin"
+            class="space-refresh"
+          >
+            {{ t('spaces.adminSpaces') }}
+          </router-link>
           <button
             type="button"
             class="space-refresh"

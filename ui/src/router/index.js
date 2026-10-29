@@ -84,6 +84,18 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/spaces/invitations',
+    name: 'SpaceInvitations',
+    component: () => import('@/pages/SpaceInvitations.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/spaces/admin',
+    name: 'SpaceAdmin',
+    component: () => import('@/pages/SpaceAdmin.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
     path: '/dashboard',
     redirect: '/chats'
   },

@@ -1770,6 +1770,16 @@
     "supportInvestigation": "Support investigation",
     "confirmRole": "Change this member role?",
     "confirmRemove": "Remove this member?",
-    "confirmTransfer": "Transfer ownership to this member?"
+    "confirmTransfer": "Transfer ownership to this member?",
+    "invitations": "Invitations",
+    "invitationsHint": "Review pending team space invitations.",
+    "noInvitations": "No pending invitations",
+    "noInvitationsBody": "New invitations will appear here.",
+    "accept": "Accept",
+    "reject": "Reject",
+    "adminSpaces": "Admin spaces",
+    "adminSpacesHint": "Take over team spaces without an active owner.",
+    "noOwnerless": "No ownerless spaces",
+    "noOwnerlessBody": "All team spaces currently have an owner."
   }
 }

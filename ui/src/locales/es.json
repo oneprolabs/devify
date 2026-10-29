@@ -557,6 +557,16 @@
     "noOperationsBody": "Las cargas y tareas aparecerán aquí al comenzar.",
     "unknownSource": "fuente desconocida",
     "duplicates": "duplicados",
-    "attempts": "intentos"
+    "attempts": "intentos",
+    "relationRelated": "Relacionados",
+    "relationSame": "Mismo",
+    "relationSeparate": "Separados",
+    "relationDepends": "Depende de",
+    "relationPending": "Pendiente",
+    "relationAccepted": "Aceptada",
+    "relationRejected": "Rechazada",
+    "uploadPackage": "Subir paquete",
+    "uploading": "Subiendo…",
+    "openOperations": "Operaciones"
   }
 }

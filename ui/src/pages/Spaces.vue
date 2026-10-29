@@ -97,6 +97,12 @@
           >
             {{ t('spaces.openAnalysis') }}
           </router-link>
+          <router-link
+            class="space-open-operations"
+            :to="`/spaces/${selectedSpace.id}/operations`"
+          >
+            {{ t('spaces.openOperations') }}
+          </router-link>
 
           <div class="space-section-title">
             <h3>{{ t('spaces.sources') }}</h3>
@@ -391,6 +397,19 @@ onMounted(loadSpaces)
   font-size: 12px;
 }
 .space-open-analysis:hover {
+  border-color: rgb(var(--c-ac));
+  color: rgb(var(--c-ac));
+}
+.space-open-operations {
+  display: inline-flex;
+  margin: 14px 16px 0;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 6px;
+  padding: 8px 11px;
+  color: rgb(var(--c-tx2));
+  font-size: 12px;
+}
+.space-open-operations:hover {
   border-color: rgb(var(--c-ac));
   color: rgb(var(--c-ac));
 }

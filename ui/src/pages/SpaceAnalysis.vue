@@ -171,11 +171,28 @@
                   v-model="evidenceMessageId"
                   inputmode="numeric"
                   :placeholder="t('spaces.messageId')"
-                /><button
-                  type="button"
-                  class="text-action"
-                  @click="addEvidence"
-                >
+                /><select v-model="relationKind" class="relation-select">
+                  <option value="related">
+                    {{ t('spaces.relationRelated') }}
+                  </option>
+                  <option value="same">{{ t('spaces.relationSame') }}</option>
+                  <option value="separate">
+                    {{ t('spaces.relationSeparate') }}
+                  </option>
+                  <option value="depends_on">
+                    {{ t('spaces.relationDepends') }}
+                  </option></select
+                ><select v-model="relationDecision" class="relation-select">
+                  <option value="pending">
+                    {{ t('spaces.relationPending') }}
+                  </option>
+                  <option value="accepted">
+                    {{ t('spaces.relationAccepted') }}
+                  </option>
+                  <option value="rejected">
+                    {{ t('spaces.relationRejected') }}
+                  </option></select
+                ><button type="button" class="text-action" @click="addEvidence">
                   {{ t('spaces.addEvidence') }}
                 </button>
               </div>
@@ -283,6 +300,8 @@ const formMode = ref('create')
 const form = reactive({ kind: 'note', title: '', key: '', content: '' })
 const evidenceMessageId = ref('')
 const relationEventId = ref('')
+const relationKind = ref('related')
+const relationDecision = ref('pending')
 const tabs = computed(() => [
   { value: 'notes', label: t('spaces.notes') },
   { value: 'events', label: t('spaces.events') },
@@ -450,7 +469,8 @@ const addRelation = async () => {
     await spacesApi.createEventRelation(props.spaceId, {
       left_event_id: selected.value.id,
       right_event_id: Number(relationEventId.value),
-      relation_kind: 'related',
+      relation_kind: relationKind.value,
+      decision: relationDecision.value,
       source_note_ids: []
     })
     relationEventId.value = ''

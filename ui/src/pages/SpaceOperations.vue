@@ -37,6 +37,15 @@
             <h2>{{ activeLabel }}</h2>
             <p>{{ activeDescription }}</p>
           </div>
+          <label v-if="activeTab === 'uploads'" class="upload-button">
+            {{ uploading ? t('spaces.uploading') : t('spaces.uploadPackage') }}
+            <input
+              type="file"
+              accept=".zip,application/zip"
+              :disabled="uploading"
+              @change="uploadPackage"
+            />
+          </label>
           <button
             type="button"
             class="operations-refresh"
@@ -98,6 +107,7 @@ const space = ref(null)
 const activeTab = ref('uploads')
 const items = ref([])
 const loading = ref(false)
+const uploading = ref(false)
 const error = ref('')
 const tabs = computed(() => [
   { value: 'uploads', label: t('spaces.uploads') },
@@ -155,6 +165,28 @@ const retry = async (item) => {
     await loadActive()
   } catch (requestError) {
     error.value = requestError.response?.data?.detail || t('spaces.loadError')
+  }
+}
+const uploadPackage = async (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file || uploading.value) return
+  uploading.value = true
+  error.value = ''
+  try {
+    const created = await spacesApi.createUpload(props.spaceId, {
+      source_type: 'wechat',
+      idempotency_key: `web-${Date.now()}-${file.name}`,
+      archive_size: file.size
+    })
+    const batch = created.data.data || created.data
+    await spacesApi.uploadArchive(batch.id, file)
+    await spacesApi.completeUpload(batch.id)
+    await loadActive()
+  } catch (requestError) {
+    error.value = requestError.response?.data?.detail || t('spaces.loadError')
+  } finally {
+    uploading.value = false
   }
 }
 watch(activeTab, loadActive)
@@ -273,6 +305,21 @@ onMounted(async () => {
 .operation-retry {
   color: rgb(var(--c-ac));
   font-size: 11px;
+}
+.upload-button {
+  position: relative;
+  border: 1px solid rgb(var(--c-ac));
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: rgb(var(--c-ac));
+  cursor: pointer;
+  font-size: 11px;
+}
+.upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 .operation-rows {
   padding-top: 6px;

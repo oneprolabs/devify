@@ -54,6 +54,22 @@ export const spacesApi = {
     return api.get(`/v1/spaces/${spaceId}/chat/uploads`, { params })
   },
 
+  createUpload(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/chat/uploads`, data)
+  },
+
+  uploadArchive(batchId, file) {
+    const form = new FormData()
+    form.append('archive', file)
+    return api.put(`/v1/chat/uploads/${batchId}/archive`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+
+  completeUpload(batchId) {
+    return api.post(`/v1/chat/uploads/${batchId}/complete`)
+  },
+
   getAnalysisJobs(spaceId, params = {}) {
     return api.get(`/v1/spaces/${spaceId}/analysis-jobs`, { params })
   },
@@ -84,6 +100,10 @@ export const spacesApi = {
 
   createEventRelation(spaceId, data) {
     return api.post(`/v1/spaces/${spaceId}/event-relations`, data)
+  },
+
+  getEventRelations(spaceId, params = {}) {
+    return api.get(`/v1/spaces/${spaceId}/event-relations`, { params })
   },
 
   createReport(spaceId, data) {

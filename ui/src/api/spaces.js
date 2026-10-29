@@ -48,5 +48,33 @@ export const spacesApi = {
 
   getReport(reportId) {
     return api.get(`/v1/reports/${reportId}`)
+  },
+
+  createNote(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/notes`, data)
+  },
+
+  updateNote(noteId, data) {
+    return api.patch(`/v1/notes/${noteId}`, data)
+  },
+
+  addNoteEvidence(noteId, data) {
+    return api.post(`/v1/notes/${noteId}/evidence`, data)
+  },
+
+  createEvent(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/events`, data)
+  },
+
+  updateEvent(eventId, data) {
+    return api.patch(`/v1/events/${eventId}`, data)
+  },
+
+  createEventRelation(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/event-relations`, data)
+  },
+
+  createReport(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/reports`, data)
   }
 }

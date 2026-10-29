@@ -12,6 +12,7 @@ from chat_analysis.api_serializers import (
 )
 from chat_analysis.models import Report
 from chat_analysis.report_services import create_report_snapshot
+from chat_analysis.report_tasks import dispatch_report_generation
 from chat_analysis.services import (
     ChatAnalysisConflict,
     ChatAnalysisPermissionError,
@@ -103,6 +104,15 @@ class SpaceReportListCreateAPIView(APIView):
             return Response({"detail": str(error)}, status=403)
         except ChatAnalysisConflict as error:
             return Response({"detail": str(error)}, status=409)
+        if created:
+            report.status = Report.Status.QUEUED
+            report.processing = {
+                **(report.processing or {}),
+                "generator": "llm_pending",
+                "version": "report.llm.v1",
+            }
+            report.save(update_fields=("status", "processing", "updated_at"))
+            transaction.on_commit(lambda: dispatch_report_generation(report))
         audit_space_action(
             actor=request.user,
             space=space,
@@ -113,7 +123,7 @@ class SpaceReportListCreateAPIView(APIView):
         )
         return Response(
             {"data": ReportSerializer(report).data},
-            status=201 if created else 200,
+            status=202 if created else 200,
         )
 
 

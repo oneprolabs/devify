@@ -49,6 +49,7 @@ urlpatterns = [
     path("api/v1/", include("threadline.urls")),
     path("api/v1/", include("spaces.urls")),
     path("api/v1/", include("chat_ingestion.urls")),
+    path("api/v1/", include("chat_sources.urls")),
     path("api/v1/", include("chat_domain.urls")),
     path("api/v1/", include("chat_analysis.urls")),
     path("api/v1/", include("chat_analysis.api_urls")),

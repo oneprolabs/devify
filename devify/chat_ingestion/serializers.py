@@ -51,15 +51,29 @@ class UploadItemSerializer(serializers.ModelSerializer):
 class UploadBatchSerializer(serializers.ModelSerializer):
     items = UploadItemSerializer(many=True, read_only=True)
     space_id = serializers.IntegerField(read_only=True)
+    source_id = serializers.IntegerField(read_only=True)
     uploaded_by_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = UploadBatch
         fields = (
-            "id", "uuid", "space_id", "uploaded_by_id", "source_type",
-            "source_account_id", "idempotency_key", "archive_sha256",
-            "archive_size", "status", "error_message", "message_count",
-            "duplicate_count", "items", "created_at", "updated_at",
+            "id",
+            "uuid",
+            "space_id",
+            "source_id",
+            "uploaded_by_id",
+            "source_type",
+            "source_account_id",
+            "idempotency_key",
+            "archive_sha256",
+            "archive_size",
+            "status",
+            "error_message",
+            "message_count",
+            "duplicate_count",
+            "items",
+            "created_at",
+            "updated_at",
             "completed_at",
         )
         read_only_fields = fields

@@ -130,6 +130,7 @@ INSTALLED_APPS += [
     "billing",
     "accounts",
     "spaces.apps.SpacesConfig",
+    "chat_sources.apps.ChatSourcesConfig",
     "chat_ingestion.apps.ChatIngestionConfig",
     "chat_analysis.apps.ChatAnalysisConfig",
     "chat_domain.apps.ChatDomainConfig",

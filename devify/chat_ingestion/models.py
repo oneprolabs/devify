@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import models
 
 from spaces.models import Space
+from chat_sources.models import Source
 
 
 class UploadBatch(models.Model):
@@ -28,6 +29,13 @@ class UploadBatch(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="chat_upload_batches",
+    )
+    source = models.ForeignKey(
+        Source,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="upload_batches",
     )
     source_type = models.CharField(max_length=20, choices=SourceType.choices)
     source_account_id = models.CharField(max_length=255, blank=True)

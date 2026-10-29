@@ -1,6 +1,9 @@
 import api from './index'
 
 export const spacesApi = {
+  createSpace(data) {
+    return api.post('/v1/spaces', data)
+  },
   getSpaces() {
     return api.get('/v1/spaces')
   },
@@ -76,6 +79,46 @@ export const spacesApi = {
 
   retryAnalysisJob(jobId) {
     return api.post(`/v1/analysis-jobs/${jobId}/retry`)
+  },
+
+  getMembers(spaceId) {
+    return api.get(`/v1/spaces/${spaceId}/members`)
+  },
+
+  inviteMember(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/members`, data)
+  },
+
+  updateMember(spaceId, userId, data) {
+    return api.patch(`/v1/spaces/${spaceId}/members/${userId}`, data)
+  },
+
+  removeMember(spaceId, userId) {
+    return api.delete(`/v1/spaces/${spaceId}/members/${userId}`)
+  },
+
+  acceptInvitation(spaceId, userId) {
+    return api.post(`/v1/spaces/${spaceId}/members/${userId}/accept`)
+  },
+
+  rejectInvitation(spaceId, userId) {
+    return api.delete(`/v1/spaces/${spaceId}/members/${userId}/accept`)
+  },
+
+  transferOwnership(spaceId, userId) {
+    return api.post(`/v1/spaces/${spaceId}/ownership`, { user_id: userId })
+  },
+
+  updateSpace(spaceId, data) {
+    return api.patch(`/v1/spaces/${spaceId}`, data)
+  },
+
+  takeoverSpace(spaceId, reason) {
+    return api.post(`/v1/spaces/${spaceId}/takeover`, { reason })
+  },
+
+  endTakeover(spaceId) {
+    return api.delete(`/v1/spaces/${spaceId}/takeover`)
   },
 
   createNote(spaceId, data) {

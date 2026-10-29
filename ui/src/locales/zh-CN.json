@@ -1758,6 +1758,27 @@
     "relationRejected": "已拒绝",
     "uploadPackage": "上传聊天包",
     "uploading": "上传中…",
-    "openOperations": "操作状态"
+    "openOperations": "操作状态",
+    "create": "创建团队空间",
+    "nameField": "空间名称",
+    "slugField": "Slug（可选）",
+    "management": "管理",
+    "rename": "重命名",
+    "archive": "归档",
+    "restore": "恢复",
+    "takeover": "接管空间",
+    "endTakeover": "结束接管",
+    "invite": "邀请",
+    "userId": "用户 ID",
+    "transfer": "转移 Owner",
+    "noMembers": "暂无成员",
+    "noMembersBody": "当前空间没有有效成员。",
+    "confirmArchive": "确认修改空间状态？",
+    "confirmEndTakeover": "确认结束管理员接管？",
+    "takeoverReason": "接管原因",
+    "supportInvestigation": "支持排查",
+    "confirmRole": "确认修改成员角色？",
+    "confirmRemove": "确认移除成员？",
+    "confirmTransfer": "确认将 Owner 转移给该成员？"
   }
 }

@@ -109,8 +109,13 @@ def store_archive(batch, uploaded_file):
     """
 
     limit = max_archive_bytes()
-    declared_sha256 = (batch.archive_sha256 or "").lower()
-    declared_size = batch.archive_size
+    # Declared checksums only guard the first upload. Once an archive is
+    # stored, ``archive_sha256``/``archive_size`` are the server's own
+    # values for that file, so a retry that replaces a rejected archive must
+    # not be compared against its predecessor.
+    replacing = archive_exists(batch)
+    declared_sha256 = "" if replacing else (batch.archive_sha256 or "").lower()
+    declared_size = None if replacing else batch.archive_size
 
     root = archive_root()
     root.mkdir(parents=True, exist_ok=True)

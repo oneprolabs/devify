@@ -33,12 +33,6 @@ PARTS_MEMBER = "message_parts.jsonl"
 ORIGINS_MEMBER = "origins.jsonl"
 REQUIRED_MEMBERS = (MANIFEST_MEMBER, CONVERSATIONS_MEMBER, MESSAGES_MEMBER)
 SUPPORTED_PLATFORMS = ("wechat", "whatsapp", "line")
-JSONL_MEMBERS = (
-    CONVERSATIONS_MEMBER,
-    MESSAGES_MEMBER,
-    PARTS_MEMBER,
-    ORIGINS_MEMBER,
-)
 
 MANIFEST_MAX_BYTES = 2 * 1024 * 1024
 CHUNK_SIZE = 1024 * 1024
@@ -86,19 +80,6 @@ class PackageManifest:
     scope: dict = field(default_factory=dict)
     counts: dict = field(default_factory=dict)
     whitelist: tuple = ()
-
-    @property
-    def parser_version(self):
-        return self.schema_version
-
-    @property
-    def scope_conversation_ids(self):
-        values = self.scope.get("conversation_ids") or []
-        if not isinstance(values, list):
-            raise ManifestInvalid(
-                "manifest.json scope.conversation_ids must be a list."
-            )
-        return tuple(str(value) for value in values)
 
 
 def normalize_member_path(name):
@@ -330,17 +311,3 @@ def parse_occurred_at(value, tzinfo, timezone_name=""):
             )
         parsed = parsed.replace(tzinfo=tzinfo)
     return parsed.astimezone(dt_timezone.utc)
-
-
-def parse_int(value, *, field_name, default=None, minimum=None):
-    if value is None or value == "":
-        return default
-    if isinstance(value, bool):
-        raise ValueError(f"{field_name} must be an integer.")
-    try:
-        number = int(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"{field_name} must be an integer.") from error
-    if minimum is not None and number < minimum:
-        raise ValueError(f"{field_name} must be >= {minimum}.")
-    return number

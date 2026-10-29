@@ -40,7 +40,6 @@ from chat_ingestion.services import (
     transition_batch,
 )
 
-PARSER_VERSION = "wechat.v1"
 EXPANDED_BYTES_SETTING = "CHAT_UPLOAD_MAX_EXPANDED_BYTES"
 DEFAULT_MAX_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024
 
@@ -60,6 +59,7 @@ class ArchiveParseError(ValueError):
 
 @dataclass(frozen=True)
 class Manifest:
+    schema_version: str
     platform: str
     source_namespace: str
     timezone: object
@@ -205,6 +205,7 @@ def _validate_manifest(package, batch):
 
     zone = manifest.tzinfo or ZoneInfo(settings.TIME_ZONE or "UTC")
     return Manifest(
+        schema_version=manifest.schema_version,
         platform=manifest.platform,
         source_namespace=manifest.source_namespace,
         timezone=zone,
@@ -384,7 +385,7 @@ def _parse_messages(
             origin={
                 "upload_item": message_item,
                 "locator_key": f"line:{number}",
-                "parser_version": PARSER_VERSION,
+                "parser_version": manifest.schema_version,
                 "record_locator": {"file": name, "line": number},
             },
         )
@@ -487,7 +488,7 @@ def _parse_parts(package, conversations, messages, items):
         parts[(message.pk, part.part_key)] = part
 
 
-def _parse_origins(package, conversations, messages, items):
+def _parse_origins(package, manifest, conversations, messages, items):
     if not package.has(ORIGINS_MEMBER):
         return
     name = ORIGINS_MEMBER
@@ -501,7 +502,7 @@ def _parse_origins(package, conversations, messages, items):
         )
         parser_version = _string(
             record, "parser_version", where, max_length=50
-        ) or PARSER_VERSION
+        ) or manifest.schema_version
         upload_item_path = _string(
             record, "upload_item_path", where, max_length=500
         )
@@ -564,7 +565,7 @@ def _parse_locked(batch):
             items[MESSAGES_MEMBER],
         )
         _parse_parts(package, conversations, messages, items)
-        _parse_origins(package, conversations, messages, items)
+        _parse_origins(package, manifest, conversations, messages, items)
 
     message_item = items[MESSAGES_MEMBER]
     message_item.message_count = created_count

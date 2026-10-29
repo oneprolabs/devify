@@ -311,3 +311,106 @@ def test_manifest_cannot_choose_space_or_uploader():
     assert batch.space_id == space.pk
     assert batch.uploaded_by_id == owner.pk
     assert not Conversation.objects.filter(space=other_space).exists()
+
+
+def test_failed_import_can_be_retried_with_a_corrected_archive():
+    owner = User.objects.create_user(username="parse-retry-owner")
+    space = make_team(owner, slug="parse-retry-team")
+    client = auth_client(owner)
+    batch = start_upload(
+        client,
+        space,
+        "parse-retry",
+        build_archive(manifest=default_manifest(1, 3)),
+    )
+
+    failed = complete(client, batch)
+    assert failed.status_code == 422
+
+    corrected = client.put(
+        f"/api/v1/chat/uploads/{batch.pk}/archive",
+        {
+            "archive": SimpleUploadedFile(
+                "package.zip", build_archive(), content_type="application/zip"
+            )
+        },
+        format="multipart",
+    )
+    assert corrected.status_code == 200
+
+    retried = complete(client, batch)
+
+    assert retried.status_code == 200
+    batch.refresh_from_db()
+    assert batch.status == UploadBatch.Status.COMPLETED
+    assert batch.error_message == ""
+    assert batch.message_count == 2
+    assert Message.objects.count() == 2
+
+
+def test_origin_file_records_a_second_source_for_the_same_message():
+    owner = User.objects.create_user(username="parse-origin-owner")
+    space = make_team(owner, slug="parse-origin-team")
+    client = auth_client(owner)
+    origins = [
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "locator_key": "offset:42",
+            "parser_version": "wechat.v1",
+            "upload_item_path": "raw/export.json",
+            "record_locator": {"offset": 42},
+        }
+    ]
+    batch = start_upload(
+        client,
+        space,
+        "parse-origin",
+        build_archive(
+            origins=origins,
+            extra={"raw/export.json": b"{}"},
+            media={},
+        ),
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 200
+    origin = MessageOrigin.objects.get(locator_key="offset:42")
+    assert origin.upload_item.path == "raw/export.json"
+    assert origin.record_locator == {"offset": 42}
+    assert MessageOrigin.objects.filter(
+        message__message_key="srv:1"
+    ).count() == 2
+
+
+def test_messages_without_ids_dedupe_by_locator_and_file_hash():
+    owner = User.objects.create_user(username="parse-no-id-owner")
+    space = make_team(owner, slug="parse-no-id-team")
+    client = auth_client(owner)
+    messages = [
+        {
+            "conversation_id": "group-a",
+            "sender_key": "wx-a",
+            "occurred_at": "2026-10-20T09:00:00+08:00",
+        },
+        {
+            "conversation_id": "group-a",
+            "sender_key": "wx-self",
+            "occurred_at": "2026-10-20T09:05:00+08:00",
+        },
+    ]
+    content = build_archive(messages=messages, parts=[], media={})
+
+    first = start_upload(client, space, "parse-no-id-1", content)
+    assert complete(client, first).status_code == 200
+    second = start_upload(client, space, "parse-no-id-2", content)
+    response = complete(client, second)
+
+    assert response.status_code == 200
+    keys = set(Message.objects.values_list("message_key", flat=True))
+    assert len(keys) == 2
+    assert all(key.startswith("loc:") for key in keys)
+    second.refresh_from_db()
+    assert second.message_count == 0
+    assert second.duplicate_count == 2

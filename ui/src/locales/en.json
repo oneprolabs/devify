@@ -1718,6 +1718,17 @@
     "noEventLinks": "Not linked to an event",
     "noNoteLinks": "No notes linked",
     "noRelations": "No relations recorded",
-    "openAnalysis": "Open analysis workspace"
+    "openAnalysis": "Open analysis workspace",
+    "newNote": "New note",
+    "newEvent": "New event",
+    "newReport": "New report",
+    "editItem": "Edit item",
+    "titleField": "Title",
+    "keyField": "Stable key",
+    "contentField": "Content",
+    "messageId": "Message ID",
+    "addEvidence": "Add evidence",
+    "otherEventId": "Other event ID",
+    "addRelation": "Add relation"
   }
 }

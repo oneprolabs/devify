@@ -536,6 +536,17 @@
     "noEventLinks": "Sin eventos vinculados",
     "noNoteLinks": "Sin notas vinculadas",
     "noRelations": "Sin relaciones registradas",
-    "openAnalysis": "Abrir espacio de análisis"
+    "openAnalysis": "Abrir espacio de análisis",
+    "newNote": "Nueva nota",
+    "newEvent": "Nuevo evento",
+    "newReport": "Nuevo informe",
+    "editItem": "Editar elemento",
+    "titleField": "Título",
+    "keyField": "Clave estable",
+    "contentField": "Contenido",
+    "messageId": "ID del mensaje",
+    "addEvidence": "Añadir evidencia",
+    "otherEventId": "ID del otro evento",
+    "addRelation": "Añadir relación"
   }
 }

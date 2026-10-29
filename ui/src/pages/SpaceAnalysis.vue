@@ -29,7 +29,49 @@
         >
           {{ tab.label }} <span>{{ items[tab.value].length }}</span>
         </button>
+        <div class="analysis-actions">
+          <button type="button" class="analysis-action" @click="openCreateForm">
+            {{
+              activeTab === 'notes'
+                ? t('spaces.newNote')
+                : activeTab === 'events'
+                  ? t('spaces.newEvent')
+                  : t('spaces.newReport')
+            }}
+          </button>
+        </div>
       </nav>
+      <form v-if="formOpen" class="analysis-form" @submit.prevent="submitForm">
+        <div class="analysis-form-head">
+          <h2>{{ formTitle }}</h2>
+          <button type="button" class="form-close" @click="closeForm">
+            {{ t('common.close') }}
+          </button>
+        </div>
+        <div class="form-grid">
+          <label
+            ><span>{{ t('spaces.titleField') }}</span
+            ><input v-model="form.title" required maxlength="500"
+          /></label>
+          <label
+            ><span>{{ t('spaces.keyField') }}</span
+            ><input v-model="form.key" required maxlength="255"
+          /></label>
+          <label class="form-wide"
+            ><span>{{ t('spaces.contentField') }}</span
+            ><textarea v-model="form.content" required rows="4"></textarea>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="analysis-action primary"
+            :disabled="formSubmitting"
+          >
+            {{ formSubmitting ? t('common.saving') : t('common.save') }}
+          </button>
+        </div>
+      </form>
       <main class="analysis-body">
         <section class="analysis-list">
           <div class="analysis-list-head">
@@ -94,6 +136,11 @@
               <p>{{ selected.origin }} · {{ selected.assignment_mode }}</p>
             </div>
             <div class="detail-content">{{ selected.content }}</div>
+            <div class="detail-toolbar">
+              <button type="button" class="text-action" @click="openEditForm">
+                {{ t('common.edit') }}
+              </button>
+            </div>
             <div class="detail-section">
               <h3>{{ t('spaces.evidence') }}</h3>
               <div v-if="!selected.evidence?.length" class="detail-muted">
@@ -119,6 +166,19 @@
               <div v-if="!selected.event_ids?.length" class="detail-muted">
                 {{ t('spaces.noEventLinks') }}
               </div>
+              <div class="inline-action">
+                <input
+                  v-model="evidenceMessageId"
+                  inputmode="numeric"
+                  :placeholder="t('spaces.messageId')"
+                /><button
+                  type="button"
+                  class="text-action"
+                  @click="addEvidence"
+                >
+                  {{ t('spaces.addEvidence') }}
+                </button>
+              </div>
             </div>
           </template>
           <template v-else-if="activeTab === 'events'">
@@ -128,6 +188,11 @@
               <p>{{ selected.status || t('common.status.unknown') }}</p>
             </div>
             <div class="detail-content">{{ selected.content }}</div>
+            <div class="detail-toolbar">
+              <button type="button" class="text-action" @click="openEditForm">
+                {{ t('common.edit') }}
+              </button>
+            </div>
             <div class="detail-section">
               <h3>{{ t('spaces.notes') }}</h3>
               <span
@@ -150,6 +215,19 @@
               >
               <div v-if="!selected.relation_ids?.length" class="detail-muted">
                 {{ t('spaces.noRelations') }}
+              </div>
+              <div class="inline-action">
+                <input
+                  v-model="relationEventId"
+                  inputmode="numeric"
+                  :placeholder="t('spaces.otherEventId')"
+                /><button
+                  type="button"
+                  class="text-action"
+                  @click="addRelation"
+                >
+                  {{ t('spaces.addRelation') }}
+                </button>
               </div>
             </div>
           </template>
@@ -183,7 +261,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { spacesApi } from '@/api/spaces'
@@ -199,6 +277,12 @@ const selected = ref(null)
 const loading = ref(false)
 const detailLoading = ref(false)
 const error = ref('')
+const formOpen = ref(false)
+const formSubmitting = ref(false)
+const formMode = ref('create')
+const form = reactive({ kind: 'note', title: '', key: '', content: '' })
+const evidenceMessageId = ref('')
+const relationEventId = ref('')
 const tabs = computed(() => [
   { value: 'notes', label: t('spaces.notes') },
   { value: 'events', label: t('spaces.events') },
@@ -266,6 +350,115 @@ const summaryFor = (item) =>
   item.content || item.summary || item.body?.slice(0, 100) || '—'
 const metaFor = (item) =>
   item.status || item.origin || item.generated_at?.slice(0, 10) || ''
+const formTitle = computed(() =>
+  formMode.value === 'edit'
+    ? t('spaces.editItem')
+    : activeTab.value === 'notes'
+      ? t('spaces.newNote')
+      : activeTab.value === 'events'
+        ? t('spaces.newEvent')
+        : t('spaces.newReport')
+)
+const openCreateForm = () => {
+  formMode.value = 'create'
+  form.kind =
+    activeTab.value === 'reports'
+      ? 'report'
+      : activeTab.value === 'events'
+        ? 'event'
+        : 'note'
+  form.title = ''
+  form.key = `${form.kind}-${Date.now()}`
+  form.content = ''
+  formOpen.value = true
+}
+const openEditForm = () => {
+  if (
+    !selected.value ||
+    (activeTab.value !== 'notes' && activeTab.value !== 'events')
+  )
+    return
+  formMode.value = 'edit'
+  form.kind = activeTab.value === 'events' ? 'event' : 'note'
+  form.title = selected.value.title
+  form.key = selected.value.note_key || selected.value.event_key || ''
+  form.content = selected.value.content || ''
+  formOpen.value = true
+}
+const closeForm = () => {
+  formOpen.value = false
+}
+const submitForm = async () => {
+  formSubmitting.value = true
+  try {
+    let response
+    if (formMode.value === 'edit') {
+      response =
+        form.kind === 'note'
+          ? await spacesApi.updateNote(selected.value.id, {
+              title: form.title,
+              content: form.content
+            })
+          : await spacesApi.updateEvent(selected.value.id, {
+              title: form.title,
+              content: form.content
+            })
+    } else if (form.kind === 'note') {
+      response = await spacesApi.createNote(props.spaceId, {
+        note_key: form.key,
+        title: form.title,
+        content: form.content,
+        origin: 'manual'
+      })
+    } else if (form.kind === 'event') {
+      response = await spacesApi.createEvent(props.spaceId, {
+        event_key: form.key,
+        title: form.title,
+        content: form.content,
+        status: 'open'
+      })
+    } else {
+      response = await spacesApi.createReport(props.spaceId, {
+        request_key: form.key,
+        title: form.title
+      })
+    }
+    formOpen.value = false
+    await loadActive()
+    if (response?.data?.data) await selectItem(response.data.data)
+  } catch (requestError) {
+    error.value = requestError.response?.data?.detail || t('spaces.loadError')
+  } finally {
+    formSubmitting.value = false
+  }
+}
+const addEvidence = async () => {
+  if (!selected.value || !evidenceMessageId.value) return
+  try {
+    await spacesApi.addNoteEvidence(selected.value.id, {
+      message_id: Number(evidenceMessageId.value)
+    })
+    evidenceMessageId.value = ''
+    await selectItem(selected.value)
+  } catch (requestError) {
+    error.value = requestError.response?.data?.detail || t('spaces.loadError')
+  }
+}
+const addRelation = async () => {
+  if (!selected.value || !relationEventId.value) return
+  try {
+    await spacesApi.createEventRelation(props.spaceId, {
+      left_event_id: selected.value.id,
+      right_event_id: Number(relationEventId.value),
+      relation_kind: 'related',
+      source_note_ids: []
+    })
+    relationEventId.value = ''
+    await selectItem(selected.value)
+  } catch (requestError) {
+    error.value = requestError.response?.data?.detail || t('spaces.loadError')
+  }
+}
 watch(activeTab, loadActive)
 watch(
   () => props.spaceId,
@@ -356,6 +549,90 @@ onMounted(async () => {
 .analysis-tab.active {
   border-bottom-color: rgb(var(--c-ac));
   color: rgb(var(--c-ac));
+}
+.analysis-actions {
+  margin-left: auto;
+}
+.analysis-action {
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: rgb(var(--c-tx2));
+  font-size: 11px;
+}
+.analysis-action:hover,
+.analysis-action.primary {
+  border-color: rgb(var(--c-ac));
+  background: rgb(var(--c-ac));
+  color: rgb(var(--c-ac-on));
+}
+.analysis-form {
+  border-bottom: 1px solid rgb(var(--c-line));
+  background: rgb(var(--c-panel-sub));
+  padding: 14px 20px;
+}
+.analysis-form-head,
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.analysis-form-head h2 {
+  margin: 0;
+  font-size: 13px;
+}
+.form-close,
+.text-action {
+  color: rgb(var(--c-ac));
+  font-size: 11px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: rgb(var(--c-tx2));
+  font-size: 11px;
+}
+.form-grid input,
+.form-grid textarea,
+.inline-action input {
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 5px;
+  background: rgb(var(--c-panel));
+  padding: 7px 8px;
+  color: rgb(var(--c-tx));
+  font-size: 12px;
+  outline: none;
+}
+.form-grid textarea {
+  resize: vertical;
+}
+.form-wide {
+  grid-column: 1 / -1;
+}
+.form-actions {
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+.detail-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+.inline-action {
+  display: flex;
+  gap: 7px;
+  margin-top: 10px;
+}
+.inline-action input {
+  width: 120px;
 }
 .analysis-body {
   display: grid;

@@ -1727,6 +1727,17 @@
     "noEventLinks": "尚未关联事件",
     "noNoteLinks": "暂无关联记录",
     "noRelations": "暂无关系",
-    "openAnalysis": "打开分析工作台"
+    "openAnalysis": "打开分析工作台",
+    "newNote": "新建记录",
+    "newEvent": "新建事件",
+    "newReport": "新建报告",
+    "editItem": "编辑内容",
+    "titleField": "标题",
+    "keyField": "稳定键",
+    "contentField": "内容",
+    "messageId": "消息 ID",
+    "addEvidence": "添加证据",
+    "otherEventId": "另一个事件 ID",
+    "addRelation": "添加关系"
   }
 }

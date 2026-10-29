@@ -13,7 +13,6 @@ from spaces.views import (
     SpaceTakeoverAPIView,
 )
 
-
 urlpatterns = [
     path("spaces", SpaceListCreateAPIView.as_view(), name="space-list-create"),
     path(

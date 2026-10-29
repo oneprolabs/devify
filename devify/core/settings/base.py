@@ -17,12 +17,10 @@ from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
-from .database import *
-
 # Import module-specific configurations
 from .billing import *
+from .database import *
 from .email_system import *
-
 from .logging_config import configure_logging
 from .sentry import *
 
@@ -471,11 +469,11 @@ CSRF_COOKIE_HTTPONLY = False
 # External Libraries Configuration
 # ============================
 from .accounts import *
+from .billing import *
+from .cache import *
 from .celery import *
 from .rest import *
 from .swagger import *
-from .cache import *
-from .billing import *
 
 # ============================
 # DRF Spectacular Configuration

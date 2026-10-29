@@ -14,24 +14,24 @@ Public API endpoints:
 from django.urls import path
 
 from .views import (
-    SettingsAPIView,
-    SettingsDetailAPIView,
-    SettingsImapValidateAPIView,
     EmailMessageAPIView,
-    EmailMessageDetailAPIView,
     EmailMessageBatchMergeAPIView,
     EmailMessageBatchRetryAPIView,
+    EmailMessageDetailAPIView,
     EmailMessageIssueClusterAPIView,
     EmailMessageMetadataAPIView,
     EmailMessageStatsAPIView,
     EmailTodoAPIView,
+    EmailTodoBatchAPIView,
     EmailTodoDetailAPIView,
     EmailTodoStatsAPIView,
-    EmailTodoBatchAPIView,
-    ThreadlineShareLinkAPIView,
-    ThreadlineShareLinkDetailAPIView,
     PublicShareLinkAPIView,
     PublicShareLinkVerifyAPIView,
+    SettingsAPIView,
+    SettingsDetailAPIView,
+    SettingsImapValidateAPIView,
+    ThreadlineShareLinkAPIView,
+    ThreadlineShareLinkDetailAPIView,
 )
 from .views.email_alias import (
     EmailAliasAPIView,
@@ -43,17 +43,17 @@ from .views.email_mailbox import (
     EmailMailboxListAPIView,
     EmailMailboxTestAPIView,
 )
-from .views.space_email import SpaceEmailDetailAPIView, SpaceEmailListAPIView
 from .views.monitoring import (
+    clear_metrics_cache,
+    email_processing_metrics,
+    health_check,
+    monitoring_dashboard,
+    simple_health,
+    simple_metrics,
     task_metrics,
     task_status_summary,
-    email_processing_metrics,
-    monitoring_dashboard,
-    clear_metrics_cache,
-    health_check,
-    simple_metrics,
-    simple_health,
 )
+from .views.space_email import SpaceEmailDetailAPIView, SpaceEmailListAPIView
 
 # URL patterns for Threadline API endpoints
 urlpatterns = [

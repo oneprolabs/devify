@@ -2,16 +2,23 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
-from rest_framework.test import APIClient
 from django.utils import timezone
+from rest_framework.test import APIClient
 
-from threadline.models import (
-    EmailAttachment, EmailMailbox, EmailMessage, _assign_personal_space,
-)
 from spaces.models import (
-    Space, SpaceAuditLog, SpaceMembership, SpacePolicy, SpaceTakeover,
+    Space,
+    SpaceAuditLog,
+    SpaceMembership,
+    SpacePolicy,
+    SpaceTakeover,
 )
 from spaces.services import SpaceBootstrapService, SpacePermissionService
+from threadline.models import (
+    EmailAttachment,
+    EmailMailbox,
+    EmailMessage,
+    _assign_personal_space,
+)
 
 
 @pytest.mark.django_db

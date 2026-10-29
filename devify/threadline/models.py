@@ -1,22 +1,21 @@
 import logging
 import uuid as uuid_lib
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
-from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from billing.fields import EncryptedTextField
-
 from threadline.state_machine import (
-    EmailStatus,
-    get_initial_email_status,
-    can_transition_to,
-    get_next_states,
     EMAIL_STATE_MACHINE,
+    EmailStatus,
+    can_transition_to,
+    get_initial_email_status,
+    get_next_states,
 )
 
 logger = logging.getLogger(__name__)

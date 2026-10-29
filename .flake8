@@ -3,6 +3,9 @@
 # cannot read. E203 and W503 are the two black disagrees with by design.
 max-line-length = 79
 extend-ignore = E203, W503
+per-file-ignores =
+    # Settings modules assemble configuration through star imports on purpose.
+    devify/core/settings/*.py: F401, F403, F811, E402
 exclude =
     .git,
     __pycache__,

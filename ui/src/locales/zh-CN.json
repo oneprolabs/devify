@@ -1687,6 +1687,20 @@
     "noSources": "暂无来源",
     "noSourcesBody": "客户端或管理员连接来源后会显示在这里。",
     "noCapabilities": "暂无已验证能力",
-    "loadError": "无法加载空间。"
+    "loadError": "无法加载空间。",
+    "openWorkspace": "打开聊天工作台",
+    "chatWorkspace": "查看此空间内的对话和消息。",
+    "switchSpace": "切换空间",
+    "conversations": "对话",
+    "searchConversations": "搜索对话",
+    "messages": "条消息",
+    "noConversations": "暂无对话",
+    "noConversationsBody": "上传规范化聊天包后，对话会显示在这里。",
+    "selectConversation": "选择一个对话",
+    "selectConversationBody": "选择对话后查看其中的消息。",
+    "noMessages": "暂无消息",
+    "noMessagesBody": "该对话还没有规范化消息。",
+    "unknownSender": "未知发送者",
+    "noMessageContent": "这条消息没有可读取的内容。"
   }
 }

@@ -1678,6 +1678,20 @@
     "noSources": "No sources connected",
     "noSourcesBody": "Sources will appear when a client or administrator connects one.",
     "noCapabilities": "No verified capabilities",
-    "loadError": "Unable to load spaces."
+    "loadError": "Unable to load spaces.",
+    "openWorkspace": "Open chat workspace",
+    "chatWorkspace": "Conversations and messages for this space.",
+    "switchSpace": "Switch space",
+    "conversations": "Conversations",
+    "searchConversations": "Search conversations",
+    "messages": "messages",
+    "noConversations": "No conversations yet",
+    "noConversationsBody": "Upload a normalized chat package to start building the conversation history.",
+    "selectConversation": "Select a conversation",
+    "selectConversationBody": "Choose a conversation to inspect its messages.",
+    "noMessages": "No messages",
+    "noMessagesBody": "This conversation does not contain any normalized messages.",
+    "unknownSender": "Unknown sender",
+    "noMessageContent": "This message has no readable content."
   }
 }

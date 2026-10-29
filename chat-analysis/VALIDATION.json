@@ -1,0 +1,62 @@
+{
+  "version": "v0.20",
+  "checked_at": "2026-10-29",
+  "html_nesting": "passed",
+  "unique_html_ids": "passed",
+  "internal_and_local_links": "passed",
+  "schema_prose_field_counts": "passed",
+  "tables_including_app_config": 20,
+  "business_table_count": 19,
+  "note_fields": 9,
+  "event_fields": 8,
+  "declared_indexes_and_unique_keys": 47,
+  "foreign_keys": 36,
+  "er_diagram": {
+    "svg_xml": "passed",
+    "all_schema_tables_covered": true,
+    "non_user_non_self_fk_coverage": "passed",
+    "rendering": "Static SVG verification; browser rendering not performed",
+    "native_preview": "Quick Look thumbnails of the three standalone SVGs were generated and visually reviewed; the HTML document was not browser-rendered."
+  },
+  "examples": {
+    "both_catalogs_fields_fks_unique_keys": "passed",
+    "all_tables_have_examples": true,
+    "real_messages_checked": 4,
+    "real_note_count": 2,
+    "real_messages_per_note": [
+      2,
+      2
+    ],
+    "report_sections": 6,
+    "report_items": 40,
+    "external_reference_links": 69,
+    "verified_note_message_report_links": 8,
+    "source_hashes_and_anchors": "passed"
+  },
+  "sql_checks": {
+    "engine": "in-memory SQLite only; source catalogs copied into memory; isolated mutations use synthetic fixtures",
+    "passed": [
+      "All 11 documented SQL examples execute",
+      "Real prototype Note has two source messages",
+      "Real personal report returns six items",
+      "Both real events return original report placements without duplicates",
+      "All user-scoped queries exclude another user",
+      "Text plus image form one Note and return shared image description",
+      "Cross-conversation event query and reverse-message lookup deduplicate",
+      "Unassigned manual Note remains queryable with an empty membership set",
+      "Manual reassignment changes current reverse lookup, preserves Note sources and historical report placements/body",
+      "Manual empty membership remains protected against automatic insertion",
+      "Manual content and stale timestamp candidates are rejected by SQL write guards",
+      "Message–Note and Note–Event many-to-many fixtures succeed",
+      "Native FKs, unique event-note association and Note time interval constraints reject invalid rows"
+    ]
+  },
+  "scope": "Logical design plus Devify foundation cross-check. Local SQL/design checks remain separate from MariaDB production migration and Celery/browser acceptance.",
+  "implementation_cross_check": {
+    "models": "passed for implemented foundation models",
+    "apis": "passed for local API tests",
+    "local_test_count": 124,
+    "migration_runtime": "not run against MariaDB container",
+    "browser_acceptance": "not run"
+  }
+}

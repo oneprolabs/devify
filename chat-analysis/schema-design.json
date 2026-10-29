@@ -1,0 +1,1694 @@
+{
+  "version": "v0.20",
+  "date": "2026-10-29",
+  "status": "logical_design_with_devify_foundation_implemented",
+  "common_fields": [
+    "id",
+    "created_at",
+    "updated_at"
+  ],
+  "business_table_count": 19,
+  "tables": [
+    {
+      "name": "conversation",
+      "layer": "source",
+      "purpose": "原有聊天或邮件的内容容器，可以是群聊、私聊、一封邮件，或围绕邮件主题形成的会话。",
+      "design_basis": "微信导出已有 conversation.talker / display_name / type，WhatsApp 有 chat_jid / chat_name。因此身份和展示名必须分开：名称会变、同名不代表同会话。账号范围未在样本中完整核实，不能只凭群名跨账号合并。 用户明确：conversation 表达原有内容容器，邮件也可按主题作为一个 conversation 存在；不限定为即时聊天或多封邮件线程。",
+      "stored_effect": "按群名、对话名或邮件主题找到原有内容，并把消息与后续补充保留在对应容器中；这里保存来源组织方式，不承担事件分类。",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "ID",
+          "constraint": "FK → user",
+          "meaning": "会话归属用户"
+        },
+        {
+          "name": "platform",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "wechat / whatsapp / email / unknown"
+        },
+        {
+          "name": "source_namespace",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "已核实账号范围；缺失时使用临时导入范围"
+        },
+        {
+          "name": "source_conversation_id",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "talker、chat_jid、源邮件 ID 或邮件会话 ID"
+        },
+        {
+          "name": "identity_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "平台＋命名空间＋源会话 ID 的规范键；无源 ID 时使用导入范围键"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "原有群名、对话名或邮件主题，用于展示与查找"
+        },
+        {
+          "name": "kind",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "group / direct / mail / mail_thread / unknown，只描述来源容器"
+        },
+        {
+          "name": "timezone",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "默认时区；不能覆盖消息自带偏移"
+        },
+        {
+          "name": "self_sender_key",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "经核实的本人来源身份"
+        },
+        {
+          "name": "message_count",
+          "type": "BIGINT",
+          "constraint": "默认 0；派生缓存",
+          "meaning": "去重后的顶层记录数量"
+        },
+        {
+          "name": "last_message_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；派生缓存",
+          "meaning": "最近已知消息时间"
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "平台特有小属性；不放人员全集、任务、消息或事件分类"
+        }
+      ],
+      "constraints": [
+        "U1 唯一 (user_id, identity_key)",
+        "I1 (user_id, last_message_at, id)"
+      ],
+      "query_ids": [
+        "Q1",
+        "Q2",
+        "Q4"
+      ],
+      "write_rule": "源容器身份相同才追加；title 使用群名、对话名或邮件主题。单封邮件可用源邮件 ID，邮件会话可用线程 ID，不仅凭相同主题自动合并。邮件是本轮确认的概念范围，格式适配仍需样本验收。"
+    },
+    {
+      "name": "message",
+      "layer": "source",
+      "purpose": "原始聊天内容，保存每条原始消息；邮件场景下保存原始邮件内容。",
+      "design_basis": "用户明确：message 就是原始聊天内容。微信和 WhatsApp 的文字、图片、引用、转发及系统记录都应按来源保留；发送人、时间和源消息 ID 用于定位这些内容。微信大整数消息 ID 需无损保存，WhatsApp 可缺发送者 ID 或正文，不能因此丢掉原始消息。",
+      "stored_effect": "能够查看原始聊天内容，并按会话、发送人和时间定位；事件通过证据关联原始消息，提取结果与图片解释不会覆盖原始内容。",
+      "fields": [
+        {
+          "name": "conversation_id",
+          "type": "ID",
+          "constraint": "FK → conversation",
+          "meaning": "唯一的原始会话归属"
+        },
+        {
+          "name": "message_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "会话内幂等键"
+        },
+        {
+          "name": "source_message_id",
+          "type": "VARCHAR",
+          "constraint": "可空；无损解析",
+          "meaning": "源消息 ID，禁止先转 JavaScript Number 再转字符串"
+        },
+        {
+          "name": "record_kind",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "message / system / edit / revoke / unknown"
+        },
+        {
+          "name": "sender_key",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "来源稳定身份；不以同昵称认同一人"
+        },
+        {
+          "name": "sender_name",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "该消息当时的显示名"
+        },
+        {
+          "name": "direction",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "incoming / outgoing / unknown"
+        },
+        {
+          "name": "occurred_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "源时间不明则为空"
+        },
+        {
+          "name": "source_order",
+          "type": "BIGINT",
+          "constraint": "可空",
+          "meaning": "来源提供的可靠数值顺序"
+        },
+        {
+          "name": "ingest_seq",
+          "type": "BIGINT",
+          "constraint": "会话内递增",
+          "meaning": "发现新增与补录的入库顺序，不代替业务时间"
+        },
+        {
+          "name": "reply_to_message_id",
+          "type": "ID",
+          "constraint": "可空；FK → message",
+          "meaning": "已匹配的回复 / 编辑 / 撤回目标"
+        },
+        {
+          "name": "target_source_id",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "目标未导入时仍保留源 ID"
+        },
+        {
+          "name": "relation_kind",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "reply / edit / revoke"
+        },
+        {
+          "name": "source_fields",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "原 type / subtype、原时间 / 精度 / 排序值；不复制 raw XML"
+        },
+        {
+          "name": "normalization_state",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "waiting / ready / partial / failed"
+        }
+      ],
+      "constraints": [
+        "U2 唯一 (conversation_id, message_key)",
+        "U3 唯一 (conversation_id, ingest_seq)",
+        "I2 (conversation_id, occurred_at, id)",
+        "I3 (conversation_id, sender_key, occurred_at)；I4 (reply_to_message_id)"
+      ],
+      "query_ids": [
+        "Q2",
+        "Q5",
+        "Q6"
+      ],
+      "write_rule": "有稳定 ID 时包含真实修订标识生成键；无 ID 时原文件哈希＋记录定位只保证同文件重试幂等。不同文件的同文同秒消息不强合并。先按 message 分页，再批量取部件，避免 JOIN 导致一条消息重复分页。"
+    },
+    {
+      "name": "message_part",
+      "layer": "source",
+      "purpose": "原始消息内部的有序内容组成，包括文字、图片、引用与转发子条目。",
+      "design_basis": "微信不是统一文本结构：Text / Quote / Image / MergedMessages 各有不同内容。实际一条合并转发的 XML 中含 4 个文本子条目和 1 个图片子条目。附件列表不能表达原始顺序、嵌套与缺图；媒体路径也不等于服务器上已有文件。",
+      "stored_effect": "与 message 共同还原原始聊天内容；原文按顺序展示，事件可定位到其中某张图片或转发子条目，缺失附件有明确标记。",
+      "fields": [
+        {
+          "name": "message_id",
+          "type": "ID",
+          "constraint": "FK → message",
+          "meaning": "所属顶层消息"
+        },
+        {
+          "name": "part_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "解析器产生的稳定部件键"
+        },
+        {
+          "name": "parent_part_id",
+          "type": "ID",
+          "constraint": "可空；FK → message_part",
+          "meaning": "同消息内父节点，禁止成环"
+        },
+        {
+          "name": "ordinal",
+          "type": "INT",
+          "constraint": "非负",
+          "meaning": "同级展示顺序"
+        },
+        {
+          "name": "kind",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "text / image / video / audio / file / quote / forwarded_item / unknown"
+        },
+        {
+          "name": "text",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "原文或 caption；不填入图片推理结果"
+        },
+        {
+          "name": "file_id",
+          "type": "ID",
+          "constraint": "可空；FK → file_asset",
+          "meaning": "已经持久化的媒体文件"
+        },
+        {
+          "name": "upload_item_id",
+          "type": "ID",
+          "constraint": "可空；FK → upload_item",
+          "meaning": "本次实际附件条目；file_id 须与条目一致"
+        },
+        {
+          "name": "binding_state",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "available / missing / omitted / unsupported / unresolved；文本为 available"
+        },
+        {
+          "name": "source_locator",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "包内路径、源媒体标识、XML 节点定位"
+        },
+        {
+          "name": "source_header",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "转发 / 引用子条目的原发送者、时间、源 ID"
+        }
+      ],
+      "constraints": [
+        "U4 唯一 (message_id, part_key)",
+        "I5 (message_id, parent_part_id, ordinal, id)",
+        "I6 (file_id, message_id)"
+      ],
+      "query_ids": [
+        "Q2",
+        "Q5",
+        "Q7"
+      ],
+      "write_rule": "同图在不同消息中保留不同部件，只共享 file_id。基础描述通过 file_processing.file_id 查询，取消部件上的冗余 selected_processing_id。转发子条目不伪装为当前群的新顶层消息。"
+    },
+    {
+      "name": "message_origin",
+      "layer": "source",
+      "purpose": "一条规范消息在一次导入中的原始文件位置。",
+      "design_basis": "同一聊天可能多次导出并重叠；一条消息可有多个导入出处。将 origins 数组塞在 message 中会持续增长，也难以从上传文件反查消息。原始 XML 中未解析的信息仍需有恢复入口。",
+      "stored_effect": "从事件结论一路查到原导出文件与具体记录；重复上传增加出处，不重复已有稳定身份的消息。",
+      "fields": [
+        {
+          "name": "message_id",
+          "type": "ID",
+          "constraint": "FK → message",
+          "meaning": "规范消息"
+        },
+        {
+          "name": "upload_item_id",
+          "type": "ID",
+          "constraint": "FK → upload_item",
+          "meaning": "原始聊天文件，非图片附件"
+        },
+        {
+          "name": "locator_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "文件内记录定位键"
+        },
+        {
+          "name": "record_locator",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "记录序号、JSON Pointer 或行范围"
+        },
+        {
+          "name": "parser_version",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "定位及规范化规则版本"
+        }
+      ],
+      "constraints": [
+        "U5 唯一 (upload_item_id, locator_key, parser_version)",
+        "I7 (message_id, upload_item_id)"
+      ],
+      "query_ids": [
+        "Q5",
+        "Q10"
+      ],
+      "write_rule": "消息、部件、出处与解析检查点在同一事务提交。改变解析器时仍核对源消息身份；不因解析版本改变重新制造消息。"
+    },
+    {
+      "name": "file_asset",
+      "layer": "media",
+      "purpose": "全局仅一份的原文件字节，图片和原始聊天文件均可使用。",
+      "design_basis": "用户确认首版按用户管理图片，但底层相同图片只存一份。微信 Image 仅有 md5，WhatsApp media_path 只是本机定位，均不能替代已经上传并校验的文件。",
+      "stored_effect": "用户引用各自保留，存储空间按真实文件字节复用；原图和来源文件可追溯。",
+      "fields": [
+        {
+          "name": "sha256",
+          "type": "CHAR(64)",
+          "constraint": "服务端计算",
+          "meaning": "真实内容哈希"
+        },
+        {
+          "name": "byte_size",
+          "type": "BIGINT",
+          "constraint": "非负",
+          "meaning": "真实字节数"
+        },
+        {
+          "name": "file_url",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "持久对象地址，不存签名 URL 或凭证"
+        },
+        {
+          "name": "state",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "writing / ready / failed / deleting"
+        },
+        {
+          "name": "media_kind",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "image / text / audio / video / file / unknown；chat_record 用途只在 upload_item.role"
+        },
+        {
+          "name": "mime_type",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "校验后的媒体类型"
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "宽高、时长等文件固有属性"
+        }
+      ],
+      "constraints": [
+        "U6 唯一 (sha256, byte_size)"
+      ],
+      "query_ids": [
+        "Q7",
+        "Q10"
+      ],
+      "write_rule": "首版只按相同字节去重；不做相似图、压缩图或裁剪图合并。归属沿用户上传 / 消息引用判断，不能凭 file_id 或哈希访问他人文件。"
+    },
+    {
+      "name": "file_processing",
+      "layer": "media",
+      "purpose": "一张图片识别一次的不带上下文的基础描述。",
+      "design_basis": "用户确认图片内容描述可统一复用，而“为什么在此对话发图”在 events 中判断。二者若共用一个描述字段，某次聊天的解释会污染其他上下文并导致重复识图。",
+      "stored_effect": "新消息只增加引用，已成功的图片描述直接复用；事件通常只读对话和文字描述，不重复发送原图。",
+      "fields": [
+        {
+          "name": "file_id",
+          "type": "ID",
+          "constraint": "FK → file_asset；唯一",
+          "meaning": "同一图片唯一一条处理记录"
+        },
+        {
+          "name": "state",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "pending / running / succeeded / failed"
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "图片中有什么、可辨文字；不包含聊天用途推断"
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "最近一次错误"
+        },
+        {
+          "name": "finished_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "成功完成时间"
+        }
+      ],
+      "constraints": [
+        "U7 唯一 (file_id)"
+      ],
+      "query_ids": [
+        "Q5",
+        "Q7"
+      ],
+      "write_rule": "成功结果直接复用，失败重试原记录；并发原子领取一条处理记录。恢复执行依托现有任务运行器，不另设计图片多规格、多模型或版本管理。用户原 caption 留在 message_part.text，图片在上下文中的用途写 note.content。"
+    },
+    {
+      "name": "note",
+      "layer": "event",
+      "purpose": "一段聊天围绕一件事情形成的阶段性摘要；可由多条消息共同支撑，独立于事件保存。",
+      "design_basis": "用户确认先整理范围内的聊天，再规划事件并关联历史。原过程记录必须先有事件，无法表达已总结但尚未确定归属的信息；因此把摘要独立成 Note。粒度是一段有意义的上下文归纳，不是每句话或每个动作。",
+      "stored_effect": "先形成可回溯的摘要，即使尚无事件也可查询；同一段聊天涉及不同事情时分别形成摘要。自动总结与人工整理使用同一结构。",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "ID",
+          "constraint": "FK → user",
+          "meaning": "摘要所属用户"
+        },
+        {
+          "name": "note_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "用户内稳定幂等键，与事件归属及模型版本解耦；首次提取分配、重试复用"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "本段摘要的简短标题"
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "constraint": "必填",
+          "meaning": "阶段性归纳，保留诉求、承诺、观点、风险、进展或结果及必要上下文；不等同于已验证事实"
+        },
+        {
+          "name": "start_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "摘要内容明确涉及的业务时间起点；未知留空，不以生成时间代替"
+        },
+        {
+          "name": "end_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC；有值时 start_at 非空且 end_at ≥ start_at",
+          "meaning": "业务时间终点；单时点可与 start_at 相同，有起止时须 end_at ≥ start_at"
+        },
+        {
+          "name": "origin",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "auto / manual；人工新增或编辑当前摘要后记 manual，自动任务不覆盖人工内容"
+        },
+        {
+          "name": "assignment_mode",
+          "type": "VARCHAR",
+          "constraint": "默认 auto",
+          "meaning": "auto / manual；manual 固定当前完整事件关联集合，也可确认暂不归属任何事件"
+        },
+        {
+          "name": "analysis_job_id",
+          "type": "ID",
+          "constraint": "可空；FK → analysis_job",
+          "meaning": "自动提取的来源任务；人工后续编辑仍保留最初任务线索"
+        }
+      ],
+      "constraints": [
+        "U9 唯一 (user_id, note_key)",
+        "I14 (user_id, start_at, id)",
+        "I15 (analysis_job_id, id)",
+        "I31 (user_id, assignment_mode, id)"
+      ],
+      "query_ids": [
+        "Q5",
+        "Q6",
+        "Q8",
+        "Q10",
+        "Q13"
+      ],
+      "write_rule": "先在固定输入范围内生成摘要与真实来源并持久化，再组织范围内事件、检索历史关联。自动摘要至少关联一条真实消息，人工新增允许无消息来源并明确 origin=manual。键不包含 event_id，重试使用稳定提取项映射，不按标题或正文去重；不同任务的语义重复仍需检索判断。业务时间不明可全空，仅知起点可 end_at 为空，不写虚构时间。自动重跑先检查当前 origin 和 assignment_mode；人工内容与人工确认的归属集合都只能提出建议，不直接覆盖。"
+    },
+    {
+      "name": "note_message",
+      "layer": "event",
+      "purpose": "一份信息摘要与其原始消息的多对多关联，可定位到消息中的具体部件。",
+      "design_basis": "N 条消息可共同支撑一份 Note，一条消息也可涉及多个 Note；图片属于消息部件。关联表直接以 Note 和 Message 命名，比泛称来源更容易理解。依据应随摘要保留，不随事件归属移动。",
+      "stored_effect": "从摘要回到聊天原文或图片，也能从消息反查摘要及事件；没有关联就返回空。图片上下文解释写在 note.content，共享图片描述不受影响。",
+      "fields": [
+        {
+          "name": "note_id",
+          "type": "ID",
+          "constraint": "FK → note",
+          "meaning": "对应哪份阶段性摘要"
+        },
+        {
+          "name": "message_id",
+          "type": "ID",
+          "constraint": "FK → message",
+          "meaning": "实际存在且与摘要属于同一用户的原消息"
+        },
+        {
+          "name": "message_part_id",
+          "type": "ID",
+          "constraint": "可空；FK → message_part",
+          "meaning": "具体文字或图片部件，必须属于该消息；为空表示引用整条消息"
+        },
+        {
+          "name": "reference_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "消息 ID＋部件 ID 或 whole 的规范键，避免同一摘要重复引用"
+        }
+      ],
+      "constraints": [
+        "U11 唯一 (note_id, reference_key)",
+        "I17 (message_id, note_id)",
+        "I18 (message_part_id, note_id)"
+      ],
+      "query_ids": [
+        "Q4",
+        "Q5",
+        "Q6",
+        "Q7"
+      ],
+      "write_rule": "提取时同时保留确切消息 ID，不能事后凭摘要相似度补造依据。部件必须属于消息，所有引用须在摘要用户可访问范围内。原 caption 与消息正文保持原样。人工修订来源时重新归纳该 Note 及关联事件，并按原有人工保护规则提交；调整事件归属不改这张表。"
+    },
+    {
+      "name": "event",
+      "layer": "event",
+      "purpose": "围绕同一件事情组织相关 Note，保存整体总结、当前状态与业务时间，作为持续追踪入口。",
+      "design_basis": "一段聊天先形成阶段性摘要，再将围绕同一件事情的摘要串联为 Event。Event 是跨片段持续维护的事情，Note 是各阶段的信息；同类或同项目通过标签归类，不直接认定为同一事件。",
+      "stored_effect": "打开事件可读整体情况，再查看由 Note 形成的时间线并回到原消息；归属调整后重整当前总结，报告保存当时结果。",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "ID",
+          "constraint": "FK → user",
+          "meaning": "事件所属用户"
+        },
+        {
+          "name": "event_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "稳定事件键，创建重试不重复建事件"
+        },
+        {
+          "name": "conversation_id",
+          "type": "ID",
+          "constraint": "可空；FK → conversation",
+          "meaning": "主要来源容器提示；人工无来源或跨会话场景可空，真实来源沿 Note 查消息"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "从对话中挖掘出的事件名称"
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "constraint": "必填",
+          "meaning": "当前关联摘要的整体归纳与必要背景，不存完整时间线或原消息数组"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "open / in_progress / done；NULL 表示事件信息无完成进度要求，不代表已完成"
+        },
+        {
+          "name": "opened_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "关联摘要中最早明确业务时间；未知或无关联时为空"
+        },
+        {
+          "name": "last_activity_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "关联摘要中最近明确业务时间；取 end_at，缺终点则取 start_at，不用 created_at 代替"
+        }
+      ],
+      "constraints": [
+        "U8 唯一 (user_id, event_key)",
+        "I8 (user_id, status, last_activity_at, id)",
+        "I11 (user_id, conversation_id, last_activity_at, id)"
+      ],
+      "query_ids": [
+        "Q3",
+        "Q4",
+        "Q5",
+        "Q8"
+      ],
+      "write_rule": "先提取并保存 Note 与 note_message，再判断范围内组织与历史匹配；明确同一件事才复用事件，不按标题相似度强合并。事件和 event_note 一起提交；内容、状态与起止业务时间根据当前关联摘要综合更新，不能把某份 Note 的局部完成直接复制为整个事件完成，也不能按最后写入摘要判状态。人工新增或纠正通过 Note 保存，事件正文为这些摘要的当前归纳。无关联的事件保留 ID 以供历史引用，当前状态与业务时间清空、正文注明暂无关联摘要，不自动标已完成或删除。"
+    },
+    {
+      "name": "event_note",
+      "layer": "event",
+      "purpose": "事件与信息摘要的多对多关联，表达当前有哪些摘要归属这件事。",
+      "design_basis": "同一件事情跨片段、跨日期或跨会话发展。摘要先独立保存，再确认属于哪件事；同一项目或同类事项不自动合并。一份摘要确实同时支撑多个事件时允许复用。",
+      "stored_effect": "归错时调整关联即可；拆分或归并事件可重新组织摘要。时间线按关联 Note 的业务时间形成，不再维护独立 Step 记录。",
+      "fields": [
+        {
+          "name": "event_id",
+          "type": "ID",
+          "constraint": "FK → event",
+          "meaning": "被持续跟踪的事情"
+        },
+        {
+          "name": "note_id",
+          "type": "ID",
+          "constraint": "FK → note",
+          "meaning": "关联的信息摘要；须与事件属于同一用户"
+        }
+      ],
+      "constraints": [
+        "U10 唯一 (event_id, note_id)",
+        "I16 (note_id, event_id)"
+      ],
+      "query_ids": [
+        "Q4",
+        "Q5",
+        "Q6",
+        "Q8",
+        "Q13"
+      ],
+      "write_rule": "手动调整以一份 Note 的完整关联集合为单位：校验同用户与候选，锁定 Note 及按 ID 排序的受影响事件，更新关联并置 assignment_mode=manual，即使移除全部归属也保留此标记。自动关联遇 manual 时跳过写入，只提供建议；用户明确恢复自动后才可自动改动。摘要、关联、事件总结/状态/业务时间按受影响范围一起提交；候选在事务外生成，提交时核对 updated_at 与读取的关联集合，变化则重新归纳，不持锁调用模型。调整不重建 Note 或 note_message，也不改已生成报告的历史归属。"
+    },
+    {
+      "name": "event_tag",
+      "layer": "event",
+      "purpose": "一件事件的一个标签，用于后续按主题查询。",
+      "design_basis": "标签是用户需要的统一查询入口，单独保存便于查标签与状态的交集；不预建项目分类树，也不把标签关系混入事件正文。",
+      "stored_effect": "能查询 CPF 等标签下的事件、未完成事项，并复用同一条件生成主题订阅报告。",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "ID",
+          "constraint": "FK → user",
+          "meaning": "须与 event.user_id 一致，支持用户范围内标签查询"
+        },
+        {
+          "name": "event_id",
+          "type": "ID",
+          "constraint": "FK → event",
+          "meaning": "被标记的事件"
+        },
+        {
+          "name": "tag_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "用户范围内规范标签键；不同简称不自动合并"
+        },
+        {
+          "name": "label",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "展示名称"
+        }
+      ],
+      "constraints": [
+        "U13 唯一 (user_id, event_id, tag_key)",
+        "I20 (user_id, tag_key, event_id)"
+      ],
+      "query_ids": [
+        "Q4",
+        "Q9"
+      ],
+      "write_rule": "保存当前标签关联，添加与移除直接维护这张表；不改变事件身份、状态和原消息。首版不做标签审核、锁定或历史审计。"
+    },
+    {
+      "name": "topic_subscription",
+      "layer": "report",
+      "purpose": "一个用户保存的关注问题、筛选条件和整理周期。",
+      "design_basis": "产品已确定“报告”和“主题订阅”为入口，且订阅由用户添加；此前只有全局 AppConfig，无法保存每人的主题、启停和执行规则，因此补独立用户规则表。",
+      "stored_effect": "同一事件库可以按不同用户关注范围生成专题报告，不必预先重组原始聊天或复制事件。",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "ID",
+          "constraint": "FK → user",
+          "meaning": "规则所属用户"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "订阅主题名称"
+        },
+        {
+          "name": "instruction",
+          "type": "TEXT",
+          "constraint": "必填",
+          "meaning": "本主题希望如何归纳，交给事件读取后的报告任务"
+        },
+        {
+          "name": "filters",
+          "type": "JSON",
+          "constraint": "固定查询条件",
+          "meaning": "conversation_ids、tag_keys、keywords；不存命中消息 / 事件清单"
+        },
+        {
+          "name": "include_open",
+          "type": "BOOL",
+          "constraint": "默认 true",
+          "meaning": "同时纳入范围内全部未完成及待跟踪事项"
+        },
+        {
+          "name": "period",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "day / week / month"
+        },
+        {
+          "name": "time_local",
+          "type": "TIME",
+          "constraint": "必填",
+          "meaning": "用户当地执行时间"
+        },
+        {
+          "name": "timezone",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "IANA 时区，例如 Asia/Shanghai"
+        },
+        {
+          "name": "week_day",
+          "type": "INT",
+          "constraint": "可空；1—7",
+          "meaning": "仅周报有效，1 为周一"
+        },
+        {
+          "name": "month_day",
+          "type": "INT",
+          "constraint": "可空；1—28",
+          "meaning": "仅月报有效，避免短月不存在日期"
+        },
+        {
+          "name": "enabled",
+          "type": "BOOL",
+          "constraint": "默认 false",
+          "meaning": "用户启停"
+        },
+        {
+          "name": "rule_version",
+          "type": "INT",
+          "constraint": "初始 1",
+          "meaning": "修改规则递增，用于报告保存当时规则"
+        }
+      ],
+      "constraints": [
+        "I21 (user_id, enabled, id)"
+      ],
+      "query_ids": [
+        "Q9"
+      ],
+      "write_rule": "空 filters 表示本用户全部事件；不同筛选维度取 AND，同维度多值取 OR。conversation_ids 按“有效证据涉及的原会话”筛选，不只按主会话；tag_keys 用 event_tag，keywords 用有说明的检索策略。保存及执行均校验用户权限。首版运行器按少量启用规则计算执行点，不加独立计划表。"
+    },
+    {
+      "name": "report",
+      "layer": "report",
+      "purpose": "每次生成报告持久化一条 report 记录，保存所属用户、完整正文及生成时的快照。",
+      "design_basis": "真实日报有 6 个栏目、40 个条目，同一事件可跨栏目出现，一个条目也可概括多个事件。事件由 Note 组织，报告冻结事件、摘要与来源的当时内容；完整正文和结构化条目分别支持历史展示与查询。",
+      "stored_effect": "可以原样打开已保存报告，也可直接查询某份报告的 personal 栏目、一个条目的建议和来源。栏目、条目与关联均属于该次报告，不回写成事件状态或全局负责人。",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "ID",
+          "constraint": "FK → user",
+          "meaning": "报告所属用户"
+        },
+        {
+          "name": "subscription_id",
+          "type": "ID",
+          "constraint": "可空；FK → topic_subscription",
+          "meaning": "专题来源；普通报告为空"
+        },
+        {
+          "name": "request_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "计划身份＋计划触发 UTC 时点；导入已有报告时用 import＋内容哈希；按用户唯一"
+        },
+        {
+          "name": "previous_report_id",
+          "type": "ID",
+          "constraint": "可空；FK → report",
+          "meaning": "主动补跑生成新版本时的旧报告"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "报告标题"
+        },
+        {
+          "name": "period",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "day / week / month"
+        },
+        {
+          "name": "start_at",
+          "type": "TIMESTAMP",
+          "constraint": "UTC；必填",
+          "meaning": "期间开始，包含"
+        },
+        {
+          "name": "end_at",
+          "type": "TIMESTAMP",
+          "constraint": "UTC；必填",
+          "meaning": "期间结束，不包含"
+        },
+        {
+          "name": "timezone",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "期间边界对应的用户时区"
+        },
+        {
+          "name": "as_of_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；冻结后固定",
+          "meaning": "全量待跟踪事项的基准时点"
+        },
+        {
+          "name": "knowledge_cutoff",
+          "type": "TIMESTAMP",
+          "constraint": "可空；冻结后固定",
+          "meaning": "本次允许使用的已提交知识边界"
+        },
+        {
+          "name": "scheduled_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "计划触发时间，不等于生成完成时间"
+        },
+        {
+          "name": "state",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "queued / generating / ready / partial / failed"
+        },
+        {
+          "name": "rule_snapshot",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "本次订阅规则版本、关注要求、筛选与时间设置"
+        },
+        {
+          "name": "body_format",
+          "type": "VARCHAR",
+          "constraint": "默认 markdown",
+          "meaning": "markdown / html；依据实际格式渲染，导入报告保留 HTML 正文"
+        },
+        {
+          "name": "body",
+          "type": "TEXT",
+          "constraint": "生成中可空；ready / partial 时必填",
+          "meaning": "完整报告正文，格式由 body_format 决定；生成与导入均持久化，详情不重新调用模型"
+        },
+        {
+          "name": "source_info",
+          "type": "JSON",
+          "constraint": "可空；固定来源信息",
+          "meaning": "kind、origin_url、local_path、source_base、sha256；保存导入报告出处，不放完整条目或聊天正文"
+        },
+        {
+          "name": "content",
+          "type": "JSON",
+          "constraint": "可空；轻量结构化辅助信息",
+          "meaning": "section_count、item_count 及可确定的业务指标；条目数不当作事件数，不存栏目 / 条目大数组"
+        },
+        {
+          "name": "snapshot_ref",
+          "type": "JSON",
+          "constraint": "可空；固定对象引用",
+          "meaning": "url、sha256、schema_version、item_count；完整冻结输入，含事件、Note 内容、event_note 归属及原消息来源"
+        },
+        {
+          "name": "processing",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "模型 / 提示版本和当前阶段；不存尝试历史"
+        },
+        {
+          "name": "generated_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "实际完成时间；导入报告无法核实时留空，不以资料截止时点代替"
+        }
+      ],
+      "constraints": [
+        "U14 唯一 (user_id, request_key)",
+        "I22 (user_id, period, generated_at, id)",
+        "I23 (user_id, subscription_id, generated_at, id)"
+      ],
+      "query_ids": [
+        "Q5",
+        "Q8",
+        "Q9",
+        "Q11",
+        "Q12"
+      ],
+      "write_rule": "生成时先确定栏目、条目及其来源，再渲染 body；正文、结构化记录、轻量计数、输入快照与完成状态一并提交，不能只保存其中一份。导入已有 HTML 时保留原文，再提取栏目 / 条目；没有底层输入快照则 snapshot_ref 留空并注明核对范围；未匹配到底层事件的来源先以 reference 类型保存。ready / partial 必须有正文，旧报告保持不变；当前 Note 内容或归属变化不回写报告来源的当时事件上下文。HTML 按内容格式展示，不执行导入页脚本。"
+    },
+    {
+      "name": "report_section",
+      "layer": "report",
+      "purpose": "一份报告中的一个有序栏目，例如“需要你跟进的事”。",
+      "design_basis": "真实报告有 risks、today、personal、done、ongoing、other 六个栏目；标题可变，但程序需要稳定栏目键查询，不能只从 body 的标题临时切字符串。",
+      "stored_effect": "可按 report_id＋section_key 定位个人跟进或已完成栏目，并按 position 恢复原报告顺序。",
+      "fields": [
+        {
+          "name": "report_id",
+          "type": "ID",
+          "constraint": "FK → report",
+          "meaning": "所属报告"
+        },
+        {
+          "name": "section_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "本次报告内稳定键，如 personal；允许自定义，不是事件类型"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "当次栏目标题"
+        },
+        {
+          "name": "position",
+          "type": "INT",
+          "constraint": "正整数",
+          "meaning": "栏目展示顺序"
+        }
+      ],
+      "constraints": [
+        "U19 唯一 (report_id, section_key)",
+        "I28 (report_id, position, id)"
+      ],
+      "query_ids": [
+        "Q8",
+        "Q11"
+      ],
+      "write_rule": "栏目与报告一起保存；不把栏目做成 event 分类。一条事件可在多个栏目中被不同角度描述。"
+    },
+    {
+      "name": "report_item",
+      "layer": "report",
+      "purpose": "报告栏目中的一条内容，保存该次归纳后的描述、提示和建议。",
+      "design_basis": "真实 personal 条目同时有标题、正文、侧边提示和 personal-next；today 有时间与对接说明，risks 有强调样式。它们是报告视图，不能直接当成原消息、正式指派或事件严重程度。",
+      "stored_effect": "可单独读取、展示或检索某一条个人跟进内容，同时保留原报告的次序与措辞。",
+      "fields": [
+        {
+          "name": "section_id",
+          "type": "ID",
+          "constraint": "FK → report_section",
+          "meaning": "所属栏目"
+        },
+        {
+          "name": "position",
+          "type": "INT",
+          "constraint": "正整数",
+          "meaning": "栏目内顺序"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "该条报告标题，不覆盖 event.title"
+        },
+        {
+          "name": "summary",
+          "type": "TEXT",
+          "constraint": "必填",
+          "meaning": "原报告归纳段落，可能包含分析；不是 Message 原文"
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "原报告侧边提示，例如“原型待重新评审”"
+        },
+        {
+          "name": "time_text",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "报告原有时间表达；如“先核对时间 18:00–19:00”，不擅自转成确定日程"
+        },
+        {
+          "name": "contact_text",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "报告中的对接说明，保留“建议”等限定，不自动成为全局负责人"
+        },
+        {
+          "name": "followup_text",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "原报告下一步或补充状态说明"
+        },
+        {
+          "name": "followup_kind",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "source_explicit / report_suggestion / status_note / mixed / unknown；没有原消息核对不能标 source_explicit"
+        },
+        {
+          "name": "display_kind",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "当次展示方式，如 critical、task、personal-item、week-item；不代表事件状态"
+        }
+      ],
+      "constraints": [
+        "U20 唯一 (section_id, position)"
+      ],
+      "query_ids": [
+        "Q8",
+        "Q11",
+        "Q12"
+      ],
+      "write_rule": "同一栏目内逐条保存；一条内容可以关联多个事件，不能强设单一 event_id。导入时保留原文字，不把建议写成已确认承诺；后续改变事件不修改已生成条目。"
+    },
+    {
+      "name": "report_item_source",
+      "layer": "report",
+      "purpose": "报告条目到事件、摘要、摘要原文关联或外部来源链接的引用。",
+      "design_basis": "报告条目可概括多个事件，并引用各阶段 Note 及原消息；外部来源区块可能含多条摘录，不能冒充某条原消息。报告记录保存时的事件上下文，不能随日后人工调整归属而改变。",
+      "stored_effect": "从报告读出当时引用的事件与摘要，必要时继续回到原消息；当前归属已变时仍保留历史报告的原意。",
+      "fields": [
+        {
+          "name": "report_item_id",
+          "type": "ID",
+          "constraint": "FK → report_item",
+          "meaning": "所属报告条目"
+        },
+        {
+          "name": "reference_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "类型＋目标对象＋必要事件上下文的稳定键"
+        },
+        {
+          "name": "source_kind",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "event / note / note_message / reference"
+        },
+        {
+          "name": "event_id",
+          "type": "ID",
+          "constraint": "可空；FK → event",
+          "meaning": "event 类型必填；note / note_message 可记录生成时事件上下文，后续归属变化不回写"
+        },
+        {
+          "name": "note_id",
+          "type": "ID",
+          "constraint": "可空；FK → note",
+          "meaning": "note / note_message 类型必填；摘要当前内容可能后续修订"
+        },
+        {
+          "name": "note_message_id",
+          "type": "ID",
+          "constraint": "可空；FK → note_message",
+          "meaning": "note_message 类型必填，且该关联属于 note_id"
+        },
+        {
+          "name": "reference_url",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "reference 类型必填，其余类型为空；相对链接按 report.source_info.source_base 解析"
+        },
+        {
+          "name": "label",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "原报告中的原文链接展示文字"
+        }
+      ],
+      "constraints": [
+        "U21 唯一 (report_item_id, reference_key)",
+        "I29 (event_id, report_item_id)",
+        "I30 (note_message_id, report_item_id)",
+        "I32 (note_id, report_item_id)"
+      ],
+      "query_ids": [
+        "Q5",
+        "Q11",
+        "Q12"
+      ],
+      "write_rule": "source_kind=event 时只填 event_id；note 时填 note_id；note_message 时填 note_id 和 note_message_id，二者必须一致。note / note_message 可另外保存生成时 event_id 上下文，保存时须有对应 event_note，同用户；reference 只填 reference_url。仅在保存时校验归属，后续移归不回写历史上下文。对象 ID 用于跳转当前内容，报告当时的措辞与归属以已保存 body、条目及生成快照为准。仍被报告引用的摘要及原文关联不可硬删除。"
+    },
+    {
+      "name": "upload_batch",
+      "layer": "operations",
+      "purpose": "一次用户压缩包上传与整体处理进度。",
+      "design_basis": "一个导出包可含多个聊天文件和媒体，一次上传不等于一个会话；上传成功也不等于内容已解析。因此批次身份和内容身份分开。",
+      "stored_effect": "展示本次上传是否完成、缺什么以及能否恢复；可从原始出处定位哪次上传。",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "ID",
+          "constraint": "FK → user",
+          "meaning": "上传者"
+        },
+        {
+          "name": "request_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "用户上传请求幂等键"
+        },
+        {
+          "name": "filename",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "上传原名"
+        },
+        {
+          "name": "archive_url",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "已确认原包地址；暂存清理后可空"
+        },
+        {
+          "name": "object_version",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "固定处理对象版本"
+        },
+        {
+          "name": "declared_bytes",
+          "type": "BIGINT",
+          "constraint": "必填",
+          "meaning": "申报大小"
+        },
+        {
+          "name": "actual_bytes",
+          "type": "BIGINT",
+          "constraint": "可空",
+          "meaning": "核验后大小"
+        },
+        {
+          "name": "archive_sha256",
+          "type": "CHAR(64)",
+          "constraint": "可空",
+          "meaning": "完整原包校验"
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "本次平台、账号命名空间、导出版本、时区来源与限制快照"
+        },
+        {
+          "name": "state",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "uploading / queued / processing / ready / partial / failed"
+        },
+        {
+          "name": "progress",
+          "type": "JSON",
+          "constraint": "固定计数",
+          "meaning": "enumerated、discovered_count、done_count、failed_count"
+        },
+        {
+          "name": "checkpoint",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "枚举阶段恢复点，不存文件 / 日志数组"
+        },
+        {
+          "name": "confirmed_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "直传核验完成"
+        },
+        {
+          "name": "finished_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "本批次处理结束"
+        },
+        {
+          "name": "archive_purged_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "暂存原包清理时间"
+        },
+        {
+          "name": "lease_owner",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "当前执行者"
+        },
+        {
+          "name": "lease_until",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "可恢复领取的到期时间"
+        },
+        {
+          "name": "fencing_token",
+          "type": "BIGINT",
+          "constraint": "递增",
+          "meaning": "拒绝旧执行者提交"
+        },
+        {
+          "name": "attempts",
+          "type": "INT",
+          "constraint": "默认 0",
+          "meaning": "累计尝试次数"
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "最近错误，不是历史数组"
+        }
+      ],
+      "constraints": [
+        "U15 唯一 (user_id, request_key)",
+        "I24 (user_id, created_at, id)"
+      ],
+      "query_ids": [
+        "Q10"
+      ],
+      "write_rule": "原包直传对象存储，确认所属对象、实际大小及格式后处理；路径与对象版本固定。枚举未结束不能判完成；不支持、失败和缺图均列缺口。"
+    },
+    {
+      "name": "upload_item",
+      "layer": "operations",
+      "purpose": "一个包内文件及其可恢复处理进度；同时保留用户文件引用。",
+      "design_basis": "微信 media_files、WhatsApp media_path 要绑定实际包内文件，原聊天文件也必须保留；靠附件文件名或全局哈希无法证明哪个用户上传过文件。",
+      "stored_effect": "按用户找到原文件 / 图片的合法引用，按文件恢复处理；无需新增用户图片表。",
+      "fields": [
+        {
+          "name": "batch_id",
+          "type": "ID",
+          "constraint": "FK → upload_batch",
+          "meaning": "所属上传"
+        },
+        {
+          "name": "entry_path",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "规范包内路径，防路径穿越"
+        },
+        {
+          "name": "role",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "chat_record / attachment / unknown"
+        },
+        {
+          "name": "file_id",
+          "type": "ID",
+          "constraint": "可空；FK → file_asset",
+          "meaning": "文件持久化后填写"
+        },
+        {
+          "name": "original_name",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "用户原文件名"
+        },
+        {
+          "name": "state",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "pending / running / waiting / done / failed / skipped"
+        },
+        {
+          "name": "stage",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "当前解析阶段"
+        },
+        {
+          "name": "checkpoint",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "记录游标 / 已提交数 / 解析器版本"
+        },
+        {
+          "name": "result",
+          "type": "JSON",
+          "constraint": "固定摘要",
+          "meaning": "处理计数、完整性缺口与较大结果引用；不存全部消息 ID"
+        },
+        {
+          "name": "finished_at",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "处理结束时间"
+        },
+        {
+          "name": "lease_owner",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "当前执行者"
+        },
+        {
+          "name": "lease_until",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "可恢复领取的到期时间"
+        },
+        {
+          "name": "fencing_token",
+          "type": "BIGINT",
+          "constraint": "递增",
+          "meaning": "拒绝旧执行者提交"
+        },
+        {
+          "name": "attempts",
+          "type": "INT",
+          "constraint": "默认 0",
+          "meaning": "累计尝试次数"
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "最近错误，不是历史数组"
+        }
+      ],
+      "constraints": [
+        "U16 唯一 (batch_id, entry_path)",
+        "I25 (batch_id, state, id)",
+        "I26 (file_id, batch_id)"
+      ],
+      "query_ids": [
+        "Q7",
+        "Q10"
+      ],
+      "write_rule": "正式文件落库完成后再绑定；允许同一字节被多个用户条目引用。删除只解除自己的引用，有其他引用或报告保留依赖时不回收底层对象。"
+    },
+    {
+      "name": "analysis_job",
+      "layer": "operations",
+      "purpose": "一次从固定消息窗口提取摘要、组织事件并寻找历史关联的整理任务。",
+      "design_basis": "任务会重试、补录与等待识图，生命周期不同于原会话；放入 conversation.analysis 会混淆业务来源和执行状态。",
+      "stored_effect": "分别知道摘要是否已提取、事件是否已组织；摘要可先落库，关联失败后可恢复，不必再次解析原消息。",
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "ID",
+          "constraint": "FK → user",
+          "meaning": "执行范围"
+        },
+        {
+          "name": "conversation_id",
+          "type": "ID",
+          "constraint": "FK → conversation",
+          "meaning": "主要新输入会话"
+        },
+        {
+          "name": "request_key",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "本次窗口与输入表示的幂等键"
+        },
+        {
+          "name": "start_seq",
+          "type": "BIGINT",
+          "constraint": "必填",
+          "meaning": "输入窗口起点，包含"
+        },
+        {
+          "name": "end_seq",
+          "type": "BIGINT",
+          "constraint": "必填",
+          "meaning": "输入窗口终点，包含"
+        },
+        {
+          "name": "input_version",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "规范化 / 模型 / 提示等输入版本标识"
+        },
+        {
+          "name": "state",
+          "type": "VARCHAR",
+          "constraint": "必填",
+          "meaning": "queued / running / ready / partial / failed"
+        },
+        {
+          "name": "checkpoint",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "stage、extracted_through_seq、associated_through_seq、已提交 last_committed_seq 与缺失部件对象引用；不存摘要全集"
+        },
+        {
+          "name": "specification",
+          "type": "JSON",
+          "constraint": "固定小对象",
+          "meaning": "模型、提示等任务配置"
+        },
+        {
+          "name": "result_ref",
+          "type": "JSON",
+          "constraint": "可空；固定对象引用",
+          "meaning": "较大关联候选、人工保护冲突与缺口集合的对象引用，不直接覆盖人工决定"
+        },
+        {
+          "name": "lease_owner",
+          "type": "VARCHAR",
+          "constraint": "可空",
+          "meaning": "当前执行者"
+        },
+        {
+          "name": "lease_until",
+          "type": "TIMESTAMP",
+          "constraint": "可空；UTC",
+          "meaning": "可恢复领取的到期时间"
+        },
+        {
+          "name": "fencing_token",
+          "type": "BIGINT",
+          "constraint": "递增",
+          "meaning": "拒绝旧执行者提交"
+        },
+        {
+          "name": "attempts",
+          "type": "INT",
+          "constraint": "默认 0",
+          "meaning": "累计尝试次数"
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "constraint": "可空",
+          "meaning": "最近错误，不是历史数组"
+        }
+      ],
+      "constraints": [
+        "U17 唯一 (user_id, request_key)",
+        "I27 (conversation_id, end_seq, state)"
+      ],
+      "query_ids": [
+        "Q5",
+        "Q10"
+      ],
+      "write_rule": "按 ingest_seq 发现新增，固定范围内消息及必要上下文。第一阶段提交 note、note_message 与提取检查点，已有人工内容不覆盖；第二阶段组织范围内事件并检索历史关联，按 note.assignment_mode 保留人工归属。提取已提交但关联未结束时任务不可标 ready；任务检查点记录 stage 和独立 committed_seq，重试恢复原 note_key。缺图登记缺口，补图后先提出摘要更新候选。提交时检查 lease/fencing_token、Note 和事件的并发变化；事件关联及归纳结果同事务提交，不能以旧读取覆盖人工修改。"
+    },
+    {
+      "name": "app_config",
+      "layer": "operations",
+      "purpose": "跨模块共用的全局 key / value 配置。",
+      "design_basis": "对象存储、上传限制和系统默认报告设置是系统配置；每人的主题订阅是业务记录，不能堆进同一个全局 JSON。",
+      "stored_effect": "统一读取系统设置，业务只保留持久文件地址；用户规则可单独编辑、查询和启停。",
+      "fields": [
+        {
+          "name": "key",
+          "type": "VARCHAR",
+          "constraint": "唯一",
+          "meaning": "object_storage / chat_upload / chat_processing / chat_report"
+        },
+        {
+          "name": "value",
+          "type": "JSON",
+          "constraint": "按 key 固定 schema",
+          "meaning": "连接、限制或系统默认值；敏感值加密并后台脱敏"
+        }
+      ],
+      "constraints": [
+        "U18 唯一 (key)"
+      ],
+      "query_ids": [],
+      "write_rule": "不含 user_id，也不与每次上传建配置外键。签名 URL 临时生成，业务行不持久化授权凭证。"
+    }
+  ],
+  "queries": [
+    {
+      "id": "Q1",
+      "question": "列出我的聊天",
+      "path": "conversation.user_id → last_message_at",
+      "indexes": "I1",
+      "effect": "返回源群 / 私聊，不把事件主题当会话名称。"
+    },
+    {
+      "id": "Q2",
+      "question": "查看某群一段时间的消息和回复",
+      "path": "conversation → message → message_part；reply_to_message_id → message",
+      "indexes": "I2–I5",
+      "effect": "先分页消息，再按 source_order / ingest_seq 稳定展示和取部件；未知时间单列，不能悄悄漏掉。"
+    },
+    {
+      "id": "Q3",
+      "question": "查未完成 / 已完成事件",
+      "path": "event.user_id、status、last_activity_at",
+      "indexes": "I8",
+      "effect": "open / in_progress 为未完成，done 为已完成；status=NULL 的信息型事件不进入未完成清单或完成率分母。"
+    },
+    {
+      "id": "Q4",
+      "question": "查 CPF 标签或某群涉及的跨会话事项",
+      "path": "event_tag → event；event_note → note_message → message → conversation",
+      "indexes": "I11、U10、I16、I17、I18、I20",
+      "effect": "主来源容器与真实消息涉及的容器分别筛选；使用 EXISTS 去重，同项目或相似标题不自动合并。"
+    },
+    {
+      "id": "Q5",
+      "question": "查看事件时间线并回溯摘要与原文",
+      "path": "event → event_note → note → note_message → message / message_part → message_origin → upload_item → file_asset",
+      "indexes": "U10、I7、I14、I17",
+      "effect": "按 Note.start_at 展示已知业务时间，未知时间单列并稳定排序；一份 Note 可引用多条消息，页面先分页摘要再读取来源。当前状态由相关摘要综合判断，不再依赖最后写入的一条状态过程。"
+    },
+    {
+      "id": "Q6",
+      "question": "一条消息或一张消息图片关联了哪些事件",
+      "path": "message.id / message_part.id → note_message → note → event_note → event",
+      "indexes": "I17、I18、I16",
+      "effect": "返回当前关联的事件并去重；尚未归属事件的摘要仍可查询，无事件时返回空，不回退到其他事件。"
+    },
+    {
+      "id": "Q7",
+      "question": "按用户看图片、复用描述",
+      "path": "upload_batch.user_id → upload_item.file_id → file_asset → file_processing；message_part 反查出现位置",
+      "indexes": "I24、I26、I6、U6–U7",
+      "effect": "按 file_id 去重用户图片列表；多个用户引用共享文件与描述，各自的事件解释仍分开。"
+    },
+    {
+      "id": "Q8",
+      "question": "生成日报 / 周报 / 月报并回看历史",
+      "path": "Note 业务时间与报告期间的相交集合＋Event 的当前待跟踪集合 → report 快照",
+      "indexes": "I8、I14、U10、I22",
+      "effect": "本期摘要：完整区间按 start_at < period_end 且 end_at ≥ period_start；仅知 start_at 时按时点 start_at ≥ period_start 且 < period_end；全未知时间列缺口。未归属摘要可进入报告并标明待归属，事件计数按事件 ID 去重。生成时读取当前状态，不从 created_at 重建任意历史状态；冻结实际输入、当时关联和截止时点，旧报告直接读取已存正文。"
+    },
+    {
+      "id": "Q9",
+      "question": "按主题订阅查询、生成与查看历史",
+      "path": "topic_subscription.filters 编译为 Q3 / Q4；report.subscription_id",
+      "indexes": "I20–I23",
+      "effect": "先确定范围，后按关注要求归纳；报告保存规则快照，改订阅不改旧报告。 每次订阅生成的正文仍保存在 report.body，通过 subscription_id 查询历史。"
+    },
+    {
+      "id": "Q10",
+      "question": "追溯上传、覆盖缺口和重试来源",
+      "path": "message_origin → upload_item → upload_batch；note.analysis_job_id → analysis_job",
+      "indexes": "I7、I24–I27",
+      "effect": "追溯摘要的提取窗口与阶段检查点；提取与关联分别恢复，人工新增无任务时明确为空，不补造任务来源。"
+    },
+    {
+      "id": "Q11",
+      "question": "读取某份报告的个人跟进条目",
+      "path": "report.user_id → report_section.section_key=personal → report_item 按 position",
+      "indexes": "U19、U20",
+      "effect": "直接返回该次个人跟进条目的正文、跟进说明和参考来源，不重跑模型；不等同于实时全局个人任务表。"
+    },
+    {
+      "id": "Q12",
+      "question": "一个事件在哪些报告栏目出现、一个条目概括了哪些事件",
+      "path": "report_item_source ↔ event / note / note_message；report_item → report_section → report",
+      "indexes": "U21、I29、I30、I32",
+      "effect": "按保存时 event_id 查询历史报告位置；Note 后续移归不会把旧报告重新解释为新事件。reference 仅是外部来源链接。"
+    },
+    {
+      "id": "Q13",
+      "question": "查询待归属摘要并进行人工调整",
+      "path": "note.user_id → NOT EXISTS event_note；note.assignment_mode 控制自动关联写入",
+      "indexes": "I31、I16、U10",
+      "effect": "人工可选择暂不归属或移到其他事件；manual 锁定整个当前关联集合，包括空集合。自动重跑只提供建议，用户明确恢复 auto 后才允许更改。"
+    }
+  ],
+  "concept_definitions": {
+    "conversation": "原有聊天或邮件的内容容器；群名、对话名或一封邮件的主题可作为容器名称。",
+    "event": "围绕同一件事情组织相关 Note，保存整体总结与当前状态；时间线由关联摘要按业务时间形成。",
+    "message": "原始聊天内容，包括文字、图片、引用等；邮件场景下对应原始邮件内容。message 与 message_part 共同表达原始内容，不被事件提取结果覆盖。",
+    "note": "一段聊天围绕一件事情形成的阶段性摘要，可关联 N 条原消息；可以先保存再确定事件归属。",
+    "note_message": "Note 与原消息的多对多关联，必要时定位到消息部件。",
+    "event_note": "Event 与 Note 的多对多当前归属关系；人工确认优先于自动重新关联。"
+  },
+  "example_catalog": "schema-examples.json",
+  "real_report_examples": "reference-report-data.json",
+  "design_change": "v0.19：原过程层调整为独立 Note、消息关联与事件归属三部分；业务表 19 张＋AppConfig，共 20 张。未执行数据库迁移。",
+  "sql_examples": [
+    {
+      "id": "SQL1",
+      "title": "按标签查询未完成事件（Q4）",
+      "sql": "SELECT e.id, e.title, e.status\nFROM event e\nWHERE e.user_id = :user_id AND e.status IN ('open', 'in_progress')\n  AND EXISTS (SELECT 1 FROM event_tag t\n    WHERE t.event_id = e.id AND t.user_id = e.user_id AND t.tag_key = :tag_key)\nORDER BY e.last_activity_at DESC, e.id DESC;"
+    },
+    {
+      "id": "SQL2",
+      "title": "读取事件时间线摘要（Q5，先分页摘要）",
+      "sql": "SELECT n.id, n.title, n.content, n.start_at, n.end_at\nFROM event e\nJOIN event_note en ON en.event_id = e.id\nJOIN note n ON n.id = en.note_id AND n.user_id = e.user_id\nWHERE e.user_id = :user_id AND e.id = :event_id\nORDER BY CASE WHEN n.start_at IS NULL THEN 1 ELSE 0 END, n.start_at, n.id;"
+    },
+    {
+      "id": "SQL3",
+      "title": "展开一份摘要的原文与图片描述（Q5）",
+      "sql": "SELECT n.id AS note_id, nm.id AS note_message_id, m.id AS message_id,\n       m.conversation_id, p.id AS part_id, p.kind, p.text,\n       fp.description AS image_description\nFROM note n\nJOIN note_message nm ON nm.note_id = n.id\nJOIN message m ON m.id = nm.message_id\nJOIN conversation c ON c.id = m.conversation_id AND c.user_id = n.user_id\nLEFT JOIN message_part p ON p.message_id = m.id\n  AND (nm.message_part_id IS NULL OR p.id = nm.message_part_id)\nLEFT JOIN file_processing fp ON fp.file_id = p.file_id\nWHERE n.user_id = :user_id AND n.id = :note_id\nORDER BY m.occurred_at, m.id, p.ordinal, p.id;"
+    },
+    {
+      "id": "SQL4",
+      "title": "原文涉及某群的跨会话事件（Q4）",
+      "sql": "SELECT e.id, e.title\nFROM event e\nWHERE e.user_id = :user_id AND EXISTS (\n  SELECT 1 FROM event_note en\n  JOIN note n ON n.id = en.note_id AND n.user_id = e.user_id\n  JOIN note_message nm ON nm.note_id = n.id\n  JOIN message m ON m.id = nm.message_id\n  JOIN conversation c ON c.id = m.conversation_id AND c.user_id = e.user_id\n  WHERE en.event_id = e.id AND c.id = :conversation_id\n);"
+    },
+    {
+      "id": "SQL5",
+      "title": "从原消息反查当前事件（Q6）",
+      "sql": "SELECT DISTINCT e.id, e.title\nFROM note_message nm\nJOIN note n ON n.id = nm.note_id AND n.user_id = :user_id\nJOIN event_note en ON en.note_id = n.id\nJOIN event e ON e.id = en.event_id AND e.user_id = n.user_id\nWHERE nm.message_id = :message_id;"
+    },
+    {
+      "id": "SQL6",
+      "title": "读取报告期间涉及的摘要（Q8）",
+      "sql": "SELECT n.id, n.title, n.start_at, n.end_at\nFROM note n\nWHERE n.user_id = :user_id AND n.start_at IS NOT NULL AND (\n  (n.end_at IS NOT NULL AND n.start_at < :end_at AND n.end_at >= :start_at)\n  OR (n.end_at IS NULL AND n.start_at >= :start_at AND n.start_at < :end_at)\n)\nORDER BY n.start_at, n.id;"
+    },
+    {
+      "id": "SQL7",
+      "title": "查询未归属摘要及人工确认状态（Q13）",
+      "sql": "SELECT n.id, n.title, n.assignment_mode\nFROM note n\nWHERE n.user_id = :user_id\n  AND NOT EXISTS (SELECT 1 FROM event_note en WHERE en.note_id = n.id)\nORDER BY n.created_at, n.id;"
+    },
+    {
+      "id": "SQL8",
+      "title": "查询我的历史报告（Q8）",
+      "sql": "SELECT id, title, period, subscription_id, generated_at, state\nFROM report\nWHERE user_id = :user_id AND state IN ('ready', 'partial')\nORDER BY generated_at DESC, id DESC;"
+    },
+    {
+      "id": "SQL9",
+      "title": "打开已经保存的报告正文（Q8）",
+      "sql": "SELECT id, title, body_format, body, content, snapshot_ref, generated_at\nFROM report\nWHERE user_id = :user_id AND id = :report_id AND state IN ('ready', 'partial');"
+    },
+    {
+      "id": "SQL10",
+      "title": "读取这份报告的个人跟进条目（Q11）",
+      "sql": "SELECT i.id, i.title, i.summary, i.followup_text, i.followup_kind\nFROM report r\nJOIN report_section s ON s.report_id = r.id\nJOIN report_item i ON i.section_id = s.id\nWHERE r.user_id = :user_id AND r.id = :report_id AND s.section_key = 'personal'\nORDER BY i.position;"
+    },
+    {
+      "id": "SQL11",
+      "title": "一个事件在历史报告中出现的位置（Q12）",
+      "sql": "SELECT r.id AS report_id, s.section_key, i.id, i.title\nFROM report_item_source x\nJOIN report_item i ON i.id = x.report_item_id\nJOIN report_section s ON s.id = i.section_id\nJOIN report r ON r.id = s.report_id\nWHERE r.user_id = :user_id AND x.event_id = :event_id\nGROUP BY r.id, s.section_key, i.id, i.title;"
+    }
+  ],
+  "implementation_status": {
+    "project": "Devify",
+    "implemented": "Space-scoped Conversation/Message/MessagePart/MessageOrigin, AnalysisJob, Note, Event, EventRelation, Report snapshot, Source/SourceImport, upload parsing and async task foundations",
+    "implemented_api": "space-scoped conversation/message, analysis job, note/event/report/source and upload status APIs",
+    "not_implemented": "Tauri upload client, full AI workflow policy/configuration, production MariaDB verification, complete email space migration, full audit replay, vector/search integration",
+    "verification": "Local no-migrations tests and static checks; not production acceptance"
+  }
+}

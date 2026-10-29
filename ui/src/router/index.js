@@ -77,6 +77,13 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/spaces/:spaceId/operations',
+    name: 'SpaceOperations',
+    component: () => import('@/pages/SpaceOperations.vue'),
+    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     redirect: '/chats'
   },

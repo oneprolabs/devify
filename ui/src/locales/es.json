@@ -496,6 +496,20 @@
     "noSources": "No hay fuentes conectadas",
     "noSourcesBody": "Las fuentes aparecerán cuando un cliente o administrador conecte una.",
     "noCapabilities": "Sin capacidades verificadas",
-    "loadError": "No se pudieron cargar los espacios."
+    "loadError": "No se pudieron cargar los espacios.",
+    "openWorkspace": "Abrir espacio de chats",
+    "chatWorkspace": "Conversaciones y mensajes de este espacio.",
+    "switchSpace": "Cambiar espacio",
+    "conversations": "Conversaciones",
+    "searchConversations": "Buscar conversaciones",
+    "messages": "mensajes",
+    "noConversations": "Aún no hay conversaciones",
+    "noConversationsBody": "Sube un paquete de chat normalizado para comenzar.",
+    "selectConversation": "Selecciona una conversación",
+    "selectConversationBody": "Elige una conversación para revisar sus mensajes.",
+    "noMessages": "No hay mensajes",
+    "noMessagesBody": "Esta conversación no tiene mensajes normalizados.",
+    "unknownSender": "Remitente desconocido",
+    "noMessageContent": "Este mensaje no tiene contenido legible."
   }
 }

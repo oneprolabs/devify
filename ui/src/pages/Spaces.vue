@@ -85,6 +85,12 @@
               ><strong>{{ sources.length }}</strong>
             </div>
           </div>
+          <router-link
+            class="space-open-workspace"
+            :to="`/spaces/${selectedSpace.id}/chats`"
+          >
+            {{ t('spaces.openWorkspace') }}
+          </router-link>
 
           <div class="space-section-title">
             <h3>{{ t('spaces.sources') }}</h3>
@@ -356,6 +362,18 @@ onMounted(loadSpaces)
   font-family: ui-monospace, monospace;
   font-size: 12px;
   text-transform: capitalize;
+}
+.space-open-workspace {
+  display: inline-flex;
+  margin: 14px 16px 0;
+  border-radius: 6px;
+  background: rgb(var(--c-ac));
+  padding: 8px 11px;
+  color: rgb(var(--c-ac-on));
+  font-size: 12px;
+}
+.space-open-workspace:hover {
+  opacity: 0.9;
 }
 .space-section-title {
   display: flex;

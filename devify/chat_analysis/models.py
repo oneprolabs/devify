@@ -462,3 +462,196 @@ class EventRelation(models.Model):
             f"{self.left_event_id}-{self.right_event_id}:"
             f"{self.relation_kind}"
         )
+
+
+class Report(models.Model):
+    """A frozen report snapshot for one space."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        READY = "ready", "Ready"
+        PARTIAL = "partial", "Partial"
+        FAILED = "failed", "Failed"
+
+    class BodyFormat(models.TextChoices):
+        MARKDOWN = "markdown", "Markdown"
+        HTML = "html", "HTML"
+
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    space = models.ForeignKey(
+        Space,
+        on_delete=models.PROTECT,
+        related_name="chat_reports",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="chat_reports",
+    )
+    request_key = models.CharField(max_length=255)
+    previous_report = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="next_reports",
+    )
+    title = models.CharField(max_length=500)
+    period_start = models.DateTimeField(null=True, blank=True)
+    period_end = models.DateTimeField(null=True, blank=True)
+    body_format = models.CharField(
+        max_length=20,
+        choices=BodyFormat.choices,
+        default=BodyFormat.MARKDOWN,
+    )
+    body = models.TextField(blank=True)
+    source_info = models.JSONField(null=True, blank=True)
+    content = models.JSONField(null=True, blank=True)
+    snapshot_ref = models.JSONField(null=True, blank=True)
+    processing = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.READY,
+    )
+    generated_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-generated_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("space", "request_key"),
+                name="unique_chat_report_request",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("space", "period_start", "generated_at")),
+            models.Index(fields=("space", "status", "generated_at")),
+        ]
+
+    def clean(self):
+        if (
+            self.period_start
+            and self.period_end
+            and self.period_end < self.period_start
+        ):
+            raise ValidationError(
+                {"period_end": "period_end must be after period_start."}
+            )
+        if (
+            self.status in (self.Status.READY, self.Status.PARTIAL)
+            and not self.body
+        ):
+            raise ValidationError({"body": "Ready reports require a body."})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+
+class ReportSection(models.Model):
+    report = models.ForeignKey(
+        Report,
+        on_delete=models.CASCADE,
+        related_name="sections",
+    )
+    section_key = models.CharField(max_length=100)
+    title = models.CharField(max_length=500)
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ("position", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("report", "section_key"),
+                name="unique_chat_report_section_key",
+            ),
+            models.UniqueConstraint(
+                fields=("report", "position"),
+                name="unique_chat_report_section_position",
+            ),
+        ]
+
+
+class ReportItem(models.Model):
+    section = models.ForeignKey(
+        ReportSection,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    position = models.PositiveIntegerField()
+    title = models.CharField(max_length=500)
+    summary = models.TextField()
+    label = models.TextField(blank=True)
+    time_text = models.TextField(blank=True)
+    contact_text = models.TextField(blank=True)
+    followup_text = models.TextField(blank=True)
+    followup_kind = models.CharField(max_length=40, blank=True)
+    display_kind = models.CharField(max_length=80, blank=True)
+
+    class Meta:
+        ordering = ("position", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("section", "position"),
+                name="unique_chat_report_item_position",
+            )
+        ]
+
+
+class ReportItemSource(models.Model):
+    class SourceKind(models.TextChoices):
+        EVENT = "event", "Event"
+        NOTE = "note", "Note"
+        REFERENCE = "reference", "Reference"
+
+    item = models.ForeignKey(
+        ReportItem,
+        on_delete=models.CASCADE,
+        related_name="sources",
+    )
+    reference_key = models.CharField(max_length=255)
+    source_kind = models.CharField(max_length=20, choices=SourceKind.choices)
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="report_sources",
+    )
+    note = models.ForeignKey(
+        Note,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="report_sources",
+    )
+    reference_url = models.URLField(blank=True)
+    display_text = models.TextField(blank=True)
+    event_snapshot = models.JSONField(null=True, blank=True)
+    note_snapshot = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("item", "reference_key"),
+                name="unique_chat_report_item_source",
+            )
+        ]
+
+    def clean(self):
+        space_id = self.item.section.report.space_id if self.item_id else None
+        if self.event_id and self.event.space_id != space_id:
+            raise ValidationError(
+                {"event": "Event must belong to the report space."}
+            )
+        if self.note_id and self.note.space_id != space_id:
+            raise ValidationError(
+                {"note": "Note must belong to the report space."}
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)

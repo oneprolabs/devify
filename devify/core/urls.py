@@ -52,6 +52,7 @@ urlpatterns = [
     path("api/v1/", include("chat_domain.urls")),
     path("api/v1/", include("chat_analysis.urls")),
     path("api/v1/", include("chat_analysis.api_urls")),
+    path("api/v1/", include("chat_analysis.report_urls")),
     path("api/v1/", include("relay.urls")),
     path("api/v1/", include("expense.urls")),
     # Agentcore task execution API

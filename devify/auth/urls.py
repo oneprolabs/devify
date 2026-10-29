@@ -21,7 +21,12 @@ from accounts.views import (
     SendRegistrationEmailView,
     VerifyRegistrationTokenView,
 )
-from accounts.views.tauri_auth import TauriAuthorizeAPIView, TauriTokenAPIView
+from accounts.views.tauri_auth import (
+    TauriAuthorizeAPIView,
+    TauriDeviceListAPIView,
+    TauriDeviceRevokeAPIView,
+    TauriTokenAPIView,
+)
 
 class CustomLoginView(LoginView):
     permission_classes = [AllowAny]
@@ -53,6 +58,16 @@ urlpatterns = [
         'api/v1/auth/tauri/token',
         TauriTokenAPIView.as_view(),
         name='tauri_token'
+    ),
+    path(
+        'api/v1/auth/tauri/devices',
+        TauriDeviceListAPIView.as_view(),
+        name='tauri_devices'
+    ),
+    path(
+        'api/v1/auth/tauri/devices/<str:device_id>',
+        TauriDeviceRevokeAPIView.as_view(),
+        name='tauri_device_revoke'
     ),
     # Get or update user details
     path(

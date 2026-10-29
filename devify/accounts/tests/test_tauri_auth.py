@@ -7,6 +7,8 @@ import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
+from accounts.models import TauriDevice
+
 pytestmark = pytest.mark.django_db
 
 
@@ -57,6 +59,21 @@ def test_tauri_code_exchange_requires_pkce_and_is_one_time():
     assert exchanged.data["access"]
     assert exchanged.data["refresh"]
     assert exchanged.data["device_label"] == "Test Mac"
+    device_id = exchanged.data["device_id"]
+    assert TauriDevice.objects.filter(
+        user=user, device_id=device_id, status=TauriDevice.Status.ACTIVE
+    ).exists()
+
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {exchanged.data['access']}")
+    devices = client.get("/api/v1/auth/tauri/devices")
+    assert devices.status_code == 200
+    assert devices.data["data"][0]["device_id"] == device_id
+    assert (
+        client.delete(f"/api/v1/auth/tauri/devices/{device_id}").status_code
+        == 204
+    )
+    client.force_authenticate(user=None)
+    assert client.get("/api/v1/auth/user").status_code == 401
 
     replay = client.post(
         "/api/v1/auth/tauri/token",

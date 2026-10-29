@@ -24,6 +24,8 @@ from chat_ingestion.tasks import (
     dispatch_parse_chat_upload,
     parse_chat_upload_task,
 )
+from chat_sources.models import SourceImport
+from chat_sources.services import get_or_create_upload_source
 from spaces.models import Space, SpaceTakeover
 from spaces.services import SpacePermissionService, audit_space_action
 
@@ -107,6 +109,14 @@ def _batch_response(batch, status_code=200):
 
 
 def _enqueue_parse(batch):
+    if batch.source_id:
+        SourceImport.objects.get_or_create(
+            space=batch.space,
+            source=batch.source,
+            upload_batch=batch,
+            defaults={"initiated_by": batch.uploaded_by},
+        )
+
     def dispatch():
         if getattr(settings, "CHAT_UPLOAD_PARSE_INLINE", False):
             return parse_chat_upload_task.run(batch.pk)
@@ -131,6 +141,12 @@ class UploadBatchCreateAPIView(APIView):
         serializer = UploadBatchCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
+        source = get_or_create_upload_source(
+            space=space,
+            actor=request.user,
+            channel_type=values["source_type"],
+            account_key=values.get("source_account_id", ""),
+        )
         lookup = {
             "space": space,
             "uploaded_by": request.user,
@@ -150,6 +166,7 @@ class UploadBatchCreateAPIView(APIView):
             return _batch_response(batch)
         batch = UploadBatch.objects.create(
             **lookup,
+            source=source,
             source_type=values["source_type"],
             source_account_id=values.get("source_account_id") or "",
             archive_sha256=(values.get("archive_sha256") or "").lower(),

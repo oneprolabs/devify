@@ -2,10 +2,12 @@
 
 from celery import shared_task
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from chat_ingestion.models import UploadBatch
 from chat_ingestion.parsing import parse_archive
 from chat_ingestion.services import UploadTransitionError, transition_batch
+from chat_sources.models import SourceImport
 from spaces.services import SpacePermissionService, audit_space_action
 
 
@@ -20,6 +22,13 @@ def parse_chat_upload_task(self, batch_id):
         return {"batch_id": batch.pk, "status": batch.status}
     if batch.status != UploadBatch.Status.PROCESSING:
         return {"batch_id": batch.pk, "status": batch.status}
+    source_import = SourceImport.objects.filter(upload_batch=batch).first()
+    if source_import:
+        source_import.status = SourceImport.Status.RUNNING
+        source_import.started_at = source_import.started_at or timezone.now()
+        source_import.save(
+            update_fields=("status", "started_at", "updated_at")
+        )
     if (
         batch.space.status != batch.space.Status.ACTIVE
         or not SpacePermissionService.can_upload(
@@ -31,6 +40,18 @@ def parse_chat_upload_task(self, batch_id):
             "The upload is no longer authorized for this space."
         )
         batch.save(update_fields=("status", "error_message", "updated_at"))
+        if source_import:
+            source_import.status = SourceImport.Status.FAILED
+            source_import.error_message = batch.error_message
+            source_import.completed_at = timezone.now()
+            source_import.save(
+                update_fields=(
+                    "status",
+                    "error_message",
+                    "completed_at",
+                    "updated_at",
+                )
+            )
         return {"batch_id": batch.pk, "status": batch.status}
     try:
         batch = parse_archive(batch, retry_transient=True)
@@ -66,6 +87,29 @@ def parse_chat_upload_task(self, batch_id):
             "error": batch.error_message or None,
         },
     )
+    if source_import:
+        source_import.status = {
+            UploadBatch.Status.COMPLETED: SourceImport.Status.COMPLETED,
+            UploadBatch.Status.FAILED: SourceImport.Status.FAILED,
+        }.get(batch.status, SourceImport.Status.PARTIAL)
+        source_import.accepted_count = batch.message_count
+        source_import.duplicate_count = batch.duplicate_count
+        source_import.failed_count = int(
+            batch.status == UploadBatch.Status.FAILED
+        )
+        source_import.error_message = batch.error_message
+        source_import.completed_at = timezone.now()
+        source_import.save(
+            update_fields=(
+                "status",
+                "accepted_count",
+                "duplicate_count",
+                "failed_count",
+                "error_message",
+                "completed_at",
+                "updated_at",
+            )
+        )
     return {
         "batch_id": batch.pk,
         "status": batch.status,

@@ -70,6 +70,13 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/spaces/:spaceId/analysis',
+    name: 'SpaceAnalysis',
+    component: () => import('@/pages/SpaceAnalysis.vue'),
+    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     redirect: '/chats'
   },

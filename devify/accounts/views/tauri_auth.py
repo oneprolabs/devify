@@ -16,7 +16,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from accounts.models import TauriAuthorizationCode, TauriDevice
 
 CLIENT_ID = os.getenv("TAURI_OAUTH_CLIENT_ID", "wechat-devify-tauri")
-REDIRECT_URI = os.getenv("TAURI_OAUTH_REDIRECT_URI", "devify://auth/callback")
+REDIRECT_URI = os.getenv(
+    "TAURI_OAUTH_REDIRECT_URI",
+    "http://127.0.0.1:47832/auth/callback",
+)
 
 
 def _pkce_challenge(verifier):

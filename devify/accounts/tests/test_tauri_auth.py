@@ -29,7 +29,7 @@ def test_tauri_code_exchange_requires_pkce_and_is_one_time():
         "/api/v1/auth/tauri/authorize",
         {
             "client_id": "wechat-devify-tauri",
-            "redirect_uri": "devify://auth/callback",
+            "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "response_type": "code",
             "state": state,
             "code_challenge": challenge(verifier),
@@ -49,7 +49,7 @@ def test_tauri_code_exchange_requires_pkce_and_is_one_time():
         {
             "grant_type": "authorization_code",
             "client_id": "wechat-devify-tauri",
-            "redirect_uri": "devify://auth/callback",
+            "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "code": query["code"][0],
             "code_verifier": verifier,
         },
@@ -80,7 +80,7 @@ def test_tauri_code_exchange_requires_pkce_and_is_one_time():
         {
             "grant_type": "authorization_code",
             "client_id": "wechat-devify-tauri",
-            "redirect_uri": "devify://auth/callback",
+            "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "code": query["code"][0],
             "code_verifier": verifier,
         },
@@ -98,7 +98,7 @@ def test_tauri_code_exchange_rejects_wrong_verifier():
         "/api/v1/auth/tauri/authorize",
         {
             "client_id": "wechat-devify-tauri",
-            "redirect_uri": "devify://auth/callback",
+            "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "response_type": "code",
             "state": "state",
             "code_challenge": challenge(verifier),
@@ -110,7 +110,7 @@ def test_tauri_code_exchange_rejects_wrong_verifier():
         {
             "grant_type": "authorization_code",
             "client_id": "wechat-devify-tauri",
-            "redirect_uri": "devify://auth/callback",
+            "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "code": code,
             "code_verifier": "wrong",
         },

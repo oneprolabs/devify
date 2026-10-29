@@ -1,6 +1,15 @@
 from rest_framework import serializers
 
-from chat_analysis.models import Event, EventRelation, Note, NoteEvidence
+from chat_analysis.models import (
+    Event,
+    EventRelation,
+    Note,
+    NoteEvidence,
+    Report,
+    ReportItem,
+    ReportItemSource,
+    ReportSection,
+)
 
 
 class NoteCreateSerializer(serializers.Serializer):
@@ -165,4 +174,108 @@ class EventRelationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+        read_only_fields = fields
+
+
+class ReportCreateSerializer(serializers.Serializer):
+    request_key = serializers.CharField(max_length=255)
+    title = serializers.CharField(max_length=500)
+    period_start = serializers.DateTimeField(required=False, allow_null=True)
+    period_end = serializers.DateTimeField(required=False, allow_null=True)
+    body_format = serializers.ChoiceField(
+        choices=Report.BodyFormat.choices,
+        required=False,
+        default=Report.BodyFormat.MARKDOWN,
+    )
+
+    def validate_request_key(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("request_key is required.")
+        return value
+
+    def validate(self, attrs):
+        if (
+            attrs.get("period_start")
+            and attrs.get("period_end")
+            and attrs["period_end"] < attrs["period_start"]
+        ):
+            raise serializers.ValidationError(
+                {"period_end": "period_end must be after period_start."}
+            )
+        return attrs
+
+
+class ReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Report
+        fields = (
+            "id",
+            "uuid",
+            "space_id",
+            "created_by_id",
+            "request_key",
+            "previous_report_id",
+            "title",
+            "period_start",
+            "period_end",
+            "body_format",
+            "body",
+            "source_info",
+            "content",
+            "snapshot_ref",
+            "processing",
+            "status",
+            "generated_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+class ReportItemSourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReportItemSource
+        fields = (
+            "id",
+            "reference_key",
+            "source_kind",
+            "event_id",
+            "note_id",
+            "reference_url",
+            "display_text",
+            "event_snapshot",
+            "note_snapshot",
+        )
+        read_only_fields = fields
+
+
+class ReportItemSerializer(serializers.ModelSerializer):
+    sources = ReportItemSourceSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ReportItem
+        fields = (
+            "id",
+            "section_id",
+            "position",
+            "title",
+            "summary",
+            "label",
+            "time_text",
+            "contact_text",
+            "followup_text",
+            "followup_kind",
+            "display_kind",
+            "sources",
+        )
+        read_only_fields = fields
+
+
+class ReportSectionSerializer(serializers.ModelSerializer):
+    items = ReportItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ReportSection
+        fields = ("id", "section_key", "title", "position", "items")
         read_only_fields = fields

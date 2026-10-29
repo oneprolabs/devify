@@ -97,6 +97,10 @@ test = [
 DJANGO_SETTINGS_MODULE = "core.settings"
 testpaths = [
     "devify/accounts/tests",
+    "devify/spaces/tests",
+    "devify/chat_analysis/tests",
+    "devify/chat_domain/tests",
+    "devify/chat_ingestion/tests",
     "devify/threadline/tests",
     "devify/relay/tests",
     "devify/expense/tests",
@@ -165,7 +169,8 @@ directory = "htmlcov"
 profile = "black"
 line_length = 79
 known_first_party = [
-    "accounts", "billing", "core", "expense", "relay", "threadline",
+    "accounts", "billing", "chat_analysis", "chat_domain", "chat_ingestion",
+    "core", "expense", "relay", "spaces", "threadline",
 ]
 
 [tool.black]

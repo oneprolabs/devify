@@ -1,4 +1,5 @@
 import hashlib
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -85,9 +86,10 @@ def test_member_can_create_upload_and_repeat_is_idempotent():
     assert first.status_code == 201
     assert second.status_code == 200
     assert first.data["data"]["id"] == second.data["data"]["id"]
-    assert UploadBatch.objects.filter(
-        space=space, uploaded_by=member
-    ).count() == 1
+    assert (
+        UploadBatch.objects.filter(space=space, uploaded_by=member).count()
+        == 1
+    )
     # Regression: the global camel-case parser used to rewrite the declared
     # checksum key, so the batch silently stored an empty hash.
     assert UploadBatch.objects.get().archive_sha256 == "a" * 64
@@ -122,23 +124,23 @@ def test_retry_without_optional_fields_is_not_a_conflict():
 
 
 def test_guest_cannot_create_upload_and_conflicting_key_is_rejected():
-    owner = User.objects.create_user(
-        username="upload-guest-owner"
-    )
+    owner = User.objects.create_user(username="upload-guest-owner")
     guest = User.objects.create_user(username="upload-guest")
     space = make_team(owner, slug="upload-guest-team")
     SpaceMembership.objects.create(
         space=space, user=guest, role=SpaceMembership.Role.GUEST
     )
     client = auth_client(guest)
-    assert client.post(
-        create_url(space), payload(), format="json"
-    ).status_code == 404
+    assert (
+        client.post(create_url(space), payload(), format="json").status_code
+        == 404
+    )
 
     client = auth_client(owner)
-    assert client.post(
-        create_url(space), payload(), format="json"
-    ).status_code == 201
+    assert (
+        client.post(create_url(space), payload(), format="json").status_code
+        == 201
+    )
     conflict = client.post(
         create_url(space),
         payload(source_type="line"),
@@ -311,11 +313,14 @@ def test_archive_upload_requires_uploader_or_space_admin():
     assert missing.status_code == 404
 
     owner_client = auth_client(owner)
-    assert owner_client.put(
-        batch_url(batch, "archive"),
-        {"archive": archive_file()},
-        format="multipart",
-    ).status_code == 200
+    assert (
+        owner_client.put(
+            batch_url(batch, "archive"),
+            {"archive": archive_file()},
+            format="multipart",
+        ).status_code
+        == 200
+    )
 
 
 def test_archive_upload_requires_a_file():
@@ -364,9 +369,45 @@ def test_complete_parses_archive_and_marks_batch_completed():
     assert completed.data["data"]["message_count"] == 2
     assert repeated.status_code == 200
     assert repeated.data["data"]["status"] == UploadBatch.Status.COMPLETED
-    assert SpaceAuditLog.objects.filter(
-        action="chat.upload_completed", resource_id=str(batch.pk)
-    ).count() == 1
+    assert (
+        SpaceAuditLog.objects.filter(
+            action="chat.upload_completed", resource_id=str(batch.pk)
+        ).count()
+        == 1
+    )
+
+
+def test_complete_enqueues_parser_when_async_mode_is_enabled(settings):
+    owner = User.objects.create_user(username="upload-async-owner")
+    space = make_team(owner, slug="upload-async-team")
+    client = auth_client(owner)
+    response = client.post(
+        create_url(space),
+        {"source_type": "wechat", "idempotency_key": "async-batch"},
+        format="json",
+    )
+    batch = UploadBatch.objects.get(pk=response.data["data"]["id"])
+    client.put(
+        batch_url(batch, "archive"),
+        {"archive": archive_file(build_archive())},
+        format="multipart",
+    )
+    settings.CHAT_UPLOAD_PARSE_INLINE = False
+    with (
+        patch("chat_ingestion.views.dispatch_parse_chat_upload") as dispatch,
+        patch(
+            "chat_ingestion.views.transaction.on_commit",
+            side_effect=lambda callback: callback(),
+        ),
+    ):
+        completed = client.post(batch_url(batch, "complete"))
+
+    assert completed.status_code == 202
+    assert completed.data["data"]["status"] == UploadBatch.Status.PROCESSING
+    dispatch.assert_called_once()
+    assert UploadBatch.objects.get(pk=batch.pk).status == (
+        UploadBatch.Status.PROCESSING
+    )
 
 
 def test_cancelled_upload_is_terminal():
@@ -393,9 +434,12 @@ def test_cancelled_upload_is_terminal():
         format="multipart",
     )
     assert archive.status_code == 409
-    assert SpaceAuditLog.objects.filter(
-        action="chat.upload_cancelled", resource_id=str(batch.pk)
-    ).count() == 1
+    assert (
+        SpaceAuditLog.objects.filter(
+            action="chat.upload_cancelled", resource_id=str(batch.pk)
+        ).count()
+        == 1
+    )
 
 
 def test_archived_space_rejects_upload_mutations():

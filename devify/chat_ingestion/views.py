@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -6,7 +7,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from chat_ingestion.models import UploadBatch
-from chat_ingestion.parsing import parse_archive
 from chat_ingestion.serializers import (
     UploadBatchCreateSerializer,
     UploadBatchSerializer,
@@ -19,6 +19,10 @@ from chat_ingestion.services import (
     cancel_upload,
     complete_upload,
     store_archive,
+)
+from chat_ingestion.tasks import (
+    dispatch_parse_chat_upload,
+    parse_chat_upload_task,
 )
 from spaces.models import Space, SpaceTakeover
 from spaces.services import SpacePermissionService, audit_space_action
@@ -65,9 +69,7 @@ def _active_takeover(user, space):
 
 def _can_operate_batch(user, batch):
     if getattr(user, "is_staff", False):
-        return SpacePermissionService.has_active_takeover(
-            user, batch.space
-        )
+        return SpacePermissionService.has_active_takeover(user, batch.space)
     membership = SpacePermissionService.membership(user, batch.space)
     if not SpacePermissionService.can_write(membership):
         return False
@@ -102,6 +104,18 @@ def _batch_response(batch, status_code=200):
     return Response(
         {"data": UploadBatchSerializer(batch).data}, status=status_code
     )
+
+
+def _enqueue_parse(batch):
+    def dispatch():
+        if getattr(settings, "CHAT_UPLOAD_PARSE_INLINE", False):
+            return parse_chat_upload_task.run(batch.pk)
+        return dispatch_parse_chat_upload(batch)
+
+    if getattr(settings, "CHAT_UPLOAD_PARSE_INLINE", False):
+        return dispatch()
+    transaction.on_commit(dispatch)
+    return None
 
 
 class UploadBatchCreateAPIView(APIView):
@@ -245,24 +259,9 @@ class UploadBatchCompleteAPIView(APIView):
                 complete_upload(batch)
             except (ArchiveMissing, UploadTransitionError) as error:
                 return Response({"detail": str(error)}, status=409)
-        batch = parse_archive(batch)
-        takeover = _active_takeover(request.user, batch.space)
-        audit_space_action(
-            actor=request.user,
-            space=batch.space,
-            action="chat.upload_completed",
-            resource_type="upload_batch",
-            resource_id=batch.pk,
-            metadata={
-                "archive_sha256": batch.archive_sha256,
-                "status": batch.status,
-                "message_count": batch.message_count,
-                "duplicate_count": batch.duplicate_count,
-                "error": batch.error_message or None,
-                "takeover_id": takeover.pk if takeover else None,
-            },
-        )
-        if batch.status == UploadBatch.Status.FAILED:
+        result = _enqueue_parse(batch)
+        if result and result.get("status") == UploadBatch.Status.FAILED:
+            batch.refresh_from_db()
             return Response(
                 {
                     "detail": batch.error_message,
@@ -270,7 +269,10 @@ class UploadBatchCompleteAPIView(APIView):
                 },
                 status=422,
             )
-        return _batch_response(batch)
+        if result and result.get("status") == UploadBatch.Status.COMPLETED:
+            batch.refresh_from_db()
+            return _batch_response(batch)
+        return _batch_response(batch, status_code=202)
 
 
 class UploadBatchCancelAPIView(APIView):

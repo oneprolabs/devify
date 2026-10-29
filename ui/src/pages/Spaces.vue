@@ -91,6 +91,12 @@
           >
             {{ t('spaces.openWorkspace') }}
           </router-link>
+          <router-link
+            class="space-open-analysis"
+            :to="`/spaces/${selectedSpace.id}/analysis`"
+          >
+            {{ t('spaces.openAnalysis') }}
+          </router-link>
 
           <div class="space-section-title">
             <h3>{{ t('spaces.sources') }}</h3>
@@ -374,6 +380,19 @@ onMounted(loadSpaces)
 }
 .space-open-workspace:hover {
   opacity: 0.9;
+}
+.space-open-analysis {
+  display: inline-flex;
+  margin: 14px 16px 0;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 6px;
+  padding: 8px 11px;
+  color: rgb(var(--c-tx2));
+  font-size: 12px;
+}
+.space-open-analysis:hover {
+  border-color: rgb(var(--c-ac));
+  color: rgb(var(--c-ac));
 }
 .space-section-title {
   display: flex;

@@ -26,6 +26,7 @@ from .password import (
 from .token import (
     CustomTokenRefreshView,
 )
+
 from .user import (
     CustomUserDetailsView,
 )
@@ -36,20 +37,25 @@ from .scenes import (
 
 __all__ = [
     # Registration views
-    "SendRegistrationEmailView",
-    "VerifyRegistrationTokenView",
-    "CompleteRegistrationView",
-    "CheckVirtualEmailUsernameView",
+    'SendRegistrationEmailView',
+    'VerifyRegistrationTokenView',
+    'CompleteRegistrationView',
+    'CheckVirtualEmailUsernameView',
+
     # OAuth views
-    "CompleteGoogleSetupView",
-    "OAuthCallbackRedirectView",
+    'CompleteGoogleSetupView',
+    'OAuthCallbackRedirectView',
+
     # Password views
-    "SendPasswordResetEmailView",
-    "ConfirmPasswordResetView",
+    'SendPasswordResetEmailView',
+    'ConfirmPasswordResetView',
+
     # Token views
-    "CustomTokenRefreshView",
+    'CustomTokenRefreshView',
+
     # User views
-    "CustomUserDetailsView",
+    'CustomUserDetailsView',
+
     # Scene views
-    "GetAvailableScenesView",
+    'GetAvailableScenesView',
 ]

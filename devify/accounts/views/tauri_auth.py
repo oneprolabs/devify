@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import TauriAuthorizationCode
+from accounts.models import TauriAuthorizationCode, TauriDevice
 
 CLIENT_ID = os.getenv("TAURI_OAUTH_CLIENT_ID", "wechat-devify-tauri")
 REDIRECT_URI = os.getenv("TAURI_OAUTH_REDIRECT_URI", "devify://auth/callback")
@@ -84,6 +84,9 @@ class TauriTokenAPIView(APIView):
         redirect_uri = request.data.get("redirect_uri", "")
         code = request.data.get("code", "")
         verifier = request.data.get("code_verifier", "")
+        device_id = str(request.data.get("device_id", "")).strip()
+        device_label = str(request.data.get("device_label", "")).strip()[:120]
+        platform = str(request.data.get("platform", "")).strip()[:40]
         if (
             not _valid_client(client_id, redirect_uri)
             or not code
@@ -116,9 +119,23 @@ class TauriTokenAPIView(APIView):
             )
         if not grant.user.is_active:
             return Response({"detail": "User is inactive."}, status=400)
+        if not device_id:
+            device_id = secrets.token_urlsafe(24)
+        device, _ = TauriDevice.objects.update_or_create(
+            user=grant.user,
+            device_id=device_id,
+            defaults={
+                "label": device_label or grant.device_label,
+                "platform": platform,
+                "status": TauriDevice.Status.ACTIVE,
+                "revoked_at": None,
+                "last_seen_at": timezone.now(),
+            },
+        )
         grant.used_at = timezone.now()
         grant.save(update_fields=("used_at",))
         refresh = RefreshToken.for_user(grant.user)
+        refresh["device_id"] = device.device_id
         return Response(
             {
                 "access": str(refresh.access_token),
@@ -128,5 +145,48 @@ class TauriTokenAPIView(APIView):
                     refresh.access_token.lifetime.total_seconds()
                 ),
                 "device_label": grant.device_label,
+                "device_id": device.device_id,
             }
         )
+
+
+class TauriDeviceListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        devices = TauriDevice.objects.filter(user=request.user).order_by(
+            "-last_seen_at", "-id"
+        )
+        return Response(
+            {
+                "data": [
+                    {
+                        "device_id": device.device_id,
+                        "label": device.label,
+                        "platform": device.platform,
+                        "status": device.status,
+                        "last_seen_at": device.last_seen_at,
+                        "created_at": device.created_at,
+                        "revoked_at": device.revoked_at,
+                    }
+                    for device in devices
+                ]
+            }
+        )
+
+
+class TauriDeviceRevokeAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, device_id):
+        updated = TauriDevice.objects.filter(
+            user=request.user,
+            device_id=device_id,
+            status=TauriDevice.Status.ACTIVE,
+        ).update(
+            status=TauriDevice.Status.REVOKED,
+            revoked_at=timezone.now(),
+        )
+        if not updated:
+            return Response({"detail": "Device not found."}, status=404)
+        return Response(status=204)

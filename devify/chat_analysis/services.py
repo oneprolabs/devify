@@ -101,6 +101,34 @@ def create_analysis_job(
 
 
 @transaction.atomic
+def retry_analysis_job(*, actor, job):
+    """Requeue a terminal analysis job after checking current permissions."""
+    ensure_can_contribute(actor, job.space)
+    job = AnalysisJob.objects.select_for_update().get(pk=job.pk)
+    if job.state not in (
+        AnalysisJob.State.FAILED,
+        AnalysisJob.State.PARTIAL,
+    ):
+        raise ChatAnalysisConflict(
+            "Only failed or partial analysis jobs can be retried."
+        )
+    job.state = AnalysisJob.State.QUEUED
+    job.lease_owner = ""
+    job.lease_until = None
+    job.error = ""
+    job.save(
+        update_fields=(
+            "state",
+            "lease_owner",
+            "lease_until",
+            "error",
+            "updated_at",
+        )
+    )
+    return job
+
+
+@transaction.atomic
 def create_note(
     *,
     actor,

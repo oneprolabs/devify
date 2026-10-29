@@ -224,9 +224,7 @@ def _parse_conversations(batch, manifest, package):
     for number, record in package.iter_jsonl(name):
         where = _where(name, number)
         records += 1
-        source_id = _string(
-            record, "conversation_id", where, max_length=255
-        )
+        source_id = _string(record, "conversation_id", where, max_length=255)
         scope_key = _string(record, "scope_key", where, max_length=255)
         if not source_id and not scope_key:
             raise ArchiveParseError(
@@ -295,9 +293,7 @@ def _parse_conversations(batch, manifest, package):
 def _conversation(conversations, record, where):
     source_id = _string(record, "conversation_id", where, max_length=255)
     if not source_id:
-        raise ArchiveParseError(
-            f"{where}: 'conversation_id' is required."
-        )
+        raise ArchiveParseError(f"{where}: 'conversation_id' is required.")
     conversation = conversations.get(source_id)
     if conversation is None:
         raise ArchiveParseError(
@@ -352,9 +348,7 @@ def _parse_messages(
                 Message.RecordKind.MESSAGE,
             ),
             sender_key=_string(record, "sender_key", where, max_length=255),
-            sender_name=_string(
-                record, "sender_name", where, max_length=255
-            ),
+            sender_name=_string(record, "sender_name", where, max_length=255),
             direction=_choice(
                 record,
                 "direction",
@@ -412,9 +406,7 @@ def _message(messages, conversation, record, where):
         raise ArchiveParseError(f"{where}: 'message_key' is required.")
     message = messages.get((conversation.pk, message_key))
     if message is None:
-        raise ArchiveParseError(
-            f"{where}: unknown message {message_key!r}."
-        )
+        raise ArchiveParseError(f"{where}: unknown message {message_key!r}.")
     return message
 
 
@@ -440,9 +432,7 @@ def _parse_parts(package, conversations, messages, items):
         )
         ordinal = _integer(record, "ordinal", where) or 0
 
-        parent_key = _string(
-            record, "parent_part_key", where, max_length=255
-        )
+        parent_key = _string(record, "parent_part_key", where, max_length=255)
         parent = None
         if parent_key:
             parent = parts.get((message.pk, parent_key))
@@ -500,9 +490,10 @@ def _parse_origins(package, manifest, conversations, messages, items):
         locator_key = _string(
             record, "locator_key", where, max_length=255, required=True
         )
-        parser_version = _string(
-            record, "parser_version", where, max_length=50
-        ) or manifest.schema_version
+        parser_version = (
+            _string(record, "parser_version", where, max_length=50)
+            or manifest.schema_version
+        )
         upload_item_path = _string(
             record, "upload_item_path", where, max_length=500
         )
@@ -571,9 +562,7 @@ def _parse_locked(batch):
     message_item.message_count = created_count
     if created_count == 0 and duplicate_count:
         message_item.status = UploadItem.Status.DUPLICATE
-    message_item.save(
-        update_fields=("message_count", "status", "updated_at")
-    )
+    message_item.save(update_fields=("message_count", "status", "updated_at"))
 
     batch.message_count = created_count
     batch.duplicate_count = duplicate_count
@@ -583,7 +572,7 @@ def _parse_locked(batch):
     transition_batch(batch, UploadBatch.Status.COMPLETED, error_message="")
 
 
-def parse_archive(batch):
+def parse_archive(batch, *, retry_transient=False):
     """Parse a stored archive and move the batch to completed or failed.
 
     The caller is expected to have moved the batch to ``processing`` (the
@@ -607,6 +596,8 @@ def parse_archive(batch):
             zipfile.BadZipFile,
             OSError,
         ) as error:
+            if retry_transient and isinstance(error, (RuntimeError, OSError)):
+                raise
             batch.refresh_from_db(fields=("status", "error_message"))
             if batch.status == UploadBatch.Status.PROCESSING:
                 message = str(error) or error.__class__.__name__

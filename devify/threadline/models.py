@@ -21,6 +21,27 @@ from threadline.state_machine import (
 
 logger = logging.getLogger(__name__)
 
+
+def _ensure_personal_space_id(user_id):
+    """Return the user's personal space, creating it for legacy callers."""
+    from spaces.models import Space
+    from spaces.services import SpaceBootstrapService
+
+    space = Space.objects.filter(personal_owner_id=user_id).first()
+    if space:
+        return space.pk
+    return SpaceBootstrapService.ensure_personal_space(
+        User.objects.get(pk=user_id)
+    ).pk
+
+
+def _assign_personal_space(instance):
+    if not instance._state.adding or instance.space_id is not None:
+        return
+    if instance.user_id:
+        instance.space_id = _ensure_personal_space_id(instance.user_id)
+
+
 class Settings(models.Model):
     """
     User settings using key-value design with JSON values
@@ -296,6 +317,13 @@ class EmailMessage(models.Model):
         verbose_name=_("User"),
         related_name="email_messages",
     )
+    space = models.ForeignKey(
+        "spaces.Space",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="email_messages",
+    )
     message_id = models.CharField(
         max_length=255,
         verbose_name=_("Message ID"),
@@ -541,6 +569,7 @@ class EmailMessage(models.Model):
         """
         Override save to automatically validate status transitions
         """
+        _assign_personal_space(self)
         update_fields = kwargs.get("update_fields")
         update_fields_set = (
             set(update_fields) if update_fields is not None else None
@@ -609,6 +638,13 @@ class EmailAttachment(models.Model):
         on_delete=models.CASCADE,
         verbose_name=_("User"),
         related_name="attachments",
+    )
+    space = models.ForeignKey(
+        "spaces.Space",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="email_attachments",
     )
     email_message = models.ForeignKey(
         EmailMessage,
@@ -682,6 +718,15 @@ class EmailAttachment(models.Model):
             models.Index(fields=["user", "content_md5"]),
             models.Index(fields=["email_message"]),
         ]
+
+    def save(self, *args, **kwargs):
+        if (
+            self._state.adding
+            and self.space_id is None
+            and self.email_message_id
+        ):
+            self.space_id = self.email_message.space_id
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.filename} ({self.content_type})"
@@ -988,7 +1033,6 @@ class ThreadlineShareLink(models.Model):
         self.last_viewed_at = timestamp
 
 
-
 class EmailMailbox(models.Model):
     """
     One IMAP mailbox a user has connected.
@@ -1014,6 +1058,13 @@ class EmailMailbox(models.Model):
         on_delete=models.CASCADE,
         related_name="mailboxes",
         verbose_name=_("User"),
+    )
+    space = models.ForeignKey(
+        "spaces.Space",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="email_mailboxes",
     )
     name = models.CharField(
         max_length=100,
@@ -1094,6 +1145,10 @@ class EmailMailbox(models.Model):
     def __str__(self) -> str:
         return f"{self.display_name} -> {self.user_id}"
 
+    def save(self, *args, **kwargs):
+        _assign_personal_space(self)
+        super().save(*args, **kwargs)
+
     @property
     def display_name(self) -> str:
         return self.name or self.username
@@ -1152,6 +1207,7 @@ class EmailMailbox(models.Model):
         from expense.services.routing import subject_terms
 
         return subject_terms(self.user)
+
 
 class EmailAlias(models.Model):
     """

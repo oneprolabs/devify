@@ -34,6 +34,12 @@ def _serialize_space(space, user):
     data = dict(serializer.data)
     membership = SpacePermissionService.membership(user, space)
     data["role"] = membership.role if membership else None
+    data["admin_takeover_active"] = bool(
+        user.is_staff
+        and SpaceTakeover.objects.filter(
+            space=space, admin=user, active=True
+        ).exists()
+    )
     return data
 
 
@@ -307,6 +313,31 @@ class SpaceMemberAcceptAPIView(APIView):
         return Response(
             {"data": {"user_id": user_id, "status": membership.status}}
         )
+
+    @transaction.atomic
+    def delete(self, request, space_id, user_id):
+        space = get_object_or_404(Space, pk=space_id)
+        membership = SpaceMembership.objects.filter(
+            space=space,
+            user_id=user_id,
+            status=SpaceMembership.Status.INVITED,
+        ).first()
+        if not membership:
+            return Response({"detail": "Invitation not found."}, status=404)
+        if membership.user_id != request.user.id:
+            return Response(
+                {"detail": "Only the invited user can reject."}, status=403
+            )
+        membership.status = SpaceMembership.Status.REMOVED
+        membership.save(update_fields=("status", "updated_at"))
+        audit_space_action(
+            actor=request.user,
+            space=space,
+            action="membership.rejected",
+            resource_type="user",
+            resource_id=request.user.pk,
+        )
+        return Response(status=204)
 
 
 class SpaceMemberActionAPIView(APIView):

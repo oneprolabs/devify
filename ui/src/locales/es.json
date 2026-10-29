@@ -567,6 +567,27 @@
     "relationRejected": "Rechazada",
     "uploadPackage": "Subir paquete",
     "uploading": "Subiendo…",
-    "openOperations": "Operaciones"
+    "openOperations": "Operaciones",
+    "create": "Crear espacio de equipo",
+    "nameField": "Nombre del espacio",
+    "slugField": "Slug (opcional)",
+    "management": "Gestión",
+    "rename": "Renombrar",
+    "archive": "Archivar",
+    "restore": "Restaurar",
+    "takeover": "Tomar control",
+    "endTakeover": "Finalizar control",
+    "invite": "Invitar",
+    "userId": "ID de usuario",
+    "transfer": "Transferir Owner",
+    "noMembers": "Sin miembros",
+    "noMembersBody": "Este espacio no tiene miembros activos.",
+    "confirmArchive": "¿Cambiar el estado del espacio?",
+    "confirmEndTakeover": "¿Finalizar el control administrativo?",
+    "takeoverReason": "Motivo",
+    "supportInvestigation": "Investigación de soporte",
+    "confirmRole": "¿Cambiar el rol?",
+    "confirmRemove": "¿Eliminar este miembro?",
+    "confirmTransfer": "¿Transferir Owner a este miembro?"
   }
 }

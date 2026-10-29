@@ -8,6 +8,13 @@
         <template #actions>
           <button
             type="button"
+            class="space-create"
+            @click="showCreate = !showCreate"
+          >
+            {{ t('spaces.create') }}
+          </button>
+          <button
+            type="button"
             class="space-refresh"
             :disabled="loading"
             @click="loadSpaces"
@@ -18,6 +25,26 @@
       </PageHeader>
 
       <div v-if="error" class="space-alert" role="alert">{{ error }}</div>
+      <form
+        v-if="showCreate"
+        class="space-create-form"
+        @submit.prevent="createSpace"
+      >
+        <label
+          ><span>{{ t('spaces.nameField') }}</span
+          ><input v-model="createForm.name" required maxlength="120"
+        /></label>
+        <label
+          ><span>{{ t('spaces.slugField') }}</span
+          ><input v-model="createForm.slug" maxlength="140"
+        /></label>
+        <button type="submit" class="space-create" :disabled="actionLoading">
+          {{ t('common.save') }}
+        </button>
+        <button type="button" class="space-cancel" @click="showCreate = false">
+          {{ t('common.cancel') }}
+        </button>
+      </form>
 
       <div class="space-grid">
         <section class="space-panel" aria-labelledby="space-list-title">
@@ -145,6 +172,112 @@
               </div>
             </div>
           </div>
+          <div v-if="selectedSpace.kind === 'team'" class="management-section">
+            <div class="space-section-title">
+              <h3>{{ t('spaces.management') }}</h3>
+              <span>{{ selectedSpace.role || '—' }}</span>
+            </div>
+            <div class="management-actions">
+              <button
+                v-if="canManage"
+                type="button"
+                class="space-action"
+                @click="renameSpace"
+              >
+                {{ t('spaces.rename') }}
+              </button>
+              <button
+                v-if="isOwner"
+                type="button"
+                class="space-action"
+                @click="toggleArchive"
+              >
+                {{
+                  selectedSpace.status === 'archived'
+                    ? t('spaces.restore')
+                    : t('spaces.archive')
+                }}
+              </button>
+              <button
+                v-if="isStaff"
+                type="button"
+                class="space-action"
+                @click="toggleTakeover"
+              >
+                {{
+                  takeoverActive
+                    ? t('spaces.endTakeover')
+                    : t('spaces.takeover')
+                }}
+              </button>
+            </div>
+            <div v-if="canManage" class="invite-form">
+              <input
+                v-model="inviteForm.userId"
+                inputmode="numeric"
+                :placeholder="t('spaces.userId')"
+              />
+              <select v-model="inviteForm.role">
+                <option value="user">User</option>
+                <option value="maintainer">Maintainer</option>
+                <option value="guest">Guest</option>
+              </select>
+              <button
+                type="button"
+                class="space-action primary"
+                @click="inviteMember"
+              >
+                {{ t('spaces.invite') }}
+              </button>
+            </div>
+            <div v-if="membersLoading" class="space-loading">
+              {{ t('common.loading') }}
+            </div>
+            <div v-else class="member-list">
+              <div
+                v-for="member in members"
+                :key="member.user_id"
+                class="member-row"
+              >
+                <div>
+                  <strong>{{ member.username }}</strong
+                  ><small>#{{ member.user_id }} · {{ member.status }}</small>
+                </div>
+                <div class="member-actions">
+                  <select
+                    v-if="canManage && member.role !== 'owner'"
+                    :value="member.role"
+                    @change="changeRole(member, $event.target.value)"
+                  >
+                    <option value="maintainer">Maintainer</option>
+                    <option value="user">User</option>
+                    <option value="guest">Guest</option>
+                  </select>
+                  <span v-else class="member-role">{{ member.role }}</span>
+                  <button
+                    v-if="isOwner && member.role !== 'owner'"
+                    type="button"
+                    class="text-danger"
+                    @click="transferOwnership(member)"
+                  >
+                    {{ t('spaces.transfer') }}
+                  </button>
+                  <button
+                    v-if="canManage && member.role !== 'owner'"
+                    type="button"
+                    class="text-danger"
+                    @click="removeMember(member)"
+                  >
+                    {{ t('common.delete') }}
+                  </button>
+                </div>
+              </div>
+              <div v-if="!members.length" class="space-empty compact">
+                <strong>{{ t('spaces.noMembers') }}</strong
+                ><span>{{ t('spaces.noMembersBody') }}</span>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section
@@ -163,11 +296,13 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useUserStore } from '@/store/user'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { spacesApi } from '@/api/spaces'
 
 const { t } = useI18n()
+const userStore = useUserStore()
 const spaces = ref([])
 const sources = ref([])
 const selectedId = ref(
@@ -176,6 +311,21 @@ const selectedId = ref(
 const loading = ref(false)
 const sourcesLoading = ref(false)
 const error = ref('')
+const members = ref([])
+const membersLoading = ref(false)
+const actionLoading = ref(false)
+const showCreate = ref(false)
+const createForm = ref({ name: '', slug: '' })
+const inviteForm = ref({ userId: '', role: 'user' })
+
+const canManage = computed(() =>
+  ['owner', 'maintainer'].includes(selectedSpace.value?.role)
+)
+const isOwner = computed(() => selectedSpace.value?.role === 'owner')
+const isStaff = computed(() => Boolean(userStore.isAdmin))
+const takeoverActive = computed(() =>
+  Boolean(selectedSpace.value?.admin_takeover_active)
+)
 
 const selectedSpace = computed(
   () => spaces.value.find((space) => space.id === selectedId.value) || null
@@ -203,6 +353,90 @@ const loadSources = async () => {
   }
 }
 
+const loadMembers = async () => {
+  if (!selectedSpace.value || selectedSpace.value.kind !== 'team') return
+  membersLoading.value = true
+  try {
+    const response = await spacesApi.getMembers(selectedSpace.value.id)
+    members.value = response.data.data || response.data || []
+  } catch (requestError) {
+    error.value = requestError.response?.data?.detail || t('spaces.loadError')
+  } finally {
+    membersLoading.value = false
+  }
+}
+
+const runAction = async (action) => {
+  actionLoading.value = true
+  try {
+    await action()
+    await loadSpaces()
+    await loadMembers()
+  } catch (requestError) {
+    error.value = requestError.response?.data?.detail || t('spaces.loadError')
+  } finally {
+    actionLoading.value = false
+  }
+}
+const createSpace = () =>
+  runAction(async () => {
+    await spacesApi.createSpace(createForm.value)
+    showCreate.value = false
+    createForm.value = { name: '', slug: '' }
+  })
+const renameSpace = () => {
+  const name = window.prompt(t('spaces.nameField'), selectedSpace.value.name)
+  if (name && name !== selectedSpace.value.name)
+    runAction(() => spacesApi.updateSpace(selectedSpace.value.id, { name }))
+}
+const toggleArchive = () => {
+  const next = selectedSpace.value.status === 'archived' ? 'active' : 'archived'
+  if (window.confirm(t('spaces.confirmArchive')))
+    runAction(() =>
+      spacesApi.updateSpace(selectedSpace.value.id, { status: next })
+    )
+}
+const toggleTakeover = () => {
+  if (takeoverActive.value) {
+    if (window.confirm(t('spaces.confirmEndTakeover')))
+      runAction(() => spacesApi.endTakeover(selectedSpace.value.id))
+  } else {
+    const reason = window.prompt(
+      t('spaces.takeoverReason'),
+      t('spaces.supportInvestigation')
+    )
+    if (reason)
+      runAction(() => spacesApi.takeoverSpace(selectedSpace.value.id, reason))
+  }
+}
+const inviteMember = () => {
+  if (!inviteForm.value.userId) return
+  runAction(() =>
+    spacesApi.inviteMember(selectedSpace.value.id, {
+      user_id: Number(inviteForm.value.userId),
+      role: inviteForm.value.role
+    })
+  )
+}
+const changeRole = (member, role) => {
+  if (window.confirm(t('spaces.confirmRole')))
+    runAction(() =>
+      spacesApi.updateMember(selectedSpace.value.id, member.user_id, { role })
+    )
+}
+const removeMember = (member) => {
+  if (window.confirm(t('spaces.confirmRemove')))
+    runAction(() =>
+      spacesApi.removeMember(selectedSpace.value.id, member.user_id)
+    )
+}
+const transferOwnership = (member) => {
+  if (window.confirm(t('spaces.confirmTransfer')))
+    runAction(() =>
+      spacesApi.transferOwnership(selectedSpace.value.id, member.user_id)
+    )
+}
+
 const loadSpaces = async () => {
   loading.value = true
   error.value = ''
@@ -219,7 +453,10 @@ const loadSpaces = async () => {
   }
 }
 
-watch(selectedId, loadSources)
+watch(selectedId, async () => {
+  await loadSources()
+  await loadMembers()
+})
 onMounted(loadSpaces)
 </script>
 
@@ -412,6 +649,80 @@ onMounted(loadSpaces)
 .space-open-operations:hover {
   border-color: rgb(var(--c-ac));
   color: rgb(var(--c-ac));
+}
+.management-section {
+  border-top: 1px solid rgb(var(--c-line));
+  margin-top: 14px;
+}
+.management-actions,
+.invite-form,
+.member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 0 16px 10px;
+}
+.space-action,
+.space-cancel {
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 5px;
+  padding: 6px 9px;
+  color: rgb(var(--c-tx2));
+  font-size: 11px;
+}
+.space-action:hover {
+  border-color: rgb(var(--c-ac));
+  color: rgb(var(--c-ac));
+}
+.space-action.primary {
+  border-color: rgb(var(--c-ac));
+  background: rgb(var(--c-ac));
+  color: rgb(var(--c-ac-on));
+}
+.text-danger {
+  color: rgb(var(--c-bad));
+  font-size: 10px;
+}
+.invite-form input,
+.invite-form select,
+.member-actions select {
+  width: 110px;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 5px;
+  background: rgb(var(--c-panel));
+  padding: 6px 7px;
+  color: rgb(var(--c-tx));
+  font-size: 11px;
+}
+.member-list {
+  padding: 0 8px 8px;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid rgb(var(--c-line-soft));
+  padding: 9px 8px;
+}
+.member-row > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.member-row strong {
+  color: rgb(var(--c-tx));
+  font-size: 12px;
+}
+.member-row small {
+  color: rgb(var(--c-tx3));
+  font-size: 10px;
+}
+.member-role {
+  color: rgb(var(--c-tx3));
+  font-size: 10px;
 }
 .space-section-title {
   display: flex;

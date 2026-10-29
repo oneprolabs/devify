@@ -1749,6 +1749,27 @@
     "relationRejected": "Rejected",
     "uploadPackage": "Upload package",
     "uploading": "Uploading…",
-    "openOperations": "Operations"
+    "openOperations": "Operations",
+    "create": "Create team space",
+    "nameField": "Space name",
+    "slugField": "Slug (optional)",
+    "management": "Management",
+    "rename": "Rename",
+    "archive": "Archive",
+    "restore": "Restore",
+    "takeover": "Take over",
+    "endTakeover": "End takeover",
+    "invite": "Invite",
+    "userId": "User ID",
+    "transfer": "Transfer owner",
+    "noMembers": "No members",
+    "noMembersBody": "This space currently has no active members.",
+    "confirmArchive": "Change this space status?",
+    "confirmEndTakeover": "End administrator takeover?",
+    "takeoverReason": "Takeover reason",
+    "supportInvestigation": "Support investigation",
+    "confirmRole": "Change this member role?",
+    "confirmRemove": "Remove this member?",
+    "confirmTransfer": "Transfer ownership to this member?"
   }
 }

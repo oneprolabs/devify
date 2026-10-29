@@ -1,0 +1,102 @@
+import base64
+import hashlib
+import secrets
+from urllib.parse import parse_qs, urlparse
+
+import pytest
+from django.contrib.auth.models import User
+from rest_framework.test import APIClient
+
+pytestmark = pytest.mark.django_db
+
+
+def challenge(verifier):
+    digest = hashlib.sha256(verifier.encode()).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
+
+def test_tauri_code_exchange_requires_pkce_and_is_one_time():
+    user = User.objects.create_user(
+        username="tauri-auth-user", password="secret"
+    )
+    client = APIClient()
+    client.force_authenticate(user=user)
+    verifier = secrets.token_urlsafe(32)
+    state = secrets.token_urlsafe(12)
+    authorize = client.get(
+        "/api/v1/auth/tauri/authorize",
+        {
+            "client_id": "wechat-devify-tauri",
+            "redirect_uri": "devify://auth/callback",
+            "response_type": "code",
+            "state": state,
+            "code_challenge": challenge(verifier),
+            "code_challenge_method": "S256",
+            "device_label": "Test Mac",
+        },
+    )
+    assert authorize.status_code == 302
+    callback = urlparse(authorize["Location"])
+    query = parse_qs(callback.query)
+    assert query["state"] == [state]
+    assert "access" not in query
+    assert "refresh" not in query
+
+    exchanged = client.post(
+        "/api/v1/auth/tauri/token",
+        {
+            "grant_type": "authorization_code",
+            "client_id": "wechat-devify-tauri",
+            "redirect_uri": "devify://auth/callback",
+            "code": query["code"][0],
+            "code_verifier": verifier,
+        },
+        format="json",
+    )
+    assert exchanged.status_code == 200
+    assert exchanged.data["access"]
+    assert exchanged.data["refresh"]
+    assert exchanged.data["device_label"] == "Test Mac"
+
+    replay = client.post(
+        "/api/v1/auth/tauri/token",
+        {
+            "grant_type": "authorization_code",
+            "client_id": "wechat-devify-tauri",
+            "redirect_uri": "devify://auth/callback",
+            "code": query["code"][0],
+            "code_verifier": verifier,
+        },
+        format="json",
+    )
+    assert replay.status_code == 400
+
+
+def test_tauri_code_exchange_rejects_wrong_verifier():
+    user = User.objects.create_user(username="tauri-auth-pkce")
+    client = APIClient()
+    client.force_authenticate(user=user)
+    verifier = secrets.token_urlsafe(32)
+    response = client.get(
+        "/api/v1/auth/tauri/authorize",
+        {
+            "client_id": "wechat-devify-tauri",
+            "redirect_uri": "devify://auth/callback",
+            "response_type": "code",
+            "state": "state",
+            "code_challenge": challenge(verifier),
+        },
+    )
+    code = parse_qs(urlparse(response["Location"]).query)["code"][0]
+    exchange = client.post(
+        "/api/v1/auth/tauri/token",
+        {
+            "grant_type": "authorization_code",
+            "client_id": "wechat-devify-tauri",
+            "redirect_uri": "devify://auth/callback",
+            "code": code,
+            "code_verifier": "wrong",
+        },
+        format="json",
+    )
+    assert exchange.status_code == 400

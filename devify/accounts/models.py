@@ -23,8 +23,10 @@ Other methods to extend the User model:
     - Subclassing User: Create a custom user model with your own fields.
     - Using a ForeignKey: Establish a many-to-one relationship for extensions.
 """
+
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 
 
 class Profile(models.Model):
@@ -43,17 +45,14 @@ class Profile(models.Model):
         )
     """
 
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE
-    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
 
     registration_completed = models.BooleanField(
         default=False,
         help_text=(
             "Indicates whether user has completed the registration process "
             "(set password, virtual email, scene selection)."
-        )
+        ),
     )
 
     registration_token = models.CharField(
@@ -65,54 +64,51 @@ class Profile(models.Model):
         help_text=(
             "Temporary token for email registration verification. "
             "Expires after REGISTRATION_TOKEN_EXPIRY_HOURS."
-        )
+        ),
     )
 
     registration_token_expires = models.DateTimeField(
         null=True,
         blank=True,
-        help_text="Expiration datetime for registration_token."
+        help_text="Expiration datetime for registration_token.",
     )
 
     nickname = models.CharField(
-        max_length=30,
-        blank=True,
-        help_text="User nickname."
+        max_length=30, blank=True, help_text="User nickname."
     )
 
     avatar_url = models.URLField(
-        blank=True,
-        help_text="URL link to the user's avatar."
+        blank=True, help_text="URL link to the user's avatar."
     )
 
     bio = models.TextField(
         max_length=500,
         blank=True,
-        help_text="Personal biography or description."
+        help_text="Personal biography or description.",
     )
 
     language = models.CharField(
         max_length=10,
-        default='en-US',
+        default="en-US",
         choices=[
-            ('en-US', 'English'),
-            ('zh-CN', '简体中文'),
-            ('es', 'Español'),
+            ("en-US", "English"),
+            ("zh-CN", "简体中文"),
+            ("es", "Español"),
         ],
         help_text=(
             "Specifies the language used by AI when generating summaries, "
             "titles, and metadata. This is a global setting shared across "
             "all applications."
-        )
+        ),
     )
 
     timezone = models.CharField(
         max_length=50,
-        default='UTC',
+        default="UTC",
         help_text=(
             "User's timezone for displaying dates and times. "
             "Common values: 'UTC', 'Asia/Shanghai', 'America/New_York', etc."
-        )
+        ),
     )
 
     def __str__(self):
@@ -121,3 +117,31 @@ class Profile(models.Model):
         representation of the Profile instance.
         """
         return self.user.username
+
+
+class TauriAuthorizationCode(models.Model):
+    """One-time authorization code for the native Tauri client."""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="tauri_authorization_codes",
+    )
+    code_hash = models.CharField(max_length=128, unique=True)
+    client_id = models.CharField(max_length=100)
+    redirect_uri = models.CharField(max_length=500)
+    code_challenge = models.CharField(max_length=128)
+    device_label = models.CharField(max_length=120, blank=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("user", "created_at")),
+            models.Index(fields=("expires_at", "used_at")),
+        ]
+
+    @property
+    def is_expired(self):
+        return self.expires_at <= timezone.now()

@@ -1,12 +1,15 @@
 from django.urls import path
 from rest_framework.permissions import AllowAny
 from dj_rest_auth.views import (
-    LoginView, LogoutView,
-    PasswordResetView, PasswordResetConfirmView, PasswordChangeView,
+    LoginView,
+    LogoutView,
+    PasswordChangeView,
 )
 from dj_rest_auth.registration.views import (
-    RegisterView, VerifyEmailView,
-    SocialLoginView, SocialConnectView
+    RegisterView,
+    VerifyEmailView,
+    SocialLoginView,
+    SocialConnectView,
 )
 
 from accounts.views import (
@@ -21,75 +24,80 @@ from accounts.views import (
     SendRegistrationEmailView,
     VerifyRegistrationTokenView,
 )
+from accounts.views.tauri_auth import TauriAuthorizeAPIView, TauriTokenAPIView
+
 
 class CustomLoginView(LoginView):
     permission_classes = [AllowAny]
 
+
 urlpatterns = [
     # Login endpoint
-    path(
-        'api/v1/auth/login',
-        CustomLoginView.as_view(),
-        name='rest_login'
-    ),
+    path("api/v1/auth/login", CustomLoginView.as_view(), name="rest_login"),
     # Logout endpoint
+    path("api/v1/auth/logout", LogoutView.as_view(), name="rest_logout"),
     path(
-        'api/v1/auth/logout',
-        LogoutView.as_view(),
-        name='rest_logout'
+        "api/v1/auth/token/refresh",
+        CustomTokenRefreshView.as_view(),
+        name="rest_token_refresh",
     ),
     path(
-        'api/v1/auth/token/refresh',
-        CustomTokenRefreshView.as_view(),
-        name='rest_token_refresh'
+        "api/v1/auth/tauri/authorize",
+        TauriAuthorizeAPIView.as_view(),
+        name="tauri_authorize",
+    ),
+    path(
+        "api/v1/auth/tauri/token",
+        TauriTokenAPIView.as_view(),
+        name="tauri_token",
     ),
     # Get or update user details
     path(
-        'api/v1/auth/user',
+        "api/v1/auth/user",
         CustomUserDetailsView.as_view(),
-        name='rest_user_details'
+        name="rest_user_details",
     ),
     # Request password reset (custom implementation)
     path(
-        'api/v1/auth/password/reset',
+        "api/v1/auth/password/reset",
         SendPasswordResetEmailView.as_view(),
-        name='rest_password_reset'
+        name="rest_password_reset",
     ),
     # Confirm password reset (custom implementation)
     path(
-        'api/v1/auth/password/reset/confirm',
+        "api/v1/auth/password/reset/confirm",
         ConfirmPasswordResetView.as_view(),
-        name='rest_password_reset_confirm'
+        name="rest_password_reset_confirm",
     ),
     # Change password
     path(
-        'api/v1/auth/password/change',
+        "api/v1/auth/password/change",
         PasswordChangeView.as_view(),
-        name='rest_password_change'
+        name="rest_password_change",
     ),
     # Register new user
     path(
-        'api/v1/auth/registration',
+        "api/v1/auth/registration",
         RegisterView.as_view(),
-        name='rest_register'
+        name="rest_register",
     ),
     # Verify email after registration
     path(
-        'api/v1/auth/registration/verify-email',
+        "api/v1/auth/registration/verify-email",
         VerifyEmailView.as_view(),
-        name='rest_verify_email'
+        name="rest_verify_email",
     ),
     # Social login endpoint
     path(
-        'api/v1/auth/social/login',
+        "api/v1/auth/social/login",
         SocialLoginView.as_view(),
-        name='social_login'
+        name="social_login",
     ),
     # Social connect endpoint
     path(
-        'api/v1/auth/social/connect',
+        "api/v1/auth/social/connect",
         SocialConnectView.as_view(),
-        name='social_connect'
+        name="social_connect",
     ),
     # Social disconnect endpoint (uncomment if needed)
     # path(
@@ -97,47 +105,43 @@ urlpatterns = [
     #     SocialDisconnectView.as_view(),
     #     name='social_disconnect'
     # ),
-
     # Custom registration endpoints
     path(
-        'api/v1/auth/register/send-email',
+        "api/v1/auth/register/send-email",
         SendRegistrationEmailView.as_view(),
-        name='register_send_email'
+        name="register_send_email",
     ),
     path(
-        'api/v1/auth/register/verify-token/<str:token>',
+        "api/v1/auth/register/verify-token/<str:token>",
         VerifyRegistrationTokenView.as_view(),
-        name='register_verify_token'
+        name="register_verify_token",
     ),
     path(
-        'api/v1/auth/register/complete',
+        "api/v1/auth/register/complete",
         CompleteRegistrationView.as_view(),
-        name='register_complete'
+        name="register_complete",
     ),
     path(
-        'api/v1/auth/check-username/<str:username>',
+        "api/v1/auth/check-username/<str:username>",
         CheckVirtualEmailUsernameView.as_view(),
-        name='check_username'
+        name="check_username",
     ),
-
     # OAuth complete setup (generic for all OAuth providers)
     path(
-        'api/v1/auth/oauth/complete-setup',
+        "api/v1/auth/oauth/complete-setup",
         CompleteGoogleSetupView.as_view(),
-        name='oauth_complete_setup'
+        name="oauth_complete_setup",
     ),
-
     # Backward compatibility: Google-specific endpoint
     path(
-        'api/v1/auth/google/complete-setup',
+        "api/v1/auth/google/complete-setup",
         CompleteGoogleSetupView.as_view(),
-        name='google_complete_setup'
+        name="google_complete_setup",
     ),
-
     # Utility endpoints
     path(
-        'api/v1/auth/scenes',
+        "api/v1/auth/scenes",
         GetAvailableScenesView.as_view(),
-        name='available_scenes'
+        name="available_scenes",
     ),
 ]

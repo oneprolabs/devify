@@ -1748,6 +1748,16 @@
     "noOperationsBody": "开始上传或分析后，状态会显示在这里。",
     "unknownSource": "未知来源",
     "duplicates": "重复",
-    "attempts": "次尝试"
+    "attempts": "次尝试",
+    "relationRelated": "相关",
+    "relationSame": "同一事件",
+    "relationSeparate": "保持独立",
+    "relationDepends": "依赖",
+    "relationPending": "待确认",
+    "relationAccepted": "已接受",
+    "relationRejected": "已拒绝",
+    "uploadPackage": "上传聊天包",
+    "uploading": "上传中…",
+    "openOperations": "操作状态"
   }
 }

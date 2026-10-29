@@ -1739,6 +1739,16 @@
     "noOperationsBody": "Uploads and analysis jobs will appear here after work starts.",
     "unknownSource": "unknown source",
     "duplicates": "duplicates",
-    "attempts": "attempts"
+    "attempts": "attempts",
+    "relationRelated": "Related",
+    "relationSame": "Same",
+    "relationSeparate": "Separate",
+    "relationDepends": "Depends on",
+    "relationPending": "Pending",
+    "relationAccepted": "Accepted",
+    "relationRejected": "Rejected",
+    "uploadPackage": "Upload package",
+    "uploading": "Uploading…",
+    "openOperations": "Operations"
   }
 }

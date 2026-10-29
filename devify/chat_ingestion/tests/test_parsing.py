@@ -9,6 +9,7 @@ from chat_domain.models import (
     MessageOrigin,
     MessagePart,
 )
+from chat_analysis.models import AnalysisJob, Note
 from chat_ingestion.models import UploadBatch, UploadItem
 from chat_ingestion.tests.archives import build_archive, default_manifest
 from spaces.models import Space, SpaceMembership
@@ -107,11 +108,12 @@ def test_complete_parses_archive_into_conversations_messages_and_parts():
     assert image_part.upload_item.path == "media/photo.png"
     assert image_part.binding_state == MessagePart.BindingState.AVAILABLE
 
-    origins = MessageOrigin.objects.filter(
-        message__conversation=conversation
-    )
+    origins = MessageOrigin.objects.filter(message__conversation=conversation)
     assert origins.count() == 2
     assert {origin.parser_version for origin in origins} == {"wechat.v1"}
+    job = AnalysisJob.objects.get(conversation=conversation)
+    assert job.state in (AnalysisJob.State.READY, AnalysisJob.State.PARTIAL)
+    assert Note.objects.filter(analysis_job=job).count() == 1
 
 
 def test_reimport_dedupes_messages_and_records_new_origins():
@@ -379,9 +381,9 @@ def test_origin_file_records_a_second_source_for_the_same_message():
     origin = MessageOrigin.objects.get(locator_key="offset:42")
     assert origin.upload_item.path == "raw/export.json"
     assert origin.record_locator == {"offset": 42}
-    assert MessageOrigin.objects.filter(
-        message__message_key="srv:1"
-    ).count() == 2
+    assert (
+        MessageOrigin.objects.filter(message__message_key="srv:1").count() == 2
+    )
 
 
 def test_messages_without_ids_dedupe_by_locator_and_file_hash():

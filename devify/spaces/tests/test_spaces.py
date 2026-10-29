@@ -593,6 +593,7 @@ def test_user_can_list_own_invitations_only():
     assert response.data["data"] == [
         {
             "space_id": space.id,
+            "user_id": invited.id,
             "space_name": space.name,
             "space_slug": space.slug,
             "role": "guest",

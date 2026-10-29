@@ -1,9 +1,10 @@
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import path, include
+from django.urls import include, path
 
 from accounts.views import OAuthCallbackRedirectView
-from .swagger import schema_view, swagger_view, redoc_view
+
+from .swagger import redoc_view, schema_view, swagger_view
 
 # Define project URL routing configuration
 urlpatterns = [

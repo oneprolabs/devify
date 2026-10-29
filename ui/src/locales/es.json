@@ -477,5 +477,25 @@
     "label": "Tamaño de texto",
     "standard": "Estándar",
     "large": "Grande"
+  },
+  "spaces": {
+    "menuTitle": "Espacios",
+    "title": "Espacios",
+    "subtitle": "Elige un espacio y revisa sus fuentes conectadas.",
+    "available": "Espacios disponibles",
+    "availableHint": "Solo aparecen los espacios visibles para tu cuenta.",
+    "emptyTitle": "No hay espacios disponibles",
+    "emptyBody": "Tu cuenta aún no tiene un espacio accesible.",
+    "selectTitle": "Selecciona un espacio",
+    "selectBody": "Elige un espacio para ver sus fuentes y estados de importación.",
+    "sources": "Fuentes",
+    "sourcesHint": "Cuentas de origen y sus capacidades declaradas.",
+    "type": "Tipo",
+    "role": "Rol",
+    "capabilitiesNote": "Las capacidades las declara el adaptador.",
+    "noSources": "No hay fuentes conectadas",
+    "noSourcesBody": "Las fuentes aparecerán cuando un cliente o administrador conecte una.",
+    "noCapabilities": "Sin capacidades verificadas",
+    "loadError": "No se pudieron cargar los espacios."
   }
 }

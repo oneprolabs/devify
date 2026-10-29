@@ -26,6 +26,14 @@
           {{ pendingChats }}
         </span>
       </router-link>
+      <router-link
+        to="/spaces"
+        class="nav-item"
+        :class="itemClass(isActive('/spaces'))"
+      >
+        <IconApps class="h-[17px] w-[17px] flex-none" />
+        {{ t('spaces.menuTitle') }}
+      </router-link>
     </nav>
 
     <div class="flex flex-col px-3 pt-4">

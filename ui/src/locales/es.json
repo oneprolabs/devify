@@ -588,6 +588,16 @@
     "supportInvestigation": "Investigación de soporte",
     "confirmRole": "¿Cambiar el rol?",
     "confirmRemove": "¿Eliminar este miembro?",
-    "confirmTransfer": "¿Transferir Owner a este miembro?"
+    "confirmTransfer": "¿Transferir Owner a este miembro?",
+    "invitations": "Invitaciones",
+    "invitationsHint": "Revisa las invitaciones pendientes.",
+    "noInvitations": "No hay invitaciones pendientes",
+    "noInvitationsBody": "Las nuevas invitaciones aparecerán aquí.",
+    "accept": "Aceptar",
+    "reject": "Rechazar",
+    "adminSpaces": "Espacios de administración",
+    "adminSpacesHint": "Toma el control de espacios sin Owner activo.",
+    "noOwnerless": "No hay espacios sin Owner",
+    "noOwnerlessBody": "Todos los espacios tienen un Owner."
   }
 }

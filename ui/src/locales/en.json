@@ -1659,5 +1659,25 @@
     "label": "Text size",
     "standard": "Standard",
     "large": "Large"
+  },
+  "spaces": {
+    "menuTitle": "Spaces",
+    "title": "Spaces",
+    "subtitle": "Choose a space and inspect its connected sources.",
+    "available": "Available spaces",
+    "availableHint": "Only spaces visible to your account appear here.",
+    "emptyTitle": "No spaces available",
+    "emptyBody": "Your account does not have an accessible space yet.",
+    "selectTitle": "Select a space",
+    "selectBody": "Choose a space to view its sources and import status.",
+    "sources": "Sources",
+    "sourcesHint": "Source accounts and their declared capabilities.",
+    "type": "Type",
+    "role": "Role",
+    "capabilitiesNote": "Capabilities are reported by the adapter.",
+    "noSources": "No sources connected",
+    "noSourcesBody": "Sources will appear when a client or administrator connects one.",
+    "noCapabilities": "No verified capabilities",
+    "loadError": "Unable to load spaces."
   }
 }

@@ -1668,5 +1668,25 @@
     "label": "字号",
     "standard": "标准",
     "large": "较大"
+  },
+  "spaces": {
+    "menuTitle": "空间",
+    "title": "空间",
+    "subtitle": "选择空间并查看已连接的来源。",
+    "available": "可用空间",
+    "availableHint": "这里只显示当前账号有权限访问的空间。",
+    "emptyTitle": "暂无可用空间",
+    "emptyBody": "当前账号还没有可访问的空间。",
+    "selectTitle": "选择一个空间",
+    "selectBody": "选择空间后查看来源和导入状态。",
+    "sources": "来源",
+    "sourcesHint": "来源账号及其已声明的能力。",
+    "type": "类型",
+    "role": "角色",
+    "capabilitiesNote": "能力由来源适配器声明。",
+    "noSources": "暂无来源",
+    "noSourcesBody": "客户端或管理员连接来源后会显示在这里。",
+    "noCapabilities": "暂无已验证能力",
+    "loadError": "无法加载空间。"
   }
 }

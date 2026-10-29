@@ -57,6 +57,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/spaces',
+    name: 'Spaces',
+    component: () => import('@/pages/Spaces.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     redirect: '/chats'
   },

@@ -69,6 +69,8 @@ class TauriAuthorizeAPIView(APIView):
         location = (
             f"{redirect_uri}?{urlencode({'code': raw_code, 'state': state})}"
         )
+        if request.query_params.get("mode") == "browser":
+            return Response({"data": {"redirect_url": location}})
         response = HttpResponse(status=302)
         response["Location"] = location
         return response

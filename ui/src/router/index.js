@@ -14,6 +14,12 @@ const routes = [
     meta: { requiresGuest: true }
   },
   {
+    path: '/auth/tauri/authorize',
+    name: 'TauriAuthorize',
+    component: () => import('@/pages/TauriAuthorize.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/register',
     name: 'Register',
     component: () => import('@/pages/Auth.vue'),
@@ -191,7 +197,7 @@ router.beforeEach(async (to, from, next) => {
     if (!userStore.isAuthenticated) {
       const isValid = await userStore.checkAuth()
       if (!isValid) {
-        next('/login')
+        next({ path: '/login', query: { next: to.fullPath } })
         return
       }
     }

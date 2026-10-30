@@ -23,6 +23,7 @@ from accounts.views import (
 )
 from accounts.views.tauri_auth import (
     TauriAuthorizeAPIView,
+    TauriConfigAPIView,
     TauriDeviceListAPIView,
     TauriDeviceRevokeAPIView,
     TauriTokenAPIView,
@@ -53,6 +54,11 @@ urlpatterns = [
         'api/v1/auth/tauri/authorize',
         TauriAuthorizeAPIView.as_view(),
         name='tauri_authorize'
+    ),
+    path(
+        'api/v1/auth/tauri/config',
+        TauriConfigAPIView.as_view(),
+        name='tauri_config',
     ),
     path(
         'api/v1/auth/tauri/token',

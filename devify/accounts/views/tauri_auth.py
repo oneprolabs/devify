@@ -74,6 +74,24 @@ class TauriAuthorizeAPIView(APIView):
         return response
 
 
+class TauriConfigAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(
+            {
+                "data": {
+                    "protocol_version": "oauth2-pkce.v1",
+                    "client_id": CLIENT_ID,
+                    "authorize_path": "/api/v1/auth/tauri/authorize",
+                    "token_path": "/api/v1/auth/tauri/token",
+                    "redirect_uri": REDIRECT_URI,
+                    "capabilities": ["spaces", "chat_upload", "analysis_status"],
+                }
+            }
+        )
+
+
 class TauriTokenAPIView(APIView):
     """Exchange a PKCE authorization code for the normal Devify JWT pair."""
 

@@ -9,13 +9,17 @@ into chunked Notes with message evidence. Automatic runs reuse stable note
 keys and the existing Note service, which refuses to overwrite manual Notes.
 """
 
+import json
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 
 from django.db import transaction
+from django.conf import settings
 from django.utils import timezone
 
 from chat_analysis.models import AnalysisJob, Note
+from chat_analysis.suggestions import create_event_suggestion
 from chat_analysis.services import (
     ChatAnalysisError,
     ChatAnalysisPermissionError,
@@ -25,6 +29,9 @@ from chat_analysis.services import (
 from chat_domain.models import Message, MessagePart
 from spaces.models import Space
 from spaces.services import SpacePermissionService
+from core.tracking import LLMTracker
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_LEASE_SECONDS = 300
 DEFAULT_MAX_ATTEMPTS = 3
@@ -46,11 +53,7 @@ class ExecutionResult:
 
 
 def _lock_job(job_id):
-    return (
-        AnalysisJob.objects.select_for_update()
-        .filter(pk=job_id)
-        .first()
-    )
+    return AnalysisJob.objects.select_for_update().filter(pk=job_id).first()
 
 
 def _ensure_lease(job, worker_id, fencing_token):
@@ -120,9 +123,7 @@ def renew_analysis_lease(
     with transaction.atomic():
         locked = AnalysisJob.objects.select_for_update().get(pk=job.pk)
         _ensure_lease(locked, worker_id, fencing_token)
-        locked.lease_until = timezone.now() + timedelta(
-            seconds=lease_seconds
-        )
+        locked.lease_until = timezone.now() + timedelta(seconds=lease_seconds)
         update_fields = ["lease_until", "updated_at"]
         if checkpoint is not None:
             locked.checkpoint = checkpoint
@@ -160,9 +161,7 @@ def complete_analysis_job(
         locked = AnalysisJob.objects.select_for_update().get(pk=job.pk)
         _ensure_lease(locked, worker_id, fencing_token)
         locked.state = (
-            AnalysisJob.State.PARTIAL
-            if partial
-            else AnalysisJob.State.READY
+            AnalysisJob.State.PARTIAL if partial else AnalysisJob.State.READY
         )
         if checkpoint is not None:
             locked.checkpoint = checkpoint
@@ -345,7 +344,72 @@ def _write_chunk_note(job, messages):
             note=note,
             message=message,
         )
+    _enrich_note_with_llm(job, note, messages)
     return True, missing_content
+
+
+def _enrich_note_with_llm(job, note, messages):
+    """Structure a Note and propose Events without mutating Events."""
+    if not getattr(settings, "CHAT_ANALYSIS_LLM_ENABLED", False):
+        return
+    content = [
+        {
+            "seq": message.ingest_seq,
+            "sender": message.sender_name or message.sender_key,
+            "time": (
+                message.occurred_at.isoformat()
+                if message.occurred_at
+                else None
+            ),
+            "text": " / ".join(_message_texts(message)),
+        }
+        for message in messages
+    ]
+    prompt = (
+        "Extract structured facts from the chat messages. Return JSON with "
+        "facts, actions, risks, decisions and events arrays. Each event must "
+        "have event_key, title and summary. Do not invent facts."
+    )
+    try:
+        output, usage = LLMTracker.call_and_track(
+            prompt=prompt,
+            content=json.dumps(content, ensure_ascii=False),
+            json_mode=True,
+            node_name="chat_note_structuring",
+            state={},
+        )
+        if not isinstance(output, dict):
+            return
+        note.structured_data = output
+        note.generation_version = "chat-note-llm.v1"
+        note.save(
+            update_fields=(
+                "structured_data",
+                "generation_version",
+                "updated_at",
+            )
+        )
+        for index, event in enumerate(output.get("events") or []):
+            if not isinstance(event, dict):
+                continue
+            title = str(event.get("title") or "").strip()
+            summary = str(event.get("summary") or "").strip()
+            if not title or not summary:
+                continue
+            event_key = str(
+                event.get("event_key")
+                or f"{job.uuid}:event:{messages[0].ingest_seq}:{index}"
+            )[:255]
+            create_event_suggestion(
+                actor=job.created_by,
+                note=note,
+                analysis_job=job,
+                event_key=event_key,
+                title=title,
+                summary=summary,
+            )
+    except Exception:
+        logger.exception("LLM note structuring failed for job %s", job.pk)
 
 
 def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):

@@ -157,6 +157,16 @@ export const spacesApi = {
     return api.get(`/v1/spaces/${spaceId}/event-relations`, { params })
   },
 
+  getEventSuggestions(spaceId, params = {}) {
+    return api.get(`/v1/spaces/${spaceId}/event-suggestions`, { params })
+  },
+
+  reviewEventSuggestion(suggestionId, decision) {
+    return api.post(`/v1/event-suggestions/${suggestionId}/review`, {
+      decision
+    })
+  },
+
   createReport(spaceId, data) {
     return api.post(`/v1/spaces/${spaceId}/reports`, data)
   }

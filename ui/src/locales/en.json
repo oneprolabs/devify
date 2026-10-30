@@ -1780,6 +1780,8 @@
     "adminSpaces": "Admin spaces",
     "adminSpacesHint": "Take over team spaces without an active owner.",
     "noOwnerless": "No ownerless spaces",
-    "noOwnerlessBody": "All team spaces currently have an owner."
+    "noOwnerlessBody": "All team spaces currently have an owner.",
+    "suggestions": "Event suggestions",
+    "noSuggestions": "No pending suggestions"
   }
 }

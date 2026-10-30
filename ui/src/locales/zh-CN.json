@@ -1789,6 +1789,8 @@
     "adminSpaces": "管理员空间",
     "adminSpacesHint": "接管没有有效 Owner 的团队空间。",
     "noOwnerless": "暂无无 Owner 空间",
-    "noOwnerlessBody": "当前所有团队空间都有 Owner。"
+    "noOwnerlessBody": "当前所有团队空间都有 Owner。",
+    "suggestions": "事件建议",
+    "noSuggestions": "暂无待确认建议"
   }
 }

@@ -14,9 +14,9 @@ const routes = [
     meta: { requiresGuest: true }
   },
   {
-    path: '/auth/tauri/authorize',
-    name: 'TauriAuthorize',
-    component: () => import('@/pages/TauriAuthorize.vue'),
+    path: '/auth/desktop/authorize',
+    name: 'DesktopAuthorize',
+    component: () => import('@/pages/DesktopAuthorize.vue'),
     meta: { requiresAuth: true }
   },
   {

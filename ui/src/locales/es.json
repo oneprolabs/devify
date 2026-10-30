@@ -598,6 +598,8 @@
     "adminSpaces": "Espacios de administración",
     "adminSpacesHint": "Toma el control de espacios sin Owner activo.",
     "noOwnerless": "No hay espacios sin Owner",
-    "noOwnerlessBody": "Todos los espacios tienen un Owner."
+    "noOwnerlessBody": "Todos los espacios tienen un Owner.",
+    "suggestions": "Sugerencias de eventos",
+    "noSuggestions": "Sin sugerencias pendientes"
   }
 }

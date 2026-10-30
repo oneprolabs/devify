@@ -125,6 +125,8 @@ class Note(models.Model):
     note_key = models.CharField(max_length=255)
     title = models.CharField(max_length=500)
     content = models.TextField()
+    structured_data = models.JSONField(null=True, blank=True)
+    generation_version = models.CharField(max_length=80, blank=True)
     start_at = models.DateTimeField(null=True, blank=True)
     end_at = models.DateTimeField(null=True, blank=True)
     origin = models.CharField(
@@ -462,6 +464,82 @@ class EventRelation(models.Model):
             f"{self.left_event_id}-{self.right_event_id}:"
             f"{self.relation_kind}"
         )
+
+
+class EventSuggestion(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        REJECTED = "rejected", "Rejected"
+
+    space = models.ForeignKey(
+        Space, on_delete=models.PROTECT, related_name="chat_event_suggestions"
+    )
+    analysis_job = models.ForeignKey(
+        AnalysisJob,
+        on_delete=models.CASCADE,
+        related_name="event_suggestions",
+    )
+    note = models.ForeignKey(
+        Note, on_delete=models.CASCADE, related_name="event_suggestions"
+    )
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="suggestion_sources",
+    )
+    event_key = models.CharField(max_length=255)
+    title = models.CharField(max_length=500)
+    summary = models.TextField()
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_event_suggestions",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_event_suggestions",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("analysis_job", "note", "event_key"),
+                name="unique_chat_event_suggestion",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("space", "status", "created_at")),
+        ]
+
+    def clean(self):
+        if self.note_id and self.note.space_id != self.space_id:
+            raise ValidationError({"note": "Note must belong to the space."})
+        if (
+            self.analysis_job_id
+            and self.analysis_job.space_id != self.space_id
+        ):
+            raise ValidationError(
+                {"analysis_job": "Analysis job must belong to the space."}
+            )
+        if self.event_id and self.event.space_id != self.space_id:
+            raise ValidationError({"event": "Event must belong to the space."})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 
 class Report(models.Model):

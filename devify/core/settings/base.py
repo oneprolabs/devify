@@ -55,6 +55,10 @@ SECRET_KEY = os.getenv(
     "django-insecure-$k0f0!qp@0k%1xa_)zy!+xvwpv)+&$q&!d69ma@l615bdc2ytd",
 )
 
+CHAT_ANALYSIS_LLM_ENABLED = os.getenv(
+    "CHAT_ANALYSIS_LLM_ENABLED", "false"
+).lower() in {"1", "true", "yes"}
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 
@@ -211,8 +215,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": (
-            "django.contrib.auth.password_validation."
-            "MinimumLengthValidator"
+            "django.contrib.auth.password_validation." "MinimumLengthValidator"
         ),
     },
     {

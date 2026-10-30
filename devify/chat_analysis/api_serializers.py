@@ -9,6 +9,7 @@ from chat_analysis.models import (
     ReportItem,
     ReportItemSource,
     ReportSection,
+    EventSuggestion,
 )
 
 
@@ -278,4 +279,26 @@ class ReportSectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReportSection
         fields = ("id", "section_key", "title", "position", "items")
+        read_only_fields = fields
+
+
+class EventSuggestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventSuggestion
+        fields = (
+            "id",
+            "space_id",
+            "analysis_job_id",
+            "note_id",
+            "event_id",
+            "event_key",
+            "title",
+            "summary",
+            "status",
+            "created_by_id",
+            "reviewed_by_id",
+            "reviewed_at",
+            "created_at",
+            "updated_at",
+        )
         read_only_fields = fields

@@ -196,6 +196,37 @@
                   {{ t('spaces.addEvidence') }}
                 </button>
               </div>
+              <div class="suggestion-list">
+                <h3>{{ t('spaces.suggestions') }}</h3>
+                <div v-if="!suggestions.length" class="detail-muted">
+                  {{ t('spaces.noSuggestions') }}
+                </div>
+                <div
+                  v-for="suggestion in suggestions"
+                  :key="suggestion.id"
+                  class="suggestion-row"
+                >
+                  <div>
+                    <strong>{{ suggestion.title }}</strong>
+                    <p>{{ suggestion.summary }}</p>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      class="text-action"
+                      @click="reviewSuggestion(suggestion, 'accepted')"
+                    >
+                      {{ t('spaces.accept') }}</button
+                    ><button
+                      type="button"
+                      class="text-danger"
+                      @click="reviewSuggestion(suggestion, 'rejected')"
+                    >
+                      {{ t('spaces.reject') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </template>
           <template v-else-if="activeTab === 'events'">
@@ -294,6 +325,7 @@ const selected = ref(null)
 const loading = ref(false)
 const detailLoading = ref(false)
 const error = ref('')
+const suggestions = ref([])
 const formOpen = ref(false)
 const formSubmitting = ref(false)
 const formMode = ref('create')
@@ -340,12 +372,30 @@ const loadActive = async () => {
           ? await spacesApi.getEvents(props.spaceId, { page_size: 100 })
           : await spacesApi.getReports(props.spaceId, { page_size: 100 })
     items.value[activeTab.value] = listData(response)
+    if (activeTab.value === 'events') {
+      const suggestionResponse = await spacesApi.getEventSuggestions(
+        props.spaceId,
+        { status: 'pending' }
+      )
+      suggestions.value =
+        suggestionResponse.data.data || suggestionResponse.data || []
+    }
     selected.value = null
     if (activeItems.value.length) selectItem(activeItems.value[0])
   } catch (requestError) {
     error.value = requestError.response?.data?.detail || t('spaces.loadError')
   } finally {
     loading.value = false
+  }
+}
+const reviewSuggestion = async (suggestion, decision) => {
+  try {
+    await spacesApi.reviewEventSuggestion(suggestion.id, decision)
+    suggestions.value = suggestions.value.filter(
+      (item) => item.id !== suggestion.id
+    )
+  } catch (requestError) {
+    error.value = requestError.response?.data?.detail || t('spaces.loadError')
   }
 }
 const selectItem = async (item) => {
@@ -653,6 +703,39 @@ onMounted(async () => {
 }
 .inline-action input {
   width: 120px;
+}
+.relation-select {
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 5px;
+  background: rgb(var(--c-panel));
+  padding: 6px;
+  color: rgb(var(--c-tx2));
+  font-size: 10px;
+}
+.suggestion-list {
+  border-top: 1px solid rgb(var(--c-line-soft));
+  padding: 15px 0;
+}
+.suggestion-list h3 {
+  margin: 0 0 8px;
+  color: rgb(var(--c-tx2));
+  font-size: 12px;
+}
+.suggestion-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid rgb(var(--c-line-soft));
+  padding: 8px 0;
+}
+.suggestion-row strong {
+  color: rgb(var(--c-tx));
+  font-size: 11px;
+}
+.suggestion-row p {
+  margin: 3px 0 0;
+  color: rgb(var(--c-tx2));
+  font-size: 11px;
 }
 .analysis-body {
   display: grid;

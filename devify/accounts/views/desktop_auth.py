@@ -13,11 +13,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import TauriAuthorizationCode, TauriDevice
+from accounts.models import DesktopAuthorizationCode, DesktopDevice
 
-CLIENT_ID = os.getenv("TAURI_OAUTH_CLIENT_ID", "wechat-devify-tauri")
+CLIENT_ID = os.getenv("DESKTOP_OAUTH_CLIENT_ID", "desktop-client")
 REDIRECT_URI = os.getenv(
-    "TAURI_OAUTH_REDIRECT_URI",
+    "DESKTOP_OAUTH_REDIRECT_URI",
     "http://127.0.0.1:47832/auth/callback",
 )
 
@@ -31,7 +31,7 @@ def _valid_client(client_id, redirect_uri):
     return client_id == CLIENT_ID and redirect_uri == REDIRECT_URI
 
 
-class TauriAuthorizeAPIView(APIView):
+class DesktopAuthorizeAPIView(APIView):
     """Issue a short-lived, one-time code after the browser session logs in."""
 
     permission_classes = [IsAuthenticated]
@@ -44,7 +44,7 @@ class TauriAuthorizeAPIView(APIView):
         code_challenge = request.query_params.get("code_challenge", "")
         device_label = request.query_params.get("device_label", "")[:120]
         if not _valid_client(client_id, redirect_uri):
-            return Response({"detail": "Invalid Tauri client."}, status=400)
+            return Response({"detail": "Invalid desktop client."}, status=400)
         if response_type != "code" or not state or not code_challenge:
             return Response(
                 {"detail": "Authorization code and PKCE are required."},
@@ -57,7 +57,7 @@ class TauriAuthorizeAPIView(APIView):
             )
 
         raw_code = secrets.token_urlsafe(48)
-        TauriAuthorizationCode.objects.create(
+        DesktopAuthorizationCode.objects.create(
             user=request.user,
             code_hash=hashlib.sha256(raw_code.encode("ascii")).hexdigest(),
             client_id=client_id,
@@ -76,7 +76,7 @@ class TauriAuthorizeAPIView(APIView):
         return response
 
 
-class TauriConfigAPIView(APIView):
+class DesktopConfigAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -85,16 +85,18 @@ class TauriConfigAPIView(APIView):
                 "data": {
                     "protocol_version": "oauth2-pkce.v1",
                     "client_id": CLIENT_ID,
-                    "authorize_path": "/api/v1/auth/tauri/authorize",
-                    "token_path": "/api/v1/auth/tauri/token",
+                    "authorize_path": "/api/v1/auth/desktop/authorize",
+                    "token_path": "/api/v1/auth/desktop/token",
                     "redirect_uri": REDIRECT_URI,
-                    "capabilities": ["spaces", "chat_upload", "analysis_status"],
+                    "capabilities": [
+                        "spaces", "chat_upload", "analysis_status"
+                    ],
                 }
             }
         )
 
 
-class TauriTokenAPIView(APIView):
+class DesktopTokenAPIView(APIView):
     """Exchange a PKCE authorization code for the normal Devify JWT pair."""
 
     permission_classes = [AllowAny]
@@ -120,7 +122,7 @@ class TauriTokenAPIView(APIView):
             )
         code_hash = hashlib.sha256(str(code).encode("ascii")).hexdigest()
         grant = (
-            TauriAuthorizationCode.objects.select_for_update()
+            DesktopAuthorizationCode.objects.select_for_update()
             .select_related("user")
             .filter(
                 code_hash=code_hash,
@@ -144,13 +146,13 @@ class TauriTokenAPIView(APIView):
             return Response({"detail": "User is inactive."}, status=400)
         if not device_id:
             device_id = secrets.token_urlsafe(24)
-        device, _ = TauriDevice.objects.update_or_create(
+        device, _ = DesktopDevice.objects.update_or_create(
             user=grant.user,
             device_id=device_id,
             defaults={
                 "label": device_label or grant.device_label,
                 "platform": platform,
-                "status": TauriDevice.Status.ACTIVE,
+                "status": DesktopDevice.Status.ACTIVE,
                 "revoked_at": None,
                 "last_seen_at": timezone.now(),
             },
@@ -173,11 +175,11 @@ class TauriTokenAPIView(APIView):
         )
 
 
-class TauriDeviceListAPIView(APIView):
+class DesktopDeviceListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        devices = TauriDevice.objects.filter(user=request.user).order_by(
+        devices = DesktopDevice.objects.filter(user=request.user).order_by(
             "-last_seen_at", "-id"
         )
         return Response(
@@ -198,16 +200,16 @@ class TauriDeviceListAPIView(APIView):
         )
 
 
-class TauriDeviceRevokeAPIView(APIView):
+class DesktopDeviceRevokeAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, device_id):
-        updated = TauriDevice.objects.filter(
+        updated = DesktopDevice.objects.filter(
             user=request.user,
             device_id=device_id,
-            status=TauriDevice.Status.ACTIVE,
+            status=DesktopDevice.Status.ACTIVE,
         ).update(
-            status=TauriDevice.Status.REVOKED,
+            status=DesktopDevice.Status.REVOKED,
             revoked_at=timezone.now(),
         )
         if not updated:

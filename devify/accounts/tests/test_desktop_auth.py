@@ -7,7 +7,7 @@ import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
-from accounts.models import TauriDevice
+from accounts.models import DesktopDevice
 
 pytestmark = pytest.mark.django_db
 
@@ -17,18 +17,18 @@ def challenge(verifier):
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
 
-def test_tauri_code_exchange_requires_pkce_and_is_one_time():
+def test_desktop_code_exchange_requires_pkce_and_is_one_time():
     user = User.objects.create_user(
-        username="tauri-auth-user", password="secret"
+        username="desktop-auth-user", password="secret"
     )
     client = APIClient()
     client.force_authenticate(user=user)
     verifier = secrets.token_urlsafe(32)
     state = secrets.token_urlsafe(12)
     authorize = client.get(
-        "/api/v1/auth/tauri/authorize",
+        "/api/v1/auth/desktop/authorize",
         {
-            "client_id": "wechat-devify-tauri",
+            "client_id": "desktop-client",
             "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "response_type": "code",
             "state": state,
@@ -45,10 +45,10 @@ def test_tauri_code_exchange_requires_pkce_and_is_one_time():
     assert "refresh" not in query
 
     exchanged = client.post(
-        "/api/v1/auth/tauri/token",
+        "/api/v1/auth/desktop/token",
         {
             "grant_type": "authorization_code",
-            "client_id": "wechat-devify-tauri",
+            "client_id": "desktop-client",
             "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "code": query["code"][0],
             "code_verifier": verifier,
@@ -60,26 +60,26 @@ def test_tauri_code_exchange_requires_pkce_and_is_one_time():
     assert exchanged.data["refresh"]
     assert exchanged.data["device_label"] == "Test Mac"
     device_id = exchanged.data["device_id"]
-    assert TauriDevice.objects.filter(
-        user=user, device_id=device_id, status=TauriDevice.Status.ACTIVE
+    assert DesktopDevice.objects.filter(
+        user=user, device_id=device_id, status=DesktopDevice.Status.ACTIVE
     ).exists()
 
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {exchanged.data['access']}")
-    devices = client.get("/api/v1/auth/tauri/devices")
+    devices = client.get("/api/v1/auth/desktop/devices")
     assert devices.status_code == 200
     assert devices.data["data"][0]["device_id"] == device_id
     assert (
-        client.delete(f"/api/v1/auth/tauri/devices/{device_id}").status_code
+        client.delete(f"/api/v1/auth/desktop/devices/{device_id}").status_code
         == 204
     )
     client.force_authenticate(user=None)
     assert client.get("/api/v1/auth/user").status_code == 401
 
     replay = client.post(
-        "/api/v1/auth/tauri/token",
+        "/api/v1/auth/desktop/token",
         {
             "grant_type": "authorization_code",
-            "client_id": "wechat-devify-tauri",
+            "client_id": "desktop-client",
             "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "code": query["code"][0],
             "code_verifier": verifier,
@@ -89,15 +89,15 @@ def test_tauri_code_exchange_requires_pkce_and_is_one_time():
     assert replay.status_code == 400
 
 
-def test_tauri_code_exchange_rejects_wrong_verifier():
-    user = User.objects.create_user(username="tauri-auth-pkce")
+def test_desktop_code_exchange_rejects_wrong_verifier():
+    user = User.objects.create_user(username="desktop-auth-pkce")
     client = APIClient()
     client.force_authenticate(user=user)
     verifier = secrets.token_urlsafe(32)
     response = client.get(
-        "/api/v1/auth/tauri/authorize",
+        "/api/v1/auth/desktop/authorize",
         {
-            "client_id": "wechat-devify-tauri",
+            "client_id": "desktop-client",
             "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "response_type": "code",
             "state": "state",
@@ -106,10 +106,10 @@ def test_tauri_code_exchange_rejects_wrong_verifier():
     )
     code = parse_qs(urlparse(response["Location"]).query)["code"][0]
     exchange = client.post(
-        "/api/v1/auth/tauri/token",
+        "/api/v1/auth/desktop/token",
         {
             "grant_type": "authorization_code",
-            "client_id": "wechat-devify-tauri",
+            "client_id": "desktop-client",
             "redirect_uri": "http://127.0.0.1:47832/auth/callback",
             "code": code,
             "code_verifier": "wrong",

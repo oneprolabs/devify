@@ -124,10 +124,14 @@ class Profile(models.Model):
         return self.user.username
 
 
-class TauriAuthorizationCode(models.Model):
-    """One-time authorization code for the native Tauri client."""
+class DesktopAuthorizationCode(models.Model):
+    """One-time authorization code for the native desktop client."""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tauri_authorization_codes")
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="desktop_authorization_codes",
+    )
     code_hash = models.CharField(max_length=128, unique=True)
     client_id = models.CharField(max_length=100)
     redirect_uri = models.CharField(max_length=500)
@@ -148,22 +152,28 @@ class TauriAuthorizationCode(models.Model):
         return self.expires_at <= timezone.now()
 
 
-class TauriDevice(models.Model):
+class DesktopDevice(models.Model):
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
         REVOKED = "revoked", "Revoked"
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tauri_devices")
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="desktop_devices"
+    )
     device_id = models.CharField(max_length=100)
     label = models.CharField(max_length=120, blank=True)
     platform = models.CharField(max_length=40, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.ACTIVE
+    )
     last_seen_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=("user", "device_id"), name="unique_tauri_device")
+            models.UniqueConstraint(
+                fields=("user", "device_id"), name="unique_desktop_device"
+            )
         ]
         indexes = [models.Index(fields=("user", "status", "last_seen_at"))]

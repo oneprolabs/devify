@@ -1,7 +1,7 @@
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from accounts.models import TauriDevice
+from accounts.models import DesktopDevice
 
 
 class DeviceAwareJWTAuthentication(JWTAuthentication):
@@ -10,10 +10,10 @@ class DeviceAwareJWTAuthentication(JWTAuthentication):
         device_id = validated_token.get("device_id")
         if (
             device_id
-            and not TauriDevice.objects.filter(
+            and not DesktopDevice.objects.filter(
                 user=user,
                 device_id=device_id,
-                status=TauriDevice.Status.ACTIVE,
+                status=DesktopDevice.Status.ACTIVE,
             ).exists()
         ):
             raise AuthenticationFailed(

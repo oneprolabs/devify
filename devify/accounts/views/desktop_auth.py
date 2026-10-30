@@ -86,6 +86,7 @@ class DesktopConfigAPIView(APIView):
                     "protocol_version": "oauth2-pkce.v1",
                     "client_id": CLIENT_ID,
                     "authorize_path": "/api/v1/auth/desktop/authorize",
+                    "browser_authorize_path": "/auth/desktop/authorize",
                     "token_path": "/api/v1/auth/desktop/token",
                     "redirect_uri": REDIRECT_URI,
                     "capabilities": [

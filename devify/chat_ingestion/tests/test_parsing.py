@@ -1,7 +1,6 @@
 import pytest
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.utils import timezone
 from rest_framework.test import APIClient
 
 from chat_domain.models import (
@@ -593,19 +592,20 @@ def test_invalid_message_fields_fail_the_whole_batch(overrides, message):
     assert Message.objects.count() == 0
 
 
-def test_naive_timestamp_without_manifest_timezone_uses_server_timezone():
-    """Pin the current contract: no manifest timezone falls back to TIME_ZONE.
+@pytest.mark.parametrize("manifest_timezone", ["", "Asia/Shanghai"])
+def test_naive_timestamp_is_rejected_whatever_the_manifest_says(
+    manifest_timezone,
+):
+    """Timestamps must carry an offset; the manifest timezone is metadata.
 
-    ``_validate_manifest`` substitutes ``settings.TIME_ZONE`` when the manifest
-    omits it, so a naive ``occurred_at`` is interpreted in the server timezone
-    instead of being rejected. Changing that is a contract decision, so this
-    test records the current behaviour explicitly.
+    Interpreting a naive value in the manifest or server timezone would shift
+    imported messages by hours, so the package is rejected instead.
     """
 
     owner = User.objects.create_user(username="parse-tz-owner")
     space = make_team(owner, slug="parse-tz-team")
     client = auth_client(owner)
-    manifest = default_manifest(1, 1, timezone="")
+    manifest = default_manifest(1, 1, timezone=manifest_timezone)
     messages = [
         {
             "conversation_id": "group-a",
@@ -616,7 +616,7 @@ def test_naive_timestamp_without_manifest_timezone_uses_server_timezone():
     batch = start_upload(
         client,
         space,
-        "parse-tz",
+        "parse-tz-" + (manifest_timezone or "none"),
         build_archive(
             manifest=manifest, messages=messages, parts=[], media={}
         ),
@@ -624,11 +624,9 @@ def test_naive_timestamp_without_manifest_timezone_uses_server_timezone():
 
     response = complete(client, batch)
 
-    assert response.status_code == 200
-    message = Message.objects.get(message_key="srv:1")
-    assert timezone.localtime(message.occurred_at).strftime(
-        "%Y-%m-%d %H:%M"
-    ) == ("2026-10-20 09:00")
+    assert response.status_code == 422
+    assert "must include a timezone offset" in response.data["detail"]
+    assert Message.objects.count() == 0
 
 
 def test_part_parent_must_appear_before_its_child():

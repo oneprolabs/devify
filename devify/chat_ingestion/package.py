@@ -300,18 +300,22 @@ class ChatPackage:
         )
 
 
-def parse_occurred_at(value, tzinfo, timezone_name=""):
-    """Parse an ISO timestamp, interpreting naive values in the source tz."""
+def parse_occurred_at(value):
+    """Parse an absolute ISO timestamp and normalise it to UTC.
+
+    The contract requires every timestamp to carry an offset. A naive value
+    is rejected instead of being interpreted in the manifest or server
+    timezone: guessing would silently shift imported messages by hours, and
+    displaying local time is the client's job.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError("occurred_at is required.")
     parsed = parse_datetime(value.strip())
     if parsed is None:
         raise ValueError(f"occurred_at is not an ISO timestamp: {value!r}.")
     if parsed.tzinfo is None:
-        if tzinfo is None:
-            raise ValueError(
-                "occurred_at has no timezone and the manifest has none "
-                "either."
-            )
-        parsed = parsed.replace(tzinfo=tzinfo)
+        raise ValueError(
+            "occurred_at must include a timezone offset, e.g. "
+            "2026-10-20T09:00:00+08:00 or 2026-10-20T01:00:00Z."
+        )
     return parsed.astimezone(dt_timezone.utc)

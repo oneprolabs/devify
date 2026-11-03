@@ -244,5 +244,5 @@
 4. **问答/报告存在实现完整性风险：**关键词筛选需要补齐测试与实现校验；LLM 报告输出的结构化栏目需要真正落库，不能只保存正文。
 5. **旧邮件资源仍可能绕过空间语义：**`EmailTodo`、Issue、分享链接、EmailAlias 等需继续迁移和做旧 API ACL 审计。
 6. **生成物和未提交工作树较多：**合并前要区分源码、迁移、测试、fixture、demo 数据和本地归档，避免把运行产物或隐私样本发布到仓库/镜像。
-7. **时区语义需要在契约里明确：**manifest 未提供 `timezone` 时，`_validate_manifest` 会退回到服务端 `TIME_ZONE`，无偏移的 `occurred_at` 因此按服务器时区解释，而不是按来源时区或直接拒绝。当前行为已用测试固定（`test_naive_timestamp_without_manifest_timezone_uses_server_timezone`），冻结 `wechat.v1` 时必须确认是继续回退、强制要求 manifest 时区，还是要求所有时间戳带偏移。
+7. **时区语义已定（2026-11-03）：**统一使用绝对时间戳——`occurred_at` 必须带偏移，服务端换算成 UTC 存储，客户端按用户本地时区渲染；无偏移值直接 422，不再回退 manifest 或服务端时区。实现见 `chat_ingestion/package.py::parse_occurred_at` 与 `test_naive_timestamp_is_rejected_whatever_the_manifest_says`。
 8. **包契约对空容器过于宽松（已修）：**`manifest.scope`/`counts` 传空数组时原来会被 `or {}` 静默转成空对象；现在只接受 `object` 或省略，其他类型直接拒绝。

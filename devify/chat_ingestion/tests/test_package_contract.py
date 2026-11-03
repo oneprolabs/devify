@@ -254,9 +254,15 @@ def test_jsonl_record_limit_is_enforced(tmp_path, settings):
     [
         ("", "occurred_at is required"),
         ("not-a-time", "not an ISO timestamp"),
-        ("2026-10-20T09:00:00", "has no timezone"),
+        ("2026-10-20T09:00:00", "must include a timezone offset"),
     ],
 )
 def test_occurred_at_requires_an_absolute_timestamp(value, message):
     with pytest.raises(ValueError, match=message):
-        parse_occurred_at(value, None)
+        parse_occurred_at(value)
+
+
+def test_occurred_at_normalises_offsets_to_utc():
+    assert parse_occurred_at("2026-10-20T09:00:00+08:00") == (
+        parse_occurred_at("2026-10-20T01:00:00Z")
+    )

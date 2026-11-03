@@ -1,7 +1,7 @@
 # wechat.v1 上传契约
 
-> 状态：**待冻结**（2026-11-03）。本文按当前代码整理，标记为「待决策」的三处需要产品确认后
-> 才能宣称契约冻结；其余条款与实现一致，可作为双端对齐依据。
+> 状态：**部分冻结**（2026-11-03）。时间语义已定稿（见 §2.1）；附件缺口与重复 origin
+> 两处仍待确认，其余条款与实现一致，可作为双端对齐依据。
 >
 > 事实来源：`devify/chat_ingestion/package.py`、`parsing.py`、`services.py`、
 > `models.py`、`devify/chat_domain/services.py`，以及 `tests/test_package_contract.py`、
@@ -40,13 +40,24 @@
 | `schema_version` | 是 | 必须等于 `<platform>.v1`，长度不限但需匹配 |
 | `platform` | 是 | `wechat` / `whatsapp` / `line`；必须等于批次 `source_type` |
 | `source_namespace` | 是 | ≤255 字符；与 `platform` 一起构成来源身份 |
-| `timezone` | 否 | IANA 名称；用于解释无偏移时间戳 |
+| `timezone` | 否 | IANA 名称；仅作展示默认值，**不参与时间戳解释** |
 | `scope.conversation_ids` | 否 | 字符串数组；必须是 `whitelist_snapshot` 的子集，且与实际会话集合完全一致 |
 | `counts.conversations` / `counts.messages` | 是 | 非负整数，必须与实际行数完全一致 |
 | `whitelist_snapshot` | 否 | 字符串数组 |
 | `client` | 否 | 仅用于诊断，服务端不据此授权 |
 
 `scope` / `counts` 必须是对象；传数组或标量直接拒绝（空数组也算错误）。
+
+### 2.1 时间语义（已定稿）
+
+- `occurred_at` 必须是**带偏移的绝对时间**：`2026-10-20T09:00:00+08:00` 或
+  `2026-10-20T01:00:00Z`。
+- 服务端接收后统一换算成 UTC 存储；API 输出带明确偏移（当前按服务端 `TIME_ZONE`
+  渲染为 `+08:00`，仍是绝对时间，不存在歧义）。
+- 无偏移的时间戳直接拒绝（422），不使用 manifest 时区、也不使用服务端时区兜底：
+  任何猜测都会让导入的消息整体偏移数小时。
+- manifest 的 `timezone` 仅作为展示默认值保留；**客户端按用户本地时区渲染**，
+  服务端不做本地化。
 
 ## 3. JSONL 通用规则
 
@@ -75,7 +86,7 @@
 | `source_message_id` | 否 | ≤255；优先作为去重身份 |
 | `revision` | 否 | ≤100；参与去重键，用于区分编辑后版本 |
 | `record_locator_key` | 否 | ≤255；无来源 ID 时的定位键 |
-| `occurred_at` | 否 | ISO-8601；无偏移时按 manifest 时区解释 |
+| `occurred_at` | 否 | ISO-8601 绝对时间，必须带偏移；见 §2.1 |
 | `sender_key` / `sender_name` | 否 | ≤255 |
 | `direction` | 否 | `incoming` / `outgoing` / `unknown` |
 | `source_order` | 否 | 非负整数 |
@@ -151,10 +162,10 @@ created ──> uploading ──> processing ──> completed
 
 ## 8. 待决策（冻结前必须确认）
 
-1. **无偏移时间戳的语义**。当前实现：manifest 无 `timezone` 时回退服务端
-   `TIME_ZONE`，无偏移的 `occurred_at` 会被按服务器时区解释，跨时区部署可能整体
-   偏移。选项：继续回退 / 强制要求 manifest 时区 / 要求所有时间戳带偏移。
-   现状由 `test_naive_timestamp_without_manifest_timezone_uses_server_timezone` 固定。
+1. ~~无偏移时间戳的语义~~ **已决定（2026-11-03）**：统一使用绝对时间戳，客户端负责
+   转成本地时间展示。实现：`parse_occurred_at` 拒绝无偏移值，服务端不再回退到
+   manifest 或服务端时区；测试
+   `test_naive_timestamp_is_rejected_whatever_the_manifest_says`。
 2. **附件缺口的表达**。当前客户端不产 `media/`，服务端把媒体 part 记为
    `binding_state=missing` 并继续导入。需要确认：首版是否允许「只有文本、附件缺失」
    视为成功导入，还是必须有附件才算完整（影响客户端打包与验收口径）。
@@ -169,5 +180,6 @@ created ──> uploading ──> processing ──> completed
 | 读取与解密 | 只读本机库，白名单在 Rust 层强制 | 不接收数据库、密钥、解密缓存 |
 | 范围选择 | 账号 / 会话 / 日期 / 逐条 | 只信任批次与登录身份，不信任 manifest 授权字段 |
 | 规范化 | 产出 `wechat.v1` 包与预览指纹 | 整包校验，任一不一致整批失败 |
+| 时间 | 产出带偏移的绝对时间戳，按用户本地时区展示 | 统一换算 UTC 存储，输出带偏移；不做本地化 |
 | 去重 | 生成稳定 `message_key` / `revision` | 按空间 + 会话 + 消息键去重 |
 | 分析 | 只做本机预览 | 正式 Note / Event / Report / 主题 / 问答 |

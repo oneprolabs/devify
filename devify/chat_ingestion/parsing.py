@@ -11,7 +11,6 @@ message or upload item is kept.
 import mimetypes
 import zipfile
 from dataclasses import dataclass
-from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db import transaction
@@ -121,7 +120,7 @@ def _choice(record, key, where, choices, default):
     return value
 
 
-def _timestamp(value, zone, where):
+def _timestamp(value, where):
     if value in (None, ""):
         return None
     if not isinstance(value, str):
@@ -129,7 +128,7 @@ def _timestamp(value, zone, where):
             f"{where}: 'occurred_at' must be an ISO-8601 string."
         )
     try:
-        return parse_occurred_at(value, zone)
+        return parse_occurred_at(value)
     except ValueError as error:
         raise ArchiveParseError(f"{where}: {error}") from None
 
@@ -203,7 +202,9 @@ def _validate_manifest(package, batch):
                 "The archive scope is not contained in its whitelist."
             )
 
-    zone = manifest.tzinfo or ZoneInfo(settings.TIME_ZONE or "UTC")
+    # The manifest timezone is metadata for display defaults; timestamps
+    # themselves must carry an offset, so nothing is interpreted with it.
+    zone = manifest.tzinfo
     return Manifest(
         schema_version=manifest.schema_version,
         platform=manifest.platform,
@@ -327,9 +328,7 @@ def _parse_messages(
         if not message_key and not source_message_id and not locator_key:
             locator_key = f"line:{number}"
 
-        occurred_at = _timestamp(
-            record.get("occurred_at"), manifest.timezone, where
-        )
+        occurred_at = _timestamp(record.get("occurred_at"), where)
         source_order = _integer(record, "source_order", where)
         source_fields = _mapping(record, "source_fields", where)
 

@@ -8,6 +8,8 @@ rejected as a whole: the batch becomes ``failed`` and no conversation,
 message or upload item is kept.
 """
 
+import hashlib
+import json
 import mimetypes
 import zipfile
 from dataclasses import dataclass
@@ -513,6 +515,65 @@ def _parse_origins(package, manifest, conversations, messages, items):
         )
 
 
+def _content_digests(messages):
+    """Hash the normalised content, per conversation and for the whole batch.
+
+    The digest deliberately ignores the zip layout and the uploader: two
+    people exporting the same group produce the same value, so the caller can
+    skip analysing data that has already been processed.
+    """
+
+    by_conversation = {}
+    seen = set()
+    for message in messages.values():
+        if message.pk in seen:
+            continue
+        seen.add(message.pk)
+        parts = [
+            [part.kind, part.ordinal, part.text]
+            for part in MessagePart.objects.filter(
+                message_id=message.pk
+            ).order_by("ordinal", "pk")
+        ]
+        by_conversation.setdefault(message.conversation_id, []).append(
+            {
+                "key": message.message_key,
+                "at": (
+                    message.occurred_at.isoformat()
+                    if message.occurred_at
+                    else ""
+                ),
+                "sender": message.sender_key,
+                "name": message.sender_name,
+                "direction": message.direction,
+                "kind": message.record_kind,
+                "parts": parts,
+            }
+        )
+
+    digests = {}
+    for conversation_id, entries in by_conversation.items():
+        entries.sort(key=lambda entry: (entry["key"], entry["at"]))
+        payload = json.dumps(
+            entries,
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        digests[str(conversation_id)] = hashlib.sha256(
+            payload.encode("utf-8")
+        ).hexdigest()
+
+    # The batch-level digest is content only: conversation ids differ between
+    # spaces, and the hash is meant to describe the data, not its location.
+    summary = json.dumps(
+        sorted(digests.values()),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(summary.encode("utf-8")).hexdigest(), digests
+
+
 @transaction.atomic
 def _parse_locked(batch):
     path = archive_path(batch)
@@ -556,6 +617,7 @@ def _parse_locked(batch):
         )
         _parse_parts(package, conversations, messages, items)
         _parse_origins(package, manifest, conversations, messages, items)
+        content_sha256, conversation_digests = _content_digests(messages)
 
     message_item = items[MESSAGES_MEMBER]
     message_item.message_count = created_count
@@ -565,8 +627,16 @@ def _parse_locked(batch):
 
     batch.message_count = created_count
     batch.duplicate_count = duplicate_count
+    batch.content_sha256 = content_sha256
+    batch.conversation_digests = conversation_digests
     batch.save(
-        update_fields=("message_count", "duplicate_count", "updated_at")
+        update_fields=(
+            "message_count",
+            "duplicate_count",
+            "content_sha256",
+            "conversation_digests",
+            "updated_at",
+        )
     )
     transition_batch(batch, UploadBatch.Status.COMPLETED, error_message="")
 

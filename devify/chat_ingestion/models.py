@@ -42,6 +42,11 @@ class UploadBatch(models.Model):
     idempotency_key = models.CharField(max_length=255)
     archive_sha256 = models.CharField(max_length=64, blank=True)
     archive_size = models.PositiveBigIntegerField(null=True, blank=True)
+    # Digest of the normalised content, not of the zip: two uploaders packing
+    # the same conversation differently still get the same value, which is
+    # what lets the server skip analysing identical data twice.
+    content_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    conversation_digests = models.JSONField(default=dict, blank=True)
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.CREATED
     )

@@ -4,6 +4,7 @@ from chat_ingestion.views import (
     UploadBatchArchiveAPIView,
     UploadBatchCancelAPIView,
     UploadBatchCompleteAPIView,
+    UploadBatchRetryAPIView, UploadBatchItemDetailAPIView,
     UploadBatchCreateAPIView,
     UploadBatchDetailAPIView,
 )
@@ -28,6 +29,16 @@ urlpatterns = [
         "chat/uploads/<int:batch_id>/complete",
         UploadBatchCompleteAPIView.as_view(),
         name="chat-upload-complete",
+    ),
+    path(
+        "chat/uploads/<int:batch_id>/items/<int:item_id>",
+        UploadBatchItemDetailAPIView.as_view(),
+        name="chat-upload-item-detail",
+    ),
+    path(
+        "chat/uploads/<int:batch_id>/retry",
+        UploadBatchRetryAPIView.as_view(),
+        name="chat-upload-retry",
     ),
     path(
         "chat/uploads/<int:batch_id>/cancel",

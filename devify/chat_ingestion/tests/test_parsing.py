@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from chat_domain.models import (
@@ -416,3 +417,274 @@ def test_messages_without_ids_dedupe_by_locator_and_file_hash():
     second.refresh_from_db()
     assert second.message_count == 0
     assert second.duplicate_count == 2
+
+
+def test_repeated_complete_on_a_completed_batch_is_idempotent():
+    owner = User.objects.create_user(username="parse-idempotent-owner")
+    space = make_team(owner, slug="parse-idempotent-team")
+    client = auth_client(owner)
+    batch = start_upload(client, space, "parse-idempotent", build_archive())
+
+    first = complete(client, batch)
+    second = complete(client, batch)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.data["data"]["status"] == UploadBatch.Status.COMPLETED
+    assert second.data["data"]["message_count"] == 2
+    assert Message.objects.count() == 2
+    assert Conversation.objects.count() == 1
+    assert MessageOrigin.objects.count() == 2
+
+
+def test_duplicate_message_key_inside_one_package_is_counted_as_duplicate():
+    owner = User.objects.create_user(username="parse-dup-key-owner")
+    space = make_team(owner, slug="parse-dup-key-team")
+    client = auth_client(owner)
+    duplicated = [
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "sender_key": "wx-a",
+            "occurred_at": "2026-10-20T09:00:00+08:00",
+        },
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "sender_key": "wx-a",
+            "occurred_at": "2026-10-20T09:00:00+08:00",
+        },
+    ]
+    batch = start_upload(
+        client,
+        space,
+        "parse-dup-key",
+        build_archive(messages=duplicated, parts=[], media={}),
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 200
+    batch.refresh_from_db()
+    assert Message.objects.count() == 1
+    assert batch.message_count == 1
+    assert batch.duplicate_count == 1
+
+
+def test_duplicate_conversation_record_in_one_package_is_rejected():
+    owner = User.objects.create_user(username="parse-dup-conv-owner")
+    space = make_team(owner, slug="parse-dup-conv-team")
+    client = auth_client(owner)
+    conversations = [
+        {"conversation_id": "group-a", "title": "项目群"},
+        {"conversation_id": "group-a", "title": "项目群（重复）"},
+    ]
+    batch = start_upload(
+        client,
+        space,
+        "parse-dup-conv",
+        build_archive(
+            conversations=conversations, messages=[], parts=[], media={}
+        ),
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 422
+    assert "duplicate conversation" in response.data["detail"]
+    assert Conversation.objects.count() == 0
+
+
+def test_same_conversation_id_in_another_namespace_stays_separate():
+    owner = User.objects.create_user(username="parse-namespace-owner")
+    space = make_team(owner, slug="parse-namespace-team")
+    client = auth_client(owner)
+
+    first = start_upload(client, space, "parse-ns-1", build_archive())
+    assert complete(client, first).status_code == 200
+    other_manifest = default_manifest(1, 2, source_namespace="account:other")
+    second = start_upload(
+        client,
+        space,
+        "parse-ns-2",
+        build_archive(manifest=other_manifest),
+    )
+    response = complete(client, second)
+
+    assert response.status_code == 200
+    response.data["data"]["message_count"] == 2
+    assert Conversation.objects.filter(space=space).count() == 2
+    assert Message.objects.count() == 4
+
+
+@pytest.mark.parametrize(
+    "overrides, message",
+    [
+        (
+            {"messages": [{"conversation_id": "group-a", "message_key": 5}]},
+            "must be a string",
+        ),
+        (
+            {
+                "messages": [
+                    {
+                        "conversation_id": "group-a",
+                        "message_key": "k",
+                        "occurred_at": 123,
+                    }
+                ]
+            },
+            "ISO-8601",
+        ),
+        (
+            {
+                "messages": [
+                    {
+                        "conversation_id": "group-a",
+                        "message_key": "k",
+                        "source_order": True,
+                    }
+                ]
+            },
+            "must be an integer",
+        ),
+        (
+            {
+                "messages": [
+                    {
+                        "conversation_id": "group-a",
+                        "message_key": "k",
+                        "direction": "sideways",
+                    }
+                ]
+            },
+            "unsupported value",
+        ),
+        (
+            {"messages": [{"message_key": "k"}]},
+            "'conversation_id' is required",
+        ),
+        (
+            {
+                "messages": [
+                    {"conversation_id": "group-a", "message_key": "k" * 501}
+                ]
+            },
+            "exceeds 500 characters",
+        ),
+    ],
+)
+def test_invalid_message_fields_fail_the_whole_batch(overrides, message):
+    owner = User.objects.create_user(username="parse-fields-owner")
+    space = make_team(owner, slug="parse-fields-team")
+    client = auth_client(owner)
+    payload = {"messages": overrides["messages"], "parts": [], "media": {}}
+    batch = start_upload(
+        client,
+        space,
+        "parse-fields-" + str(abs(hash(message))),
+        build_archive(**payload),
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 422
+    assert message in response.data["detail"]
+    assert Message.objects.count() == 0
+
+
+def test_naive_timestamp_without_manifest_timezone_uses_server_timezone():
+    """Pin the current contract: no manifest timezone falls back to TIME_ZONE.
+
+    ``_validate_manifest`` substitutes ``settings.TIME_ZONE`` when the manifest
+    omits it, so a naive ``occurred_at`` is interpreted in the server timezone
+    instead of being rejected. Changing that is a contract decision, so this
+    test records the current behaviour explicitly.
+    """
+
+    owner = User.objects.create_user(username="parse-tz-owner")
+    space = make_team(owner, slug="parse-tz-team")
+    client = auth_client(owner)
+    manifest = default_manifest(1, 1, timezone="")
+    messages = [
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "occurred_at": "2026-10-20T09:00:00",
+        }
+    ]
+    batch = start_upload(
+        client,
+        space,
+        "parse-tz",
+        build_archive(
+            manifest=manifest, messages=messages, parts=[], media={}
+        ),
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 200
+    message = Message.objects.get(message_key="srv:1")
+    assert timezone.localtime(message.occurred_at).strftime(
+        "%Y-%m-%d %H:%M"
+    ) == ("2026-10-20 09:00")
+
+
+def test_part_parent_must_appear_before_its_child():
+    owner = User.objects.create_user(username="parse-parent-owner")
+    space = make_team(owner, slug="parse-parent-team")
+    client = auth_client(owner)
+    parts = [
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "part_key": "child",
+            "parent_part_key": "parent",
+            "kind": "text",
+            "text": "child",
+        },
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "part_key": "parent",
+            "kind": "text",
+            "text": "parent",
+        },
+    ]
+    batch = start_upload(
+        client,
+        space,
+        "parse-parent",
+        build_archive(parts=parts, media={}),
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 422
+    assert "must appear before its child" in response.data["detail"]
+
+
+def test_origin_must_reference_a_file_in_the_archive():
+    owner = User.objects.create_user(username="parse-origin-missing-owner")
+    space = make_team(owner, slug="parse-origin-missing-team")
+    client = auth_client(owner)
+    origins = [
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "locator_key": "offset:7",
+            "upload_item_path": "raw/missing.json",
+        }
+    ]
+    batch = start_upload(
+        client,
+        space,
+        "parse-origin-missing",
+        build_archive(origins=origins, media={}),
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 422
+    assert "origin file is not part of the archive" in response.data["detail"]

@@ -10,6 +10,8 @@ from spaces.views import (
     SpaceMemberListCreateAPIView,
     SpaceOwnershipAPIView,
     SpacePolicyAPIView,
+    SpaceWorkflowConfigAPIView,
+    SpaceAuditLogListAPIView, SpaceQuotaAPIView, SpaceQuotaUsageAPIView,
     SpaceTakeoverAPIView,
 )
 
@@ -24,6 +26,26 @@ urlpatterns = [
         "spaces/<int:space_id>",
         SpaceDetailAPIView.as_view(),
         name="space-detail",
+    ),
+    path(
+        "spaces/<int:space_id>/quota/usage",
+        SpaceQuotaUsageAPIView.as_view(),
+        name="space-quota-usage",
+    ),
+    path(
+        "spaces/<int:space_id>/quota",
+        SpaceQuotaAPIView.as_view(),
+        name="space-quota",
+    ),
+    path(
+        "spaces/<int:space_id>/audit-logs",
+        SpaceAuditLogListAPIView.as_view(),
+        name="space-audit-logs",
+    ),
+    path(
+        "spaces/<int:space_id>/workflow-config",
+        SpaceWorkflowConfigAPIView.as_view(),
+        name="space-workflow-config",
     ),
     path(
         "spaces/<int:space_id>/members",

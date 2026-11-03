@@ -7,10 +7,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from chat_ingestion.models import UploadBatch
+from chat_ingestion.models import UploadBatch, UploadItem
 from chat_ingestion.serializers import (
     UploadBatchCreateSerializer,
     UploadBatchSerializer,
+    UploadItemSerializer,
 )
 from chat_ingestion.services import (
     ArchiveMismatch,
@@ -20,6 +21,7 @@ from chat_ingestion.services import (
     cancel_upload,
     complete_upload,
     store_archive,
+    transition_batch,
 )
 from chat_ingestion.tasks import (
     dispatch_parse_chat_upload,
@@ -28,7 +30,7 @@ from chat_ingestion.tasks import (
 from chat_sources.models import SourceImport
 from chat_sources.services import get_or_create_upload_source
 from spaces.models import Space, SpaceTakeover
-from spaces.services import SpacePermissionService, audit_space_action
+from spaces.services import SpacePermissionService, audit_space_action, check_storage_quota
 
 CONFLICT_FIELDS = (
     "source_type",
@@ -193,6 +195,9 @@ class UploadBatchCreateAPIView(APIView):
         serializer = UploadBatchCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
+        quota_error = check_storage_quota(space, values.get("archive_size"))
+        if quota_error:
+            return Response({"detail": quota_error}, status=413)
         source = get_or_create_upload_source(
             space=space,
             actor=request.user,
@@ -341,6 +346,44 @@ class UploadBatchCompleteAPIView(APIView):
         if result and result.get("status") == UploadBatch.Status.COMPLETED:
             batch.refresh_from_db()
             return _batch_response(batch)
+        return _batch_response(batch, status_code=202)
+
+
+class UploadBatchItemDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, batch_id, item_id):
+        batch = _visible_batch(request.user, batch_id)
+        if batch is None:
+            return Response({"detail": "Upload not found."}, status=404)
+        item = get_object_or_404(UploadItem, batch=batch, pk=item_id)
+        return Response({"data": UploadItemSerializer(item).data})
+
+
+class UploadBatchRetryAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, batch_id):
+        batch = _visible_batch(request.user, batch_id, lock=True)
+        if batch is None:
+            return Response({"detail": "Upload not found."}, status=404)
+        if batch.space.status != Space.Status.ACTIVE:
+            return _read_only_response()
+        if not _can_operate_batch(request.user, batch):
+            return Response({"detail": "Upload permission required."}, status=403)
+        if batch.status != UploadBatch.Status.FAILED:
+            return Response({"detail": "Only failed uploads can be retried."}, status=409)
+        try:
+            transition_batch(batch, UploadBatch.Status.UPLOADING, error_message="")
+        except UploadTransitionError as error:
+            return Response({"detail": str(error)}, status=409)
+        result = _enqueue_parse(batch)
+        if result and result.get("status") == UploadBatch.Status.FAILED:
+            batch.refresh_from_db()
+            return Response({"detail": batch.error_message, "data": UploadBatchSerializer(batch).data}, status=422)
+        takeover = _active_takeover(request.user, batch.space)
+        audit_space_action(actor=request.user, space=batch.space, action="chat.upload_retried", resource_type="upload_batch", resource_id=batch.pk, metadata={"takeover_id": takeover.pk if takeover else None})
         return _batch_response(batch, status_code=202)
 
 

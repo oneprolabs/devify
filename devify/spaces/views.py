@@ -8,20 +8,32 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from spaces.models import Space, SpaceAuditLog, SpaceMembership, SpaceTakeover
+from spaces.models import (
+    Space,
+    SpaceAuditLog,
+    SpaceMembership,
+    SpaceQuota,
+    SpaceTakeover,
+    SpaceWorkflowConfig,
+)
 from spaces.serializers import (
     MemberInviteSerializer,
     MemberRoleSerializer,
     OwnershipTransferSerializer,
     SpaceCreateSerializer,
     SpacePolicySerializer,
+    SpaceQuotaSerializer,
+    SpaceQuotaUpdateSerializer,
     SpaceSerializer,
     SpaceUpdateSerializer,
+    SpaceWorkflowConfigSerializer,
+    SpaceWorkflowConfigUpdateSerializer,
     TakeoverSerializer,
 )
 from spaces.services import (
     SpacePermissionService,
     audit_space_action,
+    check_member_quota,
     get_space_policy,
     invite_member,
     takeover_space,
@@ -34,6 +46,8 @@ def _serialize_space(space, user):
     data = dict(serializer.data)
     membership = SpacePermissionService.membership(user, space)
     data["role"] = membership.role if membership else None
+    data["is_personal_owner"] = space.personal_owner_id == user.id
+    data["is_global_admin"] = bool(user.is_staff)
     data["admin_takeover_active"] = bool(
         user.is_staff
         and SpaceTakeover.objects.filter(
@@ -251,6 +265,9 @@ class SpaceMemberListCreateAPIView(APIView):
                 {"detail": "Personal spaces cannot invite members."},
                 status=409,
             )
+        quota_error = check_member_quota(space)
+        if quota_error:
+            return Response({"detail": quota_error}, status=409)
         serializer = MemberInviteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user_model = get_user_model()
@@ -555,3 +572,130 @@ class SpacePolicyAPIView(APIView):
             },
         )
         return self.get(request)
+
+
+class SpaceWorkflowConfigAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, space_id):
+        space = get_object_or_404(Space, pk=space_id)
+        if not SpacePermissionService.can_read(request.user, space):
+            return Response({"detail": "Space not found."}, status=404)
+        config, _ = SpaceWorkflowConfig.objects.get_or_create(space=space)
+        return Response({"data": SpaceWorkflowConfigSerializer(config).data})
+
+    @transaction.atomic
+    def patch(self, request, space_id):
+        space = get_object_or_404(Space, pk=space_id)
+        membership = SpacePermissionService.membership(request.user, space)
+        can_manage = SpacePermissionService.can_manage(membership) or (request.user.is_staff and SpacePermissionService.has_active_takeover(request.user, space))
+        if not can_manage:
+            return Response({"detail": "Space workflow configuration permission required."}, status=403)
+        config, _ = SpaceWorkflowConfig.objects.select_for_update().get_or_create(space=space)
+        serializer = SpaceWorkflowConfigUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        for field, value in serializer.validated_data.items():
+            setattr(config, field, value)
+        config.version += 1
+        config.updated_by = request.user
+        config.save()
+        audit_space_action(actor=request.user, space=space, action="space.workflow_config_updated", resource_type="workflow_config", metadata={"version": config.version})
+        return Response({"data": SpaceWorkflowConfigSerializer(config).data})
+
+
+class SpaceQuotaUsageAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, space_id):
+        space = get_object_or_404(Space, pk=space_id)
+        if not SpacePermissionService.can_read(request.user, space):
+            return Response({"detail": "Space not found."}, status=404)
+        from django.db.models import Sum
+        from django.utils import timezone
+
+        from chat_analysis.models import QuestionAnswer
+        from chat_domain.models import Conversation, Message, MessagePart
+        from chat_ingestion.models import UploadBatch
+        quota, _ = SpaceQuota.objects.get_or_create(space=space)
+        member_count = space.memberships.filter(status=SpaceMembership.Status.ACTIVE).count()
+        storage_used = UploadBatch.objects.filter(space=space).exclude(status=UploadBatch.Status.CANCELLED).aggregate(total=Sum("archive_size"))["total"] or 0
+        conversation_count = Conversation.objects.filter(space=space).count()
+        message_count = Message.objects.filter(conversation__space=space).count()
+        media_count = MessagePart.objects.filter(
+            message__conversation__space=space,
+            kind__in=(
+                MessagePart.Kind.IMAGE,
+                MessagePart.Kind.VIDEO,
+                MessagePart.Kind.AUDIO,
+                MessagePart.Kind.FILE,
+            ),
+        ).count()
+        day_start = timezone.localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
+        ai_calls = QuestionAnswer.objects.filter(space=space, created_at__gte=day_start).count()
+        return Response(
+            {
+                "data": {
+                    "quota": SpaceQuotaSerializer(quota).data,
+                    "usage": {
+                        "member_count": member_count,
+                        "storage_used_bytes": storage_used,
+                        "conversation_count": conversation_count,
+                        "message_count": message_count,
+                        "media_count": media_count,
+                        "daily_ai_calls_used": ai_calls,
+                    },
+                }
+            }
+        )
+
+
+class SpaceAuditLogListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, space_id):
+        space = get_object_or_404(Space, pk=space_id)
+        if not SpacePermissionService.can_read(request.user, space):
+            return Response({"detail": "Space not found."}, status=404)
+        logs = SpaceAuditLog.objects.filter(space=space).select_related("actor")
+        action = request.query_params.get("action", "").strip()
+        if action:
+            logs = logs.filter(action=action)
+        try:
+            page = max(int(request.query_params.get("page", 1)), 1)
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = min(max(int(request.query_params.get("page_size", 50)), 1), 100)
+        except (TypeError, ValueError):
+            page_size = 50
+        total = logs.count()
+        start = (page - 1) * page_size
+        data = [{"id": log.pk, "actor_id": log.actor_id, "actor": log.actor.get_username() if log.actor else None, "action": log.action, "resource_type": log.resource_type, "resource_id": log.resource_id, "metadata": log.metadata, "created_at": log.created_at} for log in logs[start:start + page_size]]
+        return Response({"data": {"list": data, "pagination": {"total": total, "page": page, "page_size": page_size, "has_next": start + page_size < total, "has_previous": page > 1}}})
+
+
+class SpaceQuotaAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, space_id):
+        space = get_object_or_404(Space, pk=space_id)
+        if not SpacePermissionService.can_read(request.user, space):
+            return Response({"detail": "Space not found."}, status=404)
+        quota, _ = SpaceQuota.objects.get_or_create(space=space)
+        return Response({"data": SpaceQuotaSerializer(quota).data})
+
+    @transaction.atomic
+    def patch(self, request, space_id):
+        space = get_object_or_404(Space, pk=space_id)
+        membership = SpacePermissionService.membership(request.user, space)
+        can_manage = SpacePermissionService.can_manage(membership) or (request.user.is_staff and SpacePermissionService.has_active_takeover(request.user, space))
+        if not can_manage:
+            return Response({"detail": "Space quota permission required."}, status=403)
+        quota, _ = SpaceQuota.objects.select_for_update().get_or_create(space=space)
+        serializer = SpaceQuotaUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        for field, value in serializer.validated_data.items(): setattr(quota, field, value)
+        quota.updated_by = request.user
+        quota.save()
+        audit_space_action(actor=request.user, space=space, action="space.quota_updated", resource_type="quota", metadata=serializer.validated_data)
+        return Response({"data": SpaceQuotaSerializer(quota).data})

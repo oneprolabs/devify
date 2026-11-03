@@ -671,7 +671,7 @@ const handleLogin = async () => {
     })
 
     const next =
-      typeof route.query.next === 'string' ? route.query.next : '/chats'
+      typeof route.query.next === 'string' ? route.query.next : '/workspace'
     router.push(next)
   } catch (error) {
     console.error('Login error:', error)

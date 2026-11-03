@@ -5,7 +5,7 @@ import { adminRoutes } from '@/admin'
 const routes = [
   {
     path: '/',
-    redirect: '/chats'
+    redirect: '/workspace'
   },
   {
     path: '/login',
@@ -57,6 +57,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/workspace',
+    name: 'PersonalWorkspace',
+    component: () => import('@/pages/PersonalWorkspace.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/chats',
     name: 'Chats',
     component: () => import('@/pages/Dashboard.vue'),
@@ -66,6 +72,13 @@ const routes = [
     path: '/spaces',
     name: 'Spaces',
     component: () => import('@/pages/Spaces.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/spaces/:spaceId/overview',
+    name: 'SpaceOverview',
+    component: () => import('@/pages/PersonalOverview.vue'),
+    props: true,
     meta: { requiresAuth: true }
   },
   {
@@ -83,9 +96,29 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/spaces/:spaceId/topics',
+    name: 'SpaceTopics',
+    component: () => import('@/pages/SpaceTopics.vue'),
+    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/spaces/:spaceId/apps',
+    name: 'SpaceAppCenter',
+    component: () => import('@/pages/AppCenter.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/spaces/:spaceId/operations',
     name: 'SpaceOperations',
     component: () => import('@/pages/SpaceOperations.vue'),
+    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/spaces/:spaceId/settings',
+    name: 'SpaceSettings',
+    component: () => import('@/pages/SpaceSettings.vue'),
     props: true,
     meta: { requiresAuth: true }
   },
@@ -215,13 +248,13 @@ router.beforeEach(async (to, from, next) => {
     if (!userStore.isAuthenticated) {
       const isValid = await userStore.checkAuth()
       if (!isValid) {
-        next('/login')
+        next({ path: '/login', query: { next: to.fullPath } })
         return
       }
     }
     next()
   } else if (to.meta.requiresGuest && userStore.isAuthenticated) {
-    next('/dashboard')
+    next('/workspace')
   } else {
     next()
   }

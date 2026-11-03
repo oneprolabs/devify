@@ -9,8 +9,8 @@ function extractData(response) {
 }
 
 export const relayApi = {
-  getApps() {
-    return apiClient.get('/v1/apps').then(extractData)
+  getApps(spaceId) {
+    return apiClient.get('/v1/apps', { params: spaceId ? { space_id: spaceId } : {} }).then(extractData)
   },
 
   getStats() {

@@ -59,6 +59,19 @@ CHAT_ANALYSIS_LLM_ENABLED = os.getenv(
     "CHAT_ANALYSIS_LLM_ENABLED", "false"
 ).lower() in {"1", "true", "yes"}
 
+CHAT_ANALYSIS_AUTO_CREATE_EVENTS = os.getenv(
+    "CHAT_ANALYSIS_AUTO_CREATE_EVENTS", "false"
+).lower() in {"1", "true", "yes"}
+
+# A queued question or report with no worker result after this many seconds is
+# moved to a terminal state by the stale-task sweep.
+CHAT_ANALYSIS_QUESTION_TIMEOUT_SECONDS = int(
+    os.getenv("CHAT_ANALYSIS_QUESTION_TIMEOUT_SECONDS", "900")
+)
+CHAT_ANALYSIS_REPORT_TIMEOUT_SECONDS = int(
+    os.getenv("CHAT_ANALYSIS_REPORT_TIMEOUT_SECONDS", "1800")
+)
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 
@@ -136,7 +149,7 @@ INSTALLED_APPS += [
     "spaces.apps.SpacesConfig",
     "chat_sources.apps.ChatSourcesConfig",
     "chat_ingestion.apps.ChatIngestionConfig",
-    "chat_analysis.apps.ChatAnalysisConfig",
+    "chat_analysis",
     "chat_domain.apps.ChatDomainConfig",
     "threadline",
     "relay",

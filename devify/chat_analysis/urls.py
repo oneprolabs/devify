@@ -3,6 +3,7 @@ from django.urls import path
 from chat_analysis.views import (
     AnalysisJobDetailAPIView,
     AnalysisJobRetryAPIView,
+    AnalysisJobCancelAPIView,
     SpaceAnalysisJobListCreateAPIView,
 )
 
@@ -17,6 +18,11 @@ urlpatterns = [
         "analysis-jobs/<int:job_id>",
         AnalysisJobDetailAPIView.as_view(),
         name="chat-analysis-job-detail",
+    ),
+    path(
+        "analysis-jobs/<int:job_id>/cancel",
+        AnalysisJobCancelAPIView.as_view(),
+        name="chat-analysis-job-cancel",
     ),
     path(
         "analysis-jobs/<int:job_id>/retry",

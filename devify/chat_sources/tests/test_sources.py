@@ -125,3 +125,19 @@ def test_source_import_stays_in_the_same_space():
             source=source,
             initiated_by=owner,
         )
+
+
+def test_source_status_verify_and_jobs_are_explicit_for_local_upload():
+    owner = User.objects.create_user(username="source-status-owner")
+    space = make_space(owner, "source-status-team")
+    source = Source.objects.create(space=space, channel_type=Source.ChannelType.WECHAT, provider="tauri_upload", external_account_key="wxid-status", display_name="WeChat", capabilities=["file_import"], created_by=owner, updated_by=owner)
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    verify = client.post(f"/api/v1/sources/{source.pk}/verify")
+    assert verify.status_code == 200
+    assert verify.data["data"]["verified"] is False
+    assert verify.data["data"]["status"] == "not_applicable"
+    status = client.get(f"/api/v1/sources/{source.pk}/status")
+    assert status.status_code == 200
+    assert status.data["data"]["capabilities"] == ["file_import"]
+    assert client.get(f"/api/v1/sources/{source.pk}/jobs").data["data"] == []

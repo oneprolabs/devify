@@ -9,6 +9,7 @@ import { usePreferencesStore } from './store/preferences'
 import { initTheme } from './composables/useTheme'
 import { initFontScale } from './composables/useFontScale'
 import './assets/css/main.css'
+import './assets/css/workspace.css'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 const app = createApp(App)
@@ -22,8 +23,10 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || 'production',
     release: import.meta.env.VITE_SENTRY_RELEASE || undefined,
     integrations: [Sentry.browserTracingIntegration({ router })],
-    tracesSampleRate: parseFloat(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE || '0.1'),
-    sendDefaultPii: import.meta.env.VITE_SENTRY_SEND_PII === 'true',
+    tracesSampleRate: parseFloat(
+      import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE || '0.1'
+    ),
+    sendDefaultPii: import.meta.env.VITE_SENTRY_SEND_PII === 'true'
   })
 }
 

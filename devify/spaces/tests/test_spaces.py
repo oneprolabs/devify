@@ -676,3 +676,173 @@ def test_new_email_resources_default_to_the_users_personal_space():
     assert mailbox.space_id == space.id
     assert email.space_id == space.id
     assert attachment.space_id == space.id
+
+@pytest.mark.django_db
+def test_space_workflow_config_is_readable_and_owner_only_writable():
+    owner = User.objects.create_user(username="workflow-owner")
+    member = User.objects.create_user(username="workflow-member")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    SpaceMembership.objects.create(space=space, user=member, role=SpaceMembership.Role.USER, status=SpaceMembership.Status.ACTIVE)
+    client = APIClient()
+    client.force_authenticate(user=member)
+    assert client.get(f"/api/v1/spaces/{space.pk}/workflow-config").status_code == 200
+    assert client.patch(f"/api/v1/spaces/{space.pk}/workflow-config", {"language": "en-US"}, format="json").status_code == 403
+    client.force_authenticate(user=owner)
+    updated = client.patch(f"/api/v1/spaces/{space.pk}/workflow-config", {"language": "en-US", "processing_paused": True}, format="json")
+    assert updated.status_code == 200
+    assert updated.data["data"]["version"] == 2
+    assert updated.data["data"]["processing_paused"] is True
+
+@pytest.mark.django_db
+def test_space_audit_logs_are_visible_to_members():
+    owner = User.objects.create_user(username="audit-owner")
+    member = User.objects.create_user(username="audit-member")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    SpaceMembership.objects.create(space=space, user=member, role=SpaceMembership.Role.USER, status=SpaceMembership.Status.ACTIVE)
+    SpaceAuditLog.objects.create(space=space, actor=owner, action="space.test", resource_type="test", resource_id="1")
+    client = APIClient()
+    client.force_authenticate(user=member)
+    response = client.get(f"/api/v1/spaces/{space.pk}/audit-logs")
+    assert response.status_code == 200
+    assert response.data["data"]["list"][0]["action"] == "space.test"
+
+@pytest.mark.django_db
+def test_space_email_source_is_scoped_and_requires_manager_for_write():
+    owner = User.objects.create_user(username="email-space-owner")
+    member = User.objects.create_user(username="email-space-member")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    SpaceMembership.objects.create(space=space, user=member, role=SpaceMembership.Role.USER, status=SpaceMembership.Status.ACTIVE)
+    client = APIClient()
+    client.force_authenticate(user=member)
+    assert client.get(f"/api/v1/spaces/{space.pk}/email-sources").status_code == 200
+    denied = client.post(f"/api/v1/spaces/{space.pk}/email-sources", {"imap_host": "imap.example.com", "username": "mail@example.com", "password": "secret"}, format="json")
+    assert denied.status_code == 403
+    client.force_authenticate(user=owner)
+    created = client.post(f"/api/v1/spaces/{space.pk}/email-sources", {"imap_host": "imap.example.com", "username": "mail@example.com", "password": "secret"}, format="json")
+    assert created.status_code == 201
+    assert created.data["data"]["has_password"] is True
+
+@pytest.mark.django_db
+def test_space_quota_is_member_readable_and_manager_writable():
+    owner = User.objects.create_user(username="quota-owner")
+    member = User.objects.create_user(username="quota-member")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    SpaceMembership.objects.create(space=space, user=member, role=SpaceMembership.Role.USER, status=SpaceMembership.Status.ACTIVE)
+    client = APIClient(); client.force_authenticate(user=member)
+    assert client.get(f"/api/v1/spaces/{space.pk}/quota").status_code == 200
+    assert client.patch(f"/api/v1/spaces/{space.pk}/quota", {"daily_ai_calls": 10}, format="json").status_code == 403
+    client.force_authenticate(user=owner)
+    response = client.patch(f"/api/v1/spaces/{space.pk}/quota", {"daily_ai_calls": 10}, format="json")
+    assert response.status_code == 200
+    assert response.data["data"]["daily_ai_calls"] == 10
+
+@pytest.mark.django_db
+def test_space_quota_usage_reports_current_members_storage_and_ai_calls():
+    owner = User.objects.create_user(username="quota-usage-owner")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    client = APIClient(); client.force_authenticate(user=owner)
+    response = client.get(f"/api/v1/spaces/{space.pk}/quota/usage")
+    assert response.status_code == 200
+    assert response.data["data"]["usage"]["member_count"] == 1
+    assert response.data["data"]["usage"]["storage_used_bytes"] == 0
+    assert response.data["data"]["usage"]["daily_ai_calls_used"] == 0
+    assert response.data["data"]["usage"]["conversation_count"] == 0
+    assert response.data["data"]["usage"]["message_count"] == 0
+    assert response.data["data"]["usage"]["media_count"] == 0
+
+
+@pytest.mark.django_db
+def test_space_quota_usage_counts_conversations_messages_and_media():
+    from chat_domain.models import Conversation, Message, MessagePart
+
+    owner = User.objects.create_user(username="quota-count-owner")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    conversation = Conversation.objects.create(
+        space=space,
+        platform=Conversation.Platform.WECHAT,
+        source_namespace="account:local",
+        source_conversation_id="group-a",
+        identity_key="wechat:account:local:group-a",
+        title="group-a",
+        message_count=2,
+    )
+    text_message = Message.objects.create(
+        conversation=conversation,
+        message_key="src:1",
+        ingest_seq=1,
+        sender_name="Alice",
+    )
+    MessagePart.objects.create(
+        message=text_message,
+        part_key="text-1",
+        kind=MessagePart.Kind.TEXT,
+        text="hello",
+    )
+    image_message = Message.objects.create(
+        conversation=conversation,
+        message_key="src:2",
+        ingest_seq=2,
+        sender_name="Bob",
+    )
+    MessagePart.objects.create(
+        message=image_message,
+        part_key="image-1",
+        kind=MessagePart.Kind.IMAGE,
+    )
+    client = APIClient(); client.force_authenticate(user=owner)
+    response = client.get(f"/api/v1/spaces/{space.pk}/quota/usage")
+    assert response.status_code == 200
+    usage = response.data["data"]["usage"]
+    assert usage["conversation_count"] == 1
+    assert usage["message_count"] == 2
+    assert usage["media_count"] == 1
+
+@pytest.mark.django_db
+def test_guest_is_read_only_and_staff_requires_takeover_for_space_management():
+    owner = User.objects.create_user(username="matrix-owner")
+    guest = User.objects.create_user(username="matrix-guest")
+    staff = User.objects.create_user(username="matrix-staff", is_staff=True)
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    SpaceMembership.objects.create(space=space, user=guest, role=SpaceMembership.Role.GUEST, status=SpaceMembership.Status.ACTIVE)
+    client = APIClient(); client.force_authenticate(user=guest)
+    assert client.get(f"/api/v1/spaces/{space.pk}/workflow-config").status_code == 200
+    assert client.patch(f"/api/v1/spaces/{space.pk}/workflow-config", {"language": "en"}, format="json").status_code == 403
+    client.force_authenticate(user=staff)
+    assert client.patch(f"/api/v1/spaces/{space.pk}/quota", {"daily_ai_calls": 1}, format="json").status_code == 403
+    takeover = client.post(f"/api/v1/spaces/{space.pk}/takeover", {"reason": "matrix test"}, format="json")
+    assert takeover.status_code == 201
+    assert client.patch(f"/api/v1/spaces/{space.pk}/quota", {"daily_ai_calls": 1}, format="json").status_code == 200
+
+@pytest.mark.django_db
+def test_space_email_source_can_be_updated_and_disabled_by_manager():
+    owner = User.objects.create_user(username="email-detail-owner")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    client = APIClient(); client.force_authenticate(user=owner)
+    created = client.post(f"/api/v1/spaces/{space.pk}/email-sources", {"imap_host": "imap.example.com", "username": "detail@example.com", "password": "secret"}, format="json")
+    mailbox_uuid = created.data["data"]["uuid"]
+    updated = client.patch(f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}", {"name": "Main inbox", "enabled": False}, format="json")
+    assert updated.status_code == 200
+    assert updated.data["data"]["enabled"] is False
+    disabled = client.delete(f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}")
+    assert disabled.status_code == 200
+
+@pytest.mark.django_db
+def test_space_email_source_connection_test_uses_space_manager_permission():
+    owner = User.objects.create_user(username="email-test-owner")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    client = APIClient(); client.force_authenticate(user=owner)
+    with patch("threadline.views.email_mailbox.EmailConfigManager.validate_imap_connection", return_value=(True, "")):
+        response = client.post(f"/api/v1/spaces/{space.pk}/email-sources/test", {"imap_host": "imap.example.com", "username": "mail@example.com", "password": "secret"}, format="json")
+    assert response.status_code == 200
+    assert response.data["data"]["success"] is True
+
+@pytest.mark.django_db
+def test_space_email_source_sync_reports_not_started_without_faking_execution():
+    owner = User.objects.create_user(username="email-sync-owner")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    client = APIClient(); client.force_authenticate(user=owner)
+    created = client.post(f"/api/v1/spaces/{space.pk}/email-sources", {"imap_host": "imap.example.com", "username": "sync@example.com", "password": "secret"}, format="json")
+    mailbox_uuid = created.data["data"]["uuid"]
+    response = client.post(f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}/sync")
+    assert response.status_code == 200
+    assert response.data["data"]["status"] == "not_started"

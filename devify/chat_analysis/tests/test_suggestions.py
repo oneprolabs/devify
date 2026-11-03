@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from chat_analysis.models import (
@@ -101,6 +102,7 @@ def test_llm_note_structuring_creates_pending_event_suggestion(settings):
         text="Please prepare the annual quote.",
     )
     settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = False
     result = {
         "facts": ["Annual quote requested"],
         "actions": ["Prepare quote"],
@@ -132,3 +134,55 @@ def test_llm_note_structuring_creates_pending_event_suggestion(settings):
     assert Note.objects.filter(
         analysis_job=job, generation_version="chat-note-llm.v1"
     ).exists()
+
+
+def test_auto_create_events_accepts_llm_suggestions(settings):
+    owner = User.objects.create_user(username="suggestion-auto-owner")
+    space = make_space(owner, "suggestion-auto-team")
+    job = make_job(space, owner)
+    message = Message.objects.create(
+        conversation=job.conversation,
+        message_key="src:2",
+        ingest_seq=1,
+        sender_name="Alice",
+        occurred_at=timezone.now(),
+    )
+    MessagePart.objects.create(
+        message=message,
+        part_key="text-0",
+        kind=MessagePart.Kind.TEXT,
+        text="Please prepare the annual quote.",
+    )
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    result = {
+        "facts": ["Annual quote requested"],
+        "actions": ["Prepare quote"],
+        "risks": [],
+        "decisions": [],
+        "events": [
+            {
+                "event_key": "quote-follow-up",
+                "title": "Prepare quote",
+                "summary": "Prepare the annual quote.",
+            }
+        ],
+    }
+    with patch(
+        "chat_analysis.execution.LLMTracker.call_and_track",
+        return_value=(result, {"model": "test"}),
+    ):
+        from chat_analysis.execution import execute_analysis_job
+
+        execution = execute_analysis_job(
+            job.pk, worker_id="suggestion-auto-test"
+        )
+
+    assert execution.job.state == AnalysisJob.State.READY
+    suggestion = EventSuggestion.objects.get(analysis_job=job)
+    assert suggestion.status == EventSuggestion.Status.ACCEPTED
+    event = Event.objects.get(space=space, event_key="quote-follow-up")
+    assert suggestion.event_id == event.pk
+    assert event.last_activity_at == message.occurred_at
+    note = Note.objects.get(analysis_job=job)
+    assert note.event_links.filter(event=event).exists()

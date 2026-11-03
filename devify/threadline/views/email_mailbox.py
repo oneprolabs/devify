@@ -173,3 +173,121 @@ class EmailMailboxTestAPIView(APIView):
             )
 
         return _response({"success": True}, message="connected")
+
+class SpaceEmailSourceListAPIView(APIView):
+    """Space-scoped mailbox configuration; legacy user mailbox routes remain intact."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _space(self, request, space_id, *, write=False):
+        from spaces.models import Space
+        from spaces.services import SpacePermissionService
+
+        space = get_object_or_404(Space, pk=space_id)
+        allowed = SpacePermissionService.can_upload(request.user, space) if write else SpacePermissionService.can_read(request.user, space)
+        if not allowed:
+            return None
+        return space
+
+    def get(self, request, space_id):
+        space = self._space(request, space_id)
+        if space is None:
+            return _response({"detail": "Space not found."}, code=404, status_code=404)
+        mailboxes = EmailMailbox.objects.filter(space=space).order_by("created_at")
+        return _response({"mailboxes": EmailMailboxSerializer(mailboxes, many=True, context={"request": request}).data})
+
+    def post(self, request, space_id):
+        space = self._space(request, space_id, write=True)
+        if space is None:
+            return _response({"detail": "Space not found."}, code=404, status_code=404)
+        from spaces.services import SpacePermissionService
+        membership = SpacePermissionService.membership(request.user, space)
+        if not (request.user.is_staff and SpacePermissionService.has_active_takeover(request.user, space) or SpacePermissionService.can_manage(membership)):
+            return _response({"detail": "Space email source permission required."}, code=403, status_code=403)
+        serializer = EmailMailboxSerializer(data=request.data or {}, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            mailbox = serializer.save(space=space)
+        return _response(EmailMailboxSerializer(mailbox, context={"request": request}).data, message="created", code=201, status_code=201)
+
+class SpaceEmailSourceDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_space(self, request, space_id, *, write=False):
+        from spaces.models import Space
+        from spaces.services import SpacePermissionService
+        space = get_object_or_404(Space, pk=space_id)
+        if not (SpacePermissionService.can_upload(request.user, space) if write else SpacePermissionService.can_read(request.user, space)):
+            return None
+        return space
+
+    def _get_mailbox(self, request, space_id, mailbox_uuid, *, write=False):
+        space = self._get_space(request, space_id, write=write)
+        if space is None:
+            return None, None
+        mailbox = get_object_or_404(EmailMailbox, space=space, uuid=mailbox_uuid)
+        return space, mailbox
+
+    def patch(self, request, space_id, mailbox_uuid):
+        space, mailbox = self._get_mailbox(request, space_id, mailbox_uuid, write=True)
+        if mailbox is None:
+            return _response({"detail": "Email source not found."}, code=404, status_code=404)
+        from spaces.services import SpacePermissionService
+        membership = SpacePermissionService.membership(request.user, space)
+        if not (request.user.is_staff and SpacePermissionService.has_active_takeover(request.user, space) or SpacePermissionService.can_manage(membership)):
+            return _response({"detail": "Space email source permission required."}, code=403, status_code=403)
+        serializer = EmailMailboxSerializer(mailbox, data=request.data, partial=True, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        mailbox = serializer.save()
+        return _response(EmailMailboxSerializer(mailbox, context={"request": request}).data)
+
+    def delete(self, request, space_id, mailbox_uuid):
+        space, mailbox = self._get_mailbox(request, space_id, mailbox_uuid, write=True)
+        if mailbox is None:
+            return _response({"detail": "Email source not found."}, code=404, status_code=404)
+        from spaces.services import SpacePermissionService
+        membership = SpacePermissionService.membership(request.user, space)
+        if not (request.user.is_staff and SpacePermissionService.has_active_takeover(request.user, space) or SpacePermissionService.can_manage(membership)):
+            return _response({"detail": "Space email source permission required."}, code=403, status_code=403)
+        mailbox.enabled = False
+        mailbox.save(update_fields=("enabled", "updated_at"))
+        return _response(None, message="disabled")
+
+class SpaceEmailSourceTestAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, space_id, mailbox_uuid=None):
+        from spaces.models import Space
+        from spaces.services import SpacePermissionService
+        space = get_object_or_404(Space, pk=space_id)
+        membership = SpacePermissionService.membership(request.user, space)
+        allowed = SpacePermissionService.can_manage(membership) or (request.user.is_staff and SpacePermissionService.has_active_takeover(request.user, space))
+        if not allowed:
+            return _response({"detail": "Space email source permission required."}, code=403, status_code=403)
+        if mailbox_uuid:
+            mailbox = get_object_or_404(EmailMailbox, space=space, uuid=mailbox_uuid)
+            config = mailbox.to_email_config()
+        else:
+            payload = request.data or {}
+            config = {"imap_config": {"imap_host": (payload.get("imap_host") or "").strip(), "imap_port": payload.get("imap_port") or 993, "imap_ssl_port": payload.get("imap_port") or 993, "use_ssl": payload.get("use_ssl", True), "username": (payload.get("username") or "").strip(), "password": payload.get("password") or "", "folder": payload.get("folder") or "INBOX"}, "filter_config": {}}
+        is_valid, error_message = EmailConfigManager.validate_imap_connection(config, user_context=f"space:{space.pk} user:{request.user.pk}")
+        if not is_valid:
+            return _response({"success": False}, message=error_message or "IMAP validation failed", code=400, status_code=400)
+        return _response({"success": True}, message="connected")
+
+
+class SpaceEmailSourceSyncAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, space_id, mailbox_uuid):
+        from spaces.models import Space
+        from spaces.services import SpacePermissionService
+        space = get_object_or_404(Space, pk=space_id)
+        membership = SpacePermissionService.membership(request.user, space)
+        can_manage = SpacePermissionService.can_manage(membership) or (request.user.is_staff and SpacePermissionService.has_active_takeover(request.user, space))
+        if not can_manage:
+            return _response({"detail": "Space email source permission required."}, code=403, status_code=403)
+        mailbox = get_object_or_404(EmailMailbox, space=space, uuid=mailbox_uuid)
+        if not mailbox.enabled:
+            return _response({"detail": "Email source is disabled."}, code=409, status_code=409)
+        return _response({"source_id": str(mailbox.uuid), "status": "not_started", "reason": "邮箱抓取调度仍由现有账号级调度器执行，空间级启动任务尚未接入。"}, message="not_started")

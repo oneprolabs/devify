@@ -73,6 +73,8 @@
   "apps": {
     "menuTitle": "应用中心",
     "centerTitle": "应用中心",
+    "noSpaceApps": "当前空间暂无可用应用。",
+    "backToWorkspace": "返回工作台",
     "centerSubtitle": "打开各个应用模块并连接外部工具。",
     "openApp": "打开",
     "panelTitle": "应用中心",
@@ -1670,6 +1672,8 @@
     "large": "较大"
   },
   "spaces": {
+    "personalWorkspace": "聊天记录",
+    "personalWorkspaceError": "无法打开个人工作台，请重试或查看空间。",
     "menuTitle": "空间",
     "title": "空间",
     "subtitle": "选择空间并查看已连接的来源。",
@@ -1688,7 +1692,9 @@
     "noSourcesBody": "客户端或管理员连接来源后会显示在这里。",
     "noCapabilities": "暂无已验证能力",
     "loadError": "无法加载空间。",
-    "openWorkspace": "打开聊天工作台",
+    "mailConversations": "对话列表",
+    "conversationRecords": "会话记录",
+    "openWorkspace": "查看会话记录",
     "chatWorkspace": "查看此空间内的对话和消息。",
     "switchSpace": "切换空间",
     "conversations": "对话",

@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from chat_analysis.models import (
@@ -58,6 +59,8 @@ def create_report_snapshot(
     period_start=None,
     period_end=None,
     body_format=Report.BodyFormat.MARKDOWN,
+    filters=None,
+    include_open=True,
 ):
     ensure_can_contribute(actor, space)
     existing = Report.objects.filter(
@@ -73,6 +76,7 @@ def create_report_snapshot(
             )
         return existing, False
 
+    filters = filters or {}
     events = _in_period(
         Event.objects.filter(space=space).order_by("-last_activity_at", "-id"),
         period_start,
@@ -85,6 +89,23 @@ def create_report_snapshot(
         period_end,
         "start_at",
     )
+    if filters.get("event_ids"):
+        events = events.filter(pk__in=filters["event_ids"])
+    if filters.get("note_ids"):
+        notes = notes.filter(pk__in=filters["note_ids"])
+    if filters.get("conversation_ids"):
+        notes = notes.filter(evidence__message__conversation_id__in=filters["conversation_ids"]).distinct()
+        events = events.filter(note_links__note__in=notes).distinct()
+    if filters.get("tag_keys"):
+        events = events.filter(tag_assignments__tag__tag_key__in=filters["tag_keys"]).distinct()
+    if filters.get("keywords"):
+        keyword_query = Q()
+        for keyword in filters["keywords"]:
+            keyword_query |= Q(title__icontains=keyword) | Q(content__icontains=keyword)
+        events = events.filter(keyword_query)
+        notes = notes.filter(keyword_query)
+    if not include_open:
+        events = events.filter(status=Event.Status.DONE)
     events = list(events)
     notes = list(notes)
     generated_at = timezone.now()

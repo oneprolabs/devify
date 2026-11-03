@@ -4,18 +4,15 @@
       <header class="operations-header">
         <div class="operations-heading">
           <router-link
-            :to="`/spaces/${spaceId}/analysis`"
+            :to="`/spaces/${spaceId}/overview`"
             class="operations-back"
             >{{ t('common.back') }}</router-link
           >
           <div>
-            <h1>{{ space?.name || t('spaces.title') }}</h1>
-            <p>{{ t('spaces.operationsWorkspace') }}</p>
+            <h1>同步记录</h1>
+            <p>查看上传批次和分析任务的处理状态。</p>
           </div>
         </div>
-        <router-link to="/spaces" class="operations-switch">{{
-          t('spaces.switchSpace')
-        }}</router-link>
       </header>
       <div v-if="error" class="operations-alert" role="alert">{{ error }}</div>
       <nav class="operations-tabs" role="tablist">
@@ -62,32 +59,10 @@
           <strong>{{ t('spaces.noOperations') }}</strong
           ><span>{{ t('spaces.noOperationsBody') }}</span>
         </div>
-        <div v-else class="operation-rows" role="list">
-          <div
-            v-for="item in items"
-            :key="item.id"
-            class="operation-row"
-            role="listitem"
-          >
-            <div class="operation-main">
-              <strong>{{ titleFor(item) }}</strong
-              ><span>{{ detailFor(item) }}</span>
-            </div>
-            <span
-              class="operation-status"
-              :class="statusClass(item.status || item.state)"
-              >{{ item.status || item.state }}</span
-            ><button
-              v-if="
-                activeTab === 'jobs' &&
-                ['failed', 'partial'].includes(item.state)
-              "
-              type="button"
-              class="operation-retry"
-              @click="retry(item)"
-            >
-              {{ t('common.tryAgain') }}
-            </button>
+        <div v-else class="operation-table" role="table">
+          <div class="operation-table-row operation-table-head" role="row"><span>时间</span><span>{{ activeTab === 'uploads' ? '设备 / 来源' : '任务' }}</span><span>{{ activeTab === 'uploads' ? '会话与消息' : '输入范围' }}</span><span>状态</span><span>操作</span></div>
+          <div v-for="item in items" :key="item.id" class="operation-table-row" role="row">
+            <time>{{ formatDate(item.created_at) }}</time><span class="operation-main"><strong>{{ titleFor(item) }}</strong><small>{{ activeTab === 'uploads' ? (item.source_account_id || '本机客户端') : item.request_key }}</small></span><span class="operation-detail">{{ detailFor(item) }}</span><span class="operation-status" :class="statusClass(item.status || item.state)">{{ statusText(item.status || item.state) }}</span><span class="operation-actions"><button v-if="activeTab === 'jobs' && ['failed', 'partial'].includes(item.state)" type="button" @click="retry(item)">{{ t('common.tryAgain') }}</button><button v-if="activeTab === 'jobs' && ['queued', 'running'].includes(item.state)" type="button" @click="cancelJob(item)">取消</button><button v-if="activeTab === 'uploads' && item.status === 'failed'" type="button" @click="retryUpload(item)">重试</button></span>
           </div>
         </div>
       </main>
@@ -143,22 +118,41 @@ const loadActive = async () => {
 }
 const titleFor = (item) =>
   activeTab.value === 'uploads'
-    ? `${item.source_type} · ${item.source_account_id || t('spaces.unknownSource')}`
+    ? `${sourceText(item.source_type)} · ${item.source_account_id || t('spaces.unknownSource')}`
     : item.request_key
 const detailFor = (item) =>
   activeTab.value === 'uploads'
     ? `${item.message_count} ${t('spaces.messages')} · ${item.duplicate_count} ${t('spaces.duplicates')}`
     : `${item.input_version} · ${item.attempts} ${t('spaces.attempts')}`
+const formatDate = value => value ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+const statusText = (status) =>
+  ({
+    created: '待上传',
+    uploading: '上传中',
+    processing: '解析中',
+    completed: '已完成',
+    failed: '失败',
+    cancelled: '已取消',
+    queued: '排队中',
+    running: '运行中',
+    ready: '已完成',
+    partial: '部分完成'
+  })[status] || status
+const sourceText = (source) =>
+  ({ wechat: '微信', whatsapp: 'WhatsApp', line: 'LINE', email: '邮件' })[source] || source
 const statusClass = (status) =>
   ({
     completed: 'ok',
     ready: 'ok',
     success: 'ok',
     failed: 'bad',
+    cancelled: 'bad',
     partial: 'warn',
     processing: 'warn',
     running: 'warn'
   })[status] || ''
+const cancelJob = async (item) => { try { await spacesApi.cancelAnalysisJob(item.id); await loadActive() } catch (requestError) { error.value = requestError.response?.data?.detail || t('spaces.loadError') } }
+const retryUpload = async (item) => { try { await spacesApi.retryUpload(item.id); await loadActive() } catch (requestError) { error.value = requestError.response?.data?.detail || t('spaces.loadError') } }
 const retry = async (item) => {
   try {
     await spacesApi.retryAnalysisJob(item.id)
@@ -207,7 +201,7 @@ onMounted(async () => {
 })
 </script>
 <style scoped>
-.operations-page {
+.operation-table { overflow:hidden; border:1px solid rgb(var(--c-line)); border-radius:8px; background:rgb(var(--c-panel)); }.operation-table-row { display:grid; grid-template-columns:110px minmax(150px,1fr) minmax(180px,1.3fr) 90px 120px; gap:14px; align-items:center; padding:11px 16px; font-size:12px; }.operation-table-row + .operation-table-row { border-top:1px solid rgb(var(--c-line-soft)); }.operation-table-row:not(.operation-table-head):hover { background:rgb(var(--c-panel-sub)); }.operation-table-head { color:rgb(var(--c-tx3)); font-size:11px; }.operation-main { display:flex; min-width:0; flex-direction:column; gap:3px; }.operation-main strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.operation-main small,.operation-detail,time { color:rgb(var(--c-tx3)); font-size:11px; }.operation-detail { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.operation-actions { display:flex; gap:8px; }.operation-actions button { color:rgb(var(--c-ac)); font-size:11px; }.operations-page {
   display: flex;
   min-height: 100%;
   flex-direction: column;
@@ -381,6 +375,7 @@ onMounted(async () => {
   color: rgb(var(--c-tx2));
   font-size: 13px;
 }
+@media (max-width: 900px) { .operation-table { overflow-x:auto; }.operation-table-row { min-width:650px; } }
 @media (max-width: 768px) {
   .operations-header {
     padding: 10px 14px;

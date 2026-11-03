@@ -17,6 +17,7 @@ class AnalysisJob(models.Model):
         READY = "ready", "Ready"
         PARTIAL = "partial", "Partial"
         FAILED = "failed", "Failed"
+        CANCELLED = "cancelled", "Cancelled"
 
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     space = models.ForeignKey(
@@ -38,6 +39,7 @@ class AnalysisJob(models.Model):
     start_seq = models.PositiveBigIntegerField(default=0)
     end_seq = models.PositiveBigIntegerField()
     input_version = models.CharField(max_length=100)
+    engine_version = models.CharField(max_length=80, blank=True, default="")
     state = models.CharField(
         max_length=20,
         choices=State.choices,
@@ -252,6 +254,62 @@ class NoteEvidence(models.Model):
         return self.reference_key
 
 
+class EventEvidence(models.Model):
+    """A message that actually supports one Event.
+
+    Note evidence covers a whole extraction chunk, which is far too coarse to
+    answer "which messages are this event about?". Event evidence keeps the
+    per-event link so the workspace can show a real timeline.
+    """
+
+    event = models.ForeignKey(
+        "Event",
+        on_delete=models.CASCADE,
+        related_name="evidence",
+    )
+    message = models.ForeignKey(
+        "chat_domain.Message",
+        on_delete=models.CASCADE,
+        related_name="chat_event_evidence",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_chat_event_evidence",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("id",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("event", "message"),
+                name="unique_chat_event_evidence",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("message", "event")),
+        ]
+
+    def clean(self):
+        if not self.message_id:
+            raise ValidationError({"message": "message is required."})
+        if (
+            self.event_id
+            and self.message.conversation.space_id != self.event.space_id
+        ):
+            raise ValidationError(
+                {"message": "Evidence must belong to the same space."}
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"event {self.event_id} <- message {self.message_id}"
+
+
 class Event(models.Model):
     """A tracked matter that aggregates Notes."""
 
@@ -272,6 +330,7 @@ class Event(models.Model):
         related_name="chat_events",
     )
     event_key = models.CharField(max_length=255)
+    entity_key = models.CharField(max_length=120, blank=True, default="")
     title = models.CharField(max_length=500)
     content = models.TextField()
     status = models.CharField(
@@ -296,10 +355,56 @@ class Event(models.Model):
         indexes = [
             models.Index(fields=("space", "status", "last_activity_at", "id")),
             models.Index(fields=("space", "last_activity_at", "id")),
+            models.Index(fields=("space", "entity_key", "id")),
         ]
 
     def __str__(self):
         return self.title
+
+
+class EventTag(models.Model):
+    """A user-visible label scoped to one space."""
+
+    space = models.ForeignKey(Space, on_delete=models.PROTECT, related_name="chat_event_tags")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_chat_event_tags")
+    tag_key = models.CharField(max_length=120)
+    label = models.CharField(max_length=120)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("label", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("space", "tag_key"), name="unique_chat_event_tag_key"),
+        ]
+        indexes = [models.Index(fields=("space", "label"))]
+
+    def __str__(self):
+        return self.label
+
+
+class EventTagAssignment(models.Model):
+    """The current association between an event and a space tag."""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="tag_assignments")
+    tag = models.ForeignKey(EventTag, on_delete=models.CASCADE, related_name="event_assignments")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_event_tag_assignments")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("id",)
+        constraints = [
+            models.UniqueConstraint(fields=("event", "tag"), name="unique_chat_event_tag_assignment"),
+        ]
+        indexes = [models.Index(fields=("tag", "event"))]
+
+    def clean(self):
+        if self.event_id and self.tag_id and self.event.space_id != self.tag.space_id:
+            raise ValidationError({"tag": "Tag and event must belong to the same space."})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 
 class EventNote(models.Model):
@@ -491,8 +596,12 @@ class EventSuggestion(models.Model):
         related_name="suggestion_sources",
     )
     event_key = models.CharField(max_length=255)
+    entity_key = models.CharField(max_length=120, blank=True, default="")
     title = models.CharField(max_length=500)
     summary = models.TextField()
+    proposed_status = models.CharField(max_length=20, blank=True, default="")
+    proposed_tags = models.JSONField(default=list, blank=True)
+    source_seqs = models.JSONField(default=list, blank=True)
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.PENDING
     )
@@ -540,6 +649,79 @@ class EventSuggestion(models.Model):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+
+class TopicSubscription(models.Model):
+    """A saved personal view of events and notes for recurring reports."""
+
+    class Period(models.TextChoices):
+        DAY = "day", "Day"
+        WEEK = "week", "Week"
+        MONTH = "month", "Month"
+
+    space = models.ForeignKey(
+        Space, on_delete=models.PROTECT, related_name="chat_topic_subscriptions"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="chat_topic_subscriptions",
+    )
+    title = models.CharField(max_length=255)
+    instruction = models.TextField()
+    filters = models.JSONField(default=dict, blank=True)
+    include_open = models.BooleanField(default=True)
+    period = models.CharField(max_length=10, choices=Period.choices, default=Period.WEEK)
+    time_local = models.TimeField(null=True, blank=True)
+    timezone = models.CharField(max_length=64, default="Asia/Shanghai")
+    enabled = models.BooleanField(default=True)
+    last_run_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("space", "created_by", "title"),
+                name="unique_chat_topic_title",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("space", "enabled", "updated_at")),
+            models.Index(fields=("created_by", "space")),
+        ]
+
+
+
+class QuestionAnswer(models.Model):
+    """A user's persisted question and the grounded answer returned for it."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        READY = "ready", "Ready"
+        FAILED = "failed", "Failed"
+
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    space = models.ForeignKey(Space, on_delete=models.PROTECT, related_name="chat_questions")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="chat_questions")
+    question = models.CharField(max_length=2000)
+    scope = models.JSONField(default=dict, blank=True)
+    answer = models.TextField(blank=True)
+    citations = models.JSONField(default=list, blank=True)
+    usage = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=("space", "created_by", "created_at")),
+            models.Index(fields=("space", "status", "created_at")),
+        ]
 
 
 class Report(models.Model):

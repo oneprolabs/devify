@@ -18,7 +18,7 @@
     <nav class="flex flex-col gap-0.5 px-3">
       <router-link to="/chats" class="nav-item" :class="itemClass(chatsActive)">
         <IconChats class="h-[17px] w-[17px] flex-none" />
-        {{ t('chats.title') }}
+        {{ t('spaces.mailConversations') }}
         <span
           v-if="pendingChats"
           class="ml-auto rounded-full bg-warn-soft px-[7px] py-0.5 font-mono text-[calc(10.5px*var(--fs))] text-warn"
@@ -26,19 +26,32 @@
           {{ pendingChats }}
         </span>
       </router-link>
-      <router-link
-        to="/spaces"
-        class="nav-item"
-        :class="itemClass(isActive('/spaces'))"
+      <button
+        type="button"
+        class="nav-parent"
+        :class="{ 'is-active': workspaceActive }"
+        :aria-expanded="treeOpen"
+        @click="treeOpen = !treeOpen"
       >
         <IconApps class="h-[17px] w-[17px] flex-none" />
-        {{ t('spaces.menuTitle') }}
-      </router-link>
+        {{ t('spaces.personalWorkspace') }}
+        <span class="nav-chevron" :class="{ open: treeOpen }" aria-hidden="true">▾</span>
+      </button>
+      <div v-if="treeOpen" class="nav-tree">
+        <router-link :to="workspacePath" class="tree-item" :class="itemClass(route.name === 'SpaceOverview' || (route.name === 'PersonalWorkspace' && route.query.view !== 'chats'))">概览</router-link>
+        <router-link :to="conversationPath" class="tree-item" :class="itemClass(route.name === 'SpaceChats' || (route.name === 'PersonalWorkspace' && route.query.view === 'chats'))">会话</router-link>
+        <router-link :to="analysisPath" class="tree-item" :class="itemClass(route.name === 'SpaceAnalysis' && !route.query.tab && !route.query.panel)">事件</router-link>
+        <router-link :to="topicsPath" class="tree-item" :class="itemClass(route.name === 'SpaceTopics')">主题订阅</router-link>
+        <router-link :to="reportPath" class="tree-item" :class="itemClass(route.name === 'SpaceAnalysis' && route.query.tab === 'reports')">报告</router-link>
+        <router-link :to="askPath" class="tree-item" :class="itemClass(route.name === 'SpaceAnalysis' && route.query.panel === 'ask')">问答</router-link>
+        <router-link :to="syncPath" class="tree-item" :class="itemClass(route.name === 'SpaceOperations')">同步记录</router-link>
+        <router-link :to="settingsPath" class="tree-item" :class="itemClass(route.name === 'SpaceSettings')">设备与设置</router-link>
+      </div>
     </nav>
 
     <div class="flex flex-col px-3 pt-4">
       <router-link
-        to="/apps"
+        :to="appCenterPath"
         class="flex h-8 items-center gap-2.5 rounded px-3 text-ink-3 transition-colors hover:bg-chip hover:text-ink"
       >
         <IconApps class="h-[15px] w-[15px] flex-none" />
@@ -134,7 +147,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { relayApi } from '@/api/relay'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import UserMenu from './UserMenu.vue'
@@ -163,14 +177,40 @@ const {
   ensureLoaded
 } = useAccountSummary()
 
+const workspacePath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/overview` : '/workspace')
+const conversationPath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/chats` : { path: '/workspace', query: { view: 'chats' } })
+const analysisPath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/analysis` : '/workspace')
+const reportPath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/analysis?tab=reports` : '/workspace')
+const askPath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/analysis?panel=ask` : '/workspace')
+const syncPath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/operations` : '/workspace')
+const settingsPath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/settings` : '/workspace')
+const topicsPath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/topics` : '/workspace')
+const treeOpen = ref(true)
+const workspaceActive = computed(() => ['SpaceOverview', 'SpaceChats', 'SpaceAnalysis', 'SpaceTopics', 'SpaceOperations', 'SpaceSettings', 'PersonalWorkspace'].includes(route.name))
+const scopedApps = ref([])
+let scopeRequest = 0
+const appCenterPath = computed(() => route.params.spaceId ? `/spaces/${route.params.spaceId}/apps` : '/apps')
+watch(() => route.params.spaceId, async (spaceId) => {
+  const request = ++scopeRequest
+  scopedApps.value = []
+  if (!spaceId) return
+  try {
+    const apps = await relayApi.getApps(spaceId)
+    if (request === scopeRequest) scopedApps.value = Array.isArray(apps) ? apps : []
+  } catch {
+    // Fail closed: do not show account applications in an unknown space.
+  }
+}, { immediate: true })
 const appLinks = computed(() => [
   {
+    key: 'relay',
     to: '/apps/relay',
     match: '/apps/relay',
     label: t('apps.relayName'),
     icon: IconRelay
   },
   {
+    key: 'expense',
     to: '/apps/expense',
     match: '/apps/expense',
     label: t('apps.expenseName'),
@@ -178,16 +218,17 @@ const appLinks = computed(() => [
     count: unfiledInvoices.value
   },
   {
+    key: 'todos',
     to: '/todos',
     match: '/todos',
     label: t('todos.title'),
     icon: IconTodos,
     count: openTodos.value
   }
-])
+].filter(app => !route.params.spaceId || scopedApps.value.some(item => item.key === app.key)))
 
 const isActive = (path) => route.path.startsWith(path)
-const chatsActive = computed(() => isActive('/chats'))
+const chatsActive = computed(() => isActive('/chats') && !route.params.spaceId)
 
 const itemClass = (active) =>
   active
@@ -198,7 +239,7 @@ onMounted(ensureLoaded)
 </script>
 
 <style scoped>
-.nav-item {
+.nav-tree { margin: 2px 0 4px 21px; padding-left: 12px; border-left: 1px solid rgb(var(--c-line)); display:flex; flex-direction:column; gap:2px; }.tree-item { @apply flex h-8 items-center rounded px-2.5 text-[calc(13px*var(--fs))] text-ink-2 transition-colors; }.nav-parent { @apply flex h-[38px] items-center gap-2.5 rounded px-3 text-left text-[calc(13.5px*var(--fs))] text-ink transition-colors hover:bg-chip; }.nav-parent.is-active { @apply bg-accent-soft text-accent; }.nav-chevron { margin-left:auto; color:rgb(var(--c-tx3)); font-size:11px; transform:rotate(-90deg); transition:transform .15s ease; }.nav-chevron.open { transform:none; }.nav-item {
   @apply flex h-[38px] items-center gap-2.5 rounded px-3 text-[calc(13.5px*var(--fs))] transition-colors;
 }
 </style>

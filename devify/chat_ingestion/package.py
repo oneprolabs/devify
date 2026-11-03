@@ -271,10 +271,14 @@ class ChatPackage:
                 raise ManifestInvalid(
                     f"manifest.json has an unknown timezone: {timezone!r}."
                 ) from error
-        scope = payload.get("scope") or {}
+        scope = payload.get("scope")
+        if scope is None:
+            scope = {}
         if not isinstance(scope, dict):
             raise ManifestInvalid("manifest.json scope must be an object.")
-        counts = payload.get("counts") or {}
+        counts = payload.get("counts")
+        if counts is None:
+            counts = {}
         if not isinstance(counts, dict):
             raise ManifestInvalid("manifest.json counts must be an object.")
         whitelist = payload.get("whitelist_snapshot") or []

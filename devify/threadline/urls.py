@@ -40,6 +40,7 @@ from .views.email_alias import (
 )
 from .views.email_mailbox import (
     EmailMailboxDetailAPIView,
+    SpaceEmailSourceDetailAPIView, SpaceEmailSourceTestAPIView, SpaceEmailSourceSyncAPIView,
     EmailMailboxListAPIView,
     EmailMailboxTestAPIView,
 )
@@ -54,9 +55,35 @@ from .views.monitoring import (
     task_status_summary,
 )
 from .views.space_email import SpaceEmailDetailAPIView, SpaceEmailListAPIView
+from .views.email_mailbox import SpaceEmailSourceListAPIView
 
 # URL patterns for Threadline API endpoints
 urlpatterns = [
+    path(
+        "spaces/<int:space_id>/email-sources",
+        SpaceEmailSourceListAPIView.as_view(),
+        name="space-email-sources",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>/sync",
+        SpaceEmailSourceSyncAPIView.as_view(),
+        name="space-email-source-sync",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/test",
+        SpaceEmailSourceTestAPIView.as_view(),
+        name="space-email-source-test-draft",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>/test",
+        SpaceEmailSourceTestAPIView.as_view(),
+        name="space-email-source-test",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>",
+        SpaceEmailSourceDetailAPIView.as_view(),
+        name="space-email-source-detail",
+    ),
     path(
         "spaces/<int:space_id>/emails",
         SpaceEmailListAPIView.as_view(),

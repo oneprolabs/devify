@@ -48,6 +48,7 @@ class NoteSerializer(serializers.ModelSerializer):
             "note_key",
             "title",
             "content",
+            "structured_data",
             "start_at",
             "end_at",
             "origin",

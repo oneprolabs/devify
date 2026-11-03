@@ -136,6 +136,11 @@
               {{ expanded ? '收起全文' : '展开全文' }}
             </button>
 
+            <StructuredSummary
+              :entries="[selected]"
+              title-id="note-structured-title"
+            />
+
             <section class="ws-sect">
               <div class="ws-sectt">
                 原文证据
@@ -226,6 +231,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import StructuredSummary from './StructuredSummary.vue'
 
 const props = defineProps({
   spaceId: { type: [String, Number], required: true },

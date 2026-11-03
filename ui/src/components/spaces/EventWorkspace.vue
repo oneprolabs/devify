@@ -166,9 +166,23 @@
               <div class="ws-meta-line">{{ metaLine(selected) }}</div>
             </div>
 
-            <div class="ws-summary">
-              {{ selected.content || '暂无情况描述' }}
-            </div>
+            <section
+              class="ws-soft ws-current-state"
+              aria-labelledby="event-current-state-title"
+            >
+              <div class="ws-sectt">
+                <span id="event-current-state-title">当前情况</span>
+                <span v-if="selected.content" class="ws-tag">已整理</span>
+              </div>
+              <p class="ws-summary">{{ selected.content || '暂无情况描述' }}</p>
+            </section>
+
+            <StructuredSummary
+              :entries="notes"
+              title="整理结论"
+              title-id="event-structured-title"
+              subtitle="按事实、行动、风险和决定归类"
+            />
 
             <div v-if="canEdit" class="ws-tag-edit">
               <span
@@ -213,7 +227,7 @@
 
             <section class="ws-sect" aria-labelledby="event-timeline-title">
               <div class="ws-sectt">
-                <span id="event-timeline-title">时间线</span>
+                <span id="event-timeline-title">变化记录</span>
                 <span class="spacer"></span>
                 <button
                   v-if="selected.note_ids?.length"
@@ -247,9 +261,15 @@
                       <span class="ws-tag">{{
                         note.origin === 'manual' ? '人工整理' : '整理信息'
                       }}</span>
+                      <span
+                        v-for="kind in noteKinds(note)"
+                        :key="`${note.id}-${kind}`"
+                        class="ws-tag ac"
+                        >{{ kind }}</span
+                      >
                       <span>{{ note.title }}</span>
                     </div>
-                    <div class="ws-tl-text">{{ note.content }}</div>
+                    <div class="ws-tl-text">{{ noteTimelineText(note) }}</div>
                     <details
                       v-if="note.evidence?.length"
                       class="ws-evidence-box"
@@ -318,7 +338,7 @@
 
             <div class="ws-clhint">
               <span class="ws-clmark">a</span>
-              编辑事件、调整标签会立即同步到服务端；原始消息请到会话中查看。
+              整理结论按类型归拢，变化记录保留完整时间顺序；原始消息请到会话中查看。
             </div>
           </div>
         </div>
@@ -359,6 +379,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { spacesApi } from '@/api/spaces'
+import StructuredSummary from './StructuredSummary.vue'
 
 const props = defineProps({
   spaceId: { type: [String, Number], required: true },
@@ -395,6 +416,36 @@ const notesError = ref(false)
 const notesNext = ref(false)
 const notesLoadingMore = ref(false)
 let requestId = 0
+
+const noteStructuredItems = (note) =>
+  ['facts', 'actions', 'risks', 'decisions'].flatMap((key) => {
+    const values = note.structured_data?.[key]
+    if (!Array.isArray(values)) return []
+    return values
+      .map((value) =>
+        typeof value === 'string'
+          ? value.trim()
+          : String(value?.text || value?.title || value?.content || '').trim()
+      )
+      .filter(Boolean)
+  })
+const noteKinds = (note) =>
+  [
+    ['facts', '事实'],
+    ['actions', '待办'],
+    ['risks', '风险'],
+    ['decisions', '决定']
+  ]
+    .filter(
+      ([key]) =>
+        Array.isArray(note.structured_data?.[key]) &&
+        note.structured_data[key].length
+    )
+    .map(([, label]) => label)
+const noteTimelineText = (note) => {
+  const items = noteStructuredItems(note)
+  return items.length ? items.slice(0, 3).join('；') : note.content
+}
 
 const openCount = computed(
   () => props.events.filter((item) => item.status !== 'done').length
@@ -597,6 +648,15 @@ watch(
 </script>
 
 <style scoped>
+.ws-current-state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+}
+.ws-current-state .ws-summary {
+  color: rgb(var(--c-tx));
+}
 .ws-det-intro {
   display: flex;
   flex-direction: column;

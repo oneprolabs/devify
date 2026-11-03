@@ -43,6 +43,27 @@ describe('NoteWorkspace', () => {
     expect(wrapper.find('.note-toggle').text()).toBe('收起全文')
   })
 
+  it('shows structured results separately from raw content', () => {
+    const wrapper = render({
+      selected: {
+        ...note,
+        content: '原始聊天整理文本',
+        structured_data: {
+          facts: [{ text: '客户确认了交付范围' }],
+          actions: [{ text: '明天发送最终版本' }],
+          risks: [],
+          decisions: [{ text: '采用当前报价口径' }]
+        }
+      }
+    })
+    expect(wrapper.find('#note-structured-title').text()).toContain(
+      '结构化整理'
+    )
+    expect(wrapper.findAll('.ws-structured-card')).toHaveLength(3)
+    expect(wrapper.text()).toContain('客户确认了交付范围')
+    expect(wrapper.text()).toContain('明天发送最终版本')
+  })
+
   it('opens message evidence and linked events', async () => {
     const wrapper = render()
     await wrapper.find('.ws-li-action').trigger('click')

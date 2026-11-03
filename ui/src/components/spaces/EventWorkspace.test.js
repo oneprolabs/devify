@@ -85,6 +85,36 @@ describe('EventWorkspace', () => {
     })
   })
 
+  it('groups structured note results into a readable summary', async () => {
+    spacesApi.getEventNotes.mockResolvedValue({
+      data: {
+        data: {
+          list: [
+            {
+              id: 3,
+              title: '报价讨论',
+              content: '原始整理文本',
+              structured_data: {
+                facts: [{ text: '客户需要年度报价' }],
+                actions: [{ text: '周四前发送报价' }],
+                risks: [{ text: '客户尚未确认范围' }],
+                decisions: []
+              }
+            }
+          ],
+          pagination: {}
+        }
+      }
+    })
+    const wrapper = render({ selected: { ...events[0], note_ids: [3] } })
+    await flushPromises()
+    expect(wrapper.find('#event-structured-title').text()).toContain('整理结论')
+    expect(wrapper.findAll('.ws-structured-card')).toHaveLength(3)
+    expect(wrapper.text()).toContain('客户需要年度报价')
+    expect(wrapper.text()).toContain('周四前发送报价')
+    expect(wrapper.text()).not.toContain('原始整理文本')
+  })
+
   it('reports a linked note loading error', async () => {
     spacesApi.getEventNotes.mockRejectedValue(new Error('network'))
     const wrapper = render({ selected: { ...events[0], note_ids: [3] } })

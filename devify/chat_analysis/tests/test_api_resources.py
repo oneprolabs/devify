@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
-from chat_analysis.models import Event, EventNote, EventRelation
+from chat_analysis.models import Event, EventNote, EventRelation, Note
 from chat_domain.models import Conversation, Message, MessagePart
 from spaces.models import Space, SpaceMembership
 
@@ -86,8 +86,14 @@ def test_member_can_create_note_add_evidence_and_edit_it():
     assert updated.status_code == 200
     assert updated.data["data"]["title"] == "Updated follow up"
 
+    Note.objects.filter(pk=note_id).update(
+        structured_data={"facts": [{"text": "Customer confirmed the scope."}]}
+    )
     detail = client.get(f"/api/v1/notes/{note_id}")
     assert detail.status_code == 200
+    assert detail.data["data"]["structured_data"]["facts"][0]["text"] == (
+        "Customer confirmed the scope."
+    )
     assert len(detail.data["data"]["evidence"]) == 1
 
 

@@ -175,3 +175,30 @@ class SpaceTakeover(models.Model):
             models.Index(fields=("space", "active")),
             models.Index(fields=("admin", "active")),
         ]
+
+
+class SpaceWorkflowConfig(models.Model):
+    """Space-owned AI processing defaults, separate from user preferences."""
+    space = models.OneToOneField(Space, on_delete=models.CASCADE, related_name="workflow_config")
+    text_llm_config_uuid = models.UUIDField(null=True, blank=True)
+    image_llm_config_uuid = models.UUIDField(null=True, blank=True)
+    language = models.CharField(max_length=32, default="zh-CN")
+    scene = models.CharField(max_length=80, default="chat")
+    prompt_overrides = models.JSONField(default=dict, blank=True)
+    attachment_policy = models.CharField(max_length=32, default="available")
+    auto_process = models.BooleanField(default=True)
+    processing_paused = models.BooleanField(default=False)
+    version = models.PositiveIntegerField(default=1)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="updated_space_workflow_configs")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class SpaceQuota(models.Model):
+    space = models.OneToOneField(Space, on_delete=models.CASCADE, related_name="quota")
+    max_members = models.PositiveIntegerField(null=True, blank=True)
+    storage_limit_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    daily_ai_calls = models.PositiveIntegerField(null=True, blank=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="updated_space_quotas")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

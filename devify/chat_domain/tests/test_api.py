@@ -1,3 +1,6 @@
+from datetime import datetime
+from datetime import timezone as dt_timezone
+
 import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
@@ -139,3 +142,131 @@ def test_global_admin_requires_takeover_and_access_is_audited():
     assert client.get(
         f"{url}/{conversation.pk}"
     ).status_code == 200
+
+
+def test_conversation_and_message_list_expose_readable_previews():
+    owner = User.objects.create_user(username="api-preview-owner")
+    space = make_space(owner, "api-preview-team")
+    conversation = make_conversation(space)
+    older = Message.objects.create(
+        conversation=conversation,
+        message_key="src:1",
+        ingest_seq=1,
+        sender_name="Alice",
+        occurred_at=datetime(2026, 11, 1, 10, 0, tzinfo=dt_timezone.utc),
+    )
+    MessagePart.objects.create(
+        message=older,
+        part_key="text-1",
+        kind=MessagePart.Kind.TEXT,
+        text="第一天消息",
+    )
+    newest = Message.objects.create(
+        conversation=conversation,
+        message_key="src:2",
+        ingest_seq=2,
+        sender_name="Bob",
+        occurred_at=datetime(2026, 11, 1, 11, 0, tzinfo=dt_timezone.utc),
+    )
+    MessagePart.objects.create(
+        message=newest,
+        part_key="text-1",
+        kind=MessagePart.Kind.TEXT,
+        text="第二天的回复",
+    )
+    MessagePart.objects.create(
+        message=newest,
+        part_key="image-1",
+        kind=MessagePart.Kind.IMAGE,
+        ordinal=1,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+
+    list_response = client.get(f"/api/v1/spaces/{space.pk}/conversations")
+    assert list_response.status_code == 200
+    row = list_response.data["data"]["list"][0]
+    assert row["last_message_preview"] == "第二天的回复 [图片]"
+    assert row["last_message_sender"] == "Bob"
+
+    detail_response = client.get(
+        f"/api/v1/spaces/{space.pk}/conversations/{conversation.pk}"
+    )
+    assert detail_response.status_code == 200
+    assert detail_response.data["data"]["last_message_preview"] == (
+        "第二天的回复 [图片]"
+    )
+
+    message_response = client.get(
+        f"/api/v1/spaces/{space.pk}/conversations/{conversation.pk}/messages"
+    )
+    assert message_response.status_code == 200
+    previews = [
+        item["preview"] for item in message_response.data["data"]["list"]
+    ]
+    assert previews == ["第一天消息", "第二天的回复 [图片]"]
+
+
+def test_conversation_preview_is_empty_without_messages():
+    owner = User.objects.create_user(username="api-preview-empty-owner")
+    space = make_space(owner, "api-preview-empty-team")
+    make_conversation(space)
+    client = APIClient()
+    client.force_authenticate(user=owner)
+
+    response = client.get(f"/api/v1/spaces/{space.pk}/conversations")
+    assert response.status_code == 200
+    row = response.data["data"]["list"][0]
+    assert row["last_message_preview"] == ""
+    assert row["last_message_sender"] == ""
+
+
+def test_message_list_can_focus_the_page_holding_a_given_message():
+    owner = User.objects.create_user(username="api-focus-owner")
+    space = make_space(owner, "api-focus-team")
+    conversation = make_conversation(space)
+    created = []
+    for index in range(1, 6):
+        created.append(
+            Message.objects.create(
+                conversation=conversation,
+                message_key=f"src:{index}",
+                ingest_seq=index,
+                sender_name="Alice",
+                occurred_at=datetime(
+                    2026, 11, 1, 10, index, tzinfo=dt_timezone.utc
+                ),
+            )
+        )
+    for message in created:
+        MessagePart.objects.create(
+            message=message,
+            part_key="text-1",
+            kind=MessagePart.Kind.TEXT,
+            text=f"消息 {message.ingest_seq}",
+        )
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    url = f"/api/v1/spaces/{space.pk}/conversations/{conversation.pk}/messages"
+
+    response = client.get(
+        url,
+        {"page_size": 2, "focus_message_id": created[3].pk},
+    )
+    assert response.status_code == 200
+    assert [row["id"] for row in response.data["data"]["list"]] == [
+        created[2].pk,
+        created[3].pk,
+    ]
+    assert response.data["data"]["pagination"]["page"] == 2
+
+    latest = client.get(url, {"page_size": 2, "page": "last"})
+    assert latest.status_code == 200
+    assert [row["id"] for row in latest.data["data"]["list"]] == [
+        created[4].pk
+    ]
+
+    invalid = client.get(url, {"focus_message_id": "abc"})
+    assert invalid.status_code == 400

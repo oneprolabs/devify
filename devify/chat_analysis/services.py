@@ -1,13 +1,16 @@
 from django.db import transaction
 from django.utils import timezone
 
+from chat_analysis.keys import canonical_entity_key, canonical_event_key
 from chat_analysis.models import (
     AnalysisJob,
     Event,
+    EventEvidence,
     EventNote,
     EventRelation,
     Note,
     NoteEvidence,
+    ReportItemSource,
 )
 from spaces.services import SpacePermissionService
 
@@ -129,6 +132,20 @@ def retry_analysis_job(*, actor, job):
 
 
 @transaction.atomic
+def cancel_analysis_job(*, actor, job):
+    ensure_can_contribute(actor, job.space)
+    locked = AnalysisJob.objects.select_for_update().get(pk=job.pk)
+    if locked.state in (AnalysisJob.State.READY, AnalysisJob.State.PARTIAL, AnalysisJob.State.FAILED, AnalysisJob.State.CANCELLED):
+        raise ChatAnalysisConflict("Only queued or running analysis jobs can be cancelled.")
+    locked.state = AnalysisJob.State.CANCELLED
+    locked.lease_owner = ""
+    locked.lease_until = None
+    locked.error = "Cancelled by user."
+    locked.save(update_fields=("state", "lease_owner", "lease_until", "error", "updated_at"))
+    return locked
+
+
+@transaction.atomic
 def create_note(
     *,
     actor,
@@ -199,11 +216,12 @@ def create_event(
     status=None,
     opened_at=None,
     last_activity_at=None,
+    entity_key="",
 ):
     ensure_can_contribute(actor, space)
     event, _ = Event.objects.get_or_create(
         space=space,
-        event_key=event_key,
+        event_key=canonical_event_key(event_key, title=title),
         defaults={
             "created_by": actor,
             "title": title,
@@ -211,9 +229,72 @@ def create_event(
             "status": status,
             "opened_at": opened_at,
             "last_activity_at": last_activity_at,
+            "entity_key": canonical_entity_key(entity_key),
         },
     )
     return event
+
+
+def refresh_event_window(event, *, messages=None):
+    """Recompute an Event's activity window from its own evidence.
+
+    Only widens the window: an event keeps its earliest start and latest
+    activity even when older evidence is later attached.
+    """
+    if messages is None:
+        occurred = list(
+            EventEvidence.objects.filter(event=event).values_list(
+                "message__occurred_at", flat=True
+            )
+        )
+    else:
+        occurred = [message.occurred_at for message in messages]
+    occurred = [value for value in occurred if value]
+    if not occurred:
+        return event
+    opened_at = min(occurred)
+    last_activity_at = max(occurred)
+    changed = []
+    if event.opened_at is None or opened_at < event.opened_at:
+        event.opened_at = opened_at
+        changed.append("opened_at")
+    if (
+        event.last_activity_at is None
+        or last_activity_at > event.last_activity_at
+    ):
+        event.last_activity_at = last_activity_at
+        changed.append("last_activity_at")
+    if changed:
+        event.save(update_fields=tuple(changed) + ("updated_at",))
+    return event
+
+
+@transaction.atomic
+def merge_events(*, actor, source, target):
+    """Fold one Event into another and drop the source row."""
+    ensure_can_contribute(actor, source.space)
+    if source.space_id != target.space_id:
+        raise ChatAnalysisError("Events must share a space.")
+    if source.pk == target.pk:
+        return target
+    for link in EventNote.objects.filter(event=source).select_related("note"):
+        EventNote.objects.get_or_create(
+            event=target,
+            note=link.note,
+            defaults={"created_by": link.created_by},
+        )
+    for link in EventEvidence.objects.filter(event=source).select_related(
+        "message"
+    ):
+        EventEvidence.objects.get_or_create(
+            event=target,
+            message=link.message,
+            defaults={"created_by": link.created_by},
+        )
+    ReportItemSource.objects.filter(event=source).update(event=target)
+    refresh_event_window(target)
+    source.delete()
+    return target
 
 
 @transaction.atomic

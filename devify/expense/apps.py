@@ -21,6 +21,7 @@ class ExpenseConfig(AppConfig):
                 "Collect invoices from email, classify them and package "
                 "them for reimbursement."
             ),
+            space_kinds=("personal",),
             order=20,
             stats=expense_stats,
         )

@@ -141,6 +141,13 @@
             {{ t('spaces.openOperations') }}
           </router-link>
 
+          <router-link
+            class="space-open-operations"
+            :to="`/spaces/${selectedSpace.id}/apps`"
+          >
+            {{ t('apps.centerTitle') }}
+          </router-link>
+
           <div class="space-section-title">
             <h3>{{ t('spaces.sources') }}</h3>
             <span>{{ t('spaces.capabilitiesNote') }}</span>
@@ -182,6 +189,17 @@
               </div>
             </div>
           </div>
+          <div class="quota-section">
+            <div class="space-section-title"><h3>额度使用</h3><button type="button" class="space-refresh" @click="loadQuotaUsage">刷新</button></div>
+            <div v-if="quotaUsage" class="quota-grid"><span>成员 {{ quotaUsage.member_count }}<small v-if="quota?.max_members"> / {{ quota.max_members }}</small></span><span>存储 {{ quotaUsage.storage_used_bytes }}<small v-if="quota?.storage_limit_bytes"> / {{ quota.storage_limit_bytes }}</small></span><span>AI {{ quotaUsage.daily_ai_calls_used }}<small v-if="quota?.daily_ai_calls"> / {{ quota.daily_ai_calls }}</small></span></div>
+          </div>
+          <div class="audit-section">
+            <div class="space-section-title"><h3>操作记录</h3><span>{{ auditLogs.length }}</span></div>
+            <div v-if="auditLoading" class="space-loading">{{ t('common.loading') }}</div>
+            <div v-else-if="!auditLogs.length" class="space-empty compact"><span>暂无操作记录</span></div>
+            <div v-else class="audit-list"><div v-for="log in auditLogs.slice(0, 8)" :key="log.id" class="audit-row"><strong>{{ log.action }}</strong><span>{{ log.actor || '系统' }} · {{ formatAuditDate(log.created_at) }}</span></div></div>
+          </div>
+
           <div v-if="selectedSpace.kind === 'team'" class="management-section">
             <div class="space-section-title">
               <h3>{{ t('spaces.management') }}</h3>
@@ -322,6 +340,10 @@ const loading = ref(false)
 const sourcesLoading = ref(false)
 const error = ref('')
 const members = ref([])
+const auditLogs = ref([])
+const quotaUsage = ref(null)
+const quota = ref(null)
+const auditLoading = ref(false)
 const membersLoading = ref(false)
 const actionLoading = ref(false)
 const showCreate = ref(false)
@@ -363,6 +385,14 @@ const loadSources = async () => {
   }
 }
 
+const loadQuotaUsage = async () => { try { const response = await spacesApi.getQuotaUsage(selectedSpace.value.id); const data = response.data.data || response.data; quotaUsage.value = data.usage; quota.value = data.quota } catch { quotaUsage.value = null } }
+const loadAuditLogs = async () => {
+  if (!selectedSpace.value) { auditLogs.value = []; return }
+  auditLoading.value = true
+  try { const response = await spacesApi.getAuditLogs(selectedSpace.value.id); const data = response.data.data || response.data || []
+    auditLogs.value = Array.isArray(data) ? data : data.list || [] } catch { auditLogs.value = [] } finally { auditLoading.value = false }
+}
+const formatAuditDate = value => value ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
 const loadMembers = async () => {
   if (!selectedSpace.value || selectedSpace.value.kind !== 'team') return
   membersLoading.value = true
@@ -382,6 +412,8 @@ const runAction = async (action) => {
     await action()
     await loadSpaces()
     await loadMembers()
+    await loadAuditLogs()
+    await loadQuotaUsage()
   } catch (requestError) {
     error.value = requestError.response?.data?.detail || t('spaces.loadError')
   } finally {
@@ -466,6 +498,8 @@ const loadSpaces = async () => {
 watch(selectedId, async () => {
   await loadSources()
   await loadMembers()
+    await loadAuditLogs()
+  await loadQuotaUsage()
 })
 onMounted(loadSpaces)
 </script>
@@ -791,7 +825,7 @@ onMounted(loadSpaces)
   font-size: 12px;
 }
 .space-empty strong,
-.space-detail-placeholder strong {
+.quota-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }.quota-grid span { border:1px solid rgb(var(--c-line-soft)); padding:8px; font-size:11px; }.quota-grid small { color:rgb(var(--c-tx3)); }.audit-list { border-top:1px solid rgb(var(--c-line-soft)); }.audit-row { display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid rgb(var(--c-line-soft)); padding:8px 0; font-size:11px; }.audit-row span { color:rgb(var(--c-tx3)); }.space-detail-placeholder strong {
   color: rgb(var(--c-tx2));
   font-size: 13px;
 }

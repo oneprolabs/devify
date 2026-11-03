@@ -83,7 +83,29 @@ class AppsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return _response(APP_REGISTRY.list_apps(request.user))
+        space_id = request.query_params.get("space_id")
+        if space_id is None:
+            return _response(APP_REGISTRY.list_apps(request.user))
+        if (
+            not space_id.isascii()
+            or not space_id.isdecimal()
+            or len(space_id) > 19
+            or not 0 < int(space_id) <= 9223372036854775807
+        ):
+            return _response({"detail": "Invalid space."}, code=400, status_code=400)
+        from spaces.models import Space
+        from spaces.services import SpacePermissionService
+
+        space = get_object_or_404(Space, pk=int(space_id))
+        if (
+            not SpacePermissionService.can_read(request.user, space)
+            or (
+                space.kind == Space.Kind.PERSONAL
+                and space.personal_owner_id != request.user.id
+            )
+        ):
+            return _response({"detail": "Space not found."}, code=404, status_code=404)
+        return _response(APP_REGISTRY.list_apps(request.user, space_kind=space.kind))
 
 
 class RelayStatsAPIView(APIView):

@@ -182,6 +182,49 @@ def test_member_can_create_event_assign_notes_and_create_relation():
     assert detail.data["data"]["note_ids"] == [note["id"]]
 
 
+def test_event_notes_include_message_evidence():
+    owner = User.objects.create_user(username="resource-evidence-owner")
+    space = make_space(owner, "resource-evidence-team")
+    message = make_message(space)
+    client = APIClient()
+    client.force_authenticate(user=owner)
+
+    note = client.post(
+        f"/api/v1/spaces/{space.pk}/notes",
+        {"note_key": "evidence-note", "title": "Note", "content": "Text."},
+        format="json",
+    ).data["data"]
+    client.post(
+        f"/api/v1/notes/{note['id']}/evidence",
+        {"message_id": message.pk, "message_part_id": message.parts.get().pk},
+        format="json",
+    )
+    event = client.post(
+        f"/api/v1/spaces/{space.pk}/events",
+        {
+            "event_key": "evidence-event",
+            "title": "Quote",
+            "content": "Prepare a quote.",
+        },
+        format="json",
+    ).data["data"]
+    client.post(
+        f"/api/v1/events/{event['id']}/notes",
+        {"note_ids": [note["id"]]},
+        format="json",
+    )
+
+    response = client.get(f"/api/v1/events/{event['id']}/notes")
+    assert response.status_code == 200
+    entries = response.data["data"]["list"]
+    assert len(entries) == 1
+    assert entries[0]["evidence"][0]["message_id"] == message.pk
+    assert (
+        entries[0]["evidence"][0]["conversation_id"]
+        == message.conversation_id
+    )
+
+
 def test_cross_space_note_and_event_are_not_visible():
     owner = User.objects.create_user(username="resource-isolation-owner")
     first = make_space(owner, "resource-first")

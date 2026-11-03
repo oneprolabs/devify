@@ -2,14 +2,19 @@ from rest_framework import serializers
 
 from chat_analysis.models import (
     Event,
+    EventEvidence,
     EventRelation,
+    EventSuggestion,
+    EventTag,
+    EventTagAssignment,
     Note,
     NoteEvidence,
+    QuestionAnswer,
     Report,
     ReportItem,
     ReportItemSource,
     ReportSection,
-    EventSuggestion,
+    TopicSubscription,
 )
 
 
@@ -54,15 +59,15 @@ class NoteSerializer(serializers.ModelSerializer):
 
 
 class NoteEvidenceSerializer(serializers.ModelSerializer):
+    conversation_id = serializers.IntegerField(source="message.conversation_id", read_only=True)
+    sender_name = serializers.CharField(source="message.sender_name", read_only=True)
+    occurred_at = serializers.DateTimeField(source="message.occurred_at", read_only=True)
+
     class Meta:
         model = NoteEvidence
         fields = (
-            "id",
-            "note_id",
-            "message_id",
-            "message_part_id",
-            "reference_key",
-            "created_at",
+            "id", "note_id", "message_id", "message_part_id", "reference_key",
+            "conversation_id", "sender_name", "occurred_at", "created_at",
         )
         read_only_fields = fields
 
@@ -104,6 +109,12 @@ class EventUpdateSerializer(serializers.Serializer):
 
 
 class EventSerializer(serializers.ModelSerializer):
+    tags = serializers.SerializerMethodField()
+
+    def get_tags(self, obj):
+        assignments = getattr(obj, "_prefetched_objects_cache", {}).get("tag_assignments", obj.tag_assignments.all())
+        return EventTagSerializer([assignment.tag for assignment in assignments], many=True).data
+
     class Meta:
         model = Event
         fields = (
@@ -112,6 +123,7 @@ class EventSerializer(serializers.ModelSerializer):
             "space_id",
             "created_by_id",
             "event_key",
+            "entity_key",
             "title",
             "content",
             "status",
@@ -119,6 +131,36 @@ class EventSerializer(serializers.ModelSerializer):
             "last_activity_at",
             "created_at",
             "updated_at",
+            "tags",
+        )
+        read_only_fields = fields
+
+
+class EventEvidenceSerializer(serializers.ModelSerializer):
+    conversation_id = serializers.IntegerField(
+        source="message.conversation_id", read_only=True
+    )
+    sender_name = serializers.CharField(
+        source="message.sender_name", read_only=True
+    )
+    occurred_at = serializers.DateTimeField(
+        source="message.occurred_at", read_only=True
+    )
+    ingest_seq = serializers.IntegerField(
+        source="message.ingest_seq", read_only=True
+    )
+
+    class Meta:
+        model = EventEvidence
+        fields = (
+            "id",
+            "event_id",
+            "message_id",
+            "conversation_id",
+            "sender_name",
+            "occurred_at",
+            "ingest_seq",
+            "created_at",
         )
         read_only_fields = fields
 
@@ -292,8 +334,12 @@ class EventSuggestionSerializer(serializers.ModelSerializer):
             "note_id",
             "event_id",
             "event_key",
+            "entity_key",
             "title",
             "summary",
+            "proposed_status",
+            "proposed_tags",
+            "source_seqs",
             "status",
             "created_by_id",
             "reviewed_by_id",
@@ -301,4 +347,103 @@ class EventSuggestionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+        read_only_fields = fields
+
+
+class TopicSubscriptionCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=255)
+    instruction = serializers.CharField(max_length=5000)
+    filters = serializers.DictField(required=False, default=dict)
+    include_open = serializers.BooleanField(required=False, default=True)
+    period = serializers.ChoiceField(choices=TopicSubscription.Period.choices, required=False, default=TopicSubscription.Period.WEEK)
+    time_local = serializers.TimeField(required=False, allow_null=True)
+    timezone = serializers.CharField(max_length=64, required=False, default="Asia/Shanghai")
+    enabled = serializers.BooleanField(required=False, default=True)
+
+    def validate_title(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Title is required.")
+        return value
+
+    def validate_instruction(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Instruction is required.")
+        return value
+
+    def validate_filters(self, value):
+        allowed = {"event_ids", "note_ids", "conversation_ids", "tag_keys", "keywords"}
+        unknown = set(value) - allowed
+        if unknown:
+            raise serializers.ValidationError({key: "Unsupported filter." for key in sorted(unknown)})
+        for key in ("event_ids", "note_ids", "conversation_ids"):
+            if key in value and (not isinstance(value[key], list) or any(not isinstance(item, int) or item < 1 for item in value[key])):
+                raise serializers.ValidationError({key: "Must be a list of positive integers."})
+        for key in ("tag_keys", "keywords"):
+            if key in value and (not isinstance(value[key], list) or any(not isinstance(item, str) or not item.strip() for item in value[key])):
+                raise serializers.ValidationError({key: "Must be a list of non-empty strings."})
+        return value
+
+
+class TopicSubscriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TopicSubscription
+        fields = ("id", "space_id", "created_by_id", "title", "instruction", "filters", "include_open", "period", "time_local", "timezone", "enabled", "last_run_at", "last_error", "created_at", "updated_at")
+        read_only_fields = fields
+
+
+class QuestionCreateSerializer(serializers.Serializer):
+    question = serializers.CharField(max_length=2000)
+    event_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, allow_empty=True, default=list)
+    note_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, allow_empty=True, default=list)
+    conversation_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, allow_empty=True, default=list)
+    tag_keys = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True, default=list)
+    keywords = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True, default=list)
+
+    def validate_question(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Question is required.")
+        return value
+
+
+class QuestionAnswerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuestionAnswer
+        fields = ("id", "uuid", "space_id", "created_by_id", "question", "scope", "answer", "citations", "usage", "status", "error", "created_at", "updated_at")
+        read_only_fields = fields
+
+
+class EventTagCreateSerializer(serializers.Serializer):
+    tag_key = serializers.CharField(max_length=120, required=False)
+    label = serializers.CharField(max_length=120)
+
+    def validate(self, attrs):
+        label = attrs["label"].strip()
+        if not label:
+            raise serializers.ValidationError({"label": "Label is required."})
+        key = attrs.get("tag_key", "").strip() or label.casefold()
+        attrs["label"] = label
+        attrs["tag_key"] = key
+        return attrs
+
+
+class EventTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventTag
+        fields = ("id", "space_id", "created_by_id", "tag_key", "label", "created_at", "updated_at")
+        read_only_fields = fields
+
+
+class EventTagAssignmentCreateSerializer(serializers.Serializer):
+    tag_id = serializers.IntegerField(min_value=1)
+
+
+class EventTagAssignmentSerializer(serializers.ModelSerializer):
+    tag = EventTagSerializer(read_only=True)
+
+    class Meta:
+        model = EventTagAssignment
+        fields = ("id", "event_id", "tag_id", "tag", "created_by_id", "created_at")
         read_only_fields = fields

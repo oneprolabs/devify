@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from django.shortcuts import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -20,6 +20,32 @@ class ChatPagination(PageNumberPagination):
     page_size = 25
     page_size_query_param = "page_size"
     max_page_size = 100
+
+
+class _ParamsRequest:
+    """Minimal request wrapper that overrides query params for pagination."""
+
+    def __init__(self, request, params):
+        self._request = request
+        self.query_params = params
+
+    def build_absolute_uri(self, *args, **kwargs):
+        return self._request.build_absolute_uri(*args, **kwargs)
+
+
+def _latest_messages(conversations):
+    """Map conversation id → its newest message, with parts prefetched."""
+    latest_ids = [
+        conversation.latest_message_id
+        for conversation in conversations
+        if getattr(conversation, "latest_message_id", None)
+    ]
+    if not latest_ids:
+        return {}
+    messages = Message.objects.filter(pk__in=latest_ids).prefetch_related(
+        "parts"
+    )
+    return {message.conversation_id: message for message in messages}
 
 
 def _authorized_space(user, space_id):
@@ -66,11 +92,21 @@ class SpaceConversationListAPIView(APIView):
             )
         conversations = conversations.order_by(
             "-last_message_at", "-id"
+        ).annotate(
+            latest_message_id=Subquery(
+                Message.objects.filter(conversation=OuterRef("pk"))
+                .order_by("-ingest_seq", "-id")
+                .values("id")[:1]
+            )
         )
 
         paginator = ChatPagination()
         page = paginator.paginate_queryset(conversations, request, view=self)
-        data = ConversationListSerializer(page, many=True).data
+        data = ConversationListSerializer(
+            page,
+            many=True,
+            context={"latest_messages": _latest_messages(page)},
+        ).data
         if takeover:
             audit_space_action(
                 actor=request.user,
@@ -97,7 +133,13 @@ class SpaceConversationDetailAPIView(APIView):
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
         conversation = get_object_or_404(
-            Conversation,
+            Conversation.objects.annotate(
+                latest_message_id=Subquery(
+                    Message.objects.filter(conversation=OuterRef("pk"))
+                    .order_by("-ingest_seq", "-id")
+                    .values("id")[:1]
+                )
+            ),
             space=space,
             pk=conversation_id,
         )
@@ -111,7 +153,14 @@ class SpaceConversationDetailAPIView(APIView):
                 metadata={"takeover_id": takeover.pk},
             )
         return Response(
-            {"data": ConversationDetailSerializer(conversation).data}
+            {
+                "data": ConversationDetailSerializer(
+                    conversation,
+                    context={
+                        "latest_messages": _latest_messages([conversation])
+                    },
+                ).data
+            }
         )
 
 
@@ -127,11 +176,35 @@ class SpaceMessageListAPIView(APIView):
             space=space,
             pk=conversation_id,
         )
-        messages = Message.objects.filter(
-            conversation=conversation
-        ).order_by("ingest_seq", "id")
+        messages = (
+            Message.objects.filter(conversation=conversation)
+            .prefetch_related("parts")
+            .order_by("ingest_seq", "id")
+        )
         paginator = ChatPagination()
-        page = paginator.paginate_queryset(messages, request, view=self)
+        pagination_request = request
+        focus_id = request.query_params.get("focus_message_id", "").strip()
+        if focus_id:
+            if not focus_id.isdigit():
+                return Response(
+                    {"detail": "focus_message_id must be an integer."},
+                    status=400,
+                )
+            anchor = messages.filter(pk=int(focus_id)).first()
+            if anchor is not None:
+                page_size = (
+                    paginator.get_page_size(request) or paginator.page_size
+                )
+                before = messages.filter(
+                    Q(ingest_seq__lt=anchor.ingest_seq)
+                    | Q(ingest_seq=anchor.ingest_seq, pk__lt=anchor.pk)
+                ).count()
+                params = request.query_params.copy()
+                params["page"] = str(before // page_size + 1)
+                pagination_request = _ParamsRequest(request, params)
+        page = paginator.paginate_queryset(
+            messages, pagination_request, view=self
+        )
         data = MessageListSerializer(page, many=True).data
         if takeover:
             audit_space_action(

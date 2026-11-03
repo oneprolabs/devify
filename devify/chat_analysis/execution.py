@@ -11,31 +11,43 @@ keys and the existing Note service, which refuses to overwrite manual Notes.
 
 import json
 import logging
+import os
+import time
 from dataclasses import dataclass
 from datetime import timedelta
 
-from django.db import transaction
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
-from chat_analysis.models import AnalysisJob, Note
-from chat_analysis.suggestions import create_event_suggestion
+from chat_analysis.models import AnalysisJob, Event, EventSuggestion, Note
 from chat_analysis.services import (
     ChatAnalysisError,
     ChatAnalysisPermissionError,
     add_note_evidence,
     create_note,
+    refresh_event_window,
+)
+from chat_analysis.suggestions import (
+    create_event_suggestion,
+    review_event_suggestion,
 )
 from chat_domain.models import Message, MessagePart
-from spaces.models import Space
-from spaces.services import SpacePermissionService
 from core.tracking import LLMTracker
+from spaces.models import Space, SpaceWorkflowConfig
+from spaces.services import SpacePermissionService
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_LEASE_SECONDS = 300
 DEFAULT_MAX_ATTEMPTS = 3
 ANALYSIS_CHUNK_SIZE = 200
+ENGINE_VERSION = "chat-analysis.v2"
+MAX_EVENTS_PER_CHUNK = 8
+EXISTING_EVENT_CONTEXT_LIMIT = 40
+DEFAULT_OUTPUT_LANGUAGE = "zh-CN"
+MODULE_LOADED_AT = time.time()
+MODULE_PATH = os.path.abspath(__file__)
 
 
 class AnalysisJobRejected(Exception):
@@ -96,6 +108,7 @@ def claim_analysis_job(
         job.lease_until = now + timedelta(seconds=lease_seconds)
         job.fencing_token = job.fencing_token + 1
         job.attempts = job.attempts + 1
+        job.engine_version = ENGINE_VERSION
         job.error = ""
         job.save(
             update_fields=(
@@ -104,6 +117,7 @@ def claim_analysis_job(
                 "lease_until",
                 "fencing_token",
                 "attempts",
+                "engine_version",
                 "error",
                 "updated_at",
             )
@@ -344,15 +358,21 @@ def _write_chunk_note(job, messages):
             note=note,
             message=message,
         )
-    _enrich_note_with_llm(job, note, messages)
-    return True, missing_content
+    partial = _enrich_note_with_llm(job, note, messages)
+    return True, missing_content or partial
 
 
-def _enrich_note_with_llm(job, note, messages):
-    """Structure a Note and propose Events without mutating Events."""
-    if not getattr(settings, "CHAT_ANALYSIS_LLM_ENABLED", False):
-        return
-    content = [
+def _output_language(space):
+    language = (
+        SpaceWorkflowConfig.objects.filter(space=space)
+        .values_list("language", flat=True)
+        .first()
+    )
+    return language or DEFAULT_OUTPUT_LANGUAGE
+
+
+def _message_payload(messages):
+    return [
         {
             "seq": message.ingest_seq,
             "sender": message.sender_name or message.sender_key,
@@ -365,51 +385,172 @@ def _enrich_note_with_llm(job, note, messages):
         }
         for message in messages
     ]
-    prompt = (
-        "Extract structured facts from the chat messages. Return JSON with "
-        "facts, actions, risks, decisions and events arrays. Each event must "
-        "have event_key, title and summary. Do not invent facts."
+
+
+def _existing_event_context(space):
+    events = Event.objects.filter(space=space).order_by(
+        "-last_activity_at", "-id"
+    )[:EXISTING_EVENT_CONTEXT_LIMIT]
+    return [
+        {
+            "event_key": event.event_key,
+            "title": event.title,
+            "entity": event.entity_key,
+            "last_activity_at": (
+                event.last_activity_at.isoformat()
+                if event.last_activity_at
+                else None
+            ),
+        }
+        for event in events
+    ]
+
+
+def _call_json(*, prompt, content, node_name):
+    output, _usage = LLMTracker.call_and_track(
+        prompt=prompt,
+        content=content,
+        json_mode=True,
+        node_name=node_name,
+        state={},
     )
-    try:
-        output, usage = LLMTracker.call_and_track(
-            prompt=prompt,
-            content=json.dumps(content, ensure_ascii=False),
-            json_mode=True,
-            node_name="chat_note_structuring",
-            state={},
+    return output if isinstance(output, dict) else None
+
+
+def _summarize_note(note, payload, language):
+    prompt = (
+        "Summarize one chunk of chat messages. Return JSON with exactly the "
+        "keys facts, actions, risks and decisions. Every item must be an "
+        "object with a short text field. Do not include events. Do not "
+        f"invent facts. Write all text in {language}."
+    )
+    output = _call_json(
+        prompt=prompt,
+        content=json.dumps(payload, ensure_ascii=False),
+        node_name="chat_note_structuring",
+    )
+    if output is None:
+        return False
+    note.structured_data = output
+    note.generation_version = "chat-note-llm.v1"
+    note.save(
+        update_fields=(
+            "structured_data",
+            "generation_version",
+            "updated_at",
         )
-        if not isinstance(output, dict):
-            return
-        note.structured_data = output
-        note.generation_version = "chat-note-llm.v1"
-        note.save(
-            update_fields=(
-                "structured_data",
-                "generation_version",
-                "updated_at",
-            )
+    )
+    return True
+
+
+def _extract_events(job, note, messages, payload, language):
+    prompt = (
+        "Extract ongoing matters (events) from one chunk of chat messages. "
+        'Return JSON: {"events": [...]}. Each event must have event_key, '
+        "entity, title, summary, status, source_seqs and tags. "
+        "Rules: one event per ongoing matter; merge messages about the same "
+        "matter into a single event; reuse the event_key of an existing "
+        "event when the matter continues it; status is one of open, "
+        "in_progress, done; source_seqs must be seq numbers from the given "
+        "messages; tags are at most five short labels such as customer, "
+        f"product or incident id. Return at most {MAX_EVENTS_PER_CHUNK} "
+        f"events. Write title and summary in {language}. Do not invent facts."
+    )
+    content = json.dumps(
+        {
+            "messages": payload,
+            "existing_events": _existing_event_context(note.space),
+        },
+        ensure_ascii=False,
+    )
+    output = _call_json(
+        prompt=prompt,
+        content=content,
+        node_name="chat_event_extraction",
+    )
+    if output is None:
+        return False
+    events = output.get("events")
+    if not isinstance(events, list):
+        return False
+    by_seq = {message.ingest_seq: message for message in messages}
+    for index, event in enumerate(events[:MAX_EVENTS_PER_CHUNK]):
+        if not isinstance(event, dict):
+            continue
+        title = str(event.get("title") or "").strip()
+        summary = str(event.get("summary") or "").strip()
+        if not title or not summary:
+            continue
+        status = str(event.get("status") or "").strip().lower()
+        if status not in Event.Status.values:
+            status = Event.Status.OPEN
+        tags = [
+            str(tag).strip()
+            for tag in (event.get("tags") or [])
+            if str(tag).strip()
+        ][:5]
+        source_messages = []
+        for value in event.get("source_seqs") or []:
+            try:
+                seq = int(value)
+            except (TypeError, ValueError):
+                continue
+            if seq in by_seq:
+                source_messages.append(by_seq[seq])
+        event_key = str(
+            event.get("event_key")
+            or f"{job.uuid}:event:{messages[0].ingest_seq}:{index}"
+        )[:255]
+        suggestion = create_event_suggestion(
+            actor=job.created_by,
+            note=note,
+            analysis_job=job,
+            event_key=event_key,
+            entity_key=str(event.get("entity") or ""),
+            title=title,
+            summary=summary,
+            status=status,
+            tags=tags,
+            source_seqs=[message.ingest_seq for message in source_messages],
         )
-        for index, event in enumerate(output.get("events") or []):
-            if not isinstance(event, dict):
-                continue
-            title = str(event.get("title") or "").strip()
-            summary = str(event.get("summary") or "").strip()
-            if not title or not summary:
-                continue
-            event_key = str(
-                event.get("event_key")
-                or f"{job.uuid}:event:{messages[0].ingest_seq}:{index}"
-            )[:255]
-            create_event_suggestion(
+        if getattr(settings, "CHAT_ANALYSIS_AUTO_CREATE_EVENTS", False):
+            suggestion = review_event_suggestion(
                 actor=job.created_by,
-                note=note,
-                analysis_job=job,
-                event_key=event_key,
-                title=title,
-                summary=summary,
+                suggestion=suggestion,
+                decision=EventSuggestion.Status.ACCEPTED,
             )
+            if suggestion.event_id and not source_messages:
+                refresh_event_window(
+                    suggestion.event, messages=messages
+                )
+    return True
+
+
+def _enrich_note_with_llm(job, note, messages):
+    """Structure a Note and propose Events without mutating Events.
+
+    Summary and event extraction are separate calls: one combined call used
+    to fill the model's output budget and silently drop the event list.
+    Returns True when part of the work could not be produced.
+    """
+    if not getattr(settings, "CHAT_ANALYSIS_LLM_ENABLED", False):
+        return False
+    payload = _message_payload(messages)
+    language = _output_language(note.space)
+    partial = False
+    try:
+        if not _summarize_note(note, payload, language):
+            partial = True
     except Exception:
+        # An unavailable LLM is an infrastructure failure, not a data gap:
+        # keep the job's state and let the caller retry.
         logger.exception("LLM note structuring failed for job %s", job.pk)
+    try:
+        if not _extract_events(job, note, messages, payload, language):
+            partial = True
+    except Exception:
+        logger.exception("LLM event extraction failed for job %s", job.pk)
+    return partial
 
 
 def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):

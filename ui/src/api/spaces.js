@@ -16,8 +16,48 @@ export const spacesApi = {
     return api.get('/v1/spaces')
   },
 
+  getEmailSources(spaceId) {
+    return api.get(`/v1/spaces/${spaceId}/email-sources`)
+  },
+
+  createEmailSource(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/email-sources`, data)
+  },
+
+  syncEmailSource(spaceId, mailboxUuid) {
+    return api.post(`/v1/spaces/${spaceId}/email-sources/${mailboxUuid}/sync`)
+  },
+
+  testEmailSource(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/email-sources/test`, data)
+  },
+
+  testStoredEmailSource(spaceId, mailboxUuid) {
+    return api.post(`/v1/spaces/${spaceId}/email-sources/${mailboxUuid}/test`)
+  },
+
+  updateEmailSource(spaceId, mailboxUuid, data) {
+    return api.patch(`/v1/spaces/${spaceId}/email-sources/${mailboxUuid}`, data)
+  },
+
+  disableEmailSource(spaceId, mailboxUuid) {
+    return api.delete(`/v1/spaces/${spaceId}/email-sources/${mailboxUuid}`)
+  },
+
   getSources(spaceId) {
     return api.get(`/v1/spaces/${spaceId}/sources`)
+  },
+
+  verifySource(sourceId) {
+    return api.post(`/v1/sources/${sourceId}/verify`)
+  },
+
+  getSourceStatus(sourceId) {
+    return api.get(`/v1/sources/${sourceId}/status`)
+  },
+
+  getSourceJobs(sourceId) {
+    return api.get(`/v1/sources/${sourceId}/jobs`)
   },
 
   getConversations(spaceId, params = {}) {
@@ -49,12 +89,88 @@ export const spacesApi = {
     return api.get(`/v1/spaces/${spaceId}/events`, { params })
   },
 
+  getEventTags(spaceId) {
+    return api.get(`/v1/spaces/${spaceId}/tags`)
+  },
+
+  createEventTag(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/tags`, data)
+  },
+
+  updateEventTag(tagId, data) {
+    return api.patch(`/v1/tags/${tagId}`, data)
+  },
+
+  deleteEventTag(tagId) {
+    return api.delete(`/v1/tags/${tagId}`)
+  },
+
+  addEventTag(eventId, tagId) {
+    return api.post(`/v1/events/${eventId}/tags`, { tag_id: tagId })
+  },
+
+  removeEventTag(eventId, tagId) {
+    return api.delete(`/v1/events/${eventId}/tags/${tagId}`)
+  },
+
   getEvent(eventId) {
     return api.get(`/v1/events/${eventId}`)
   },
 
+  getEventNotes(eventId, params = {}) {
+    return api.get(`/v1/events/${eventId}/notes`, { params })
+  },
+
+  assignEventNotes(eventId, noteIds) {
+    return api.post(`/v1/events/${eventId}/notes`, { note_ids: noteIds })
+  },
+
+  removeEventNote(eventId, noteId) {
+    return api.delete(`/v1/events/${eventId}/notes/${noteId}`)
+  },
+
   getReports(spaceId, params = {}) {
     return api.get(`/v1/spaces/${spaceId}/reports`, { params })
+  },
+
+  getTopics(spaceId) {
+    return api.get(`/v1/spaces/${spaceId}/topics`)
+  },
+
+  createTopic(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/topics`, data)
+  },
+
+  updateTopic(topicId, data) {
+    return api.patch(`/v1/topics/${topicId}`, data)
+  },
+
+  deleteTopic(topicId) {
+    return api.delete(`/v1/topics/${topicId}`)
+  },
+
+  getTopicReports(topicId) {
+    return api.get(`/v1/topics/${topicId}/reports`)
+  },
+
+  runTopic(topicId) {
+    return api.post(`/v1/topics/${topicId}/run`)
+  },
+
+  getQuestions(spaceId) {
+    return api.get(`/v1/spaces/${spaceId}/questions`)
+  },
+
+  copySpaceResources(targetSpaceId, data) {
+    return api.post(`/v1/spaces/${targetSpaceId}/resource-copies`, data)
+  },
+
+  getQuestion(spaceId, questionId) {
+    return api.get(`/v1/spaces/${spaceId}/questions/${questionId}`)
+  },
+
+  askQuestion(spaceId, data) {
+    return api.post(`/v1/spaces/${spaceId}/questions`, data)
   },
 
   getReport(reportId) {
@@ -81,12 +197,24 @@ export const spacesApi = {
     return api.post(`/v1/chat/uploads/${batchId}/complete`)
   },
 
+  retryUpload(batchId) {
+    return api.post(`/v1/chat/uploads/${batchId}/retry`)
+  },
+
+  getUploadItem(batchId, itemId) {
+    return api.get(`/v1/chat/uploads/${batchId}/items/${itemId}`)
+  },
+
   getAnalysisJobs(spaceId, params = {}) {
     return api.get(`/v1/spaces/${spaceId}/analysis-jobs`, { params })
   },
 
   retryAnalysisJob(jobId) {
     return api.post(`/v1/analysis-jobs/${jobId}/retry`)
+  },
+
+  cancelAnalysisJob(jobId) {
+    return api.post(`/v1/analysis-jobs/${jobId}/cancel`)
   },
 
   getMembers(spaceId) {
@@ -119,6 +247,30 @@ export const spacesApi = {
 
   updateSpace(spaceId, data) {
     return api.patch(`/v1/spaces/${spaceId}`, data)
+  },
+
+  getQuotaUsage(spaceId) {
+    return api.get(`/v1/spaces/${spaceId}/quota/usage`)
+  },
+
+  getQuota(spaceId) {
+    return api.get(`/v1/spaces/${spaceId}/quota`)
+  },
+
+  updateQuota(spaceId, data) {
+    return api.patch(`/v1/spaces/${spaceId}/quota`, data)
+  },
+
+  getAuditLogs(spaceId, params = {}) {
+    return api.get(`/v1/spaces/${spaceId}/audit-logs`, { params })
+  },
+
+  getWorkflowConfig(spaceId) {
+    return api.get(`/v1/spaces/${spaceId}/workflow-config`)
+  },
+
+  updateWorkflowConfig(spaceId, data) {
+    return api.patch(`/v1/spaces/${spaceId}/workflow-config`, data)
   },
 
   takeoverSpace(spaceId, reason) {
@@ -155,6 +307,18 @@ export const spacesApi = {
 
   getEventRelations(spaceId, params = {}) {
     return api.get(`/v1/spaces/${spaceId}/event-relations`, { params })
+  },
+
+  getEventRelation(relationId) {
+    return api.get(`/v1/event-relations/${relationId}`)
+  },
+
+  updateEventRelation(relationId, data) {
+    return api.patch(`/v1/event-relations/${relationId}`, data)
+  },
+
+  deleteEventRelation(relationId) {
+    return api.delete(`/v1/event-relations/${relationId}`)
   },
 
   getEventSuggestions(spaceId, params = {}) {

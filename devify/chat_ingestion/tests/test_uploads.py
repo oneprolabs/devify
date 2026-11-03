@@ -531,3 +531,20 @@ def test_batch_state_machine_rejects_skipped_steps():
     assert batch.completed_at is not None
     with pytest.raises(UploadTransitionError):
         transition_batch(batch, UploadBatch.Status.UPLOADING)
+
+@patch("chat_ingestion.views._enqueue_parse")
+def test_failed_upload_can_be_retried_and_item_is_readable(enqueue):
+    owner = User.objects.create_user(username="upload-retry-owner")
+    space = make_team(owner, slug="upload-retry-team")
+    client = auth_client(owner)
+    response = client.post(create_url(space), payload("retry-batch"), format="json")
+    batch = UploadBatch.objects.get(pk=response.data["data"]["id"])
+    batch.status = UploadBatch.Status.FAILED
+    batch.error_message = "temporary parser failure"
+    batch.save(update_fields=("status", "error_message", "updated_at"))
+    enqueue.return_value = {"status": UploadBatch.Status.PROCESSING}
+    retried = client.post(batch_url(batch, "retry"))
+    batch.refresh_from_db()
+    assert retried.status_code == 202
+    assert batch.status == UploadBatch.Status.UPLOADING
+    enqueue.assert_called_once_with(batch)

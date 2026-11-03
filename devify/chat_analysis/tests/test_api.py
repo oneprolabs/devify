@@ -4,8 +4,14 @@ import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
-from chat_analysis.models import AnalysisJob
-from chat_domain.models import Conversation
+from chat_analysis.models import (
+    AnalysisJob,
+    Event,
+    EventNote,
+    Note,
+    NoteEvidence,
+)
+from chat_domain.models import Conversation, Message
 from spaces.models import Space, SpaceMembership, SpaceTakeover
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -187,3 +193,76 @@ def test_global_admin_needs_takeover_for_analysis_access():
     assert client.get(f"/api/v1/analysis-jobs/{job.pk}").status_code == 404
     SpaceTakeover.objects.create(space=space, admin=admin, reason="audit")
     assert client.get(f"/api/v1/analysis-jobs/{job.pk}").status_code == 200
+
+
+def test_member_can_cancel_queued_analysis_job():
+    owner = User.objects.create_user(username="cancel-analysis-owner")
+    space = make_space(owner, "cancel-analysis-team")
+    conversation = make_conversation(space)
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    with patch("chat_analysis.views.dispatch_analysis_job"), patch(
+        "chat_analysis.views.transaction.on_commit", side_effect=lambda callback: callback()
+    ):
+        created = client.post(
+            f"/api/v1/spaces/{space.pk}/analysis-jobs",
+            payload(conversation),
+            format="json",
+        )
+    assert created.status_code == 202
+    job_id = created.data["data"]["id"]
+    cancelled = client.post(f"/api/v1/analysis-jobs/{job_id}/cancel")
+    assert cancelled.status_code == 200
+    assert cancelled.data["data"]["state"] == "cancelled"
+
+
+def test_events_can_be_filtered_by_source_conversation():
+    owner = User.objects.create_user(username="events-filter-owner")
+    space = make_space(owner, "events-filter-team")
+    conversation = make_conversation(space)
+    message = Message.objects.create(
+        conversation=conversation,
+        message_key="src:1",
+        ingest_seq=1,
+        sender_name="Alice",
+    )
+    note = Note.objects.create(
+        space=space,
+        created_by=owner,
+        note_key="note-1",
+        title="Quote note",
+        content="Customer asked for the annual quote.",
+    )
+    NoteEvidence.objects.create(note=note, message=message)
+    linked_event = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="event-linked",
+        title="Annual quote",
+        content="Customer is waiting for the annual quote.",
+    )
+    EventNote.objects.create(event=linked_event, note=note, created_by=owner)
+    unlinked_event = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="event-unlinked",
+        title="Unrelated matter",
+        content="No evidence from this conversation.",
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    url = f"/api/v1/spaces/{space.pk}/events"
+
+    filtered = client.get(url, {"conversation_id": conversation.pk})
+    assert filtered.status_code == 200
+    ids = [row["id"] for row in filtered.data["data"]["list"]]
+    assert ids == [linked_event.pk]
+    assert unlinked_event.pk not in ids
+
+    everything = client.get(url)
+    assert everything.status_code == 200
+    assert len(everything.data["data"]["list"]) == 2
+
+    invalid = client.get(url, {"conversation_id": "abc"})
+    assert invalid.status_code == 400

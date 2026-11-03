@@ -264,3 +264,7 @@ docker/nginx/certs/
 .rollback_version
 .devify/
 cache/
+
+# Local tooling and runtime output that must never be committed.
+/node_modules/
+devify/chat_upload_archives/

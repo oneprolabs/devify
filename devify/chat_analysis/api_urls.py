@@ -8,9 +8,25 @@ from chat_analysis.api_views import (
     SpaceEventListCreateAPIView,
     SpaceEventRelationListCreateAPIView,
     SpaceNoteListCreateAPIView,
+    SpaceTopicSubscriptionListCreateAPIView,
+    TopicSubscriptionDetailAPIView,
+    SpaceQuestionAPIView, QuestionAnswerDetailAPIView, TopicRunAPIView, SpaceResourceCopyAPIView,
+    SpaceEventTagListCreateAPIView, EventTagDetailAPIView, EventTagAssignmentAPIView, EventRelationDetailAPIView,
 )
 
 urlpatterns = [
+    path("spaces/<int:space_id>/topics", SpaceTopicSubscriptionListCreateAPIView.as_view(), name="chat-topic-list-create"),
+    path("topics/<int:topic_id>", TopicSubscriptionDetailAPIView.as_view(), name="chat-topic-detail"),
+    path("topics/<int:topic_id>/run", TopicRunAPIView.as_view(), name="chat-topic-run"),
+    path("topics/<int:topic_id>/reports", TopicRunAPIView.as_view(), name="chat-topic-reports"),
+    path("spaces/<int:space_id>/resource-copies", SpaceResourceCopyAPIView.as_view(), name="chat-resource-copy"),
+    path("spaces/<int:space_id>/questions", SpaceQuestionAPIView.as_view(), name="chat-question"),
+    path("spaces/<int:space_id>/questions/<int:question_id>", QuestionAnswerDetailAPIView.as_view(), name="chat-question-detail"),
+    path("spaces/<int:space_id>/tags", SpaceEventTagListCreateAPIView.as_view(), name="chat-event-tag-list-create"),
+    path("tags/<int:tag_id>", EventTagDetailAPIView.as_view(), name="chat-event-tag-detail"),
+    path("events/<int:event_id>/tags", EventTagAssignmentAPIView.as_view(), name="chat-event-tag-assignment"),
+    path("events/<int:event_id>/tags/<int:tag_id>", EventTagAssignmentAPIView.as_view(), name="chat-event-tag-assignment-detail"),
+    path("event-relations/<int:relation_id>", EventRelationDetailAPIView.as_view(), name="chat-event-relation-detail"),
     path(
         "spaces/<int:space_id>/notes",
         SpaceNoteListCreateAPIView.as_view(),

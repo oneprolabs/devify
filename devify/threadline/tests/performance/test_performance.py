@@ -63,11 +63,14 @@ class TestPerformanceSettings:
         url = reverse('settings-list')
 
         start_time = time.time()
-        response = authenticated_api_client.get(url, {'search': 'config'})
+        response = authenticated_api_client.get(
+            url, {'search': 'config', 'page_size': 50}
+        )
         end_time = time.time()
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data['data']['list']) == 50
+        assert response.data['data']['pagination']['total'] == 50
 
         execution_time = end_time - start_time
         assert execution_time < 1.0
@@ -83,11 +86,14 @@ class TestPerformanceSettings:
         url = reverse('settings-list')
 
         start_time = time.time()
-        response = authenticated_api_client.get(url, {'is_active': 'true'})
+        response = authenticated_api_client.get(
+            url, {'is_active': 'true', 'page_size': 50}
+        )
         end_time = time.time()
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data['data']['list']) == 50
+        assert response.data['data']['pagination']['total'] == 50
         assert all(item['is_active'] for item in response.data['data']['list'])
 
         execution_time = end_time - start_time
@@ -165,11 +171,14 @@ class TestPerformanceThreadlines:
         url = reverse('threadlines-list')
 
         start_time = time.time()
-        response = authenticated_api_client.get(url, {'search': 'meeting'})
+        response = authenticated_api_client.get(
+            url, {'search': 'meeting', 'page_size': 50}
+        )
         end_time = time.time()
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data['data']['list']) == 100
+        assert len(response.data['data']['list']) == 50
+        assert response.data['data']['pagination']['total'] == 100
 
         execution_time = end_time - start_time
         assert execution_time < 2.0
@@ -179,18 +188,28 @@ class TestPerformanceThreadlines:
         Test threadlines status filtering performance
         """
         # Create messages with different statuses
-        statuses = ['fetched', 'ocr_processing', 'llm_summary_success', 'completed']
-        for status in statuses:
-            EmailMessageFactory.create_batch(25, user=test_user, status=status)
+        statuses = [
+            'fetched',
+            'ocr_processing',
+            'llm_summary_success',
+            'completed',
+        ]
+        for item_status in statuses:
+            EmailMessageFactory.create_batch(
+                25, user=test_user, status=item_status
+            )
 
         url = reverse('threadlines-list')
 
         start_time = time.time()
-        response = authenticated_api_client.get(url, {'status': 'fetched'})
+        response = authenticated_api_client.get(
+            url, {'status': 'fetched', 'page_size': 25}
+        )
         end_time = time.time()
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data['data']['list']) == 25
+        assert response.data['data']['pagination']['total'] == 25
         assert all(item['status'] == 'fetched' for item in response.data['data']['list'])
 
         execution_time = end_time - start_time
@@ -223,7 +242,7 @@ class TestPerformanceThreadlines:
         message = EmailMessageFactory(user=test_user)
         EmailAttachmentFactory.create_batch(20, email_message=message)
 
-        url = reverse('threadlines-detail', kwargs={'pk': message.id})
+        url = reverse('threadlines-detail', kwargs={'uuid': message.uuid})
 
         start_time = time.time()
         response = authenticated_api_client.get(url)
@@ -346,7 +365,9 @@ class TestPerformanceConcurrent:
             new_message = EmailMessageFactory(user=test_user)
 
             # Retrieve the new message
-            detail_url = reverse('threadlines-detail', kwargs={'pk': new_message.id})
+            detail_url = reverse(
+                'threadlines-detail', kwargs={'uuid': new_message.uuid}
+            )
             response = authenticated_api_client.get(detail_url)
             assert response.status_code == status.HTTP_200_OK
 

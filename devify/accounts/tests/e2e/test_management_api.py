@@ -89,7 +89,7 @@ def test_management_list_users_returns_serialized_payloads():
 
     assert response.status_code == 200
 
-    payload = response.json()
+    payload = response.json()["data"]
     assert payload["count"] == 2
     assert len(payload["results"]) == 2
     assert all(item is not None for item in payload["results"])

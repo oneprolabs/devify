@@ -253,10 +253,12 @@ class TestFeishuBitableIssueHandler:
         upload_payload = mock_post.call_args_list[0].kwargs["data"]
         assert upload_payload["parent_node"] == "bascn123"
 
+    @patch("threadline.utils.issues.feishu_bitable_handler.requests.get")
     @patch("threadline.utils.issues.feishu_bitable_handler.requests.post")
     def test_create_issue_uploads_attachment_tokens_in_wiki_mode(
         self,
         mock_post,
+        mock_get,
         tmp_path,
     ):
         attachment_file = tmp_path / "demo.pdf"
@@ -301,6 +303,16 @@ class TestFeishuBitableIssueHandler:
             },
         }
 
+        node_response = Mock()
+        node_response.raise_for_status.return_value = None
+        node_response.status_code = 200
+        node_response.text = "{\"code\":0}"
+        node_response.json.return_value = {
+            "code": 0,
+            "data": {"node": {"obj_token": "obj-token-456"}},
+        }
+
+        mock_get.return_value = node_response
         mock_post.side_effect = [upload_response, create_response]
 
         record_id = wiki_handler.create_issue(

@@ -206,7 +206,8 @@ class TestPaymentSucceededWebhook:
         self, mock_djstripe_filter, mock_subscription_filter,
         mock_send_email, mock_upsert_payment_record,
         mock_handle_payment_success,
-        test_user, starter_plan, payment_provider
+        test_user, starter_plan, payment_provider,
+        django_capture_on_commit_callbacks,
     ):
         """
         Payment success recovers past_due subscription to active
@@ -243,7 +244,8 @@ class TestPaymentSucceededWebhook:
             reason='',
         )
 
-        handle_payment_succeeded(None, event=event)
+        with django_capture_on_commit_callbacks(execute=True):
+            handle_payment_succeeded(None, event=event)
 
         subscription.refresh_from_db()
         assert subscription.status == 'active'
@@ -252,7 +254,8 @@ class TestPaymentSucceededWebhook:
             user_id=test_user.id,
             amount=29.99
         )
-        mock_handle_payment_success.assert_called_once_with('sub_payment_success')
+        # handle_payment_success now takes the Stripe customer id.
+        mock_handle_payment_success.assert_called_once_with('cus_123')
         mock_upsert_payment_record.assert_called_once()
 
     @patch('billing.webhooks.upsert_payment_record_from_stripe_invoice')

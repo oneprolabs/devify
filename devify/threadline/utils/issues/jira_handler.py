@@ -1006,9 +1006,26 @@ from configuration."""
                 skipped_count += 1
         return {"linked_count": linked_count, "skipped_count": skipped_count}
 
+    @staticmethod
+    def _attachment_keys(attachment: Dict[str, Any]) -> List[str]:
+        """Stable identities for one attachment, used to skip retried uploads."""
+        keys = []
+        content_md5 = attachment.get("content_md5")
+        if content_md5:
+            keys.append(f"md5:{content_md5}")
+        attachment_id = attachment.get("id")
+        if attachment_id:
+            keys.append(f"id:{attachment_id}")
+        filename = attachment.get("filename")
+        if filename:
+            keys.append(
+                f"name:{filename}:{attachment.get('file_size', 0)}"
+            )
+        return keys
+
     def upload_attachments(
         self, issue_key: str, attachments: List[Dict[str, Any]]
-    ) -> Dict[str, int]:
+    ) -> Dict[str, Any]:
         """
         Upload attachments to JIRA issue from pure data (no ORM objects).
 
@@ -1023,12 +1040,16 @@ from configuration."""
                 - file_size: File size in bytes
 
         Returns:
-            Dict: Upload results with counts
+            Dict: Upload results with counts and attachment identities
                 - uploaded_count: Number of uploaded files
                 - skipped_count: Number of skipped files
+                - uploaded_attachment_keys: Identities of uploaded files
+                - skipped_attachment_keys: Identities of skipped files
         """
         uploaded_count = 0
         skipped_count = 0
+        uploaded_attachment_keys: List[str] = []
+        skipped_attachment_keys: List[str] = []
 
         try:
             logger.info(
@@ -1042,12 +1063,7 @@ from configuration."""
                 is_image = attachment.get("is_image", False)
                 file_path = attachment.get("file_path", "")
                 file_size = attachment.get("file_size", 0)
-
-                # Only process image attachments
-                if not is_image:
-                    logger.debug(f"Skipping non-image attachment: {filename}")
-                    skipped_count += 1
-                    continue
+                attachment_keys = self._attachment_keys(attachment)
 
                 logger.info(
                     f"Processing image attachment: {filename} "
@@ -1059,6 +1075,7 @@ from configuration."""
                 if not os.path.exists(file_path):
                     logger.warning(f"Attachment file not found: {file_path}")
                     skipped_count += 1
+                    skipped_attachment_keys.extend(attachment_keys)
                     continue
 
                 should_upload = True
@@ -1083,6 +1100,7 @@ from configuration."""
                             issue=issue_key, file_path=file_path
                         )
                         uploaded_count += 1
+                        uploaded_attachment_keys.extend(attachment_keys)
                         logger.info(
                             f"Successfully uploaded attachment {filename} "
                             f"({content_type}) to {issue_key}"
@@ -1092,8 +1110,10 @@ from configuration."""
                             f"Failed to upload attachment {filename}: {e}"
                         )
                         skipped_count += 1
+                        skipped_attachment_keys.extend(attachment_keys)
                 else:
                     skipped_count += 1
+                    skipped_attachment_keys.extend(attachment_keys)
                     logger.debug(
                         f"Skipped attachment {filename} ({skip_reason})"
                     )
@@ -1108,4 +1128,10 @@ from configuration."""
         return {
             "uploaded_count": uploaded_count,
             "skipped_count": skipped_count,
+            "uploaded_attachment_keys": list(
+                dict.fromkeys(uploaded_attachment_keys)
+            ),
+            "skipped_attachment_keys": list(
+                dict.fromkeys(skipped_attachment_keys)
+            ),
         }

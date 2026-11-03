@@ -7,6 +7,7 @@ The package is a zip archive produced by the desktop client:
     messages.jsonl
     message_parts.jsonl   # optional
     origins.jsonl         # optional
+    avatars.jsonl         # optional
     media/...             # optional
 
 Every member name is untrusted input: paths are rejected when absolute, when
@@ -31,6 +32,7 @@ CONVERSATIONS_MEMBER = "conversations.jsonl"
 MESSAGES_MEMBER = "messages.jsonl"
 PARTS_MEMBER = "message_parts.jsonl"
 ORIGINS_MEMBER = "origins.jsonl"
+AVATARS_MEMBER = "avatars.jsonl"
 REQUIRED_MEMBERS = (MANIFEST_MEMBER, CONVERSATIONS_MEMBER, MESSAGES_MEMBER)
 SUPPORTED_PLATFORMS = ("wechat", "whatsapp", "line")
 

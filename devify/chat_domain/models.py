@@ -264,3 +264,49 @@ class MessageOrigin(models.Model):
 
     def __str__(self):
         return f"{self.message_id}@{self.upload_item_id}"
+
+
+class ConversationAvatar(models.Model):
+    """The picture shown for one conversation (group or contact)."""
+
+    conversation = models.OneToOneField(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name="avatar",
+    )
+    sha256 = models.CharField(max_length=64)
+    content_type = models.CharField(max_length=64)
+    byte_size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.conversation_id}:{self.sha256[:12]}"
+
+
+class SenderAvatar(models.Model):
+    """A participant picture shared by every message from that sender."""
+
+    space = models.ForeignKey(
+        Space,
+        on_delete=models.CASCADE,
+        related_name="chat_sender_avatars",
+    )
+    sender_key = models.CharField(max_length=255)
+    sha256 = models.CharField(max_length=64)
+    content_type = models.CharField(max_length=64)
+    byte_size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("sender_key", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("space", "sender_key"),
+                name="unique_chat_sender_avatar",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.sender_key}:{self.sha256[:12]}"

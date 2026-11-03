@@ -1,10 +1,11 @@
 from datetime import datetime
 from datetime import timezone as dt_timezone
-
 import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
+from chat_analysis.models import Event, EventNote, Note, NoteEvidence
+from chat_domain.avatars import save_conversation_avatar, save_sender_avatar
 from chat_domain.models import Conversation, Message, MessagePart
 from spaces.models import Space, SpaceMembership, SpaceTakeover
 
@@ -222,6 +223,87 @@ def test_conversation_preview_is_empty_without_messages():
     assert row["last_message_sender"] == ""
 
 
+def test_conversation_list_reports_participants_and_event_counts():
+    owner = User.objects.create_user(username="api-counts-owner")
+    space = make_space(owner, "api-counts-team")
+    busy = make_conversation(space, key="busy")
+    quiet = make_conversation(space, key="quiet")
+    first = Message.objects.create(
+        conversation=busy,
+        message_key="busy:1",
+        ingest_seq=1,
+        sender_key="alice",
+        sender_name="Alice",
+    )
+    Message.objects.create(
+        conversation=busy,
+        message_key="busy:2",
+        ingest_seq=2,
+        sender_key="bob",
+        sender_name="Bob",
+    )
+    Message.objects.create(
+        conversation=quiet,
+        message_key="quiet:1",
+        ingest_seq=1,
+        sender_key="carol",
+        sender_name="Carol",
+    )
+    note = Note.objects.create(
+        space=space,
+        created_by=owner,
+        note_key="note-1",
+        title="整理",
+        content="整理内容",
+    )
+    NoteEvidence.objects.create(
+        note=note,
+        message=first,
+        reference_key=f"{first.pk}:whole",
+    )
+    open_event = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="evt-open",
+        title="待处理事件",
+        content="内容",
+        status=Event.Status.OPEN,
+    )
+    done_event = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="evt-done",
+        title="已完成事件",
+        content="内容",
+        status=Event.Status.DONE,
+    )
+    for event in (open_event, done_event):
+        EventNote.objects.create(event=event, note=note, created_by=owner)
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    response = client.get(f"/api/v1/spaces/{space.pk}/conversations")
+    assert response.status_code == 200
+    rows = {row["id"]: row for row in response.data["data"]["list"]}
+    assert rows[busy.pk]["participant_count"] == 2
+    assert rows[busy.pk]["event_count"] == 2
+    assert rows[busy.pk]["pending_event_count"] == 1
+    assert rows[quiet.pk]["participant_count"] == 1
+    assert rows[quiet.pk]["event_count"] == 0
+    assert response.data["data"]["counts"] == {"total": 2, "pending": 1}
+
+    pending = client.get(
+        f"/api/v1/spaces/{space.pk}/conversations?filter=pending"
+    )
+    assert pending.status_code == 200
+    assert [row["id"] for row in pending.data["data"]["list"]] == [busy.pk]
+
+    invalid = client.get(
+        f"/api/v1/spaces/{space.pk}/conversations?filter=unknown"
+    )
+    assert invalid.status_code == 400
+
+
 def test_message_list_can_focus_the_page_holding_a_given_message():
     owner = User.objects.create_user(username="api-focus-owner")
     space = make_space(owner, "api-focus-team")
@@ -270,3 +352,68 @@ def test_message_list_can_focus_the_page_holding_a_given_message():
 
     invalid = client.get(url, {"focus_message_id": "abc"})
     assert invalid.status_code == 400
+
+
+def test_conversation_and_sender_avatars_are_exposed_and_served(
+    settings, tmp_path
+):
+    settings.CHAT_AVATAR_DIR = str(tmp_path / "chat_avatars")
+    owner = User.objects.create_user(username="api-avatar-owner")
+    outsider = User.objects.create_user(username="api-avatar-outsider")
+    space = make_space(owner, "api-avatar-team")
+    conversation = make_conversation(space)
+    Message.objects.create(
+        conversation=conversation,
+        message_key="avatar:1",
+        ingest_seq=1,
+        sender_key="alice",
+        sender_name="Alice",
+    )
+    group_png = b"\x89PNG\r\n\x1a\n" + b"group"
+    sender_jpeg = b"\xff\xd8\xff\xe0" + b"alice"
+    conversation_avatar = save_conversation_avatar(conversation, group_png)
+    sender_avatar = save_sender_avatar(space, "alice", sender_jpeg)
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    listed = client.get(f"/api/v1/spaces/{space.pk}/conversations")
+    row = listed.data["data"]["list"][0]
+    assert row["avatar_url"].endswith(
+        f"/v1/spaces/{space.pk}/avatars/{conversation_avatar.sha256}"
+    )
+
+    messages = client.get(
+        f"/api/v1/spaces/{space.pk}/conversations/"
+        f"{conversation.pk}/messages"
+    )
+    sender_url = messages.data["data"]["list"][0]["sender_avatar_url"]
+    assert sender_url.endswith(sender_avatar.sha256)
+    assert sender_url != row["avatar_url"]
+
+    path = f"/api{row['avatar_url']}"
+    image = client.get(path)
+    assert image.status_code == 200
+    assert image["Content-Type"] == "image/png"
+    assert b"".join(image.streaming_content) == group_png
+
+    sender_path = f"/api{sender_url}"
+    sender_image = client.get(sender_path)
+    assert sender_image.status_code == 200
+    assert sender_image["Content-Type"] == "image/jpeg"
+
+    client.force_authenticate(user=outsider)
+    assert client.get(path).status_code == 404
+
+
+def test_avatar_endpoint_rejects_an_unknown_digest(settings, tmp_path):
+    settings.CHAT_AVATAR_DIR = str(tmp_path / "chat_avatars")
+    owner = User.objects.create_user(username="api-avatar-missing-owner")
+    space = make_space(owner, "api-avatar-missing-team")
+    make_conversation(space)
+    client = APIClient()
+    client.force_authenticate(user=owner)
+
+    response = client.get(
+        f"/api/v1/spaces/{space.pk}/avatars/{'0' * 64}"
+    )
+    assert response.status_code == 404

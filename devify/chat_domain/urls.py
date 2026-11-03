@@ -1,6 +1,7 @@
 from django.urls import path
 
 from chat_domain.views import (
+    SpaceAvatarAPIView,
     SpaceConversationDetailAPIView,
     SpaceConversationListAPIView,
     SpaceMessageDetailAPIView,
@@ -9,6 +10,11 @@ from chat_domain.views import (
 
 
 urlpatterns = [
+    path(
+        "spaces/<int:space_id>/avatars/<str:sha256>",
+        SpaceAvatarAPIView.as_view(),
+        name="chat-avatar",
+    ),
     path(
         "spaces/<int:space_id>/conversations",
         SpaceConversationListAPIView.as_view(),

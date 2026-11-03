@@ -16,6 +16,7 @@
 | `messages.jsonl` | 是 | 消息：消息键、来源 ID、时间、方向、来源字段 |
 | `message_parts.jsonl` | 否 | 类型化内容（文本 / 图片 / 文件 / 引用 / 转发） |
 | `origins.jsonl` | 否 | 原始定位与 parser_version；缺省时按 messages 行自动记录 |
+| `avatars.jsonl` | 否 | 会话与发送者头像；指向包内图片文件 |
 | `media/...` | 否 | 附件文件；**当前客户端不生成**，服务端按「缺失」保留 |
 
 归档本身是 zip。任何一条契约违例都让**整批失败**，不会留下半套数据。
@@ -117,6 +118,22 @@
 | `locator_key` | 是 | ≤255 |
 | `parser_version` | 否 | 缺省取 manifest 的 `schema_version` |
 | `upload_item_path` | 否 | 缺省指向 `messages.jsonl`；必须存在于包内 |
+
+### avatars.jsonl
+
+可选成员。一行一张头像，图片文件本身放在包内（建议 `media/avatars/`）。
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `scope` | 是 | `conversation` 或 `sender` |
+| `conversation_id` | scope=conversation 时必填 | 必须在本次包的会话集合内 |
+| `sender_key` | scope=sender 时必填 | ≤255；与消息的 `sender_key` 一致 |
+| `upload_item_path` | 是 | 包内图片路径；必须存在 |
+
+- 服务端按文件头识别 `image/png` / `image/jpeg` / `image/gif` / `image/webp`，
+  无法识别即整批失败（422）；单张上限 512 KB。
+- 图片按 SHA-256 内容寻址存储，同一张图只存一份；`CHAT_AVATAR_DIR` 指定存放目录。
+- 头像不是消息内容，不参与内容去重摘要；重复上传只会覆盖同一会话/发送者的当前头像。
 
 ## 4. 幂等与去重
 

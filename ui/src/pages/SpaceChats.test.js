@@ -20,6 +20,9 @@ vi.mock('@/api/spaces', () => ({
 vi.mock('vue-router', () => ({
   useRoute: () => route
 }))
+vi.mock('@/composables/useAvatars', () => ({
+  useAvatars: () => ({ resolve: (url) => (url ? 'blob:avatar' : '') })
+}))
 
 const conversation = {
   id: 2,
@@ -27,6 +30,9 @@ const conversation = {
   title: '项目群',
   source_conversation_id: 'group-a',
   message_count: 1229,
+  participant_count: 6,
+  event_count: 5,
+  pending_event_count: 3,
   last_message_at: '2026-11-01T10:00:00Z',
   last_message_preview: '今天下午对齐一下',
   last_message_sender: '都乐'
@@ -38,13 +44,27 @@ const message = {
   direction: 'incoming',
   occurred_at: '2026-11-01T10:00:00Z'
 }
+const event = {
+  id: 9,
+  title: '客户追问修复时间',
+  content: '客户在群里第三次追问。',
+  status: 'open',
+  tags: [{ id: 1, label: '客户' }],
+  last_activity_at: '2026-11-01T10:00:00Z'
+}
 
 describe('SpaceChats', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     route.query = {}
     spacesApi.getConversations.mockResolvedValue({
-      data: { data: { list: [conversation], pagination: { total: 1 } } }
+      data: {
+        data: {
+          list: [conversation],
+          counts: { total: 12, pending: 3 },
+          pagination: { total: 12 }
+        }
+      }
     })
     spacesApi.getMessages.mockResolvedValue({
       data: {
@@ -62,17 +82,8 @@ describe('SpaceChats', () => {
     spacesApi.getEvents.mockResolvedValue({
       data: {
         data: {
-          list: [
-            {
-              id: 9,
-              title: '客户追问修复时间',
-              content: '客户在群里第三次追问。',
-              status: 'open',
-              tags: [{ id: 1, label: '客户' }],
-              last_activity_at: '2026-11-01T10:00:00Z'
-            }
-          ],
-          pagination: { total: 1 }
+          list: [event],
+          pagination: { total: 5 }
         }
       }
     })
@@ -87,21 +98,38 @@ describe('SpaceChats', () => {
     return wrapper
   }
 
-  it('shows the latest page and the last-message preview in the rail', async () => {
+  it('shows the rail filters, event counts and last-message preview', async () => {
+    const wrapper = await mountPage()
+
+    const filters = wrapper.findAll('.rail-head .seg button')
+    expect(filters[0].text()).toContain('全部')
+    expect(filters[0].text()).toContain('12')
+    expect(filters[1].text()).toContain('有待处理')
+    expect(filters[1].text()).toContain('3')
+    expect(wrapper.text()).toContain('都乐：今天下午对齐一下')
+    expect(wrapper.text()).toContain('5 个事件')
+    expect(wrapper.text()).toContain('待处理')
+  })
+
+  it('opens the raw transcript first with sender avatars', async () => {
     const wrapper = await mountPage()
 
     expect(spacesApi.getMessages).toHaveBeenCalledWith('3', 2, {
       page_size: 100,
       page: 'last'
     })
-    expect(wrapper.text()).toContain('都乐：今天下午对齐一下')
+    expect(spacesApi.getEvents).not.toHaveBeenCalled()
+    expect(wrapper.find('.msg-av').text()).toBe('都')
     expect(wrapper.text()).toContain('今天下午对齐一下')
     expect(wrapper.text()).toContain('上面还有更早的消息')
+    expect(wrapper.text()).toContain('云端 1229 条 · 6 人 · 5 个事件 · 待处理')
   })
 
-  it('loads events for the selected conversation only when that tab opens', async () => {
+  it('loads events only when the event tab opens', async () => {
     const wrapper = await mountPage()
+
     expect(spacesApi.getEvents).not.toHaveBeenCalled()
+    expect(wrapper.findAll('.det-tabs button')[0].text()).toContain('5')
 
     await wrapper.findAll('.det-tabs button')[0].trigger('click')
     await flushPromises()
@@ -113,6 +141,49 @@ describe('SpaceChats', () => {
     expect(wrapper.text()).toContain('客户追问修复时间')
   })
 
+  it('asks the API for conversations with pending events', async () => {
+    const wrapper = await mountPage()
+
+    await wrapper.findAll('.rail-head .seg button')[1].trigger('click')
+    await flushPromises()
+
+    expect(spacesApi.getConversations).toHaveBeenLastCalledWith('3', {
+      page_size: 100,
+      filter: 'pending'
+    })
+  })
+
+  it('renders real avatars when the server provides them', async () => {
+    spacesApi.getConversations.mockResolvedValue({
+      data: {
+        data: {
+          list: [{ ...conversation, avatar_url: 'http://api/avatar/1' }],
+          counts: { total: 1, pending: 3 },
+          pagination: { total: 1 }
+        }
+      }
+    })
+    spacesApi.getMessages.mockResolvedValue({
+      data: {
+        data: {
+          list: [
+            {
+              ...message,
+              sender_avatar_url: 'http://api/avatar/2'
+            }
+          ],
+          pagination: { page: 1 }
+        }
+      }
+    })
+
+    const wrapper = await mountPage()
+
+    expect(wrapper.findAll('.conv-row img.av-img').length).toBe(1)
+    expect(wrapper.findAll('.msg-av img.av-img').length).toBe(1)
+    expect(wrapper.find('.msg-av').text()).toBe('')
+  })
+
   it('keeps an honest empty state for the chat summary', async () => {
     const wrapper = await mountPage()
 
@@ -122,15 +193,13 @@ describe('SpaceChats', () => {
     expect(wrapper.text()).toContain('云端还没有为这个会话生成聊天总结')
   })
 
-  it('filters the rail by platform and search text', async () => {
+  it('filters the rail by search text', async () => {
     const wrapper = await mountPage()
 
-    await wrapper.findAll('.rail-head .seg button')[2].trigger('click')
-    await flushPromises()
-    expect(wrapper.text()).toContain('没有符合条件的会话')
-
-    await wrapper.findAll('.rail-head .seg button')[0].trigger('click')
     await wrapper.find('.rail-search input').setValue('对齐')
     expect(wrapper.text()).toContain('项目群')
+
+    await wrapper.find('.rail-search input').setValue('不存在')
+    expect(wrapper.text()).toContain('没有符合条件的会话')
   })
 })

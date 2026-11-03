@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
 from chat_analysis.models import Event, Note
+from chat_domain.models import Conversation, Message
 from spaces.models import Space, SpaceMembership, SpaceTakeover
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -85,6 +86,20 @@ def world():
         },
         format="json",
     ).data["data"]
+    conversation = Conversation.objects.create(
+        space=space,
+        platform=Conversation.Platform.WECHAT,
+        source_namespace="boundary",
+        source_conversation_id="boundary-group",
+        identity_key=f"wechat:boundary:{space.pk}",
+        title="Boundary group",
+    )
+    message = Message.objects.create(
+        conversation=conversation,
+        message_key="boundary-message",
+        ingest_seq=1,
+        sender_name="Alice",
+    )
 
     return {
         "owner": owner,
@@ -95,6 +110,8 @@ def world():
         "question": question,
         "topic": topic,
         "relation": relation,
+        "conversation": conversation,
+        "message": message,
     }
 
 
@@ -125,6 +142,25 @@ def detail_urls(world):
         "space_tags": ("get", f"/api/v1/spaces/{space_id}/tags"),
         "space_topics": ("get", f"/api/v1/spaces/{space_id}/topics"),
         "space_questions": ("get", f"/api/v1/spaces/{space_id}/questions"),
+        "conversation": (
+            "get",
+            f"/api/v1/spaces/{space_id}/conversations/"
+            f"{world['conversation'].pk}",
+        ),
+        "space_conversations": (
+            "get",
+            f"/api/v1/spaces/{space_id}/conversations",
+        ),
+        "message_list": (
+            "get",
+            f"/api/v1/spaces/{space_id}/conversations/"
+            f"{world['conversation'].pk}/messages",
+        ),
+        "message": (
+            "get",
+            f"/api/v1/spaces/{space_id}/conversations/"
+            f"{world['conversation'].pk}/messages/{world['message'].pk}",
+        ),
     }
 
 
@@ -249,3 +285,164 @@ def test_archived_space_stays_readable_but_rejects_writes(world):
     )
     assert created.status_code in (404, 403, 409)
     assert not Note.objects.filter(note_key="archived-note").exists()
+
+
+def test_resource_copy_requires_source_read_permission(world):
+    stranger = User.objects.create_user(username="copy-stranger")
+    make_space(stranger, "copy-stranger-space")
+    client = client_for(stranger)
+
+    response = client.post(
+        f"/api/v1/spaces/{world['space'].pk}/resource-copies",
+        {
+            "source_space_id": world["space"].pk,
+            "resource_type": "note",
+            "resource_ids": [world["note"].pk],
+        },
+        format="json",
+    )
+
+    assert response.status_code == 404
+    assert Note.objects.filter(space=world["space"]).count() == 1
+
+
+def test_resource_copy_requires_target_write_permission(world):
+    guest = User.objects.create_user(username="copy-guest")
+    SpaceMembership.objects.create(
+        space=world["space"],
+        user=guest,
+        role=SpaceMembership.Role.GUEST,
+    )
+    target = Space.objects.create(
+        name="guest-target", slug="guest-target", kind=Space.Kind.TEAM,
+        owner=world["owner"],
+    )
+    SpaceMembership.objects.create(
+        space=target, user=guest, role=SpaceMembership.Role.GUEST
+    )
+    client = client_for(guest)
+
+    response = client.post(
+        f"/api/v1/spaces/{target.pk}/resource-copies",
+        {
+            "source_space_id": world["space"].pk,
+            "resource_type": "note",
+            "resource_ids": [world["note"].pk],
+        },
+        format="json",
+    )
+
+    assert response.status_code == 403
+    assert not Note.objects.filter(space=target).exists()
+
+
+def test_resource_copy_ignores_ids_from_another_space(world):
+    other_owner = User.objects.create_user(username="copy-other-owner")
+    other_space = make_space(other_owner, "copy-other-space")
+    foreign = Note.objects.create(
+        space=other_space,
+        created_by=other_owner,
+        note_key="foreign-note",
+        title="Foreign",
+        content="Not yours",
+    )
+    client = client_for(world["owner"])
+
+    response = client.post(
+        f"/api/v1/spaces/{world['space'].pk}/resource-copies",
+        {
+            "source_space_id": world["space"].pk,
+            "resource_type": "note",
+            "resource_ids": [world["note"].pk, foreign.pk],
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    copied_ids = [
+        item["source_id"] for item in response.data["data"]["copied"]
+    ]
+    assert copied_ids == [world["note"].pk]
+    assert not Note.objects.filter(
+        space=world["space"], title="Foreign"
+    ).exists()
+
+
+def test_resource_copy_into_archived_space_is_rejected(world):
+    target = Space.objects.create(
+        name="archived-target",
+        slug="archived-target",
+        kind=Space.Kind.TEAM,
+        owner=world["owner"],
+        status=Space.Status.ARCHIVED,
+    )
+    SpaceMembership.objects.create(
+        space=target, user=world["owner"], role=SpaceMembership.Role.OWNER
+    )
+    client = client_for(world["owner"])
+
+    response = client.post(
+        f"/api/v1/spaces/{target.pk}/resource-copies",
+        {
+            "source_space_id": world["space"].pk,
+            "resource_type": "note",
+            "resource_ids": [world["note"].pk],
+        },
+        format="json",
+    )
+
+    assert response.status_code == 403
+    assert not Note.objects.filter(space=target).exists()
+
+
+def test_copied_event_links_stay_inside_the_target_space(world):
+    """A copied event must not keep a link to a source-space note."""
+
+    from chat_analysis.models import EventNote
+
+    source_event = Event.objects.create(
+        space=world["space"],
+        created_by=world["owner"],
+        event_key="copy-source-event",
+        title="Source event",
+        content="Source content",
+    )
+    source_note = Note.objects.create(
+        space=world["space"],
+        created_by=world["owner"],
+        note_key="copy-source-note",
+        title="Source note",
+        content="Source note content",
+    )
+    EventNote.objects.create(
+        event=source_event, note=source_note, created_by=world["owner"]
+    )
+    target = Space.objects.create(
+        name="copy-target",
+        slug="copy-target-space",
+        kind=Space.Kind.TEAM,
+        owner=world["owner"],
+    )
+    SpaceMembership.objects.create(
+        space=target, user=world["owner"], role=SpaceMembership.Role.OWNER
+    )
+    client = client_for(world["owner"])
+
+    response = client.post(
+        f"/api/v1/spaces/{target.pk}/resource-copies",
+        {
+            "source_space_id": world["space"].pk,
+            "resource_type": "event",
+            "resource_ids": [source_event.pk],
+            "copy_notes": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    copied_event_id = response.data["data"]["copied"][0]["id"]
+    links = EventNote.objects.filter(event_id=copied_event_id)
+    assert links.exists()
+    for link in links:
+        assert link.note.space_id == target.pk
+        assert link.event.space_id == target.pk

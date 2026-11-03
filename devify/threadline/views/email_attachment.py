@@ -5,19 +5,22 @@ This module contains APIView classes for EmailAttachment model CRUD operations.
 """
 
 import logging
-from rest_framework import status, serializers
-from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, OpenApiParameter
-from drf_spectacular.types import OpenApiTypes
-from core.swagger import response, error_response, pagination_response
 
-from .base import BaseAPIView
+from django.db.models import Q
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import status
+from rest_framework.response import Response
+
+from core.swagger import error_response, pagination_response, response
+
 from ..models import EmailAttachment
 from ..serializers import (
-    EmailAttachmentSerializer,
     EmailAttachmentCreateSerializer,
-    EmailAttachmentUpdateSerializer
+    EmailAttachmentSerializer,
+    EmailAttachmentUpdateSerializer,
 )
+from .base import BaseAPIView, email_visibility_q
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +40,11 @@ class EmailAttachmentAPIView(BaseAPIView):
         """
         Filter attachments by user through email message
         """
-        return queryset.filter(email_message__user=self.request.user)
+        return queryset.filter(
+            email_message__user=self.request.user
+        ).filter(
+            email_visibility_q(self.request.user, prefix="email_message__")
+        )
 
     @extend_schema(
         operation_id='email_attachments_list',
@@ -101,14 +108,18 @@ class EmailAttachmentAPIView(BaseAPIView):
                 queryset = queryset.filter(status=attachment_status)
 
             # Filter by email message
-            email_message_id = request.query_params.get('email_message_id', None)
+            email_message_id = request.query_params.get(
+                'email_message_id', None
+            )
             if email_message_id:
                 queryset = queryset.filter(email_message_id=email_message_id)
 
             # Filter by content type
             content_type = request.query_params.get('content_type', None)
             if content_type:
-                queryset = queryset.filter(content_type__icontains=content_type)
+                queryset = queryset.filter(
+                    content_type__icontains=content_type
+                )
 
             # Ordering
             ordering = request.query_params.get('ordering', 'filename')
@@ -116,7 +127,9 @@ class EmailAttachmentAPIView(BaseAPIView):
                 queryset = queryset.order_by(ordering)
 
             # Pagination
-            page_size = min(int(request.query_params.get('page_size', 10)), 100)
+            page_size = min(
+                int(request.query_params.get('page_size', 10)), 100
+            )
             page = int(request.query_params.get('page', 1))
 
             start = (page - 1) * page_size
@@ -125,7 +138,9 @@ class EmailAttachmentAPIView(BaseAPIView):
             total = queryset.count()
             items = queryset[start:end]
 
-            serializer = EmailAttachmentSerializer(items, many=True, context={'request': request})
+            serializer = EmailAttachmentSerializer(
+                items, many=True, context={'request': request}
+            )
 
             response_data = {
                 'code': 200,
@@ -136,8 +151,16 @@ class EmailAttachmentAPIView(BaseAPIView):
                         'total': total,
                         'page': page,
                         'pageSize': page_size,
-                        'next': f"?page={page + 1}&page_size={page_size}" if end < total else None,
-                        'previous': f"?page={page - 1}&page_size={page_size}" if page > 1 else None
+                        'next': (
+                            f"?page={page + 1}&page_size={page_size}"
+                            if end < total
+                            else None
+                        ),
+                        'previous': (
+                            f"?page={page - 1}&page_size={page_size}"
+                            if page > 1
+                            else None
+                        ),
                     }
                 }
             }
@@ -175,7 +198,9 @@ class EmailAttachmentAPIView(BaseAPIView):
 
             if serializer.is_valid(raise_exception=True):
                 attachment = serializer.save()
-                response_serializer = EmailAttachmentSerializer(attachment, context={'request': request})
+                response_serializer = EmailAttachmentSerializer(
+                    attachment, context={'request': request}
+                )
 
                 return Response({
                     'code': 201,
@@ -207,7 +232,11 @@ class EmailAttachmentDetailAPIView(BaseAPIView):
         """
         Filter attachments by user through email message
         """
-        return queryset.filter(email_message__user=self.request.user)
+        return queryset.filter(
+            email_message__user=self.request.user
+        ).filter(
+            email_visibility_q(self.request.user, prefix="email_message__")
+        )
 
     @extend_schema(
         operation_id='email_attachments_retrieve',
@@ -225,7 +254,9 @@ class EmailAttachmentDetailAPIView(BaseAPIView):
         """
         try:
             attachment = self.get_object(pk)
-            serializer = EmailAttachmentSerializer(attachment, context={'request': request})
+            serializer = EmailAttachmentSerializer(
+                attachment, context={'request': request}
+            )
 
             return Response({
                 'code': 200,
@@ -267,7 +298,9 @@ class EmailAttachmentDetailAPIView(BaseAPIView):
 
             if serializer.is_valid(raise_exception=True):
                 updated_attachment = serializer.save()
-                response_serializer = EmailAttachmentSerializer(updated_attachment, context={'request': request})
+                response_serializer = EmailAttachmentSerializer(
+                    updated_attachment, context={'request': request}
+                )
 
                 return Response({
                     'code': 200,
@@ -310,7 +343,9 @@ class EmailAttachmentDetailAPIView(BaseAPIView):
 
             if serializer.is_valid(raise_exception=True):
                 updated_attachment = serializer.save()
-                response_serializer = EmailAttachmentSerializer(updated_attachment, context={'request': request})
+                response_serializer = EmailAttachmentSerializer(
+                    updated_attachment, context={'request': request}
+                )
 
                 return Response({
                     'code': 200,

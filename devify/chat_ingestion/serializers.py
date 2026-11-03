@@ -67,6 +67,7 @@ class UploadBatchSerializer(serializers.ModelSerializer):
             "idempotency_key",
             "archive_sha256",
             "archive_size",
+            "content_sha256",
             "status",
             "error_message",
             "message_count",

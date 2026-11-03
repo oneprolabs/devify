@@ -1,7 +1,7 @@
 # wechat.v1 上传契约
 
-> 状态：**部分冻结**（2026-11-03）。时间语义已定稿（见 §2.1）；附件缺口与重复 origin
-> 两处仍待确认，其余条款与实现一致，可作为双端对齐依据。
+> 状态：**已冻结**（2026-11-03）。时间语义见 §2.1，附件缺口见 §2.2，内容去重见 §4.1。
+> 三项都已定稿；仅「附件随包上传」推迟到后续版本，不作为首版门槛。
 >
 > 事实来源：`devify/chat_ingestion/package.py`、`parsing.py`、`services.py`、
 > `models.py`、`devify/chat_domain/services.py`，以及 `tests/test_package_contract.py`、
@@ -58,6 +58,12 @@
   任何猜测都会让导入的消息整体偏移数小时。
 - manifest 的 `timezone` 仅作为展示默认值保留；**客户端按用户本地时区渲染**，
   服务端不做本地化。
+
+### 2.2 附件缺口（已定稿）
+
+首版**允许只导入文本**：客户端不产 `media/` 时，媒体 part 以
+`binding_state=missing` 保留，批次仍然成功。附件随包上传推迟到后续版本，不作为
+首版验收门槛；缺口在 part 上显式可见，不改变导入结论。
 
 ## 3. JSONL 通用规则
 
@@ -123,6 +129,21 @@
   `duplicate_count` 反映命中数，`messages.jsonl` 上传项标为 `duplicate`。
 - 同一包内重复的 `message_key` 计为 duplicate，不报错；重复的会话记录报错。
 
+## 4.1 内容去重（已定稿）
+
+同一个人重复上传，或者**多个人上传同一个群**，都不应触发第二次分析：
+
+- 解析完成后，服务端对归一化内容计算 SHA-256：每条消息取
+  `message_key + occurred_at + sender + direction + record_kind + parts`，
+  按会话聚合，再汇总成批次级 `content_sha256`。
+- 摘要只覆盖内容，不覆盖 zip 布局、上传者或空间归属：同一个群的两份不同打包
+  会得到同一个值。
+- 分析任务的 `request_key` 形如 `upload:<会话ID>:<内容摘要>`。相同内容再次上传时
+  命中已有任务，不再新建、不再重复调用模型；批次返回"已存在"而不是重复处理。
+- 若命中任务的终态是 `failed` / `cancelled`，再次上传会重新排队该任务，而不是
+  另建一个新任务，避免同内容堆积多个失败任务。
+- 批次暴露 `content_sha256` 便于对账；`conversation_digests` 保存每个会话的摘要。
+
 ## 5. 状态机
 
 ```text
@@ -160,18 +181,15 @@ created ──> uploading ──> processing ──> completed
 | 成员数 | 5000（`CHAT_IMPORT_MAX_MEMBERS`） |
 | 单个 JSONL 记录数 | 50000（`CHAT_IMPORT_MAX_RECORDS`） |
 
-## 8. 待决策（冻结前必须确认）
+## 8. 决策记录（均已定稿）
 
-1. ~~无偏移时间戳的语义~~ **已决定（2026-11-03）**：统一使用绝对时间戳，客户端负责
-   转成本地时间展示。实现：`parse_occurred_at` 拒绝无偏移值，服务端不再回退到
-   manifest 或服务端时区；测试
-   `test_naive_timestamp_is_rejected_whatever_the_manifest_says`。
-2. **附件缺口的表达**。当前客户端不产 `media/`，服务端把媒体 part 记为
-   `binding_state=missing` 并继续导入。需要确认：首版是否允许「只有文本、附件缺失」
-   视为成功导入，还是必须有附件才算完整（影响客户端打包与验收口径）。
-3. **重复上传的 origin 保留**。当前同一消息重复导入会追加一条 origin。多人重复上传
-   同一段聊天时，是保留全部来源（可追溯，但行数增长）还是按来源账号只保留最新一次，
-   需要确定后再补去重策略。
+1. **时间语义**（2026-11-03）：统一使用绝对时间戳，客户端负责转成本地时间展示。
+   实现：`parse_occurred_at` 拒绝无偏移值，服务端不再回退 manifest 或服务端时区；
+   测试 `test_naive_timestamp_is_rejected_whatever_the_manifest_says`。
+2. **附件缺口**（2026-11-03）：首版允许只导入文本，媒体 part 记为
+   `binding_state=missing`，附件随包上传推迟，不作为首版门槛（见 §2.2）。
+3. **重复上传**（2026-11-03）：对归一化内容做一次 SHA-256，多人上传同一个群时复用
+   已有分析任务，不重复处理；origin 仍逐次追加以保留来源（见 §4.1）。
 
 ## 9. 双端职责
 

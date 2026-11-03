@@ -128,11 +128,13 @@ class RegistrationService:
         This runs automatically during registration and delegates
         to the billing subscription service for idempotency.
 
+        Billing bootstrap is best effort: a deployment without a ``free``
+        plan, or a transient billing failure, must not block signup. The
+        failure is logged and the user can be granted a plan later from the
+        billing admin.
+
         Args:
             user: Django User instance
-
-        Raises:
-            Exception: If billing initialization fails
         """
         # Local import to avoid circular dependency and conditional loading.
         # Note: Imports billing models locally to avoid circular dependency.
@@ -166,7 +168,6 @@ class RegistrationService:
                     'method': '_initialize_free_plan',
                 }
             )
-            raise
 
     @staticmethod
     @transaction.atomic

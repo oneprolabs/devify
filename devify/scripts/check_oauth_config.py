@@ -1,6 +1,10 @@
 #!/usr/bin/env python
-"""
-Test script to verify OAuth configuration
+"""Manual check for the OAuth/allauth settings in the current deployment.
+
+This used to live at ``devify/test_oauth_flow.py``, where pytest collected it
+and failed because it asserts settings that no longer exist. Run it by hand:
+
+    python devify/scripts/check_oauth_config.py
 """
 
 import os
@@ -12,7 +16,7 @@ django.setup()
 from django.conf import settings
 from accounts.adapters import CustomSocialAccountAdapter
 
-def test_oauth_config():
+def check_oauth_config():
     print("=" * 60)
     print("OAuth Configuration Test")
     print("=" * 60)
@@ -122,5 +126,5 @@ def test_oauth_config():
     print("=" * 60)
 
 if __name__ == '__main__':
-    test_oauth_config()
+    check_oauth_config()
 

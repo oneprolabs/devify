@@ -11,6 +11,8 @@ describe('AnalysisAssist', () => {
     spacesApi.askQuestion.mockResolvedValue({ data: { data: { answer: '有一个风险。', citations: [{ kind: 'event', id: 7, title: '风险', excerpt: '等待确认' }], scope: { event_ids: [7] } } } })
     const wrapper = mount(AnalysisAssist, { props: { spaceId: 3, selectedEvent: { id: 7, title: '风险' } } })
     await flushPromises()
+    // The assist panel starts collapsed; the forms only exist once expanded.
+    await wrapper.find('button.assist-toggle').trigger('click')
     expect(wrapper.text()).toContain('客户风险')
     await wrapper.find('textarea[placeholder*="当前还有哪些"]').setValue('当前风险是什么')
     await wrapper.find('form.question-form').trigger('submit')
@@ -23,6 +25,7 @@ describe('AnalysisAssist', () => {
     spacesApi.createTopic.mockResolvedValue({ data: { data: { id: 2, title: '交付', instruction: '总结交付' } } })
     const wrapper = mount(AnalysisAssist, { props: { spaceId: 3 } })
     await flushPromises()
+    await wrapper.find('button.assist-toggle').trigger('click')
     await wrapper.find('button.link-button').trigger('click')
     await wrapper.find('input[placeholder*="客户风险"]').setValue('交付')
     await wrapper.find('textarea[placeholder*="希望如何"]').setValue('总结交付')

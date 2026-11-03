@@ -79,8 +79,12 @@ def test_sync_cron_periodic_task_updates_changed_when_deleted(monkeypatch):
             deleted['value'] = True
 
     class FakePeriodicTaskManager:
-        def filter(self, **kwargs):
-            return FakeQuerySet()
+        """Stand-in for the ``PeriodicTask`` model class, not an instance."""
+
+        class objects:
+            @staticmethod
+            def filter(**kwargs):
+                return FakeQuerySet()
 
     class FakePeriodicTasks:
         calls = 0
@@ -91,7 +95,7 @@ def test_sync_cron_periodic_task_updates_changed_when_deleted(monkeypatch):
 
     monkeypatch.setattr(
         'billing.services.periodic_task_scheduler.PeriodicTask',
-        FakePeriodicTaskManager(),
+        FakePeriodicTaskManager,
     )
     monkeypatch.setattr(
         'billing.services.periodic_task_scheduler.PeriodicTasks',

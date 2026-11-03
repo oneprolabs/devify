@@ -16,11 +16,21 @@ docker exec devify-api-dev sh -lc 'cd /opt/devify && \
   DJANGO_SETTINGS_MODULE=core.settings /opt/venv/bin/python -m pytest -q -p no:sugar'
 ```
 
-注意两点：
+注意三点：
 
 - 容器只挂载 `./devify` 到 `/opt/devify`，仓库根与 `pyproject.toml` 不在容器内，
   所以必须显式设置 `DJANGO_SETTINGS_MODULE`，并使用 `/opt/venv/bin/python`。
-- 不要同时跑两个 pytest 进程：它们会争用同一个测试库，产生成片的 setup error。
+- 不要同时跑两个 pytest 进程：它们会争用同一个测试库，产生成片的 setup error
+  （典型表现是 `Can't create database 'test_devify'; database exists` 之后
+  随机的 `Table 'test_devify.djstripe_*' doesn't exist`）。
+
+同一台机器上还有别的会话在跑测试时，给本次运行换一个库名即可互不影响：
+
+```bash
+docker exec devify-api-dev sh -lc 'cd /opt/devify && \
+  DATABASE_URL="mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/devify_iso?charset=utf8mb4" \
+  DJANGO_SETTINGS_MODULE=core.settings /opt/venv/bin/python -m pytest -q -p no:sugar'
+```
 
 通过标准：0 failed、0 error。
 

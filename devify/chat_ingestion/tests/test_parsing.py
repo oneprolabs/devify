@@ -1,3 +1,7 @@
+import hashlib
+import json
+from pathlib import Path
+
 import pytest
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -5,9 +9,11 @@ from rest_framework.test import APIClient
 
 from chat_domain.models import (
     Conversation,
+    ConversationAvatar,
     Message,
     MessageOrigin,
     MessagePart,
+    SenderAvatar,
 )
 from chat_analysis.models import AnalysisJob, Note
 from chat_ingestion.models import UploadBatch, UploadItem
@@ -20,6 +26,7 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 @pytest.fixture(autouse=True)
 def archive_storage(settings, tmp_path):
     settings.CHAT_UPLOAD_ARCHIVE_DIR = str(tmp_path / "chat_archives")
+    settings.CHAT_AVATAR_DIR = str(tmp_path / "chat_avatars")
 
 
 def make_team(owner, slug="parse-team"):
@@ -686,3 +693,78 @@ def test_origin_must_reference_a_file_in_the_archive():
 
     assert response.status_code == 422
     assert "origin file is not part of the archive" in response.data["detail"]
+
+
+def test_complete_stores_conversation_and_sender_avatars(settings):
+    owner = User.objects.create_user(username="parse-avatar-owner")
+    space = make_team(owner, slug="parse-avatar-team")
+    client = auth_client(owner)
+    group_png = b"\x89PNG\r\n\x1a\n" + b"group-avatar"
+    sender_jpeg = b"\xff\xd8\xff\xe0" + b"sender-avatar"
+    avatars = [
+        {
+            "scope": "conversation",
+            "conversation_id": "group-a",
+            "upload_item_path": "media/avatars/group.png",
+        },
+        {
+            "scope": "sender",
+            "sender_key": "wx-a",
+            "upload_item_path": "media/avatars/sender.jpg",
+        },
+    ]
+    extra = {
+        "avatars.jsonl": "".join(
+            json.dumps(record, ensure_ascii=False) + "\n"
+            for record in avatars
+        ),
+        "media/avatars/group.png": group_png,
+        "media/avatars/sender.jpg": sender_jpeg,
+    }
+    batch = start_upload(
+        client, space, "parse-avatars", build_archive(extra=extra)
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 200
+    conversation = Conversation.objects.get(
+        space=space, source_conversation_id="group-a"
+    )
+    conversation_avatar = ConversationAvatar.objects.get(
+        conversation=conversation
+    )
+    assert conversation_avatar.content_type == "image/png"
+    assert conversation_avatar.sha256 == hashlib.sha256(group_png).hexdigest()
+    sender_avatar = SenderAvatar.objects.get(space=space, sender_key="wx-a")
+    assert sender_avatar.content_type == "image/jpeg"
+    stored = Path(settings.CHAT_AVATAR_DIR) / conversation_avatar.sha256
+    assert stored.read_bytes() == group_png
+
+
+def test_avatar_that_is_not_an_image_fails_the_batch():
+    owner = User.objects.create_user(username="parse-avatar-bad-owner")
+    space = make_team(owner, slug="parse-avatar-bad-team")
+    client = auth_client(owner)
+    avatars = [
+        {
+            "scope": "conversation",
+            "conversation_id": "group-a",
+            "upload_item_path": "media/avatars/broken.png",
+        }
+    ]
+    extra = {
+        "avatars.jsonl": json.dumps(avatars[0], ensure_ascii=False) + "\n",
+        "media/avatars/broken.png": b"not an image",
+    }
+    batch = start_upload(
+        client, space, "parse-avatars-bad", build_archive(extra=extra)
+    )
+
+    response = complete(client, batch)
+
+    assert response.status_code == 422
+    assert "Unsupported avatar image" in response.data["detail"]
+    assert not ConversationAvatar.objects.filter(
+        conversation__space=space
+    ).exists()

@@ -17,6 +17,11 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.db import transaction
 
+from chat_domain.avatars import (
+    MAX_AVATAR_BYTES,
+    save_conversation_avatar,
+    save_sender_avatar,
+)
 from chat_domain.models import Conversation, Message, MessagePart
 from chat_domain.services import (
     ingest_message,
@@ -26,6 +31,7 @@ from chat_domain.services import (
 )
 from chat_ingestion.models import UploadBatch, UploadItem
 from chat_ingestion.package import (
+    AVATARS_MEMBER,
     CONVERSATIONS_MEMBER,
     MESSAGES_MEMBER,
     ORIGINS_MEMBER,
@@ -479,6 +485,56 @@ def _parse_parts(package, conversations, messages, items):
         parts[(message.pk, part.part_key)] = part
 
 
+def _parse_avatars(package, space, conversations):
+    """Persist conversation and sender pictures from ``avatars.jsonl``."""
+    if not package.has(AVATARS_MEMBER):
+        return
+    name = AVATARS_MEMBER
+    for number, record in package.iter_jsonl(name):
+        where = _where(name, number)
+        scope = _choice(
+            record,
+            "scope",
+            where,
+            (("conversation", "conversation"), ("sender", "sender")),
+            "",
+        )
+        if not scope:
+            raise ArchiveParseError(f"{where}: 'scope' is required.")
+        upload_item_path = _string(
+            record, "upload_item_path", where, max_length=500, required=True
+        )
+        try:
+            member = normalize_member_path(upload_item_path)
+        except PackageError as error:
+            raise ArchiveParseError(f"{where}: {error}") from None
+        if not package.has(member):
+            raise ArchiveParseError(
+                f"{where}: avatar file is not part of the archive."
+            )
+        try:
+            data = package.read_bytes(member, limit=MAX_AVATAR_BYTES)
+        except PackageError as error:
+            raise ArchiveParseError(f"{where}: {error}") from None
+        if not data:
+            raise ArchiveParseError(f"{where}: avatar file is empty.")
+        try:
+            if scope == "conversation":
+                conversation = _conversation(conversations, record, where)
+                save_conversation_avatar(conversation, data)
+            else:
+                sender_key = _string(
+                    record,
+                    "sender_key",
+                    where,
+                    max_length=255,
+                    required=True,
+                )
+                save_sender_avatar(space, sender_key, data)
+        except ValueError as error:
+            raise ArchiveParseError(f"{where}: {error}") from None
+
+
 def _parse_origins(package, manifest, conversations, messages, items):
     if not package.has(ORIGINS_MEMBER):
         return
@@ -617,6 +673,7 @@ def _parse_locked(batch):
         )
         _parse_parts(package, conversations, messages, items)
         _parse_origins(package, manifest, conversations, messages, items)
+        _parse_avatars(package, batch.space, conversations)
         content_sha256, conversation_digests = _content_digests(messages)
 
     message_item = items[MESSAGES_MEMBER]

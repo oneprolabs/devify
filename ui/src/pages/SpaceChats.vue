@@ -44,9 +44,25 @@
                 type="button"
                 class="rail-refresh"
                 :disabled="loading"
+                aria-label="刷新会话"
+                title="刷新"
                 @click="loadConversations"
               >
-                刷新
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
               </button>
             </div>
             <label class="rail-search">
@@ -69,16 +85,16 @@
                 aria-label="搜索会话与聊天记录"
               />
             </label>
-            <div class="seg" role="group" aria-label="按来源筛选">
+            <div class="seg" role="group" aria-label="会话筛选">
               <button
-                v-for="filter in platformFilters"
+                v-for="filter in conversationFilters"
                 :key="filter.value"
                 type="button"
-                :class="{ on: platformFilter === filter.value }"
-                :aria-pressed="platformFilter === filter.value"
-                @click="platformFilter = filter.value"
+                :class="{ on: conversationFilter === filter.value }"
+                :aria-pressed="conversationFilter === filter.value"
+                @click="setConversationFilter(filter.value)"
               >
-                {{ filter.label }}
+                {{ filter.label }}<span>{{ filter.count }}</span>
               </button>
             </div>
           </div>
@@ -105,13 +121,21 @@
                 type="button"
                 class="conv-row"
                 :class="{ on: conversation.id === selectedConversation?.id }"
-                @click="selectConversation(conversation)"
+                @click="openConversation(conversation)"
               >
-                <span class="av">{{
-                  initials(
-                    conversation.title || conversation.source_conversation_id
-                  )
-                }}</span>
+                <span class="av">
+                  <img
+                    v-if="conversationAvatar(conversation)"
+                    :src="conversationAvatar(conversation)"
+                    alt=""
+                    class="av-img"
+                  />
+                  <template v-else>{{
+                    initials(
+                      conversation.title || conversation.source_conversation_id
+                    )
+                  }}</template>
+                </span>
                 <span class="conv-main">
                   <span class="conv-top">
                     <strong>{{
@@ -130,7 +154,11 @@
                   <span class="conv-meta">
                     <span>{{ platformLabel(conversation.platform) }}</span>
                     <i>·</i>
-                    <span>云端 {{ conversation.message_count }} 条</span>
+                    <span>{{ eventCountLabel(conversation) }}</span>
+                    <template v-if="conversation.pending_event_count">
+                      <i>·</i>
+                      <span class="pending">待处理</span>
+                    </template>
                   </span>
                 </span>
               </button>
@@ -168,25 +196,24 @@
               >
                 {{ sourceBadge(selectedConversation.platform) }}
               </span>
-              <div class="det-title">
-                <h2>
-                  {{
-                    selectedConversation.title ||
-                    selectedConversation.source_conversation_id
-                  }}
-                </h2>
-                <p>{{ selectedMeta }}</p>
-              </div>
+              <h2 class="det-name">
+                {{
+                  selectedConversation.title ||
+                  selectedConversation.source_conversation_id
+                }}
+              </h2>
+              <span class="det-meta">{{ selectedMeta }}</span>
+              <span class="spacer" />
               <div class="seg det-tabs" role="tablist" aria-label="会话视图">
                 <button
                   type="button"
                   role="tab"
                   :aria-selected="conversationView === 'events'"
                   :class="{ on: conversationView === 'events' }"
-                  @click="conversationView = 'events'"
+                  @click="switchConversationView('events')"
                 >
-                  事件<template v-if="eventsTotal !== null"
-                    >&nbsp;{{ eventsTotal }}</template
+                  事件<template v-if="eventTabCount !== null"
+                    >&nbsp;{{ eventTabCount }}</template
                   >
                 </button>
                 <button
@@ -194,7 +221,7 @@
                   role="tab"
                   :aria-selected="conversationView === 'raw'"
                   :class="{ on: conversationView === 'raw' }"
-                  @click="conversationView = 'raw'"
+                  @click="switchConversationView('raw')"
                 >
                   原始记录
                 </button>
@@ -203,7 +230,7 @@
                   role="tab"
                   :aria-selected="conversationView === 'summary'"
                   :class="{ on: conversationView === 'summary' }"
-                  @click="conversationView = 'summary'"
+                  @click="switchConversationView('summary')"
                 >
                   聊天总结
                 </button>
@@ -338,9 +365,17 @@
                         class="msg"
                         :class="{ 'is-open': expandedMessageId === message.id }"
                       >
-                        <span class="av msg-av">{{
-                          initials(message.sender_name || message.sender_key)
-                        }}</span>
+                        <span class="av msg-av">
+                          <img
+                            v-if="messageAvatar(message)"
+                            :src="messageAvatar(message)"
+                            alt=""
+                            class="av-img"
+                          />
+                          <template v-else>{{
+                            initials(message.sender_name || message.sender_key)
+                          }}</template>
+                        </span>
                         <div class="msg-main">
                           <div class="msg-meta">
                             <span>{{
@@ -422,11 +457,13 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { spacesApi } from '@/api/spaces'
+import { useAvatars } from '@/composables/useAvatars'
 
 const props = defineProps({
   spaceId: { type: [String, Number], required: true }
 })
 const route = useRoute()
+const { resolve: resolveAvatar } = useAvatars()
 
 const conversations = ref([])
 const conversationsTotal = ref(0)
@@ -435,7 +472,8 @@ const conversationsLoadingMore = ref(false)
 const loading = ref(false)
 
 const search = ref('')
-const platformFilter = ref('')
+const conversationFilter = ref('all')
+const pendingConversations = ref(0)
 const selectedConversation = ref(null)
 const mobileMessage = ref(false)
 
@@ -462,12 +500,6 @@ let pendingFocusId = route.query.message_id
   ? String(route.query.message_id)
   : ''
 
-const platformFilters = [
-  { value: '', label: '全部' },
-  { value: 'wechat', label: '微信' },
-  { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'email', label: '邮件' }
-]
 const onboardingSteps = [
   {
     number: '1',
@@ -493,24 +525,32 @@ const onboardingSteps = [
 
 const filteredConversations = computed(() => {
   const term = search.value.trim().toLowerCase()
-  if (!term && !platformFilter.value) return conversations.value
-  return conversations.value.filter(
-    (conversation) =>
-      (!platformFilter.value ||
-        conversation.platform === platformFilter.value) &&
-      `${conversation.title || ''} ${conversation.source_conversation_id || ''} ${conversation.last_message_preview || ''}`
-        .toLowerCase()
-        .includes(term)
+  if (!term) return conversations.value
+  return conversations.value.filter((conversation) =>
+    `${conversation.title || ''} ${conversation.source_conversation_id || ''} ${conversation.last_message_preview || ''}`
+      .toLowerCase()
+      .includes(term)
   )
 })
 
+const conversationFilters = computed(() => [
+  { value: 'all', label: '全部', count: conversationsTotal.value },
+  { value: 'pending', label: '有待处理', count: pendingConversations.value }
+])
+
+const eventTabCount = computed(
+  () => eventsTotal.value ?? selectedConversation.value?.event_count ?? null
+)
+
 const selectedMeta = computed(() => {
-  if (!selectedConversation.value) return ''
-  const parts = [
-    platformLabel(selectedConversation.value.platform),
-    `云端 ${selectedConversation.value.message_count} 条`
-  ]
-  if (eventsTotal.value !== null) parts.push(`${eventsTotal.value} 个事件`)
+  const conversation = selectedConversation.value
+  if (!conversation) return ''
+  const parts = [`云端 ${conversation.message_count} 条`]
+  if (conversation.participant_count) {
+    parts.push(`${conversation.participant_count} 人`)
+  }
+  parts.push(eventCountLabel(conversation))
+  if (conversation.pending_event_count) parts.push('待处理')
   return parts.join(' · ')
 })
 
@@ -565,6 +605,13 @@ const previewLine = (conversation) => {
     : ''
   return `${sender}${conversation.last_message_preview}`
 }
+
+const eventCountLabel = (conversation) =>
+  conversation.event_count ? `${conversation.event_count} 个事件` : '暂无事件'
+
+const conversationAvatar = (conversation) =>
+  resolveAvatar(conversation.avatar_url)
+const messageAvatar = (message) => resolveAvatar(message.sender_avatar_url)
 
 const formatRowTime = (value) => {
   if (!value) return ''
@@ -623,11 +670,14 @@ const loadConversations = async () => {
   error.value = ''
   try {
     const data = unwrap(
-      await spacesApi.getConversations(props.spaceId, { page_size: 100 })
+      await spacesApi.getConversations(props.spaceId, conversationParams())
     )
     conversations.value = data.list || []
     conversationsTotal.value =
-      data.pagination?.total ?? conversations.value.length
+      data.counts?.total ?? data.pagination?.total ?? conversations.value.length
+    pendingConversations.value =
+      data.counts?.pending ??
+      conversations.value.filter((item) => item.pending_event_count).length
     conversationsNext.value = Boolean(data.pagination?.next)
     if (!conversations.value.length) {
       selectedConversation.value = null
@@ -641,15 +691,13 @@ const loadConversations = async () => {
       (item) => item.id === selectedConversation.value?.id
     )
     const target = requested || current || conversations.value[0]
+    const view = 'raw'
     if (current && target.id === current.id) {
       selectedConversation.value = target
-      await loadMessages(target)
-      if (conversationView.value === 'events') {
-        eventsTotal.value = null
-        await loadConversationEvents()
-      }
+      await loadConversationView(target)
     } else {
-      await selectConversation(target)
+      if (requested) mobileMessage.value = true
+      await selectConversation(target, view)
     }
   } catch (requestError) {
     error.value =
@@ -659,15 +707,42 @@ const loadConversations = async () => {
   }
 }
 
-const selectConversation = async (conversation) => {
+const conversationParams = () => {
+  const params = { page_size: 100 }
+  if (conversationFilter.value === 'pending') params.filter = 'pending'
+  return params
+}
+
+const setConversationFilter = async (value) => {
+  if (conversationFilter.value === value) return
+  conversationFilter.value = value
+  await loadConversations()
+}
+
+const loadConversationView = async (conversation) => {
+  if (conversationView.value === 'raw') {
+    await loadMessages(conversation)
+    return
+  }
+  if (conversationView.value === 'summary') return
+  eventsTotal.value = null
+  await loadConversationEvents()
+}
+
+const openConversation = async (conversation) => {
+  mobileMessage.value = true
+  await selectConversation(conversation, 'raw')
+}
+
+const selectConversation = async (conversation, view = 'raw') => {
   if (!conversation) return
   selectedConversation.value = conversation
-  conversationView.value = 'raw'
-  mobileMessage.value = true
+  conversationView.value = view
   conversationEvents.value = []
   eventsTotal.value = null
   eventsNext.value = false
-  await loadMessages(conversation)
+  messages.value = []
+  await loadConversationView(conversation)
 }
 
 const loadMessages = async (conversation) => {
@@ -749,8 +824,8 @@ const loadMoreConversations = async () => {
   try {
     const data = unwrap(
       await spacesApi.getConversations(props.spaceId, {
-        page: Math.floor(conversations.value.length / 100) + 1,
-        page_size: 100
+        ...conversationParams(),
+        page: Math.floor(conversations.value.length / 100) + 1
       })
     )
     conversations.value = [...conversations.value, ...(data.list || [])]
@@ -819,15 +894,18 @@ const toggleMessage = async (message) => {
   }
 }
 
-watch(conversationView, (view) => {
-  if (
-    view === 'events' &&
-    selectedConversation.value &&
-    eventsTotal.value === null
-  ) {
-    loadConversationEvents()
+const switchConversationView = async (view) => {
+  if (conversationView.value === view) return
+  conversationView.value = view
+  const conversation = selectedConversation.value
+  if (!conversation) return
+  if (view === 'events' && eventsTotal.value === null) {
+    await loadConversationEvents()
   }
-})
+  if (view === 'raw' && !messages.value.length) {
+    await loadMessages(conversation)
+  }
+}
 
 watch(
   () => [route.query.conversation_id, route.query.message_id],
@@ -836,6 +914,7 @@ watch(
     if (String(selectedConversation.value?.id) === String(conversationId)) {
       if (messageId) {
         pendingFocusId = String(messageId)
+        conversationView.value = 'raw'
         await loadMessages(selectedConversation.value)
       }
       return
@@ -845,7 +924,8 @@ watch(
     )
     if (target) {
       pendingFocusId = messageId ? String(messageId) : ''
-      await selectConversation(target)
+      mobileMessage.value = true
+      await selectConversation(target, 'raw')
     }
   }
 )
@@ -909,7 +989,7 @@ onMounted(loadConversations)
 }
 .rail-top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
@@ -932,12 +1012,21 @@ onMounted(loadConversations)
   white-space: nowrap;
 }
 .rail-refresh {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
   flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
   color: rgb(var(--c-tx3));
-  font-size: 11px;
 }
 .rail-refresh:hover {
+  background: rgb(var(--c-chip));
   color: rgb(var(--c-ac));
+}
+.rail-refresh:disabled {
+  color: rgb(var(--c-tx4));
 }
 .rail-search {
   display: flex;
@@ -975,6 +1064,12 @@ onMounted(loadConversations)
   color: rgb(var(--c-tx2));
   font-size: 12.5px;
   white-space: nowrap;
+}
+.seg button span {
+  margin-left: 4px;
+  color: rgb(var(--c-tx3));
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
 .seg button.on {
   background: rgb(var(--c-panel));
@@ -1026,6 +1121,12 @@ onMounted(loadConversations)
   color: rgb(var(--c-tx2));
   font-size: 13px;
   font-weight: 600;
+  overflow: hidden;
+}
+.av-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .conv-row.on .av {
   background: rgb(var(--c-panel));
@@ -1077,6 +1178,9 @@ onMounted(loadConversations)
   color: rgb(var(--c-tx4));
   font-style: normal;
 }
+.conv-meta .pending {
+  color: rgb(var(--c-warn));
+}
 
 /* detail pane */
 .det {
@@ -1088,13 +1192,13 @@ onMounted(loadConversations)
 }
 .det-head {
   display: flex;
+  height: 56px;
   flex: none;
-  min-height: 56px;
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid rgb(var(--c-line));
   background: rgb(var(--c-bg));
-  padding: 10px 28px;
+  padding: 0 28px;
 }
 .src {
   display: inline-flex;
@@ -1123,11 +1227,8 @@ onMounted(loadConversations)
 .src.other {
   background: rgb(var(--c-tx4));
 }
-.det-title {
+.det-name {
   min-width: 0;
-  flex: 1;
-}
-.det-title h2 {
   margin: 0;
   overflow: hidden;
   font-family: var(--font-display);
@@ -1137,13 +1238,17 @@ onMounted(loadConversations)
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.det-title p {
-  margin: 2px 0 0;
+.det-meta {
+  flex: none;
   color: rgb(var(--c-tx3));
   font-size: 12px;
+  white-space: nowrap;
+}
+.det-head .spacer {
+  flex: 1;
 }
 .det-tabs {
-  width: 280px;
+  width: 260px;
   flex: none;
 }
 .det-body {
@@ -1281,6 +1386,7 @@ onMounted(loadConversations)
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
   border-top: 1px solid rgb(var(--c-line-soft));
   padding: 10px 0 0 24px;
 }
@@ -1322,7 +1428,7 @@ onMounted(loadConversations)
 .msg-av {
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: 9px;
   font-size: 11.5px;
 }
 .msg-main {
@@ -1566,12 +1672,21 @@ onMounted(loadConversations)
     font-size: 12px;
   }
   .det-head {
+    height: auto;
+    min-height: 56px;
     flex-wrap: wrap;
     gap: 8px;
     padding: 10px 16px;
   }
-  .det-title {
+  .det-name {
     flex: 1;
+  }
+  .det-meta {
+    width: 100%;
+    order: 2;
+  }
+  .det-head .spacer {
+    display: none;
   }
   .det-tabs {
     width: 100%;

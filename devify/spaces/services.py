@@ -1,5 +1,4 @@
-from django.db import transaction, models
-from django.utils import timezone
+from django.db import models, transaction
 from django.utils import timezone
 
 from spaces.models import (
@@ -78,6 +77,29 @@ class SpacePermissionService:
         if getattr(user, "is_staff", False):
             return cls.has_active_takeover(user, space)
         return cls.membership(user, space) is not None
+
+    @classmethod
+    def readable_space_ids(cls, user):
+        """Space ids this user may read right now.
+
+        Same rules as ``can_read``: active memberships for normal users,
+        active takeovers for staff. Used to filter legacy per-user queries so
+        they cannot bypass the space boundary.
+        """
+        if not getattr(user, "is_authenticated", False):
+            return set()
+        if getattr(user, "is_staff", False):
+            return set(
+                SpaceTakeover.objects.filter(
+                    admin=user, active=True
+                ).values_list("space_id", flat=True)
+            )
+        return set(
+            SpaceMembership.objects.filter(
+                user=user,
+                status=SpaceMembership.Status.ACTIVE,
+            ).values_list("space_id", flat=True)
+        )
 
     @classmethod
     def can_upload(cls, user, space):
@@ -286,8 +308,12 @@ def check_daily_ai_quota(space):
     if quota.daily_ai_calls is None:
         return None
     from chat_analysis.models import QuestionAnswer
-    start = timezone.localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
-    count = QuestionAnswer.objects.filter(space=space, created_at__gte=start).count()
+    start = timezone.localtime(timezone.now()).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    count = QuestionAnswer.objects.filter(
+        space=space, created_at__gte=start
+    ).count()
     if count >= quota.daily_ai_calls:
         return "Space daily AI quota exceeded."
     return None
@@ -298,7 +324,12 @@ def check_storage_quota(space, additional_bytes=0):
     if quota.storage_limit_bytes is None:
         return None
     from chat_ingestion.models import UploadBatch
-    used = UploadBatch.objects.filter(space=space).exclude(status="cancelled").aggregate(total=models.Sum("archive_size"))["total"] or 0
+    used = (
+        UploadBatch.objects.filter(space=space)
+        .exclude(status="cancelled")
+        .aggregate(total=models.Sum("archive_size"))["total"]
+        or 0
+    )
     if used + int(additional_bytes or 0) > quota.storage_limit_bytes:
         return "Space storage quota exceeded."
     return None

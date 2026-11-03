@@ -17,6 +17,18 @@ PART_PLACEHOLDERS = {
 }
 
 
+def avatar_url(space_id, sha256):
+    """API-relative URL of one stored avatar, or an empty string.
+
+    The path is relative to the API base (``/api``) so it keeps working
+    behind a proxy that rewrites the host, and the desktop client can prefix
+    its own base URL.
+    """
+    if not sha256:
+        return ""
+    return f"/v1/spaces/{space_id}/avatars/{sha256}"
+
+
 def message_preview(message, limit=280):
     """Flatten a message's parts into one readable line for list views."""
     if message is None:
@@ -37,9 +49,19 @@ def message_preview(message, limit=280):
 class ConversationListSerializer(serializers.ModelSerializer):
     last_message_preview = serializers.SerializerMethodField()
     last_message_sender = serializers.SerializerMethodField()
+    participant_count = serializers.IntegerField(read_only=True, default=0)
+    event_count = serializers.IntegerField(read_only=True, default=0)
+    pending_event_count = serializers.IntegerField(read_only=True, default=0)
+    avatar_url = serializers.SerializerMethodField()
 
     def _latest_message(self, obj):
         return (self.context.get("latest_messages") or {}).get(obj.pk)
+
+    def get_avatar_url(self, obj):
+        avatar = getattr(obj, "avatar", None)
+        if avatar is None:
+            return ""
+        return avatar_url(obj.space_id, avatar.sha256)
 
     def get_last_message_preview(self, obj):
         return message_preview(self._latest_message(obj))
@@ -62,6 +84,10 @@ class ConversationListSerializer(serializers.ModelSerializer):
             "kind",
             "timezone",
             "message_count",
+            "participant_count",
+            "event_count",
+            "pending_event_count",
+            "avatar_url",
             "last_message_at",
             "last_message_preview",
             "last_message_sender",
@@ -114,9 +140,20 @@ class MessageOriginSerializer(serializers.ModelSerializer):
 
 class MessageListSerializer(serializers.ModelSerializer):
     preview = serializers.SerializerMethodField()
+    sender_avatar_url = serializers.SerializerMethodField()
 
     def get_preview(self, obj):
         return message_preview(obj)
+
+    def get_sender_avatar_url(self, obj):
+        if not obj.sender_key:
+            return ""
+        avatar = (self.context.get("sender_avatars") or {}).get(
+            obj.sender_key
+        )
+        if avatar is None:
+            return ""
+        return avatar_url(obj.conversation.space_id, avatar.sha256)
 
     class Meta:
         model = Message
@@ -136,6 +173,7 @@ class MessageListSerializer(serializers.ModelSerializer):
             "relation_kind",
             "normalization_state",
             "preview",
+            "sender_avatar_url",
             "created_at",
             "updated_at",
         )

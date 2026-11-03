@@ -268,5 +268,6 @@ cache/
 # Local tooling and runtime output that must never be committed.
 /node_modules/
 devify/chat_upload_archives/
+devify/chat_avatars/
 
 test_report.html

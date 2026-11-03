@@ -8,35 +8,36 @@ import logging
 import re
 from datetime import datetime, time, timedelta
 
+from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext_lazy as _
-from rest_framework import status, serializers
-from rest_framework.response import Response
-from django.db.models import Q
-from django.db import transaction
-from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
-from core.swagger import response, error_response, pagination_response
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import serializers, status
+from rest_framework.response import Response
 
-from .base import BaseAPIView
+from core.swagger import error_response, pagination_response, response
+
 from ..models import EmailMessage
-from ..state_machine import EmailStatus
 from ..serializers import (
-    EmailMessageSerializer,
-    EmailMessageListSerializer,
-    EmailMessageListRetryFlowSerializer,
-    EmailMessageRetryFlowSerializer,
-    EmailMessageCreateSerializer,
-    EmailMessageUpdateSerializer,
-    EmailMessageMergeSerializer,
     EmailMessageBatchRetrySerializer,
+    EmailMessageCreateSerializer,
+    EmailMessageListRetryFlowSerializer,
+    EmailMessageListSerializer,
+    EmailMessageMergeSerializer,
+    EmailMessageRetryFlowSerializer,
+    EmailMessageSerializer,
+    EmailMessageUpdateSerializer,
 )
 from ..services import (
     ManualMergeService,
-    enqueue_merge_workflow as _enqueue_merge_workflow,
-    enqueue_merge_workflows as _enqueue_merge_workflows,
 )
+from ..services import enqueue_merge_workflow as _enqueue_merge_workflow
+from ..services import enqueue_merge_workflows as _enqueue_merge_workflows
+from ..state_machine import EmailStatus
+from .base import BaseAPIView, email_visibility_q
 
 logger = logging.getLogger(__name__)
 
@@ -252,8 +253,8 @@ class EmailMessageAPIView(BaseAPIView):
 
                 logger.info(f"Search query parsed into keywords: {keywords}")
 
-                if keywords:
                 # Build AND logic: each keyword must match at least one field.
+                if keywords:
                     for keyword in keywords:
                         logger.debug(f"Filtering by keyword: '{keyword}'")
                         queryset = queryset.filter(
@@ -798,7 +799,11 @@ class EmailMessageDetailAPIView(BaseAPIView):
         """
         Get email message by UUID with user ownership validation
         """
-        return self.get_queryset().get(uuid=uuid, user=self.request.user)
+        return (
+            self.get_queryset()
+            .filter(email_visibility_q(self.request.user))
+            .get(uuid=uuid, user=self.request.user)
+        )
 
     @extend_schema(
         operation_id="threadlines_retrieve",
@@ -1100,7 +1105,11 @@ class EmailMessageIssueClusterAPIView(BaseAPIView):
         )
 
     def get_object(self, uuid):
-        return self.get_queryset().get(uuid=uuid, user=self.request.user)
+        return (
+            self.get_queryset()
+            .filter(email_visibility_q(self.request.user))
+            .get(uuid=uuid, user=self.request.user)
+        )
 
     @extend_schema(
         operation_id="threadlines_issue_cluster",
@@ -1154,7 +1163,9 @@ class EmailMessageMetadataAPIView(BaseAPIView):
 
     def get_object(self, uuid):
         """Get email message by UUID with user ownership validation."""
-        return EmailMessage.objects.get(uuid=uuid, user=self.request.user)
+        return EmailMessage.objects.filter(
+            email_visibility_q(self.request.user)
+        ).get(uuid=uuid, user=self.request.user)
 
     @extend_schema(
         operation_id="threadlines_update_metadata",

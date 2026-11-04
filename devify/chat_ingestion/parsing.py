@@ -586,7 +586,12 @@ def _content_digests(messages):
             continue
         seen.add(message.pk)
         parts = [
-            [part.kind, part.ordinal, part.text]
+            [
+                part.kind,
+                part.ordinal,
+                part.text,
+                part.upload_item.sha256 if part.upload_item_id else "",
+            ]
             for part in MessagePart.objects.filter(
                 message_id=message.pk
             ).order_by("ordinal", "pk")

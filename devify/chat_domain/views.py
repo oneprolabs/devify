@@ -1,6 +1,8 @@
+import zipfile
+
 from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
-from django.http import FileResponse
+from django.http import FileResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -9,6 +11,8 @@ from rest_framework.views import APIView
 
 from chat_analysis.models import Event
 from chat_domain.avatars import avatar_path
+from chat_ingestion.models import UploadItem
+from chat_ingestion.services import archive_path
 from chat_domain.models import (
     Conversation,
     ConversationAvatar,
@@ -246,6 +250,7 @@ class SpaceConversationDetailAPIView(APIView):
                 "data": ConversationDetailSerializer(
                     conversation,
                     context={
+                        "space_id": space.pk,
                         "latest_messages": _latest_messages([conversation])
                     },
                 ).data
@@ -297,7 +302,10 @@ class SpaceMessageListAPIView(APIView):
         data = MessageListSerializer(
             page,
             many=True,
-            context={"sender_avatars": _sender_avatars(space, page)},
+            context={
+                "space_id": space.pk,
+                "sender_avatars": _sender_avatars(space, page),
+            },
         ).data
         if takeover:
             audit_space_action(
@@ -345,11 +353,54 @@ class SpaceMessageDetailAPIView(APIView):
                 "data": MessageDetailSerializer(
                     message,
                     context={
-                        "sender_avatars": _sender_avatars(space, [message])
+                        "space_id": space.pk,
+                        "sender_avatars": _sender_avatars(space, [message]),
                     },
                 ).data
             }
         )
+
+
+class SpaceMediaAPIView(APIView):
+    """Stream one attachment from a private chat upload archive."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, space_id, item_id):
+        space, _takeover = _authorized_space(request.user, space_id)
+        if space is None:
+            return Response({"detail": "Space not found."}, status=404)
+        item = get_object_or_404(
+            UploadItem.objects.select_related("batch"),
+            pk=item_id,
+            batch__space=space,
+        )
+        if not item.path.startswith("media/") or ".." in item.path.split("/"):
+            return Response({"detail": "Media not found."}, status=404)
+        archive = archive_path(item.batch)
+        if not archive.is_file():
+            return Response({"detail": "Media not found."}, status=404)
+        try:
+            with zipfile.ZipFile(archive) as package:
+                info = package.getinfo(item.path)
+        except (KeyError, OSError, zipfile.BadZipFile):
+            return Response({"detail": "Media not found."}, status=404)
+
+        def stream():
+            with zipfile.ZipFile(archive) as package, package.open(info) as handle:
+                while True:
+                    chunk = handle.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+
+        response = StreamingHttpResponse(
+            stream(), content_type=item.content_type or "application/octet-stream"
+        )
+        response["Content-Length"] = str(info.file_size)
+        response["Content-Disposition"] = "inline"
+        response["Cache-Control"] = "private, max-age=86400"
+        return response
 
 
 class SpaceAvatarAPIView(APIView):

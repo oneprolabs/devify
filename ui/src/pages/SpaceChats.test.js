@@ -23,6 +23,9 @@ vi.mock('vue-router', () => ({
 vi.mock('@/composables/useAvatars', () => ({
   useAvatars: () => ({ resolve: (url) => (url ? 'blob:avatar' : '') })
 }))
+vi.mock('@/composables/useChatMedia', () => ({
+  useChatMedia: () => ({ resolve: (url) => (url ? 'blob:media' : '') })
+}))
 
 const conversation = {
   id: 2,
@@ -182,6 +185,31 @@ describe('SpaceChats', () => {
     expect(wrapper.findAll('.conv-row img.av-img').length).toBe(1)
     expect(wrapper.findAll('.msg-av img.av-img').length).toBe(1)
     expect(wrapper.find('.msg-av').text()).toBe('')
+  })
+
+  it('renders an uploaded image in the expanded message', async () => {
+    spacesApi.getMessage.mockResolvedValue({
+      data: {
+        data: {
+          parts: [
+            {
+              id: 2,
+              kind: 'image',
+              binding_state: 'available',
+              media_url: '/v1/spaces/3/media/42',
+              media_content_type: 'image/png'
+            }
+          ]
+        }
+      }
+    })
+
+    const wrapper = await mountPage()
+    await wrapper.find('.bub').trigger('click')
+    await flushPromises()
+
+    const image = wrapper.find('.part-image')
+    expect(image.exists()).toBe(true)
   })
 
   it('keeps an honest empty state for the chat summary', async () => {

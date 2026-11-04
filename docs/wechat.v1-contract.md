@@ -1,7 +1,7 @@
 # wechat.v1 上传契约
 
 > 状态：**已冻结**（2026-11-03）。时间语义见 §2.1，附件缺口见 §2.2，内容去重见 §4.1。
-> 三项都已定稿；仅「附件随包上传」推迟到后续版本，不作为首版门槛。
+> 三项都已定稿；图片随包上传已接入，其他附件随包上传仍不作为首版门槛。
 >
 > 事实来源：`devify/chat_ingestion/package.py`、`parsing.py`、`services.py`、
 > `models.py`、`devify/chat_domain/services.py`，以及 `tests/test_package_contract.py`、
@@ -17,7 +17,7 @@
 | `message_parts.jsonl` | 否 | 类型化内容（文本 / 图片 / 文件 / 引用 / 转发） |
 | `origins.jsonl` | 否 | 原始定位与 parser_version；缺省时按 messages 行自动记录 |
 | `avatars.jsonl` | 否 | 会话与发送者头像；指向包内图片文件 |
-| `media/...` | 否 | 附件文件；**当前客户端不生成**，服务端按「缺失」保留 |
+| `media/...` | 否 | 附件文件；客户端会上传可读取的图片，其他附件仍可缺失 |
 
 归档本身是 zip。任何一条契约违例都让**整批失败**，不会留下半套数据。
 
@@ -62,9 +62,7 @@
 
 ### 2.2 附件缺口（已定稿）
 
-首版**允许只导入文本**：客户端不产 `media/` 时，媒体 part 以
-`binding_state=missing` 保留，批次仍然成功。附件随包上传推迟到后续版本，不作为
-首版验收门槛；缺口在 part 上显式可见，不改变导入结论。
+首版允许媒体缺口：客户端会从本机解密缓存中读取并上传可还原的图片，写入 `media/images/` 并通过 `message_parts.jsonl` 关联；找不到原图或无法解密时，媒体 part 以 `binding_state=missing` 保留，批次仍成功。视频、音频和文件随包上传仍按后续版本处理；缺口在 part 上显式可见，不改变导入结论。
 
 ## 3. JSONL 通用规则
 
@@ -110,6 +108,12 @@
 | `parent_part_key` | 否 | 父 part 必须先出现 |
 | `upload_item_path` | 否 | 指向包内文件；不存在时媒体 part 降级为 `missing` |
 | `binding_state` | 否 | 显式覆盖推导结果 |
+
+语音转写使用普通 `text` part 以兼容现有分析链路，不上传原始音频：
+- `part_key` 使用稳定的 `voice-transcript-<source_voice_id>`；
+- `source_locator.source` 为 `wechat_voice_transcript`；
+- `source_header` 可记录 `engine`、`model`、`language`；
+- 同一消息仍可保留一个 `kind=audio` 且 `binding_state=missing` 的占位 part，表示原始语音未随包上传。
 
 ### origins.jsonl
 
@@ -203,8 +207,8 @@ created ──> uploading ──> processing ──> completed
 1. **时间语义**（2026-11-03）：统一使用绝对时间戳，客户端负责转成本地时间展示。
    实现：`parse_occurred_at` 拒绝无偏移值，服务端不再回退 manifest 或服务端时区；
    测试 `test_naive_timestamp_is_rejected_whatever_the_manifest_says`。
-2. **附件缺口**（2026-11-03）：首版允许只导入文本，媒体 part 记为
-   `binding_state=missing`，附件随包上传推迟，不作为首版门槛（见 §2.2）。
+2. **附件缺口**（2026-11-03）：首版允许媒体缺口；客户端优先上传可还原的图片，其他媒体或
+   无法读取的图片记为 `binding_state=missing`，不作为首版验收门槛（见 §2.2）。
 3. **重复上传**（2026-11-03）：对归一化内容做一次 SHA-256，多人上传同一个群时复用
    已有分析任务，不重复处理；origin 仍逐次追加以保留来源（见 §4.1）。
 
@@ -214,7 +218,7 @@ created ──> uploading ──> processing ──> completed
 | --- | --- | --- |
 | 读取与解密 | 只读本机库，白名单在 Rust 层强制 | 不接收数据库、密钥、解密缓存 |
 | 范围选择 | 账号 / 会话 / 日期 / 逐条 | 只信任批次与登录身份，不信任 manifest 授权字段 |
-| 规范化 | 产出 `wechat.v1` 包与预览指纹 | 整包校验，任一不一致整批失败 |
+| 规范化 | 产出 `wechat.v1` 包与预览指纹；同步头像和可还原图片 | 整包校验，任一不一致整批失败；按权限提供原图 |
 | 时间 | 产出带偏移的绝对时间戳，按用户本地时区展示 | 统一换算 UTC 存储，输出带偏移；不做本地化 |
 | 去重 | 生成稳定 `message_key` / `revision` | 按空间 + 会话 + 消息键去重 |
 | 分析 | 只做本机预览 | 正式 Note / Event / Report / 主题 / 问答 |

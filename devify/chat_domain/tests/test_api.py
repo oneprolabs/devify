@@ -1,5 +1,6 @@
 from datetime import datetime
 from datetime import timezone as dt_timezone
+import zipfile
 import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
@@ -7,6 +8,8 @@ from rest_framework.test import APIClient
 from chat_analysis.models import Event, EventNote, Note, NoteEvidence
 from chat_domain.avatars import save_conversation_avatar, save_sender_avatar
 from chat_domain.models import Conversation, Message, MessagePart
+from chat_ingestion.models import UploadBatch, UploadItem
+from chat_ingestion.services import archive_path
 from spaces.models import Space, SpaceMembership, SpaceTakeover
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -417,3 +420,54 @@ def test_avatar_endpoint_rejects_an_unknown_digest(settings, tmp_path):
         f"/api/v1/spaces/{space.pk}/avatars/{'0' * 64}"
     )
     assert response.status_code == 404
+
+
+def test_message_media_is_streamed_only_to_space_members(settings, tmp_path):
+    owner = User.objects.create_user(username="api-media-owner")
+    outsider = User.objects.create_user(username="api-media-outsider")
+    space = make_space(owner, "api-media-team")
+    conversation = make_conversation(space, key="media")
+    message = Message.objects.create(
+        conversation=conversation, message_key="media:1", ingest_seq=1
+    )
+    batch = UploadBatch.objects.create(
+        space=space,
+        uploaded_by=owner,
+        source_type=UploadBatch.SourceType.WECHAT,
+        idempotency_key="media-batch",
+        status=UploadBatch.Status.COMPLETED,
+        archive_sha256="a" * 64,
+    )
+    image = b"\x89PNG\r\n\x1a\nimage"
+    item = UploadItem.objects.create(
+        batch=batch,
+        path="media/images/photo.png",
+        content_type="image/png",
+        size=len(image),
+        status=UploadItem.Status.ACCEPTED,
+    )
+    MessagePart.objects.create(
+        message=message,
+        part_key="image-1",
+        kind=MessagePart.Kind.IMAGE,
+        upload_item=item,
+    )
+    archive_path(batch).parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(archive_path(batch), "w") as archive:
+        archive.writestr(item.path, image)
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    detail = client.get(
+        f"/api/v1/spaces/{space.pk}/conversations/{conversation.pk}/messages/{message.pk}"
+    )
+    assert detail.status_code == 200
+    part = detail.data["data"]["parts"][0]
+    assert part["media_url"].endswith(f"/media/{item.pk}")
+    response = client.get(f"/api{part['media_url']}")
+    assert response.status_code == 200
+    assert response["Content-Type"] == "image/png"
+    assert b"".join(response.streaming_content) == image
+
+    client.force_authenticate(user=outsider)
+    assert client.get(f"/api{part['media_url']}").status_code == 404

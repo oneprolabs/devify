@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
@@ -117,7 +118,7 @@ def test_topic_run_creates_scoped_report_and_dispatches_generation(dispatch, on_
     client = APIClient()
     client.force_authenticate(user=owner)
     topic = client.post(f"/api/v1/spaces/{space.pk}/topics", {"title": "未完成风险", "instruction": "总结风险", "filters": {"keywords": ["风险"]}}, format="json").data["data"]
-    event = Event.objects.create(space=space, created_by=owner, event_key="risk-run", title="风险事项", content="风险等待确认", status=Event.Status.OPEN)
+    Event.objects.create(space=space, created_by=owner, event_key="risk-run", title="风险事项", content="风险等待确认", status=Event.Status.OPEN)
     response = client.post(f"/api/v1/topics/{topic['id']}/run")
     assert response.status_code == 202
     report = response.data["data"]

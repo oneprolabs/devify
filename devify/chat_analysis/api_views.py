@@ -1,6 +1,6 @@
 import uuid
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
@@ -58,7 +58,6 @@ from chat_analysis.services import (
     delete_note,
     upsert_event_relation,
 )
-from chat_analysis.topic_services import answer_question
 from chat_domain.models import Message, MessagePart
 from spaces.models import Space, SpaceMembership, SpaceTakeover
 from spaces.services import (

@@ -425,7 +425,52 @@
                                   >{{ partLabel(part.kind) }}</span
                                 >
                                 <p v-if="part.text">{{ part.text }}</p>
-                                <small v-else>{{ part.binding_state }}</small>
+                                <img
+                                  v-if="
+                                    part.kind === 'image' &&
+                                    part.media_url &&
+                                    resolveMedia(part.media_url)
+                                  "
+                                  :src="resolveMedia(part.media_url)"
+                                  :alt="partLabel(part.kind)"
+                                  class="part-image"
+                                  loading="lazy"
+                                />
+                                <video
+                                  v-else-if="
+                                    part.kind === 'video' && part.media_url
+                                  "
+                                  :src="resolveMedia(part.media_url)"
+                                  controls
+                                  preload="metadata"
+                                  class="part-video"
+                                />
+                                <audio
+                                  v-else-if="
+                                    part.kind === 'audio' && part.media_url
+                                  "
+                                  :src="resolveMedia(part.media_url)"
+                                  controls
+                                  class="part-audio"
+                                />
+                                <a
+                                  v-else-if="part.media_url"
+                                  :href="resolveMedia(part.media_url)"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  class="part-file"
+                                >
+                                  打开{{ partLabel(part.kind) }}
+                                </a>
+                                <small
+                                  v-else-if="!part.text"
+                                  class="part-state"
+                                  >{{
+                                    part.binding_state === 'missing'
+                                      ? '原始图片未随本次上传同步'
+                                      : part.binding_state
+                                  }}</small
+                                >
                               </div>
                             </template>
                             <p v-else class="hint compact">
@@ -458,12 +503,14 @@ import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { spacesApi } from '@/api/spaces'
 import { useAvatars } from '@/composables/useAvatars'
+import { useChatMedia } from '@/composables/useChatMedia'
 
 const props = defineProps({
   spaceId: { type: [String, Number], required: true }
 })
 const route = useRoute()
 const { resolve: resolveAvatar } = useAvatars()
+const { resolve: resolveMedia } = useChatMedia()
 
 const conversations = ref([])
 const conversationsTotal = ref(0)
@@ -1486,6 +1533,33 @@ onMounted(loadConversations)
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.part-image {
+  display: block;
+  max-width: min(420px, 100%);
+  max-height: 360px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: rgb(var(--c-chip));
+}
+.part-video {
+  display: block;
+  width: min(420px, 100%);
+  max-height: 360px;
+  border-radius: 8px;
+}
+.part-audio {
+  width: min(360px, 100%);
+}
+.part-file {
+  color: rgb(var(--c-ac));
+  text-decoration: none;
+}
+.part-file:hover {
+  text-decoration: underline;
+}
+.part-state {
+  color: rgb(var(--c-tx3));
 }
 .part-kind {
   color: rgb(var(--c-ac));

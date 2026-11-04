@@ -17,7 +17,11 @@ from chat_domain.models import (
 )
 from chat_analysis.models import AnalysisJob, Note
 from chat_ingestion.models import UploadBatch, UploadItem
-from chat_ingestion.tests.archives import build_archive, default_manifest
+from chat_ingestion.tests.archives import (
+    DEFAULT_PARTS,
+    build_archive,
+    default_manifest,
+)
 from spaces.models import Space, SpaceMembership
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -768,3 +772,49 @@ def test_avatar_that_is_not_an_image_fails_the_batch():
     assert not ConversationAvatar.objects.filter(
         conversation__space=space
     ).exists()
+
+
+def test_voice_transcript_part_is_ingested_without_audio_upload():
+    owner = User.objects.create_user(username="parse-voice-owner")
+    space = make_team(owner, slug="parse-voice-team")
+    client = auth_client(owner)
+    parts = [
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "part_key": "voice-1",
+            "kind": "audio",
+            "ordinal": 0,
+            "binding_state": "missing",
+            "source_locator": {"source": "wechat_voice", "server_id": "42"},
+        },
+        {
+            "conversation_id": "group-a",
+            "message_key": "srv:1",
+            "part_key": "voice-transcript-42",
+            "kind": "text",
+            "ordinal": 1,
+            "text": "明天下午三点开会",
+            "source_locator": {
+                "source": "wechat_voice_transcript",
+                "server_id": "42",
+            },
+            "source_header": {"engine": "whisper", "language": "zh"},
+        },
+        *DEFAULT_PARTS[1:],
+    ]
+    batch = start_upload(client, space, "parse-voice", build_archive(parts=parts))
+
+    response = complete(client, batch)
+
+    assert response.status_code == 200
+    message = Message.objects.get(message_key="srv:1")
+    audio = MessagePart.objects.get(message=message, part_key="voice-1")
+    transcript = MessagePart.objects.get(
+        message=message, part_key="voice-transcript-42"
+    )
+    assert audio.kind == MessagePart.Kind.AUDIO
+    assert audio.binding_state == MessagePart.BindingState.MISSING
+    assert transcript.kind == MessagePart.Kind.TEXT
+    assert transcript.text == "明天下午三点开会"
+    assert transcript.source_header["engine"] == "whisper"

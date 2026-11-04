@@ -29,6 +29,13 @@ def avatar_url(space_id, sha256):
     return f"/v1/spaces/{space_id}/avatars/{sha256}"
 
 
+def media_url(space_id, upload_item_id):
+    """API-relative URL for one file inside a chat upload archive."""
+    if not space_id or not upload_item_id:
+        return ""
+    return f"/v1/spaces/{space_id}/media/{upload_item_id}"
+
+
 def message_preview(message, limit=280):
     """Flatten a message's parts into one readable line for list views."""
     if message is None:
@@ -107,6 +114,27 @@ class ConversationDetailSerializer(ConversationListSerializer):
 
 
 class MessagePartSerializer(serializers.ModelSerializer):
+    media_url = serializers.SerializerMethodField()
+    media_content_type = serializers.SerializerMethodField()
+    media_size = serializers.SerializerMethodField()
+
+    def get_media_url(self, obj):
+        if obj.kind not in (
+            MessagePart.Kind.IMAGE,
+            MessagePart.Kind.VIDEO,
+            MessagePart.Kind.AUDIO,
+            MessagePart.Kind.FILE,
+        ) or obj.binding_state != MessagePart.BindingState.AVAILABLE:
+            return ""
+        item = obj.upload_item
+        return media_url(self.context.get("space_id"), item.pk if item else None)
+
+    def get_media_content_type(self, obj):
+        return getattr(obj.upload_item, "content_type", "") if obj.upload_item else ""
+
+    def get_media_size(self, obj):
+        return getattr(obj.upload_item, "size", None) if obj.upload_item else None
+
     class Meta:
         model = MessagePart
         fields = (
@@ -120,6 +148,9 @@ class MessagePartSerializer(serializers.ModelSerializer):
             "binding_state",
             "source_locator",
             "source_header",
+            "media_url",
+            "media_content_type",
+            "media_size",
         )
         read_only_fields = fields
 
@@ -153,7 +184,7 @@ class MessageListSerializer(serializers.ModelSerializer):
         )
         if avatar is None:
             return ""
-        return avatar_url(obj.conversation.space_id, avatar.sha256)
+        return avatar_url(self.context.get("space_id"), avatar.sha256)
 
     class Meta:
         model = Message

@@ -1,6 +1,5 @@
 """Asynchronous grounded question answering."""
 from celery import shared_task
-from django.utils import timezone
 
 from chat_analysis.models import QuestionAnswer
 from chat_analysis.topic_services import answer_question

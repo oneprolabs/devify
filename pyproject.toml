@@ -101,6 +101,7 @@ testpaths = [
     "devify/chat_analysis/tests",
     "devify/chat_domain/tests",
     "devify/chat_ingestion/tests",
+    "devify/chat_sources/tests",
     "devify/threadline/tests",
     "devify/relay/tests",
     "devify/expense/tests",

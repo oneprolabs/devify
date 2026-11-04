@@ -4,10 +4,9 @@ import json
 
 from django.db.models import Q
 
-from core.tracking import LLMTracker
-
 from chat_analysis.models import Event, Note
-from chat_domain.models import Conversation, Message
+from chat_domain.models import Message
+from core.tracking import LLMTracker
 from spaces.services import SpacePermissionService
 
 QUESTION_PROMPT = """You answer questions about a user's imported conversation analysis.

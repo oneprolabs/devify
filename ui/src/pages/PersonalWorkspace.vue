@@ -19,8 +19,6 @@ const route = useRoute()
 let requestId = 0
 const { t } = useI18n()
 const error = ref(false)
-const needsTakeover = ref(false)
-const takingOver = ref(false)
 async function openWorkspace() {
   const current = ++requestId
   const view = route.query.view === 'chats' ? 'chats' : 'analysis'

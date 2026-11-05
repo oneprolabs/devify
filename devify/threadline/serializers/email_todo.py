@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from ..models import EmailTodo, EmailMessage
+from ..models import EmailMessage, EmailTodo
 from .base import UserSerializer
 
 
@@ -60,7 +60,8 @@ class EmailTodoListSerializer(serializers.ModelSerializer):
             'id', 'content', 'is_completed', 'completed_at', 'priority',
             'owner', 'deadline', 'location', 'email_message_id',
             'email_message_subject', 'email_message_summary_title',
-            'email_message_metadata', 'email_message', 'created_at', 'updated_at'
+            'email_message_metadata', 'email_message', 'created_at',
+            'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'completed_at']
 
@@ -71,6 +72,7 @@ class EmailTodoListSerializer(serializers.ModelSerializer):
         if obj.email_message:
             return {
                 'id': obj.email_message.id,
+                'uuid': str(obj.email_message.uuid),
                 'subject': obj.email_message.subject,
                 'summary_title': obj.email_message.summary_title,
                 'metadata': obj.email_message.metadata or {}

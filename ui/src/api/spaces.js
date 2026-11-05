@@ -64,6 +64,10 @@ export const spacesApi = {
     return api.get(`/v1/spaces/${spaceId}/conversations`, { params })
   },
 
+  getConversation(spaceId, conversationId) {
+    return api.get(`/v1/spaces/${spaceId}/conversations/${conversationId}`)
+  },
+
   getMessages(spaceId, conversationId, params = {}) {
     return api.get(
       `/v1/spaces/${spaceId}/conversations/${conversationId}/messages`,

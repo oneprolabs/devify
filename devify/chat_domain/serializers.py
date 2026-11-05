@@ -15,6 +15,12 @@ PART_PLACEHOLDERS = {
     MessagePart.Kind.QUOTE: "[引用]",
     MessagePart.Kind.FORWARDED_ITEM: "[转发]",
 }
+MEDIA_PART_KINDS = (
+    MessagePart.Kind.IMAGE,
+    MessagePart.Kind.VIDEO,
+    MessagePart.Kind.AUDIO,
+    MessagePart.Kind.FILE,
+)
 
 
 def avatar_url(space_id, sha256):
@@ -169,12 +175,41 @@ class MessageOriginSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class MessageMediaSerializer(serializers.ModelSerializer):
+    """Media parts only, so list views can render attachments inline."""
+
+    media_url = serializers.SerializerMethodField()
+
+    def get_media_url(self, obj):
+        if obj.binding_state != MessagePart.BindingState.AVAILABLE:
+            return ""
+        item = obj.upload_item
+        space_id = self.context.get("space_id")
+        return media_url(space_id, item.pk if item else None)
+
+    class Meta:
+        model = MessagePart
+        fields = ("id", "kind", "media_url")
+        read_only_fields = fields
+
+
 class MessageListSerializer(serializers.ModelSerializer):
     preview = serializers.SerializerMethodField()
     sender_avatar_url = serializers.SerializerMethodField()
+    media = serializers.SerializerMethodField()
 
     def get_preview(self, obj):
         return message_preview(obj)
+
+    def get_media(self, obj):
+        parts = [
+            part for part in obj.parts.all() if part.kind in MEDIA_PART_KINDS
+        ]
+        if not parts:
+            return []
+        return MessageMediaSerializer(
+            parts, many=True, context=self.context
+        ).data
 
     def get_sender_avatar_url(self, obj):
         if not obj.sender_key:
@@ -204,6 +239,7 @@ class MessageListSerializer(serializers.ModelSerializer):
             "relation_kind",
             "normalization_state",
             "preview",
+            "media",
             "sender_avatar_url",
             "created_at",
             "updated_at",

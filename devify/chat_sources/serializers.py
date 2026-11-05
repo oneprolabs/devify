@@ -57,6 +57,14 @@ class SourceSerializer(serializers.ModelSerializer):
 
 
 class SourceImportSerializer(serializers.ModelSerializer):
+    upload_batch_id = serializers.SerializerMethodField()
+
+    def get_upload_batch_id(self, obj):
+        # The relation is owned by UploadBatch, so this is a reverse
+        # one-to-one accessor that raises when no batch was attached.
+        batch = getattr(obj, "upload_batch", None)
+        return batch.pk if batch else None
+
     class Meta:
         model = SourceImport
         fields = (

@@ -3,8 +3,8 @@ import uuid
 from django.conf import settings
 from django.db import models
 
-from spaces.models import Space
 from chat_sources.models import Source
+from spaces.models import Space
 
 
 class UploadBatch(models.Model):
@@ -15,6 +15,11 @@ class UploadBatch(models.Model):
         COMPLETED = "completed", "Completed"
         FAILED = "failed", "Failed"
         CANCELLED = "cancelled", "Cancelled"
+
+    class Trigger(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        MANUAL = "manual", "Manual"
+        UNKNOWN = "unknown", "Unknown"
 
     class SourceType(models.TextChoices):
         WECHAT = "wechat", "WeChat"
@@ -37,8 +42,27 @@ class UploadBatch(models.Model):
         blank=True,
         related_name="upload_batches",
     )
+    # The import run that produced this batch. The relation lives on this side
+    # so chat_ingestion depends on chat_sources instead of both apps pointing
+    # at each other; SourceImport still reaches its batch through the reverse
+    # accessor of the same name.
+    source_import = models.OneToOneField(
+        "chat_sources.SourceImport",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="upload_batch",
+    )
     source_type = models.CharField(max_length=20, choices=SourceType.choices)
     source_account_id = models.CharField(max_length=255, blank=True)
+    # Captured from the desktop client's access token when the upload is
+    # created. Web uploads leave it blank; it is only used to show which
+    # device produced a sync record.
+    device_id = models.CharField(max_length=100, blank=True)
+    # Reported by the desktop client at upload time so a record still shows
+    # its platform when the device row is missing (for example an upload made
+    # before device binding existed).
+    platform = models.CharField(max_length=40, blank=True)
     idempotency_key = models.CharField(max_length=255)
     archive_sha256 = models.CharField(max_length=64, blank=True)
     archive_size = models.PositiveBigIntegerField(null=True, blank=True)
@@ -50,11 +74,16 @@ class UploadBatch(models.Model):
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.CREATED
     )
+    trigger = models.CharField(
+        max_length=20, choices=Trigger.choices, default=Trigger.MANUAL
+    )
     error_message = models.TextField(blank=True)
     message_count = models.PositiveIntegerField(default=0)
     duplicate_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    archive_received_at = models.DateTimeField(null=True, blank=True)
+    parse_started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

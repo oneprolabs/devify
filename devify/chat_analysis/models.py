@@ -35,6 +35,14 @@ class AnalysisJob(models.Model):
         on_delete=models.PROTECT,
         related_name="chat_analysis_jobs",
     )
+    # The upload that triggered this job. Reused jobs (same conversation
+    # digest uploaded again) can be linked to more than one batch, which is
+    # why this is many-to-many.
+    upload_batches = models.ManyToManyField(
+        "chat_ingestion.UploadBatch",
+        related_name="analysis_jobs",
+        blank=True,
+    )
     request_key = models.CharField(max_length=255)
     start_seq = models.PositiveBigIntegerField(default=0)
     end_seq = models.PositiveBigIntegerField()
@@ -365,8 +373,14 @@ class Event(models.Model):
 class EventTag(models.Model):
     """A user-visible label scoped to one space."""
 
-    space = models.ForeignKey(Space, on_delete=models.PROTECT, related_name="chat_event_tags")
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_chat_event_tags")
+    space = models.ForeignKey(
+        Space, on_delete=models.PROTECT, related_name="chat_event_tags"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_chat_event_tags",
+    )
     tag_key = models.CharField(max_length=120)
     label = models.CharField(max_length=120)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -375,7 +389,10 @@ class EventTag(models.Model):
     class Meta:
         ordering = ("label", "id")
         constraints = [
-            models.UniqueConstraint(fields=("space", "tag_key"), name="unique_chat_event_tag_key"),
+            models.UniqueConstraint(
+                fields=("space", "tag_key"),
+                name="unique_chat_event_tag_key",
+            ),
         ]
         indexes = [models.Index(fields=("space", "label"))]
 
@@ -386,21 +403,38 @@ class EventTag(models.Model):
 class EventTagAssignment(models.Model):
     """The current association between an event and a space tag."""
 
-    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="tag_assignments")
-    tag = models.ForeignKey(EventTag, on_delete=models.CASCADE, related_name="event_assignments")
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_event_tag_assignments")
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name="tag_assignments"
+    )
+    tag = models.ForeignKey(
+        EventTag, on_delete=models.CASCADE, related_name="event_assignments"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_event_tag_assignments",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ("id",)
         constraints = [
-            models.UniqueConstraint(fields=("event", "tag"), name="unique_chat_event_tag_assignment"),
+            models.UniqueConstraint(
+                fields=("event", "tag"),
+                name="unique_chat_event_tag_assignment",
+            ),
         ]
         indexes = [models.Index(fields=("tag", "event"))]
 
     def clean(self):
-        if self.event_id and self.tag_id and self.event.space_id != self.tag.space_id:
-            raise ValidationError({"tag": "Tag and event must belong to the same space."})
+        if (
+            self.event_id
+            and self.tag_id
+            and self.event.space_id != self.tag.space_id
+        ):
+            raise ValidationError(
+                {"tag": "Tag and event must belong to the same space."}
+            )
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -660,7 +694,9 @@ class TopicSubscription(models.Model):
         MONTH = "month", "Month"
 
     space = models.ForeignKey(
-        Space, on_delete=models.PROTECT, related_name="chat_topic_subscriptions"
+        Space,
+        on_delete=models.PROTECT,
+        related_name="chat_topic_subscriptions",
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -671,7 +707,9 @@ class TopicSubscription(models.Model):
     instruction = models.TextField()
     filters = models.JSONField(default=dict, blank=True)
     include_open = models.BooleanField(default=True)
-    period = models.CharField(max_length=10, choices=Period.choices, default=Period.WEEK)
+    period = models.CharField(
+        max_length=10, choices=Period.choices, default=Period.WEEK
+    )
     time_local = models.TimeField(null=True, blank=True)
     timezone = models.CharField(max_length=64, default="Asia/Shanghai")
     enabled = models.BooleanField(default=True)
@@ -694,7 +732,6 @@ class TopicSubscription(models.Model):
         ]
 
 
-
 class QuestionAnswer(models.Model):
     """A user's persisted question and the grounded answer returned for it."""
 
@@ -704,14 +741,22 @@ class QuestionAnswer(models.Model):
         FAILED = "failed", "Failed"
 
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    space = models.ForeignKey(Space, on_delete=models.PROTECT, related_name="chat_questions")
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="chat_questions")
+    space = models.ForeignKey(
+        Space, on_delete=models.PROTECT, related_name="chat_questions"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="chat_questions",
+    )
     question = models.CharField(max_length=2000)
     scope = models.JSONField(default=dict, blank=True)
     answer = models.TextField(blank=True)
     citations = models.JSONField(default=list, blank=True)
     usage = models.JSONField(default=dict, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.QUEUED
+    )
     error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -876,14 +921,14 @@ class ReportItemSource(models.Model):
     source_kind = models.CharField(max_length=20, choices=SourceKind.choices)
     event = models.ForeignKey(
         Event,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="report_sources",
     )
     note = models.ForeignKey(
         Note,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="report_sources",

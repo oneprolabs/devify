@@ -78,3 +78,42 @@ def test_parser_task_retries_transient_parser_errors():
             parse_chat_upload_task.run(batch.pk)
 
     retry.assert_called_once()
+
+
+def test_completed_batch_recovers_missing_analysis_once():
+    from chat_analysis.models import AnalysisJob
+    from chat_domain.models import Conversation, Message, MessageOrigin
+    from chat_ingestion.models import UploadItem
+
+    owner = User.objects.create_user(username="task-recover-owner")
+    batch = make_batch(owner, "task-recover-team")
+    batch.status = UploadBatch.Status.COMPLETED
+    batch.message_count = 1
+    batch.save(update_fields=("status", "message_count", "updated_at"))
+    conversation = Conversation.objects.create(
+        space=batch.space,
+        platform="wechat",
+        source_namespace="local",
+        source_conversation_id="recover",
+        identity_key="recover",
+    )
+    message = Message.objects.create(
+        conversation=conversation, message_key="recover", ingest_seq=1
+    )
+    item = UploadItem.objects.create(batch=batch, path="messages")
+    MessageOrigin.objects.create(
+        message=message, upload_item=item, locator_key="1", parser_version="1"
+    )
+
+    with patch(
+        "chat_ingestion.tasks.create_analysis_job",
+        side_effect=RuntimeError("temporarily unavailable"),
+    ):
+        parse_chat_upload_task.run(batch.pk)
+    assert not batch.analysis_jobs.exists()
+    with patch("chat_ingestion.tasks.execute_analysis_job") as execute:
+        parse_chat_upload_task.run(batch.pk)
+        parse_chat_upload_task.run(batch.pk)
+    assert batch.analysis_jobs.count() == 1
+    assert AnalysisJob.objects.filter(upload_batches=batch).count() == 1
+    execute.assert_called_once()

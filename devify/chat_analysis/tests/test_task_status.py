@@ -11,6 +11,7 @@ from chat_analysis.task_status import (
     expire_stale_questions,
     expire_stale_reports,
     recover_expired_analysis_jobs,
+    recover_stale_queued_analysis_jobs,
     sweep_stale_tasks,
 )
 from chat_analysis.tasks import sweep_stale_async_tasks
@@ -185,6 +186,34 @@ def test_sweep_task_redispatches_recovered_jobs():
     dispatch.assert_called_once_with(job.pk)
     assert result["jobs_requeued"] == 1
     assert "requeued_job_ids" not in result
+
+
+def test_stale_queued_job_is_redispatched():
+    owner = User.objects.create_user(username="task-status-queued")
+    space = make_space(owner)
+    job = make_job(owner, space, "queued-stale")
+    AnalysisJob.objects.filter(pk=job.pk).update(
+        updated_at=timezone.now() - timedelta(seconds=3600)
+    )
+
+    with patch(
+        "chat_analysis.tasks.execute_analysis_job_task.delay"
+    ) as dispatch:
+        result = sweep_stale_async_tasks.run()
+
+    dispatch.assert_called_once_with(job.pk)
+    assert result["jobs_requeued"] == 1
+
+
+def test_freshly_queued_job_is_left_for_the_scheduler():
+    owner = User.objects.create_user(username="task-status-fresh")
+    space = make_space(owner)
+    make_job(owner, space, "queued-fresh")
+
+    assert recover_stale_queued_analysis_jobs() == {
+        "requeued": 0,
+        "requeued_job_ids": [],
+    }
 
 
 def test_sweep_counts_are_zero_when_everything_is_terminal():

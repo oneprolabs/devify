@@ -46,6 +46,10 @@
   --c-bad-soft: 251 236 234;
   --c-chip: 241 243 247;
 
+  /* desktop client accent used by client-only hints */
+  --c-client: 163 39 154;
+  --c-client-soft: 251 243 250;
+
   /* neutral ramp backing the legacy gray-* utilities */
   --c-n50: 247 248 250;
   --c-n100: 241 243 247;
@@ -89,6 +93,10 @@
   --c-bad: 217 88 79;
   --c-bad-soft: 52 33 31;
   --c-chip: 26 33 40;
+
+  /* desktop client accent used by client-only hints */
+  --c-client: 224 123 214;
+  --c-client-soft: 42 26 41;
 
   --c-n50: 16 20 26;
   --c-n100: 26 33 40;
@@ -135,4 +143,6 @@
   --bad: rgb(var(--c-bad));
   --bad-soft: rgb(var(--c-bad-soft));
   --chip: rgb(var(--c-chip));
+  --client: rgb(var(--c-client));
+  --client-soft: rgb(var(--c-client-soft));
 }

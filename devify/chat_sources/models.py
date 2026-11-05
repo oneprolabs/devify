@@ -110,13 +110,6 @@ class SourceImport(models.Model):
         on_delete=models.PROTECT,
         related_name="chat_source_imports",
     )
-    upload_batch = models.OneToOneField(
-        "chat_ingestion.UploadBatch",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="source_import",
-    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,

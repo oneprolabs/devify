@@ -212,6 +212,36 @@ describe('SpaceChats', () => {
     expect(image.exists()).toBe(true)
   })
 
+  it('renders an uploaded image inline instead of the placeholder', async () => {
+    spacesApi.getMessages.mockResolvedValue({
+      data: {
+        data: {
+          list: [
+            {
+              ...message,
+              preview: '[图片]',
+              media: [
+                {
+                  id: 8,
+                  kind: 'image',
+                  media_url: '/v1/spaces/3/media/43'
+                }
+              ]
+            }
+          ],
+          pagination: { page: 1 }
+        }
+      }
+    })
+
+    const wrapper = await mountPage()
+
+    const image = wrapper.find('.bub-image')
+    expect(image.exists()).toBe(true)
+    expect(image.attributes('src')).toBe('blob:media')
+    expect(wrapper.find('.bub').exists()).toBe(false)
+  })
+
   it('keeps an honest empty state for the chat summary', async () => {
     const wrapper = await mountPage()
 

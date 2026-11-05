@@ -212,6 +212,55 @@ def test_conversation_and_message_list_expose_readable_previews():
     assert previews == ["第一天消息", "第二天的回复 [图片]"]
 
 
+def test_message_list_includes_media_parts_for_inline_rendering():
+    owner = User.objects.create_user(username="api-list-media-owner")
+    space = make_space(owner, "api-list-media-team")
+    conversation = make_conversation(space, key="list-media")
+    message = Message.objects.create(
+        conversation=conversation,
+        message_key="list-media:1",
+        ingest_seq=1,
+        sender_name="Alice",
+    )
+    batch = UploadBatch.objects.create(
+        space=space,
+        uploaded_by=owner,
+        source_type=UploadBatch.SourceType.WECHAT,
+        idempotency_key="list-media-batch",
+        status=UploadBatch.Status.COMPLETED,
+        archive_sha256="b" * 64,
+    )
+    item = UploadItem.objects.create(
+        batch=batch,
+        path="media/images/photo.png",
+        content_type="image/png",
+        status=UploadItem.Status.ACCEPTED,
+    )
+    part = MessagePart.objects.create(
+        message=message,
+        part_key="image-1",
+        kind=MessagePart.Kind.IMAGE,
+        upload_item=item,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    response = client.get(
+        f"/api/v1/spaces/{space.pk}/conversations/{conversation.pk}/messages"
+    )
+
+    assert response.status_code == 200
+    row = response.data["data"]["list"][0]
+    assert row["preview"] == "[图片]"
+    assert row["media"] == [
+        {
+            "id": part.pk,
+            "kind": "image",
+            "media_url": f"/v1/spaces/{space.pk}/media/{item.pk}",
+        }
+    ]
+
+
 def test_conversation_preview_is_empty_without_messages():
     owner = User.objects.create_user(username="api-preview-empty-owner")
     space = make_space(owner, "api-preview-empty-team")

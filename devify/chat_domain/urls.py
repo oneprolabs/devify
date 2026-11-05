@@ -2,13 +2,12 @@ from django.urls import path
 
 from chat_domain.views import (
     SpaceAvatarAPIView,
-    SpaceMediaAPIView,
     SpaceConversationDetailAPIView,
     SpaceConversationListAPIView,
+    SpaceMediaAPIView,
     SpaceMessageDetailAPIView,
     SpaceMessageListAPIView,
 )
-
 
 urlpatterns = [
     path(

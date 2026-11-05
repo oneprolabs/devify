@@ -322,9 +322,12 @@ class EmailMessageAPIView(BaseAPIView):
 
             # Ordering
             ALLOWED_ORDERING_FIELDS = {
-                "received_at", "-received_at",
-                "created_at", "-created_at",
-                "subject", "-subject",
+                "received_at",
+                "-received_at",
+                "created_at",
+                "-created_at",
+                "subject",
+                "-subject",
             }
             ordering = request.query_params.get("ordering", "-received_at")
             if ordering not in ALLOWED_ORDERING_FIELDS:
@@ -737,9 +740,7 @@ class EmailMessageBatchRetryAPIView(BaseAPIView):
                 message_text = _("Batch retry failed")
                 response_status = status.HTTP_503_SERVICE_UNAVAILABLE
             else:
-                message_text = _(
-                    "Batch retry triggered with partial failures"
-                )
+                message_text = _("Batch retry triggered with partial failures")
                 response_status = status.HTTP_200_OK
 
             return Response(

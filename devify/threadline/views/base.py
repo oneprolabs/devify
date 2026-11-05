@@ -25,9 +25,7 @@ def email_visibility_q(user, prefix=""):
     message belongs to a space, because a removed member would keep reading
     it. Everything space-bound must also pass the current space check.
     """
-    return models.Q(
-        **{f"{prefix}space__isnull": True}
-    ) | models.Q(
+    return models.Q(**{f"{prefix}space__isnull": True}) | models.Q(
         **{
             f"{prefix}space_id__in": (
                 SpacePermissionService.readable_space_ids(user)
@@ -78,9 +76,7 @@ class BaseAPIView(APIView):
             field.name for field in queryset.model._meta.get_fields()
         }
         if "space" in field_names:
-            queryset = queryset.filter(
-                email_visibility_q(self.request.user)
-            )
+            queryset = queryset.filter(email_visibility_q(self.request.user))
         return queryset
 
     def get_object(self, pk):

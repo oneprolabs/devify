@@ -226,8 +226,7 @@ def test_event_notes_include_message_evidence():
     assert len(entries) == 1
     assert entries[0]["evidence"][0]["message_id"] == message.pk
     assert (
-        entries[0]["evidence"][0]["conversation_id"]
-        == message.conversation_id
+        entries[0]["evidence"][0]["conversation_id"] == message.conversation_id
     )
 
 

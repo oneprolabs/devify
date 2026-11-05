@@ -1,10 +1,11 @@
-from django.urls import path
-
 from chat_sources.views import (
     SourceDetailAPIView,
-    SourceVerifyAPIView, SourceStatusAPIView, SourceImportListAPIView,
+    SourceImportListAPIView,
+    SourceStatusAPIView,
+    SourceVerifyAPIView,
     SpaceSourceListCreateAPIView,
 )
+from django.urls import path
 
 urlpatterns = [
     path(

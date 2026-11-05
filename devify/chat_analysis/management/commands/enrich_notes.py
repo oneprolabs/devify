@@ -9,7 +9,8 @@ from chat_analysis.models import Note
 class Command(BaseCommand):
     help = (
         "Run LLM note structuring for existing automatic Notes in one space. "
-        "Use this to backfill events after CHAT_ANALYSIS_LLM_ENABLED is turned on."
+        "Use this to backfill events after CHAT_ANALYSIS_LLM_ENABLED is "
+        "turned on."
     )
 
     def add_arguments(self, parser):
@@ -17,7 +18,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--force",
             action="store_true",
-            help="Re-run notes that already have structured data or suggestions.",
+            help=(
+                "Re-run notes that already have structured data or "
+                "suggestions."
+            ),
         )
         parser.add_argument(
             "--limit",

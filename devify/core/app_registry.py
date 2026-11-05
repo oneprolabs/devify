@@ -51,7 +51,9 @@ class AppRegistry:
             "description": description,
             "order": order,
             "stats": stats,
-            "space_kinds": list(space_kinds) if space_kinds is not None else None,
+            "space_kinds": (
+                list(space_kinds) if space_kinds is not None else None
+            ),
         }
 
     def list_apps(self, user=None, space_kind=None) -> list[dict]:
@@ -70,13 +72,17 @@ class AppRegistry:
             # Legacy account-scoped applications remain available in the
             # personal context, but must never appear as team applications.
             kinds = app["space_kinds"]
-            if space_kind and space_kind not in (kinds if kinds is not None else ["personal"]):
+            if space_kind and space_kind not in (
+                kinds if kinds is not None else ["personal"]
+            ):
                 continue
             entry = {
                 k: v for k, v in app.items() if k not in ("order", "stats")
             }
             # Existing counters are account-scoped, not space-scoped.
-            entry["stats"] = {} if space_kind == "team" else self._read_stats(app, user)
+            entry["stats"] = (
+                {} if space_kind == "team" else self._read_stats(app, user)
+            )
             entries.append(entry)
         return entries
 

@@ -77,9 +77,8 @@ class Command(BaseCommand):
                 merge_events(actor=actor, source=source, target=target)
                 merged += 1
             target.event_key = key
-            target.entity_key = (
-                target.entity_key
-                or entity_from_text(target.title, key)
+            target.entity_key = target.entity_key or entity_from_text(
+                target.title, key
             )
             target.save(
                 update_fields=("event_key", "entity_key", "updated_at")

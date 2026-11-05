@@ -47,6 +47,8 @@ def test_space_member_can_list_upload_batches():
 
 
 def test_list_reports_analysis_outcome():
+    from chat_sources.models import Source
+
     from chat_analysis.models import (
         AnalysisJob,
         Event,
@@ -54,7 +56,6 @@ def test_list_reports_analysis_outcome():
         Note,
     )
     from chat_domain.models import Conversation
-    from chat_sources.models import Source
 
     owner = User.objects.create_user(username="analysis-list-owner")
     space = Space.objects.create(

@@ -31,12 +31,15 @@ def test_personal_space_bootstrap_is_idempotent():
 
     assert first.pk == second.pk
     assert Space.objects.filter(personal_owner=user).count() == 1
-    assert SpaceMembership.objects.filter(
-        space=first,
-        user=user,
-        role=SpaceMembership.Role.OWNER,
-        status=SpaceMembership.Status.ACTIVE,
-    ).count() == 1
+    assert (
+        SpaceMembership.objects.filter(
+            space=first,
+            user=user,
+            role=SpaceMembership.Role.OWNER,
+            status=SpaceMembership.Status.ACTIVE,
+        ).count()
+        == 1
+    )
 
 
 @pytest.mark.django_db
@@ -73,10 +76,13 @@ def test_team_space_creation_creates_owner_and_audit_log_when_enabled():
     assert response.status_code == 201
     space = Space.objects.get(slug="team-space")
     assert response.data["data"]["role"] == SpaceMembership.Role.OWNER
-    assert SpaceMembership.objects.get(
-        space=space,
-        user=user,
-    ).role == SpaceMembership.Role.OWNER
+    assert (
+        SpaceMembership.objects.get(
+            space=space,
+            user=user,
+        ).role
+        == SpaceMembership.Role.OWNER
+    )
     assert SpaceAuditLog.objects.filter(
         space=space,
         action="space.created",
@@ -166,17 +172,13 @@ def test_resource_permission_matrix_requires_takeover_for_global_admin():
 
     assert SpacePermissionService.can_read(member, space)
     assert SpacePermissionService.can_upload(member, space)
-    assert SpacePermissionService.can_delete_resource(
-        member, space, member.pk
-    )
+    assert SpacePermissionService.can_delete_resource(member, space, member.pk)
     assert not SpacePermissionService.can_delete_resource(
         member, space, owner.pk
     )
     assert SpacePermissionService.can_read(guest, space)
     assert not SpacePermissionService.can_upload(guest, space)
-    assert SpacePermissionService.can_delete_resource(
-        owner, space, member.pk
-    )
+    assert SpacePermissionService.can_delete_resource(owner, space, member.pk)
     assert not SpacePermissionService.can_read(admin, space)
 
     SpaceTakeover.objects.create(
@@ -184,9 +186,7 @@ def test_resource_permission_matrix_requires_takeover_for_global_admin():
     )
     assert SpacePermissionService.can_read(admin, space)
     assert SpacePermissionService.can_upload(admin, space)
-    assert SpacePermissionService.can_delete_resource(
-        admin, space, member.pk
-    )
+    assert SpacePermissionService.can_delete_resource(admin, space, member.pk)
 
 
 def test_inactive_space_disallows_upload_and_delete_without_queries():
@@ -230,7 +230,10 @@ def test_member_invitation_and_role_boundaries():
     manager = User.objects.create_user(username="manager")
     invited = User.objects.create_user(username="invited")
     space = Space.objects.create(
-        name="Team", slug="member-team", kind=Space.Kind.TEAM, owner=owner,
+        name="Team",
+        slug="member-team",
+        kind=Space.Kind.TEAM,
+        owner=owner,
     )
     for user, role in ((owner, "owner"), (manager, "maintainer")):
         SpaceMembership.objects.create(space=space, user=user, role=role)
@@ -243,15 +246,21 @@ def test_member_invitation_and_role_boundaries():
     )
     assert response.status_code == 201
     assert client.post(f"{base}/{invited.pk}/accept").status_code == 403
-    assert client.patch(
-        f"{base}/{invited.pk}", {"role": "owner"}, format="json"
-    ).status_code == 403
+    assert (
+        client.patch(
+            f"{base}/{invited.pk}", {"role": "owner"}, format="json"
+        ).status_code
+        == 403
+    )
     assert client.delete(f"{base}/{owner.pk}").status_code == 403
     client.force_authenticate(user=invited)
     assert client.post(f"{base}/{invited.pk}/accept").status_code == 200
-    assert client.post(
-        base, {"user_id": owner.pk, "role": "user"}, format="json"
-    ).status_code == 403
+    assert (
+        client.post(
+            base, {"user_id": owner.pk, "role": "user"}, format="json"
+        ).status_code
+        == 403
+    )
     assert client.delete(f"{base}/{invited.pk}").status_code == 204
     membership = SpaceMembership.objects.get(space=space, user=invited)
     assert membership.status == "removed"
@@ -265,7 +274,10 @@ def test_invitation_limit_excludes_owner_not_inviter():
     manager = User.objects.create_user(username="limit-manager")
     invited = User.objects.create_user(username="limit-invited")
     space = Space.objects.create(
-        name="Team", slug="limit-team", kind=Space.Kind.TEAM, owner=owner,
+        name="Team",
+        slug="limit-team",
+        kind=Space.Kind.TEAM,
+        owner=owner,
     )
     SpaceMembership.objects.create(space=space, user=owner, role="owner")
     SpaceMembership.objects.create(
@@ -276,7 +288,8 @@ def test_invitation_limit_excludes_owner_not_inviter():
     client.force_authenticate(user=manager)
     response = client.post(
         f"/api/v1/spaces/{space.pk}/members",
-        {"user_id": invited.pk, "role": "user"}, format="json",
+        {"user_id": invited.pk, "role": "user"},
+        format="json",
     )
     assert response.status_code == 409
 
@@ -288,22 +301,32 @@ def test_takeover_is_audited_and_does_not_replace_existing_owner():
     other = User.objects.create_user(username="takeover-other")
     admin = User.objects.create_user(username="takeover-admin", is_staff=True)
     space = Space.objects.create(
-        name="Team", slug="takeover-team", kind=Space.Kind.TEAM, owner=owner,
+        name="Team",
+        slug="takeover-team",
+        kind=Space.Kind.TEAM,
+        owner=owner,
     )
     SpaceMembership.objects.create(space=space, user=owner, role="owner")
     client = APIClient()
     url = f"/api/v1/spaces/{space.pk}/takeover"
     client.force_authenticate(user=other)
-    assert client.post(
-        url, {"reason": "recovery"}, format="json"
-    ).status_code == 403
+    assert (
+        client.post(url, {"reason": "recovery"}, format="json").status_code
+        == 403
+    )
     client.force_authenticate(user=admin)
-    assert client.post(
-        url, {"reason": "recovery", "owner_user_id": other.pk}, format="json"
-    ).status_code == 409
-    assert client.post(
-        url, {"reason": "recovery"}, format="json"
-    ).status_code == 201
+    assert (
+        client.post(
+            url,
+            {"reason": "recovery", "owner_user_id": other.pk},
+            format="json",
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(url, {"reason": "recovery"}, format="json").status_code
+        == 201
+    )
     assert SpaceTakeover.objects.filter(
         space=space, admin=admin, active=True
     ).exists()
@@ -357,31 +380,40 @@ def test_space_lifecycle_permissions():
     url = f"/api/v1/spaces/{space.pk}"
 
     client.force_authenticate(user=manager)
-    assert client.patch(
-        url, {"name": "Renamed Team"}, format="json"
-    ).status_code == 200
-    assert client.patch(
-        url, {"status": "archived"}, format="json"
-    ).status_code == 403
+    assert (
+        client.patch(url, {"name": "Renamed Team"}, format="json").status_code
+        == 200
+    )
+    assert (
+        client.patch(url, {"status": "archived"}, format="json").status_code
+        == 403
+    )
     client.force_authenticate(user=member)
-    assert client.patch(
-        url, {"name": "Nope"}, format="json"
-    ).status_code == 403
+    assert (
+        client.patch(url, {"name": "Nope"}, format="json").status_code == 403
+    )
     client.force_authenticate(user=owner)
     response = client.patch(url, {"status": "archived"}, format="json")
     assert response.status_code == 200
     assert response.data["data"]["status"] == "archived"
-    assert client.post(
-        f"/api/v1/spaces/{space.pk}/members",
-        {"user_id": member.pk, "role": "user"},
-        format="json",
-    ).status_code == 409
-    assert client.patch(
-        url, {"status": "active"}, format="json"
-    ).status_code == 200
-    assert SpaceAuditLog.objects.filter(
-        space=space, action="space.updated", actor=owner
-    ).count() == 2
+    assert (
+        client.post(
+            f"/api/v1/spaces/{space.pk}/members",
+            {"user_id": member.pk, "role": "user"},
+            format="json",
+        ).status_code
+        == 409
+    )
+    assert (
+        client.patch(url, {"status": "active"}, format="json").status_code
+        == 200
+    )
+    assert (
+        SpaceAuditLog.objects.filter(
+            space=space, action="space.updated", actor=owner
+        ).count()
+        == 2
+    )
 
 
 @pytest.mark.django_db
@@ -469,12 +501,17 @@ def test_space_email_api_uses_space_membership_not_uploader():
     assert client.get(list_url).status_code == 200
     assert client.get(detail_url).status_code == 200
     assert SpaceAuditLog.objects.filter(
-        actor=admin, space=space, action="email.list_viewed",
+        actor=admin,
+        space=space,
+        action="email.list_viewed",
         metadata__takeover_id=takeover.pk,
     ).exists()
     assert SpaceAuditLog.objects.filter(
-        actor=admin, space=space, action="email.viewed",
-        resource_id=str(email.pk), metadata__takeover_id=takeover.pk,
+        actor=admin,
+        space=space,
+        action="email.viewed",
+        resource_id=str(email.pk),
+        metadata__takeover_id=takeover.pk,
     ).exists()
     takeover.active = False
     takeover.save(update_fields=("active",))
@@ -622,9 +659,10 @@ def test_only_owner_can_transfer_team_ownership():
     client = APIClient()
     url = f"/api/v1/spaces/{space.pk}/ownership"
     client.force_authenticate(user=manager)
-    assert client.post(
-        url, {"user_id": member.pk}, format="json"
-    ).status_code == 403
+    assert (
+        client.post(url, {"user_id": member.pk}, format="json").status_code
+        == 403
+    )
     client.force_authenticate(user=owner)
 
     response = client.post(url, {"user_id": member.pk}, format="json")
@@ -677,70 +715,147 @@ def test_new_email_resources_default_to_the_users_personal_space():
     assert email.space_id == space.id
     assert attachment.space_id == space.id
 
+
 @pytest.mark.django_db
 def test_space_workflow_config_is_readable_and_owner_only_writable():
     owner = User.objects.create_user(username="workflow-owner")
     member = User.objects.create_user(username="workflow-member")
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    SpaceMembership.objects.create(space=space, user=member, role=SpaceMembership.Role.USER, status=SpaceMembership.Status.ACTIVE)
+    SpaceMembership.objects.create(
+        space=space,
+        user=member,
+        role=SpaceMembership.Role.USER,
+        status=SpaceMembership.Status.ACTIVE,
+    )
     client = APIClient()
     client.force_authenticate(user=member)
-    assert client.get(f"/api/v1/spaces/{space.pk}/workflow-config").status_code == 200
-    assert client.patch(f"/api/v1/spaces/{space.pk}/workflow-config", {"language": "en-US"}, format="json").status_code == 403
+    assert (
+        client.get(f"/api/v1/spaces/{space.pk}/workflow-config").status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            f"/api/v1/spaces/{space.pk}/workflow-config",
+            {"language": "en-US"},
+            format="json",
+        ).status_code
+        == 403
+    )
     client.force_authenticate(user=owner)
-    updated = client.patch(f"/api/v1/spaces/{space.pk}/workflow-config", {"language": "en-US", "processing_paused": True}, format="json")
+    updated = client.patch(
+        f"/api/v1/spaces/{space.pk}/workflow-config",
+        {"language": "en-US", "processing_paused": True},
+        format="json",
+    )
     assert updated.status_code == 200
     assert updated.data["data"]["version"] == 2
     assert updated.data["data"]["processing_paused"] is True
+
 
 @pytest.mark.django_db
 def test_space_audit_logs_are_visible_to_members():
     owner = User.objects.create_user(username="audit-owner")
     member = User.objects.create_user(username="audit-member")
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    SpaceMembership.objects.create(space=space, user=member, role=SpaceMembership.Role.USER, status=SpaceMembership.Status.ACTIVE)
-    SpaceAuditLog.objects.create(space=space, actor=owner, action="space.test", resource_type="test", resource_id="1")
+    SpaceMembership.objects.create(
+        space=space,
+        user=member,
+        role=SpaceMembership.Role.USER,
+        status=SpaceMembership.Status.ACTIVE,
+    )
+    SpaceAuditLog.objects.create(
+        space=space,
+        actor=owner,
+        action="space.test",
+        resource_type="test",
+        resource_id="1",
+    )
     client = APIClient()
     client.force_authenticate(user=member)
     response = client.get(f"/api/v1/spaces/{space.pk}/audit-logs")
     assert response.status_code == 200
     assert response.data["data"]["list"][0]["action"] == "space.test"
 
+
 @pytest.mark.django_db
 def test_space_email_source_is_scoped_and_requires_manager_for_write():
     owner = User.objects.create_user(username="email-space-owner")
     member = User.objects.create_user(username="email-space-member")
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    SpaceMembership.objects.create(space=space, user=member, role=SpaceMembership.Role.USER, status=SpaceMembership.Status.ACTIVE)
+    SpaceMembership.objects.create(
+        space=space,
+        user=member,
+        role=SpaceMembership.Role.USER,
+        status=SpaceMembership.Status.ACTIVE,
+    )
     client = APIClient()
     client.force_authenticate(user=member)
-    assert client.get(f"/api/v1/spaces/{space.pk}/email-sources").status_code == 200
-    denied = client.post(f"/api/v1/spaces/{space.pk}/email-sources", {"imap_host": "imap.example.com", "username": "mail@example.com", "password": "secret"}, format="json")
+    assert (
+        client.get(f"/api/v1/spaces/{space.pk}/email-sources").status_code
+        == 200
+    )
+    denied = client.post(
+        f"/api/v1/spaces/{space.pk}/email-sources",
+        {
+            "imap_host": "imap.example.com",
+            "username": "mail@example.com",
+            "password": "secret",
+        },
+        format="json",
+    )
     assert denied.status_code == 403
     client.force_authenticate(user=owner)
-    created = client.post(f"/api/v1/spaces/{space.pk}/email-sources", {"imap_host": "imap.example.com", "username": "mail@example.com", "password": "secret"}, format="json")
+    created = client.post(
+        f"/api/v1/spaces/{space.pk}/email-sources",
+        {
+            "imap_host": "imap.example.com",
+            "username": "mail@example.com",
+            "password": "secret",
+        },
+        format="json",
+    )
     assert created.status_code == 201
     assert created.data["data"]["has_password"] is True
+
 
 @pytest.mark.django_db
 def test_space_quota_is_member_readable_and_manager_writable():
     owner = User.objects.create_user(username="quota-owner")
     member = User.objects.create_user(username="quota-member")
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    SpaceMembership.objects.create(space=space, user=member, role=SpaceMembership.Role.USER, status=SpaceMembership.Status.ACTIVE)
-    client = APIClient(); client.force_authenticate(user=member)
+    SpaceMembership.objects.create(
+        space=space,
+        user=member,
+        role=SpaceMembership.Role.USER,
+        status=SpaceMembership.Status.ACTIVE,
+    )
+    client = APIClient()
+    client.force_authenticate(user=member)
     assert client.get(f"/api/v1/spaces/{space.pk}/quota").status_code == 200
-    assert client.patch(f"/api/v1/spaces/{space.pk}/quota", {"daily_ai_calls": 10}, format="json").status_code == 403
+    assert (
+        client.patch(
+            f"/api/v1/spaces/{space.pk}/quota",
+            {"daily_ai_calls": 10},
+            format="json",
+        ).status_code
+        == 403
+    )
     client.force_authenticate(user=owner)
-    response = client.patch(f"/api/v1/spaces/{space.pk}/quota", {"daily_ai_calls": 10}, format="json")
+    response = client.patch(
+        f"/api/v1/spaces/{space.pk}/quota",
+        {"daily_ai_calls": 10},
+        format="json",
+    )
     assert response.status_code == 200
     assert response.data["data"]["daily_ai_calls"] == 10
+
 
 @pytest.mark.django_db
 def test_space_quota_usage_reports_current_members_storage_and_ai_calls():
     owner = User.objects.create_user(username="quota-usage-owner")
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    client = APIClient(); client.force_authenticate(user=owner)
+    client = APIClient()
+    client.force_authenticate(user=owner)
     response = client.get(f"/api/v1/spaces/{space.pk}/quota/usage")
     assert response.status_code == 200
     assert response.data["data"]["usage"]["member_count"] == 1
@@ -789,7 +904,8 @@ def test_space_quota_usage_counts_conversations_messages_and_media():
         part_key="image-1",
         kind=MessagePart.Kind.IMAGE,
     )
-    client = APIClient(); client.force_authenticate(user=owner)
+    client = APIClient()
+    client.force_authenticate(user=owner)
     response = client.get(f"/api/v1/spaces/{space.pk}/quota/usage")
     assert response.status_code == 200
     usage = response.data["data"]["usage"]
@@ -797,52 +913,129 @@ def test_space_quota_usage_counts_conversations_messages_and_media():
     assert usage["message_count"] == 2
     assert usage["media_count"] == 1
 
+
 @pytest.mark.django_db
 def test_guest_is_read_only_and_staff_requires_takeover_for_space_management():
     owner = User.objects.create_user(username="matrix-owner")
     guest = User.objects.create_user(username="matrix-guest")
     staff = User.objects.create_user(username="matrix-staff", is_staff=True)
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    SpaceMembership.objects.create(space=space, user=guest, role=SpaceMembership.Role.GUEST, status=SpaceMembership.Status.ACTIVE)
-    client = APIClient(); client.force_authenticate(user=guest)
-    assert client.get(f"/api/v1/spaces/{space.pk}/workflow-config").status_code == 200
-    assert client.patch(f"/api/v1/spaces/{space.pk}/workflow-config", {"language": "en"}, format="json").status_code == 403
+    SpaceMembership.objects.create(
+        space=space,
+        user=guest,
+        role=SpaceMembership.Role.GUEST,
+        status=SpaceMembership.Status.ACTIVE,
+    )
+    client = APIClient()
+    client.force_authenticate(user=guest)
+    assert (
+        client.get(f"/api/v1/spaces/{space.pk}/workflow-config").status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            f"/api/v1/spaces/{space.pk}/workflow-config",
+            {"language": "en"},
+            format="json",
+        ).status_code
+        == 403
+    )
     client.force_authenticate(user=staff)
-    assert client.patch(f"/api/v1/spaces/{space.pk}/quota", {"daily_ai_calls": 1}, format="json").status_code == 403
-    takeover = client.post(f"/api/v1/spaces/{space.pk}/takeover", {"reason": "matrix test"}, format="json")
+    assert (
+        client.patch(
+            f"/api/v1/spaces/{space.pk}/quota",
+            {"daily_ai_calls": 1},
+            format="json",
+        ).status_code
+        == 403
+    )
+    takeover = client.post(
+        f"/api/v1/spaces/{space.pk}/takeover",
+        {"reason": "matrix test"},
+        format="json",
+    )
     assert takeover.status_code == 201
-    assert client.patch(f"/api/v1/spaces/{space.pk}/quota", {"daily_ai_calls": 1}, format="json").status_code == 200
+    assert (
+        client.patch(
+            f"/api/v1/spaces/{space.pk}/quota",
+            {"daily_ai_calls": 1},
+            format="json",
+        ).status_code
+        == 200
+    )
+
 
 @pytest.mark.django_db
 def test_space_email_source_can_be_updated_and_disabled_by_manager():
     owner = User.objects.create_user(username="email-detail-owner")
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    client = APIClient(); client.force_authenticate(user=owner)
-    created = client.post(f"/api/v1/spaces/{space.pk}/email-sources", {"imap_host": "imap.example.com", "username": "detail@example.com", "password": "secret"}, format="json")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    created = client.post(
+        f"/api/v1/spaces/{space.pk}/email-sources",
+        {
+            "imap_host": "imap.example.com",
+            "username": "detail@example.com",
+            "password": "secret",
+        },
+        format="json",
+    )
     mailbox_uuid = created.data["data"]["uuid"]
-    updated = client.patch(f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}", {"name": "Main inbox", "enabled": False}, format="json")
+    updated = client.patch(
+        f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}",
+        {"name": "Main inbox", "enabled": False},
+        format="json",
+    )
     assert updated.status_code == 200
     assert updated.data["data"]["enabled"] is False
-    disabled = client.delete(f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}")
+    disabled = client.delete(
+        f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}"
+    )
     assert disabled.status_code == 200
+
 
 @pytest.mark.django_db
 def test_space_email_source_connection_test_uses_space_manager_permission():
     owner = User.objects.create_user(username="email-test-owner")
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    client = APIClient(); client.force_authenticate(user=owner)
-    with patch("threadline.views.email_mailbox.EmailConfigManager.validate_imap_connection", return_value=(True, "")):
-        response = client.post(f"/api/v1/spaces/{space.pk}/email-sources/test", {"imap_host": "imap.example.com", "username": "mail@example.com", "password": "secret"}, format="json")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    with patch(
+        "threadline.views.email_mailbox.EmailConfigManager."
+        "validate_imap_connection",
+        return_value=(True, ""),
+    ):
+        response = client.post(
+            f"/api/v1/spaces/{space.pk}/email-sources/test",
+            {
+                "imap_host": "imap.example.com",
+                "username": "mail@example.com",
+                "password": "secret",
+            },
+            format="json",
+        )
     assert response.status_code == 200
     assert response.data["data"]["success"] is True
 
+
 @pytest.mark.django_db
-def test_space_email_source_sync_reports_not_started_without_faking_execution():
+def test_space_email_source_sync_reports_not_started():
     owner = User.objects.create_user(username="email-sync-owner")
     space = SpaceBootstrapService.ensure_personal_space(owner)
-    client = APIClient(); client.force_authenticate(user=owner)
-    created = client.post(f"/api/v1/spaces/{space.pk}/email-sources", {"imap_host": "imap.example.com", "username": "sync@example.com", "password": "secret"}, format="json")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    created = client.post(
+        f"/api/v1/spaces/{space.pk}/email-sources",
+        {
+            "imap_host": "imap.example.com",
+            "username": "sync@example.com",
+            "password": "secret",
+        },
+        format="json",
+    )
     mailbox_uuid = created.data["data"]["uuid"]
-    response = client.post(f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}/sync")
+    response = client.post(
+        f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}/sync"
+    )
     assert response.status_code == 200
     assert response.data["data"]["status"] == "not_started"

@@ -13,9 +13,9 @@ from chat_analysis.serializers import (
 from chat_analysis.services import (
     ChatAnalysisConflict,
     ChatAnalysisPermissionError,
+    cancel_analysis_job,
     create_analysis_job,
     retry_analysis_job,
-    cancel_analysis_job,
 )
 from chat_analysis.tasks import dispatch_analysis_job
 from chat_domain.models import Conversation
@@ -97,9 +97,7 @@ class SpaceAnalysisJobListCreateAPIView(APIView):
 
     @transaction.atomic
     def post(self, request, space_id):
-        space, takeover = _authorized_space(
-            request.user, space_id, write=True
-        )
+        space, takeover = _authorized_space(request.user, space_id, write=True)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
         serializer = AnalysisJobCreateSerializer(data=request.data)
@@ -110,9 +108,7 @@ class SpaceAnalysisJobListCreateAPIView(APIView):
             space=space,
         ).first()
         if conversation is None:
-            return Response(
-                {"detail": "Conversation not found."}, status=404
-            )
+            return Response({"detail": "Conversation not found."}, status=404)
         try:
             job = create_analysis_job(
                 actor=request.user,
@@ -173,8 +169,13 @@ class AnalysisJobCancelAPIView(APIView):
 
     @transaction.atomic
     def post(self, request, job_id):
-        job = get_object_or_404(AnalysisJob.objects.select_for_update().select_related("space"), pk=job_id)
-        space, takeover = _authorized_space(request.user, job.space_id, write=True)
+        job = get_object_or_404(
+            AnalysisJob.objects.select_for_update().select_related("space"),
+            pk=job_id,
+        )
+        space, takeover = _authorized_space(
+            request.user, job.space_id, write=True
+        )
         if space is None:
             return Response({"detail": "Analysis job not found."}, status=404)
         try:
@@ -183,7 +184,14 @@ class AnalysisJobCancelAPIView(APIView):
             return Response({"detail": str(error)}, status=403)
         except ChatAnalysisConflict as error:
             return Response({"detail": str(error)}, status=409)
-        audit_space_action(actor=request.user, space=space, action="chat.analysis_job_cancelled", resource_type="analysis_job", resource_id=job.pk, metadata={"takeover_id": takeover.pk if takeover else None})
+        audit_space_action(
+            actor=request.user,
+            space=space,
+            action="chat.analysis_job_cancelled",
+            resource_type="analysis_job",
+            resource_id=job.pk,
+            metadata={"takeover_id": takeover.pk if takeover else None},
+        )
         return Response({"data": AnalysisJobSerializer(job).data})
 
 

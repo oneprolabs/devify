@@ -2,7 +2,8 @@
 
 Run from the repository root:
   docker compose -f docker-compose.dev.yml exec -T devify-api bash -lc \
-    'cd /opt/devify && PYTHONPATH=/opt/devify DJANGO_SETTINGS_MODULE=core.settings \
+    'cd /opt/devify && PYTHONPATH=/opt/devify \
+     DJANGO_SETTINGS_MODULE=core.settings \
      /opt/venv/bin/python manage.py shell' < scripts/seed-topic-examples.py
 
 Every row is demo-marked (request_key ``demo:topic:*``, ``filters.demo``,
@@ -10,7 +11,9 @@ Every row is demo-marked (request_key ``demo:topic:*``, ``filters.demo``,
 rows first.
 
 Cleanup:
-  Report.objects.filter(space_id=46, request_key__startswith="demo:topic:").delete()
+  Report.objects.filter(
+    space_id=46, request_key__startswith="demo:topic:"
+  ).delete()
   [t.delete() for t in TopicSubscription.objects.filter(space_id=46)
    if (t.filters or {}).get("demo")]
 """
@@ -85,7 +88,12 @@ def build_report(topic, spec):
             "section_count": len(spec["sections"]),
             "item_count": sum(len(s["items"]) for s in spec["sections"]),
             "event_count": len(
-                {i["event_id"] for s in spec["sections"] for i in s["items"] if i.get("event_id")}
+                {
+                    i["event_id"]
+                    for s in spec["sections"]
+                    for i in s["items"]
+                    if i.get("event_id")
+                }
             ),
             "note_count": 0,
         },

@@ -118,9 +118,7 @@ def _task_definitions() -> list[dict]:
         },
         {
             "name": "threadline-email-task-cleanup",
-            "task": (
-                "threadline.tasks.scheduler.schedule_email_task_cleanup"
-            ),
+            "task": ("threadline.tasks.scheduler.schedule_email_task_cleanup"),
             "module": "threadline",
             "label": "EmailTask cleanup",
             "description": "Delete old EmailTask records from the database.",
@@ -132,9 +130,7 @@ def _task_definitions() -> list[dict]:
         },
         {
             "name": "threadline-share-link-cleanup",
-            "task": (
-                "threadline.tasks.scheduler.schedule_share_link_cleanup"
-            ),
+            "task": ("threadline.tasks.scheduler.schedule_share_link_cleanup"),
             "module": "threadline",
             "label": "Share link cleanup",
             "description": "Delete expired share links.",
@@ -190,11 +186,7 @@ def _update_task(definition: dict, enabled: bool, crontab_value: str) -> None:
     )
     if task is None:
         raise serializers.ValidationError(
-            {
-                "name": (
-                    f"Periodic task does not exist: {definition['name']}"
-                )
-            }
+            {"name": (f"Periodic task does not exist: {definition['name']}")}
         )
 
     schedule = _get_existing_crontab(crontab_value)
@@ -202,11 +194,7 @@ def _update_task(definition: dict, enabled: bool, crontab_value: str) -> None:
         # Only schedules created by ``register_periodic_tasks`` may be used:
         # creating one here would let the admin page drift from the registry.
         raise serializers.ValidationError(
-            {
-                "crontab": (
-                    f"Crontab schedule does not exist: {crontab_value}"
-                )
-            }
+            {"crontab": (f"Crontab schedule does not exist: {crontab_value}")}
         )
 
     task.task = definition["task"]
@@ -301,5 +289,6 @@ class AdminPeriodicTaskSettingsAPIView(APIView):
 
         PeriodicTasks.update_changed()
         return Response(
-            {"tasks": _serialise_tasks()}, status=status.HTTP_200_OK,
+            {"tasks": _serialise_tasks()},
+            status=status.HTTP_200_OK,
         )

@@ -1,9 +1,9 @@
 import uuid
 
+from chat_sources.models import Source
 from django.conf import settings
 from django.db import models
 
-from chat_sources.models import Source
 from spaces.models import Space
 
 

@@ -81,9 +81,7 @@ def transition_batch(batch, status, *, error_message=None, save=True):
     """Move a batch to ``status``, enforcing the upload state machine."""
 
     if status == batch.status:
-        raise UploadTransitionError(
-            f"Upload already in status '{status}'."
-        )
+        raise UploadTransitionError(f"Upload already in status '{status}'.")
     if status not in ALLOWED_TRANSITIONS.get(batch.status, frozenset()):
         raise UploadTransitionError(
             f"Cannot move upload from '{batch.status}' to '{status}'."

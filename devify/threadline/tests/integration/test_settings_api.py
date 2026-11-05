@@ -4,14 +4,12 @@ Tests for Settings API endpoints
 This module contains comprehensive tests for the Settings API CRUD operations.
 """
 
-from unittest.mock import Mock, patch
-
 import pytest
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from threadline.models import Settings
+
 from ..fixtures.factories import SettingsFactory, UserFactory
 from ..fixtures.payloads import build_settings_payload
 
@@ -76,7 +74,7 @@ class TestSettingsAPI:
 
         # Create another user with settings
         other_user = UserFactory()
-        other_setting = SettingsFactory(user=other_user)
+        SettingsFactory(user=other_user)
 
         url = reverse("settings-list")
         response = authenticated_api_client.get(url)
@@ -495,9 +493,15 @@ class TestSettingsAPI:
         response = authenticated_api_client.post(url, payload, format="json")
 
         assert response.status_code == status.HTTP_201_CREATED
-        assert response.data["data"]["value"]["auto_merge_strategy"] == "update"
-        assert response.data["data"]["value"]["manual_merge_strategy"] == "linked"
-        assert response.data["data"]["value"]["retry_issue_strategy"] == "update"
+        assert (
+            response.data["data"]["value"]["auto_merge_strategy"] == "update"
+        )
+        assert (
+            response.data["data"]["value"]["manual_merge_strategy"] == "linked"
+        )
+        assert (
+            response.data["data"]["value"]["retry_issue_strategy"] == "update"
+        )
 
         detail_url = reverse(
             "settings-detail", kwargs={"pk": response.data["data"]["id"]}
@@ -505,4 +509,7 @@ class TestSettingsAPI:
         detail_response = authenticated_api_client.get(detail_url)
 
         assert detail_response.status_code == status.HTTP_200_OK
-        assert detail_response.data["data"]["value"]["retry_issue_strategy"] == "update"
+        assert (
+            detail_response.data["data"]["value"]["retry_issue_strategy"]
+            == "update"
+        )

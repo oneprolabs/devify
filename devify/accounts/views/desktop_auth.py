@@ -91,7 +91,9 @@ class DesktopConfigAPIView(APIView):
                     "token_path": "/api/v1/auth/desktop/token",
                     "redirect_uri": REDIRECT_URI,
                     "capabilities": [
-                        "spaces", "chat_upload", "analysis_status"
+                        "spaces",
+                        "chat_upload",
+                        "analysis_status",
                     ],
                 }
             }

@@ -109,9 +109,7 @@ class Command(BaseCommand):
                     language,
                 )
             except Exception:
-                logger.exception(
-                    "Event rebuild failed for note %s", note.pk
-                )
+                logger.exception("Event rebuild failed for note %s", note.pk)
                 failed += 1
                 continue
             if not ok:

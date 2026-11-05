@@ -1,3 +1,5 @@
+from chat_sources.models import SourceImport
+from chat_sources.services import get_or_create_upload_source
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
@@ -33,8 +35,6 @@ from chat_ingestion.tasks import (
     dispatch_parse_chat_upload,
     parse_chat_upload_task,
 )
-from chat_sources.models import SourceImport
-from chat_sources.services import get_or_create_upload_source
 from spaces.models import Space, SpaceTakeover
 from spaces.services import (
     SpacePermissionService,
@@ -158,9 +158,7 @@ def _analysis_summaries(batches):
         for batch_id in batch_ids
     }
     job_batches = {}
-    rows = AnalysisJob.objects.filter(
-        upload_batches__id__in=batch_ids
-    ).values(
+    rows = AnalysisJob.objects.filter(upload_batches__id__in=batch_ids).values(
         "id",
         "state",
         "attempts",
@@ -195,22 +193,18 @@ def _analysis_summaries(batches):
             .distinct()
         )
         for row in event_rows:
-            for batch_id in job_batches.get(
-                row["note__analysis_job_id"], ()
-            ):
+            for batch_id in job_batches.get(row["note__analysis_job_id"], ()):
                 events_by_batch[batch_id].add(row["event_id"])
 
     result = {}
     for batch_id, summary in summaries.items():
         states = summary["states"]
         running = any(
-            state
-            in (AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING)
+            state in (AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING)
             for state in states
         )
         failed = any(
-            state
-            in (AnalysisJob.State.FAILED, AnalysisJob.State.CANCELLED)
+            state in (AnalysisJob.State.FAILED, AnalysisJob.State.CANCELLED)
             for state in states
         )
         partial = any(state == AnalysisJob.State.PARTIAL for state in states)

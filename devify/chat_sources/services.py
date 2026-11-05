@@ -1,7 +1,7 @@
-from django.db import transaction
-
 from chat_sources.adapters import capabilities_for
 from chat_sources.models import Source
+from django.db import transaction
+
 from spaces.services import SpacePermissionService, audit_space_action
 
 

@@ -156,9 +156,7 @@ def test_upload_registers_its_device_and_platform():
     assert response.status_code == 201
     assert response.data["data"]["device_id"] == "upload-device-1"
     assert response.data["data"]["platform"] == "macos"
-    device = DesktopDevice.objects.get(
-        user=owner, device_id="upload-device-1"
-    )
+    device = DesktopDevice.objects.get(user=owner, device_id="upload-device-1")
     assert device.platform == "macos"
     assert device.label == "MacBook Pro"
 

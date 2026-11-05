@@ -135,13 +135,28 @@ def retry_analysis_job(*, actor, job):
 def cancel_analysis_job(*, actor, job):
     ensure_can_contribute(actor, job.space)
     locked = AnalysisJob.objects.select_for_update().get(pk=job.pk)
-    if locked.state in (AnalysisJob.State.READY, AnalysisJob.State.PARTIAL, AnalysisJob.State.FAILED, AnalysisJob.State.CANCELLED):
-        raise ChatAnalysisConflict("Only queued or running analysis jobs can be cancelled.")
+    if locked.state in (
+        AnalysisJob.State.READY,
+        AnalysisJob.State.PARTIAL,
+        AnalysisJob.State.FAILED,
+        AnalysisJob.State.CANCELLED,
+    ):
+        raise ChatAnalysisConflict(
+            "Only queued or running analysis jobs can be cancelled."
+        )
     locked.state = AnalysisJob.State.CANCELLED
     locked.lease_owner = ""
     locked.lease_until = None
     locked.error = "Cancelled by user."
-    locked.save(update_fields=("state", "lease_owner", "lease_until", "error", "updated_at"))
+    locked.save(
+        update_fields=(
+            "state",
+            "lease_owner",
+            "lease_until",
+            "error",
+            "updated_at",
+        )
+    )
     return locked
 
 

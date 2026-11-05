@@ -18,8 +18,6 @@ from rest_framework.views import APIView
 
 from chat_analysis.models import Event
 from chat_domain.avatars import avatar_path
-from chat_ingestion.models import UploadItem
-from chat_ingestion.services import archive_path
 from chat_domain.models import (
     Conversation,
     ConversationAvatar,
@@ -33,6 +31,8 @@ from chat_domain.serializers import (
     MessageDetailSerializer,
     MessageListSerializer,
 )
+from chat_ingestion.models import UploadItem
+from chat_ingestion.services import archive_path
 from spaces.models import Space, SpaceTakeover
 from spaces.services import SpacePermissionService, audit_space_action
 
@@ -187,13 +187,16 @@ class SpaceConversationListAPIView(APIView):
                 {"detail": "filter must be all or pending."},
                 status=400,
             )
-        conversations = _annotate_conversation_counts(conversations).order_by(
-            "-last_message_at", "-id"
-        ).select_related("avatar").annotate(
-            latest_message_id=Subquery(
-                Message.objects.filter(conversation=OuterRef("pk"))
-                .order_by("-ingest_seq", "-id")
-                .values("id")[:1]
+        conversations = (
+            _annotate_conversation_counts(conversations)
+            .order_by("-last_message_at", "-id")
+            .select_related("avatar")
+            .annotate(
+                latest_message_id=Subquery(
+                    Message.objects.filter(conversation=OuterRef("pk"))
+                    .order_by("-ingest_seq", "-id")
+                    .values("id")[:1]
+                )
             )
         )
 
@@ -259,7 +262,7 @@ class SpaceConversationDetailAPIView(APIView):
                     conversation,
                     context={
                         "space_id": space.pk,
-                        "latest_messages": _latest_messages([conversation])
+                        "latest_messages": _latest_messages([conversation]),
                     },
                 ).data
             }
@@ -283,9 +286,7 @@ class SpaceMessageListAPIView(APIView):
             .prefetch_related(
                 Prefetch(
                     "parts",
-                    queryset=MessagePart.objects.select_related(
-                        "upload_item"
-                    ),
+                    queryset=MessagePart.objects.select_related("upload_item"),
                 )
             )
             .order_by("ingest_seq", "id")
@@ -352,9 +353,7 @@ class SpaceMessageDetailAPIView(APIView):
             Message.objects.prefetch_related(
                 Prefetch(
                     "parts",
-                    queryset=MessagePart.objects.select_related(
-                        "upload_item"
-                    ),
+                    queryset=MessagePart.objects.select_related("upload_item"),
                 ),
                 "origins",
             ),
@@ -410,7 +409,10 @@ class SpaceMediaAPIView(APIView):
             return Response({"detail": "Media not found."}, status=404)
 
         def stream():
-            with zipfile.ZipFile(archive) as package, package.open(info) as handle:
+            with (
+                zipfile.ZipFile(archive) as package,
+                package.open(info) as handle,
+            ):
                 while True:
                     chunk = handle.read(1024 * 1024)
                     if not chunk:
@@ -418,7 +420,8 @@ class SpaceMediaAPIView(APIView):
                     yield chunk
 
         response = StreamingHttpResponse(
-            stream(), content_type=item.content_type or "application/octet-stream"
+            stream(),
+            content_type=item.content_type or "application/octet-stream",
         )
         response["Content-Length"] = str(info.file_size)
         response["Content-Disposition"] = "inline"
@@ -435,11 +438,12 @@ class SpaceAvatarAPIView(APIView):
         space, _takeover = _authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        avatar = ConversationAvatar.objects.filter(
-            conversation__space=space, sha256=sha256
-        ).first() or SenderAvatar.objects.filter(
-            space=space, sha256=sha256
-        ).first()
+        avatar = (
+            ConversationAvatar.objects.filter(
+                conversation__space=space, sha256=sha256
+            ).first()
+            or SenderAvatar.objects.filter(space=space, sha256=sha256).first()
+        )
         if avatar is None:
             return Response({"detail": "Avatar not found."}, status=404)
         path = avatar_path(sha256)

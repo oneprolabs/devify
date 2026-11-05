@@ -1,6 +1,11 @@
 from rest_framework import serializers
 
-from spaces.models import Space, SpaceMembership, SpaceWorkflowConfig, SpaceQuota
+from spaces.models import (
+    Space,
+    SpaceMembership,
+    SpaceQuota,
+    SpaceWorkflowConfig,
+)
 
 
 class SpaceSerializer(serializers.ModelSerializer):
@@ -64,16 +69,43 @@ class TakeoverSerializer(serializers.Serializer):
 class SpaceWorkflowConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = SpaceWorkflowConfig
-        fields = ("space_id", "text_llm_config_uuid", "image_llm_config_uuid", "language", "scene", "prompt_overrides", "attachment_policy", "auto_process", "processing_paused", "version", "updated_by_id", "created_at", "updated_at")
-        read_only_fields = ("space_id", "version", "updated_by_id", "created_at", "updated_at")
+        fields = (
+            "space_id",
+            "text_llm_config_uuid",
+            "image_llm_config_uuid",
+            "language",
+            "scene",
+            "prompt_overrides",
+            "attachment_policy",
+            "auto_process",
+            "processing_paused",
+            "version",
+            "updated_by_id",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "space_id",
+            "version",
+            "updated_by_id",
+            "created_at",
+            "updated_at",
+        )
+
 
 class SpaceWorkflowConfigUpdateSerializer(serializers.Serializer):
-    text_llm_config_uuid = serializers.UUIDField(required=False, allow_null=True)
-    image_llm_config_uuid = serializers.UUIDField(required=False, allow_null=True)
+    text_llm_config_uuid = serializers.UUIDField(
+        required=False, allow_null=True
+    )
+    image_llm_config_uuid = serializers.UUIDField(
+        required=False, allow_null=True
+    )
     language = serializers.CharField(max_length=32, required=False)
     scene = serializers.CharField(max_length=80, required=False)
     prompt_overrides = serializers.DictField(required=False)
-    attachment_policy = serializers.ChoiceField(choices=("available", "skip", "required"), required=False)
+    attachment_policy = serializers.ChoiceField(
+        choices=("available", "skip", "required"), required=False
+    )
     auto_process = serializers.BooleanField(required=False)
     processing_paused = serializers.BooleanField(required=False)
 
@@ -81,10 +113,30 @@ class SpaceWorkflowConfigUpdateSerializer(serializers.Serializer):
 class SpaceQuotaSerializer(serializers.ModelSerializer):
     class Meta:
         model = SpaceQuota
-        fields = ("space_id", "max_members", "storage_limit_bytes", "daily_ai_calls", "updated_by_id", "created_at", "updated_at")
-        read_only_fields = ("space_id", "updated_by_id", "created_at", "updated_at")
+        fields = (
+            "space_id",
+            "max_members",
+            "storage_limit_bytes",
+            "daily_ai_calls",
+            "updated_by_id",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "space_id",
+            "updated_by_id",
+            "created_at",
+            "updated_at",
+        )
+
 
 class SpaceQuotaUpdateSerializer(serializers.Serializer):
-    max_members = serializers.IntegerField(min_value=0, allow_null=True, required=False)
-    storage_limit_bytes = serializers.IntegerField(min_value=0, allow_null=True, required=False)
-    daily_ai_calls = serializers.IntegerField(min_value=0, allow_null=True, required=False)
+    max_members = serializers.IntegerField(
+        min_value=0, allow_null=True, required=False
+    )
+    storage_limit_bytes = serializers.IntegerField(
+        min_value=0, allow_null=True, required=False
+    )
+    daily_ai_calls = serializers.IntegerField(
+        min_value=0, allow_null=True, required=False
+    )

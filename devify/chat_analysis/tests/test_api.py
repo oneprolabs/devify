@@ -67,9 +67,12 @@ def test_member_can_create_and_query_analysis_job():
     client = APIClient()
     client.force_authenticate(user=member)
 
-    with patch("chat_analysis.views.dispatch_analysis_job") as dispatch, patch(
-        "chat_analysis.views.transaction.on_commit",
-        side_effect=lambda callback: callback(),
+    with (
+        patch("chat_analysis.views.dispatch_analysis_job") as dispatch,
+        patch(
+            "chat_analysis.views.transaction.on_commit",
+            side_effect=lambda callback: callback(),
+        ),
     ):
         response = client.post(
             f"/api/v1/spaces/{space.pk}/analysis-jobs",
@@ -97,9 +100,12 @@ def test_same_request_key_is_idempotent_and_conflicts_on_changed_window():
     client = APIClient()
     client.force_authenticate(user=owner)
 
-    with patch("chat_analysis.views.dispatch_analysis_job"), patch(
-        "chat_analysis.views.transaction.on_commit",
-        side_effect=lambda callback: callback(),
+    with (
+        patch("chat_analysis.views.dispatch_analysis_job"),
+        patch(
+            "chat_analysis.views.transaction.on_commit",
+            side_effect=lambda callback: callback(),
+        ),
     ):
         first = client.post(
             f"/api/v1/spaces/{space.pk}/analysis-jobs",
@@ -132,14 +138,18 @@ def test_non_member_cannot_create_or_read_analysis_job():
     client = APIClient()
     client.force_authenticate(user=outsider)
 
-    assert client.post(
-        f"/api/v1/spaces/{space.pk}/analysis-jobs",
-        payload(conversation),
-        format="json",
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/spaces/{space.pk}/analysis-jobs"
-    ).status_code == 404
+    assert (
+        client.post(
+            f"/api/v1/spaces/{space.pk}/analysis-jobs",
+            payload(conversation),
+            format="json",
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(f"/api/v1/spaces/{space.pk}/analysis-jobs").status_code
+        == 404
+    )
 
 
 def test_failed_job_can_be_retried_by_member():
@@ -158,9 +168,12 @@ def test_failed_job_can_be_retried_by_member():
     )
     client = APIClient()
     client.force_authenticate(user=owner)
-    with patch("chat_analysis.views.dispatch_analysis_job") as dispatch, patch(
-        "chat_analysis.views.transaction.on_commit",
-        side_effect=lambda callback: callback(),
+    with (
+        patch("chat_analysis.views.dispatch_analysis_job") as dispatch,
+        patch(
+            "chat_analysis.views.transaction.on_commit",
+            side_effect=lambda callback: callback(),
+        ),
     ):
         response = client.post(
             f"/api/v1/analysis-jobs/{job.pk}/retry",
@@ -201,8 +214,12 @@ def test_member_can_cancel_queued_analysis_job():
     conversation = make_conversation(space)
     client = APIClient()
     client.force_authenticate(user=owner)
-    with patch("chat_analysis.views.dispatch_analysis_job"), patch(
-        "chat_analysis.views.transaction.on_commit", side_effect=lambda callback: callback()
+    with (
+        patch("chat_analysis.views.dispatch_analysis_job"),
+        patch(
+            "chat_analysis.views.transaction.on_commit",
+            side_effect=lambda callback: callback(),
+        ),
     ):
         created = client.post(
             f"/api/v1/spaces/{space.pk}/analysis-jobs",

@@ -222,9 +222,7 @@ class MessagePart(models.Model):
             ),
         ]
         indexes = [
-            models.Index(
-                fields=("message", "parent_part", "ordinal", "id")
-            ),
+            models.Index(fields=("message", "parent_part", "ordinal", "id")),
             models.Index(fields=("upload_item", "message")),
         ]
 

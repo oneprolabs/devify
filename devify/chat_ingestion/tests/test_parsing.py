@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
+from chat_analysis.models import AnalysisJob, Note
 from chat_domain.models import (
     Conversation,
     ConversationAvatar,
@@ -15,7 +16,6 @@ from chat_domain.models import (
     MessagePart,
     SenderAvatar,
 )
-from chat_analysis.models import AnalysisJob, Note
 from chat_ingestion.models import UploadBatch, UploadItem
 from chat_ingestion.tests.archives import (
     DEFAULT_PARTS,
@@ -719,8 +719,7 @@ def test_complete_stores_conversation_and_sender_avatars(settings):
     ]
     extra = {
         "avatars.jsonl": "".join(
-            json.dumps(record, ensure_ascii=False) + "\n"
-            for record in avatars
+            json.dumps(record, ensure_ascii=False) + "\n" for record in avatars
         ),
         "media/avatars/group.png": group_png,
         "media/avatars/sender.jpg": sender_jpeg,
@@ -803,7 +802,9 @@ def test_voice_transcript_part_is_ingested_without_audio_upload():
         },
         *DEFAULT_PARTS[1:],
     ]
-    batch = start_upload(client, space, "parse-voice", build_archive(parts=parts))
+    batch = start_upload(
+        client, space, "parse-voice", build_archive(parts=parts)
+    )
 
     response = complete(client, batch)
 

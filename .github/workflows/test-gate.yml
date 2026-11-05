@@ -41,7 +41,10 @@ jobs:
           --health-retries=30
     env:
       DJANGO_SETTINGS_MODULE: core.settings
-      DATABASE_URL: mysql://devify:devify@127.0.0.1:3306/devify_ci?charset=utf8mb4
+      # pytest creates its own test_devify_ci database, and the service
+      # image only grants the devify user privileges on devify_ci. Use the
+      # root account so the test database can be created and dropped.
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/devify_ci?charset=utf8mb4
       CELERY_BROKER_URL: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v4

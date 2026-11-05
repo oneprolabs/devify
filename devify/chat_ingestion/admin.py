@@ -6,7 +6,12 @@ from chat_ingestion.models import UploadBatch, UploadItem
 @admin.register(UploadBatch)
 class UploadBatchAdmin(admin.ModelAdmin):
     list_display = (
-        "id", "space", "uploaded_by", "source_type", "status", "created_at"
+        "id",
+        "space",
+        "uploaded_by",
+        "source_type",
+        "status",
+        "created_at",
     )
     list_filter = ("source_type", "status")
     search_fields = ("idempotency_key", "archive_sha256", "source_account_id")

@@ -3,6 +3,7 @@
 import logging
 
 from celery import shared_task
+from chat_sources.models import SourceImport
 from django.conf import settings
 from django.db import models
 from django.shortcuts import get_object_or_404
@@ -16,7 +17,6 @@ from chat_domain.models import Conversation, Message
 from chat_ingestion.models import UploadBatch
 from chat_ingestion.parsing import parse_archive
 from chat_ingestion.services import UploadTransitionError, transition_batch
-from chat_sources.models import SourceImport
 from spaces.services import SpacePermissionService, audit_space_action
 
 logger = logging.getLogger(__name__)

@@ -50,13 +50,10 @@ def build_identity_key(
     if not platform or not namespace:
         raise ValueError("platform and source_namespace are required.")
     if not conversation_id and not scope:
-        raise ValueError(
-            "source_conversation_id or scope_key is required."
-        )
+        raise ValueError("source_conversation_id or scope_key is required.")
     component = conversation_id or f"scope:{scope}"
     key = ":".join(
-        quote(part, safe="")
-        for part in (platform, namespace, component)
+        quote(part, safe="") for part in (platform, namespace, component)
     )
     if len(key) > 700:
         raise ValueError("Conversation identity key is too long.")
@@ -135,12 +132,13 @@ def upsert_conversation(
         defaults["metadata"] = dict(metadata)
 
     try:
-        conversation, created = (
-            Conversation.objects.select_for_update().get_or_create(
-                space=space,
-                identity_key=key,
-                defaults=defaults,
-            )
+        (
+            conversation,
+            created,
+        ) = Conversation.objects.select_for_update().get_or_create(
+            space=space,
+            identity_key=key,
+            defaults=defaults,
         )
     except IntegrityError:
         conversation = Conversation.objects.select_for_update().get(

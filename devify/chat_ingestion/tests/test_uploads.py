@@ -95,6 +95,74 @@ def test_member_can_create_upload_and_repeat_is_idempotent():
     assert UploadBatch.objects.get().archive_sha256 == "a" * 64
 
 
+def test_desktop_upload_records_the_device_from_its_token():
+    from rest_framework_simplejwt.tokens import AccessToken
+
+    from accounts.models import DesktopDevice
+
+    owner = User.objects.create_user(username="upload-device-owner")
+    space = make_team(owner, slug="upload-device-team")
+    device = DesktopDevice.objects.create(
+        user=owner,
+        device_id="mac-device-1",
+        status=DesktopDevice.Status.ACTIVE,
+    )
+    token = AccessToken.for_user(owner)
+    token["device_id"] = device.device_id
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    response = client.post(
+        create_url(space), payload("device-batch"), format="json"
+    )
+
+    assert response.status_code == 201
+    assert response.data["data"]["device_id"] == device.device_id
+
+
+def test_upload_records_its_trigger():
+    owner = User.objects.create_user(username="upload-trigger-owner")
+    space = make_team(owner, slug="upload-trigger-team")
+    client = auth_client(owner)
+
+    response = client.post(
+        create_url(space),
+        {**payload("scheduled-batch"), "trigger": "scheduled"},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.data["data"]["trigger"] == "scheduled"
+
+
+def test_upload_registers_its_device_and_platform():
+    from accounts.models import DesktopDevice
+
+    owner = User.objects.create_user(username="upload-platform-owner")
+    space = make_team(owner, slug="upload-platform-team")
+    client = auth_client(owner)
+
+    response = client.post(
+        create_url(space),
+        {
+            **payload("platform-batch"),
+            "device_id": "upload-device-1",
+            "device_label": "MacBook Pro",
+            "platform": "macos",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.data["data"]["device_id"] == "upload-device-1"
+    assert response.data["data"]["platform"] == "macos"
+    device = DesktopDevice.objects.get(
+        user=owner, device_id="upload-device-1"
+    )
+    assert device.platform == "macos"
+    assert device.label == "MacBook Pro"
+
+
 def test_retry_without_optional_fields_is_not_a_conflict():
     owner = User.objects.create_user(username="upload-minimal-owner")
     space = make_team(owner, slug="upload-minimal-team")
@@ -532,12 +600,15 @@ def test_batch_state_machine_rejects_skipped_steps():
     with pytest.raises(UploadTransitionError):
         transition_batch(batch, UploadBatch.Status.UPLOADING)
 
+
 @patch("chat_ingestion.views._enqueue_parse")
 def test_failed_upload_can_be_retried_and_item_is_readable(enqueue):
     owner = User.objects.create_user(username="upload-retry-owner")
     space = make_team(owner, slug="upload-retry-team")
     client = auth_client(owner)
-    response = client.post(create_url(space), payload("retry-batch"), format="json")
+    response = client.post(
+        create_url(space), payload("retry-batch"), format="json"
+    )
     batch = UploadBatch.objects.get(pk=response.data["data"]["id"])
     batch.status = UploadBatch.Status.FAILED
     batch.error_message = "temporary parser failure"

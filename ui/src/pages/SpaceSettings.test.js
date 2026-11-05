@@ -17,7 +17,8 @@ vi.mock('@/api/auth', () => ({
 vi.mock('@/api/spaces', () => ({
   spacesApi: {
     getWorkflowConfig: vi.fn(),
-    getQuotaUsage: vi.fn()
+    getQuotaUsage: vi.fn(),
+    getUploads: vi.fn()
   }
 }))
 
@@ -71,6 +72,14 @@ describe('SpaceSettings', () => {
         }
       }
     })
+    spacesApi.getUploads.mockResolvedValue({
+      data: {
+        data: {
+          list: [],
+          pagination: { next: null }
+        }
+      }
+    })
   })
 
   it('renders bound devices with platform and presence', async () => {
@@ -104,11 +113,35 @@ describe('SpaceSettings', () => {
     expect(wrapper.text()).toContain('未设置上限')
   })
 
-  it('shows an honest empty state without devices', async () => {
+  it('explains the empty state without devices', async () => {
     authApi.getDesktopDevices.mockResolvedValue({ data: { data: [] } })
     const wrapper = mountPage()
     await flushPromises()
-    expect(wrapper.text()).toContain('还没有绑定设备')
+    expect(wrapper.text()).toContain('还没有登记设备')
+    expect(wrapper.text()).toContain('重启客户端')
+  })
+
+  it('shows the latest client upload when no device is registered', async () => {
+    authApi.getDesktopDevices.mockResolvedValue({ data: { data: [] } })
+    spacesApi.getUploads.mockResolvedValue({
+      data: {
+        data: {
+          list: [
+            {
+              id: 22,
+              created_at: '2026-11-03T08:35:00Z',
+              platform: 'macos',
+              source_provider: 'tauri_upload'
+            }
+          ],
+          pagination: { next: null }
+        }
+      }
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('已检测到')
+    expect(wrapper.text()).toContain('macOS')
   })
 
   it('revokes a device after confirmation', async () => {
@@ -119,7 +152,7 @@ describe('SpaceSettings', () => {
     authApi.revokeDesktopDevice.mockResolvedValue({ status: 204 })
     const wrapper = mountPage()
     await flushPromises()
-    await wrapper.find('.revoke-button').trigger('click')
+    await wrapper.find('.revoke').trigger('click')
     await flushPromises()
     expect(authApi.revokeDesktopDevice).toHaveBeenCalledWith(device.device_id)
     expect(wrapper.text()).not.toContain('MacBook Pro · 工作')

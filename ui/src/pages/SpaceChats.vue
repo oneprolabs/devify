@@ -390,14 +390,30 @@
                               {{ formatClock(message.occurred_at) }}
                             </time>
                           </div>
+                          <div
+                            v-if="imageParts(message).length"
+                            class="bub-media"
+                          >
+                            <img
+                              v-for="part in imageParts(message)"
+                              v-show="resolveMedia(part.media_url)"
+                              :key="part.id"
+                              :src="resolveMedia(part.media_url)"
+                              alt="图片"
+                              class="bub-image"
+                              loading="lazy"
+                              @click="toggleMessage(message)"
+                            />
+                          </div>
                           <button
+                            v-if="bubbleText(message)"
                             type="button"
                             class="bub"
                             :class="{ me: message.direction === 'outgoing' }"
                             :aria-expanded="expandedMessageId === message.id"
                             @click="toggleMessage(message)"
                           >
-                            {{ message.preview || '（无正文）' }}
+                            {{ bubbleText(message) }}
                           </button>
                           <div
                             v-if="
@@ -511,6 +527,18 @@ const props = defineProps({
 const route = useRoute()
 const { resolve: resolveAvatar } = useAvatars()
 const { resolve: resolveMedia } = useChatMedia()
+
+const MEDIA_PLACEHOLDERS = /\[(图片|视频|语音|文件)\]/g
+const imageParts = (message) =>
+  (message.media || []).filter(
+    (part) => part.kind === 'image' && part.media_url
+  )
+// Show the picture instead of the "[图片]" placeholder; keep any real text.
+const bubbleText = (message) => {
+  const text = message.preview || ''
+  if (!imageParts(message).length) return text || '（无正文）'
+  return text.replace(MEDIA_PLACEHOLDERS, '').trim()
+}
 
 const conversations = ref([])
 const conversationsTotal = ref(0)
@@ -1515,6 +1543,21 @@ onMounted(loadConversations)
 .bub.me {
   background: rgb(var(--c-ac-soft));
   color: rgb(var(--c-tx));
+}
+.bub-media {
+  display: flex;
+  max-width: 560px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bub-image {
+  display: block;
+  max-width: min(320px, 100%);
+  max-height: 320px;
+  border-radius: 8px;
+  background: rgb(var(--c-chip));
+  cursor: zoom-in;
+  object-fit: contain;
 }
 .msg.is-open .bub {
   box-shadow: inset 0 0 0 1px rgb(var(--c-ac));

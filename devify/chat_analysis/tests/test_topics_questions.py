@@ -1,9 +1,12 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework.test import APIClient
 
+from chat_analysis import topic_services
 from chat_analysis.models import (
     Event,
     EventNote,
@@ -312,3 +315,113 @@ def test_question_context_applies_keyword_tag_and_relation_filters():
         item["id"] for item in by_keyword["events"]
     }
     assert unrelated_event.pk not in {item["id"] for item in by_keyword["events"]}
+
+
+def test_question_context_clips_notes_to_character_budget(monkeypatch):
+    owner = User.objects.create_user(username="context-budget-owner")
+    space = make_space(owner, "context-budget-team")
+    monkeypatch.setattr(topic_services, "DEFAULT_CONTEXT_CHAR_BUDGET", 4000)
+    start = timezone.now() - timedelta(days=1)
+    notes = [
+        Note.objects.create(
+            space=space,
+            created_by=owner,
+            note_key=f"big-note-{index}",
+            title=f"第 {index} 条",
+            content="报价" * 2500,
+            start_at=start + timedelta(minutes=index),
+        )
+        for index in range(30)
+    ]
+
+    context = question_context(space=space)
+
+    note_budget = int(4000 * topic_services.NOTE_BUDGET_SHARE)
+    kept_chars = sum(len(note["content"]) for note in context["notes"])
+    assert kept_chars <= note_budget
+    assert all(
+        len(note["content"]) <= topic_services.DEFAULT_CONTEXT_ITEM_CHARS
+        for note in context["notes"]
+    )
+    kept_ids = [note["id"] for note in context["notes"]]
+    assert kept_ids[0] == notes[-1].pk
+    assert notes[0].pk not in kept_ids
+    assert len(kept_ids) < len(notes)
+    assert context["scope"]["context_truncated"] is True
+
+
+def test_question_context_keeps_events_and_messages_when_notes_are_large(
+    monkeypatch,
+):
+    owner = User.objects.create_user(username="context-mix-owner")
+    space = make_space(owner, "context-mix-team")
+    monkeypatch.setattr(topic_services, "DEFAULT_CONTEXT_CHAR_BUDGET", 4000)
+    conversation = Conversation.objects.create(
+        space=space,
+        platform=Conversation.Platform.WECHAT,
+        source_namespace="test",
+        source_conversation_id="budget-group",
+        identity_key=f"wechat:test:budget-group-{space.pk}",
+    )
+    message = Message.objects.create(
+        conversation=conversation,
+        message_key="budget-message",
+        ingest_seq=1,
+        sender_name="Alice",
+    )
+    MessagePart.objects.create(
+        message=message,
+        part_key="budget-part",
+        kind=MessagePart.Kind.TEXT,
+        text="明天确认报价",
+    )
+    start = timezone.now() - timedelta(days=1)
+    notes = [
+        Note.objects.create(
+            space=space,
+            created_by=owner,
+            note_key=f"mixed-note-{index}",
+            title=f"第 {index} 条",
+            content="报价细节" * 2000,
+            start_at=start + timedelta(minutes=index),
+        )
+        for index in range(12)
+    ]
+    NoteEvidence.objects.create(
+        note=notes[-1],
+        message=message,
+        reference_key=NoteEvidence.build_reference_key(message.pk),
+    )
+    for index in range(3):
+        Event.objects.create(
+            space=space,
+            created_by=owner,
+            event_key=f"mixed-event-{index}",
+            title=f"事件 {index}",
+            content="等待客户回复",
+            status=Event.Status.OPEN,
+        )
+
+    context = question_context(space=space)
+
+    assert [event["title"] for event in context["events"]] == [
+        "事件 2",
+        "事件 1",
+        "事件 0",
+    ]
+    assert [item["id"] for item in context["messages"]] == [message.pk]
+    assert context["messages"][0]["conversation_id"] == conversation.pk
+    assert context["messages"][0]["parts"] == ["明天确认报价"]
+
+
+def test_question_context_reports_message_row_limit():
+    owner = User.objects.create_user(username="question-row-limit")
+    space = make_space(owner, "question-row-limit")
+    conversation = Conversation.objects.create(space=space, platform="wechat", source_namespace="local", source_conversation_id="row-limit", identity_key="row-limit")
+    for i in range(100):
+        Message.objects.create(conversation=conversation, message_key=f"row-{i}", ingest_seq=i + 1)
+    assert question_context(space=space)["scope"]["context_truncated"] is False
+    Message.objects.create(conversation=conversation, message_key="row-100", ingest_seq=101)
+    context = question_context(space=space)
+    assert len(context["messages"]) == 100
+    assert context["scope"]["context_truncated"] is True

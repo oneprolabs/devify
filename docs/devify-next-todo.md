@@ -246,3 +246,9 @@
 6. **生成物和未提交工作树较多：**合并前要区分源码、迁移、测试、fixture、demo 数据和本地归档，避免把运行产物或隐私样本发布到仓库/镜像。
 7. **时区语义已定（2026-11-03）：**统一使用绝对时间戳——`occurred_at` 必须带偏移，服务端换算成 UTC 存储，客户端按用户本地时区渲染；无偏移值直接 422，不再回退 manifest 或服务端时区。实现见 `chat_ingestion/package.py::parse_occurred_at` 与 `test_naive_timestamp_is_rejected_whatever_the_manifest_says`。
 8. **包契约对空容器过于宽松（已修）：**`manifest.scope`/`counts` 传空数组时原来会被 `or {}` 静默转成空对象；现在只接受 `object` 或省略，其他类型直接拒绝。
+
+## R7 结论级证据（未实现）
+
+现状：证据关联到整块分析 chunk。
+缺陷：用户无法定位支持某个结论的具体消息。
+建议：LLM 结构化输出返回消息 ID；Note 保存结论与证据的映射；抽屉按结论展开对应消息。

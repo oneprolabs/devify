@@ -60,6 +60,7 @@ def _enqueue_analysis_for_batch(batch):
                 space=batch.space, request_key=request_key
             ).first()
             if existing is not None:
+                existing.upload_batches.add(batch)
                 duplicates += 1
                 if existing.state in (
                     AnalysisJob.State.FAILED,
@@ -86,6 +87,7 @@ def _enqueue_analysis_for_batch(batch):
                 end_seq=bounds["max_seq"],
                 input_version=f"{batch.source_type}.v1",
             )
+            job.upload_batches.add(batch)
             if getattr(settings, "CHAT_UPLOAD_ANALYSIS_INLINE", False):
                 execute_analysis_job(
                     job.pk,
@@ -112,10 +114,12 @@ def parse_chat_upload_task(self, batch_id):
         pk=batch_id,
     )
     if batch.status == UploadBatch.Status.COMPLETED:
+        if not AnalysisJob.objects.filter(upload_batches=batch).exists():
+            _enqueue_analysis_for_batch(batch)
         return {"batch_id": batch.pk, "status": batch.status}
     if batch.status != UploadBatch.Status.PROCESSING:
         return {"batch_id": batch.pk, "status": batch.status}
-    source_import = SourceImport.objects.filter(upload_batch=batch).first()
+    source_import = getattr(batch, "source_import", None)
     if source_import:
         source_import.status = SourceImport.Status.RUNNING
         source_import.started_at = source_import.started_at or timezone.now()

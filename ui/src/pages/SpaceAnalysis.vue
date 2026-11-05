@@ -3,62 +3,74 @@
     <div class="analysis-page">
       <div v-if="error" class="ws-alert" role="alert">{{ error }}</div>
 
-      <AskWorkspace
-        v-if="route.query.panel === 'ask'"
-        :space-id="spaceId"
-        :initial-question="String(route.query.q || '')"
-        @select-citation="selectCitation"
-      />
-      <EventWorkspace
-        v-else-if="activeTab === 'events'"
-        :space-id="spaceId"
-        :events="items.events"
-        :selected="selected"
-        :loading="loading"
-        :detail-loading="detailLoading"
-        :has-more="eventsHaveMore"
-        :loading-more="eventsLoadingMore"
-        :can-edit="canManage"
-        :can-create="canCreate"
-        @select="selectItem"
-        @refresh="loadActive"
-        @show-notes="openNotes"
-        @edit="openEditForm"
-        @create="openCreateForm"
-        @ask="askAboutEvent"
-        @load-more="loadMoreEvents"
-        @select-citation="selectCitation"
-      />
-      <NoteWorkspace
-        v-else-if="activeTab === 'notes'"
-        :space-id="spaceId"
-        :notes="items.notes"
-        :selected="selected"
-        :loading="loading"
-        :detail-loading="detailLoading"
-        :can-create="canCreate"
-        :can-edit="canManage"
-        @select="selectItem"
-        @create="openCreateForm"
-        @edit="openEditForm"
-        @add-evidence="addEvidence"
-        @open-event="openEvent"
-        @open-message="selectCitation"
-        @back-events="backToEvents"
-      />
-      <ReportWorkspace
-        v-else
-        :space-id="spaceId"
-        :reports="items.reports"
-        :selected="selected"
-        :loading="loading"
-        :detail-loading="detailLoading"
-        :can-create="canCreate"
-        @select="selectItem"
-        @refresh="loadActive"
-        @create="openCreateForm"
-        @open-citation="selectCitation"
-      />
+      <div class="analysis-body">
+        <div class="analysis-main">
+          <AskWorkspace
+            v-if="route.query.panel === 'ask'"
+            :space-id="spaceId"
+            :initial-question="String(route.query.q || '')"
+            @select-citation="openEvidence"
+          />
+          <EventWorkspace
+            v-else-if="activeTab === 'events'"
+            :space-id="spaceId"
+            :events="items.events"
+            :selected="selected"
+            :loading="loading"
+            :detail-loading="detailLoading"
+            :has-more="eventsHaveMore"
+            :loading-more="eventsLoadingMore"
+            :can-edit="canManage"
+            :can-create="canCreate"
+            @select="selectItem"
+            @refresh="loadActive"
+            @show-notes="openNotes"
+            @edit="openEditForm"
+            @create="openCreateForm"
+            @ask="askAboutEvent"
+            @load-more="loadMoreEvents"
+            @select-citation="openEvidence"
+          />
+          <NoteWorkspace
+            v-else-if="activeTab === 'notes'"
+            :space-id="spaceId"
+            :notes="items.notes"
+            :selected="selected"
+            :loading="loading"
+            :detail-loading="detailLoading"
+            :can-create="canCreate"
+            :can-edit="canManage"
+            @select="selectItem"
+            @create="openCreateForm"
+            @edit="openEditForm"
+            @add-evidence="addEvidence"
+            @open-event="openEventEvidence"
+            @open-message="openEvidence"
+            @back-events="backToEvents"
+          />
+          <ReportWorkspace
+            v-else
+            :space-id="spaceId"
+            :reports="items.reports"
+            :selected="selected"
+            :loading="loading"
+            :detail-loading="detailLoading"
+            :can-create="canCreate"
+            @select="selectItem"
+            @refresh="loadActive"
+            @create="openCreateForm"
+            @open-citation="openEvidence"
+          />
+        </div>
+        <EvidenceDrawer
+          v-if="evidence"
+          :space-id="spaceId"
+          :target="evidence"
+          @close="closeEvidence"
+          @navigate="openEvidence"
+          @open-detail="openEvidenceDetail"
+        />
+      </div>
 
       <div v-if="formOpen" class="ws-modal-backdrop" @click.self="closeForm">
         <form class="ws-modal" @submit.prevent="submitForm">
@@ -95,11 +107,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import AskWorkspace from '@/components/spaces/AskWorkspace.vue'
+import EvidenceDrawer from '@/components/spaces/EvidenceDrawer.vue'
 import EventWorkspace from '@/components/spaces/EventWorkspace.vue'
 import NoteWorkspace from '@/components/spaces/NoteWorkspace.vue'
 import ReportWorkspace from '@/components/spaces/ReportWorkspace.vue'
@@ -241,7 +254,25 @@ const selectItem = async (item) => {
   }
 }
 
-const selectCitation = async (citation) => {
+const evidence = ref(null)
+let evidenceTrigger = null
+const openEvidence = (citation) => {
+  if (!citation) return
+  evidenceTrigger = document.activeElement
+  evidence.value = { ...citation }
+}
+const closeEvidence = async () => {
+  evidence.value = null
+  await nextTick()
+  evidenceTrigger?.focus?.()
+  evidenceTrigger = null
+}
+const openEventEvidence = (eventId) => {
+  openEvidence({ kind: 'event', id: eventId })
+}
+const openEvidenceDetail = async (citation) => {
+  await closeEvidence()
+  if (!citation) return
   if (citation.kind === 'event') {
     await router.push({
       path: `/spaces/${props.spaceId}/analysis`,
@@ -257,12 +288,6 @@ const selectCitation = async (citation) => {
       `/spaces/${props.spaceId}/chats?conversation_id=${citation.conversation_id || ''}&message_id=${citation.id}`
     )
   }
-}
-const openEvent = async (eventId) => {
-  await router.push({
-    path: `/spaces/${props.spaceId}/analysis`,
-    query: { event: eventId }
-  })
 }
 const openNotes = () => {
   activeTab.value = 'notes'
@@ -415,5 +440,17 @@ onMounted(async () => {
   flex-direction: column;
   background: rgb(var(--c-bg));
   color: rgb(var(--c-tx));
+}
+.analysis-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+.analysis-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
 }
 </style>

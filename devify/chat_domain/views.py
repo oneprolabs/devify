@@ -1,6 +1,13 @@
 import zipfile
 
-from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
+from django.db.models import (
+    Count,
+    IntegerField,
+    OuterRef,
+    Prefetch,
+    Q,
+    Subquery,
+)
 from django.db.models.functions import Coalesce
 from django.http import FileResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
@@ -17,6 +24,7 @@ from chat_domain.models import (
     Conversation,
     ConversationAvatar,
     Message,
+    MessagePart,
     SenderAvatar,
 )
 from chat_domain.serializers import (
@@ -272,7 +280,14 @@ class SpaceMessageListAPIView(APIView):
         )
         messages = (
             Message.objects.filter(conversation=conversation)
-            .prefetch_related("parts")
+            .prefetch_related(
+                Prefetch(
+                    "parts",
+                    queryset=MessagePart.objects.select_related(
+                        "upload_item"
+                    ),
+                )
+            )
             .order_by("ingest_seq", "id")
         )
         paginator = ChatPagination()
@@ -334,7 +349,15 @@ class SpaceMessageDetailAPIView(APIView):
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
         message = get_object_or_404(
-            Message.objects.prefetch_related("parts", "origins"),
+            Message.objects.prefetch_related(
+                Prefetch(
+                    "parts",
+                    queryset=MessagePart.objects.select_related(
+                        "upload_item"
+                    ),
+                ),
+                "origins",
+            ),
             conversation__space=space,
             conversation_id=conversation_id,
             pk=message_id,

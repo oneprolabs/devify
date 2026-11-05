@@ -2,6 +2,7 @@
 
 import json
 
+from django.conf import settings
 from django.db.models import Q
 
 from chat_analysis.models import Event, Note
@@ -17,8 +18,60 @@ id, title, and excerpt). Cite only supplied event, note, or message IDs.
 """
 
 
+# Character budget for the records sent to the question model. Auto-generated
+# notes are 200-message chunk summaries and can reach tens of thousands of
+# characters each; without a cap one question pulled ~0.9 MB of text, the
+# answer call ran past litellm's 180 s timeout, and the question failed
+# (local incident, 2026-11-04).
+DEFAULT_CONTEXT_CHAR_BUDGET = 60000
+DEFAULT_CONTEXT_ITEM_CHARS = 800
+# Notes carry most of the meaning, so they get the largest slice. Unused note
+# budget rolls over to events; messages take whatever is left (15% or more).
+NOTE_BUDGET_SHARE = 0.55
+EVENT_BUDGET_SHARE = 0.30
+
+
 def _ids(value):
     return {int(item) for item in value or []}
+
+
+def _context_limits():
+    budget = getattr(
+        settings,
+        "CHAT_ANALYSIS_QUESTION_CONTEXT_CHARS",
+        DEFAULT_CONTEXT_CHAR_BUDGET,
+    )
+    item_chars = getattr(
+        settings,
+        "CHAT_ANALYSIS_QUESTION_ITEM_CHARS",
+        DEFAULT_CONTEXT_ITEM_CHARS,
+    )
+    return max(1, int(budget)), max(1, int(item_chars))
+
+
+def _clip_text(text, limit):
+    """Clip text to at most ``limit`` characters, marking the cut."""
+    text = text or ""
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _fill_budget(values, budget, item_chars):
+    """Clip newest-first values until the character budget is spent."""
+    selected = []
+    used = 0
+    truncated = False
+    for value in values:
+        if used >= budget:
+            truncated = True
+            break
+        text = _clip_text(value, min(item_chars, budget - used))
+        if len(text) < len(value or ""):
+            truncated = True
+        selected.append(text)
+        used += len(text)
+    return selected, used, truncated
 
 
 def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=None, tag_keys=None, keywords=None):
@@ -49,21 +102,73 @@ def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=N
     if not event_ids and not note_ids and not conversation_ids and not tag_keys and not keywords:
         events = events.order_by("-last_activity_at", "-id")
         notes = notes.order_by("-start_at", "-id")
-    selected_events = list(events[:100])
-    selected_notes = list(notes[:100])
-    allowed_event_ids = {event.pk for event in selected_events}
-    allowed_note_ids = {note.pk for note in selected_notes}
+    event_rows = list(events[:101])
+    note_rows = list(notes[:101])
+    rows_truncated = len(event_rows) > 100 or len(note_rows) > 100
+    event_rows = event_rows[:100]
+    note_rows = note_rows[:100]
+
+    budget, item_chars = _context_limits()
+    note_budget = int(budget * NOTE_BUDGET_SHARE)
+    note_texts, note_chars, notes_truncated = _fill_budget(
+        [note.content for note in note_rows], note_budget, item_chars
+    )
+    selected_notes = [
+        {"id": note.pk, "title": note.title, "content": text}
+        for note, text in zip(note_rows, note_texts)
+    ]
+    event_texts, event_chars, events_truncated = _fill_budget(
+        [event.content for event in event_rows],
+        int(budget * EVENT_BUDGET_SHARE) + (note_budget - note_chars),
+        item_chars,
+    )
+    selected_events = [
+        {"id": event.pk, "title": event.title, "content": text, "status": event.status}
+        for event, text in zip(event_rows, event_texts)
+    ]
+    allowed_event_ids = {event["id"] for event in selected_events}
+    allowed_note_ids = {note["id"] for note in selected_notes}
     messages = Message.objects.filter(conversation__space=space)
     if conversation_ids:
         messages = messages.filter(conversation_id__in=conversation_ids)
     elif allowed_note_ids:
         messages = messages.filter(chat_note_evidence__note_id__in=allowed_note_ids).distinct()
-    messages = list(messages.order_by("-occurred_at", "-id")[:100])
+    message_rows = list(messages.order_by("-occurred_at", "-id")[:101])
+    rows_truncated = rows_truncated or len(message_rows) > 100
+    message_rows = message_rows[:100]
+    message_texts, _, messages_truncated = _fill_budget(
+        [
+            " ".join(
+                part
+                for part in message.parts.order_by("ordinal", "id")
+                .values_list("text", flat=True)[:3]
+                if part
+            )
+            for message in message_rows
+        ],
+        budget - note_chars - event_chars,
+        item_chars,
+    )
+    selected_messages = [
+        {
+            "id": message.pk,
+            "conversation_id": message.conversation_id,
+            "sender": message.sender_name or message.sender_key,
+            "occurred_at": message.occurred_at.isoformat() if message.occurred_at else None,
+            "parts": [text] if text else [],
+        }
+        for message, text in zip(message_rows, message_texts)
+    ]
     return {
-        "events": [{"id": e.pk, "title": e.title, "content": e.content, "status": e.status} for e in selected_events],
-        "notes": [{"id": n.pk, "title": n.title, "content": n.content} for n in selected_notes],
-        "messages": [{"id": m.pk, "conversation_id": m.conversation_id, "sender": m.sender_name or m.sender_key, "occurred_at": m.occurred_at.isoformat() if m.occurred_at else None, "parts": list(m.parts.order_by("ordinal", "id").values_list("text", flat=True)[:3])} for m in messages],
-        "scope": {"event_ids": sorted(allowed_event_ids), "note_ids": sorted(allowed_note_ids), "conversation_ids": sorted({m.conversation_id for m in messages} | conversation_ids)},
+        "events": selected_events,
+        "notes": selected_notes,
+        "messages": selected_messages,
+        "scope": {
+            "event_ids": sorted(allowed_event_ids),
+            "note_ids": sorted(allowed_note_ids),
+            "conversation_ids": sorted({message["conversation_id"] for message in selected_messages} | conversation_ids),
+            "context_truncated": rows_truncated or notes_truncated or events_truncated or messages_truncated,
+        },
     }
 
 

@@ -2,6 +2,76 @@
    Mirrors the Aimychats server-side design canvas: a 300px list rail on the
    left and a full-height reading pane on the right. */
 
+/* Single-column canvas page used by 同步记录 / 设备与设置: a 56px title bar
+   over an auto-scrolling, centred content column. */
+.ws-pg {
+  --font-display: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgb(var(--c-bg));
+  color: rgb(var(--c-tx));
+}
+.ws-pghead {
+  display: flex;
+  min-height: 56px;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgb(var(--c-line));
+  padding: 0 28px;
+}
+.ws-pgtitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.ws-crumb {
+  color: rgb(var(--c-tx3));
+  font-size: 13px;
+}
+.ws-pgbody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.ws-wrap {
+  display: flex;
+  max-width: 880px;
+  margin: 0 auto;
+  flex-direction: column;
+  gap: 26px;
+  box-sizing: border-box;
+  padding: 28px 32px 56px;
+}
+.ws-wrap.wide {
+  max-width: 1000px;
+}
+.ws-kv {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  font-size: 13.5px;
+}
+.ws-kv + .ws-kv {
+  border-top: 1px solid rgb(var(--c-line-soft));
+}
+.ws-kv .k {
+  color: rgb(var(--c-tx2));
+}
+.ws-kv .hint {
+  color: rgb(var(--c-tx3));
+  font-size: 12px;
+  text-align: right;
+}
+
 .ws-page {
   --font-display: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
@@ -738,6 +808,20 @@
 }
 
 @media (max-width: 800px) {
+  .ws-pghead {
+    padding: 0 16px;
+  }
+  .ws-wrap,
+  .ws-wrap.wide {
+    padding: 20px 16px 40px;
+  }
+  .ws-kv {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .ws-kv .hint {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
   .ws-split {
     display: block;
     overflow-y: auto;

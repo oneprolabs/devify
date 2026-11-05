@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import DesktopAuthorizationCode, DesktopDevice
+from accounts.utils import default_device_label
 
 CLIENT_ID = os.getenv("DESKTOP_OAUTH_CLIENT_ID", "desktop-client")
 REDIRECT_URI = os.getenv(
@@ -147,11 +148,16 @@ class DesktopTokenAPIView(APIView):
             return Response({"detail": "User is inactive."}, status=400)
         if not device_id:
             device_id = secrets.token_urlsafe(24)
+        label = (
+            device_label
+            or grant.device_label
+            or default_device_label(platform)
+        )
         device, _ = DesktopDevice.objects.update_or_create(
             user=grant.user,
             device_id=device_id,
             defaults={
-                "label": device_label or grant.device_label,
+                "label": label,
                 "platform": platform,
                 "status": DesktopDevice.Status.ACTIVE,
                 "revoked_at": None,
@@ -179,26 +185,95 @@ class DesktopTokenAPIView(APIView):
 class DesktopDeviceListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @staticmethod
+    def _payload(device):
+        return {
+            "device_id": device.device_id,
+            "label": device.label,
+            "platform": device.platform,
+            "status": device.status,
+            "last_seen_at": device.last_seen_at,
+            "created_at": device.created_at,
+            "revoked_at": device.revoked_at,
+        }
+
     def get(self, request):
         devices = DesktopDevice.objects.filter(user=request.user).order_by(
             "-last_seen_at", "-id"
         )
         return Response(
-            {
-                "data": [
-                    {
-                        "device_id": device.device_id,
-                        "label": device.label,
-                        "platform": device.platform,
-                        "status": device.status,
-                        "last_seen_at": device.last_seen_at,
-                        "created_at": device.created_at,
-                        "revoked_at": device.revoked_at,
-                    }
-                    for device in devices
-                ]
-            }
+            {"data": [self._payload(device) for device in devices]}
         )
+
+    @transaction.atomic
+    def post(self, request):
+        """Register or refresh the device behind an existing login.
+
+        Older clients already hold a valid token without a device claim, so
+        this endpoint lets them bind the current machine without forcing a new
+        sign-in.
+        """
+        device_id = str(request.data.get("device_id", "")).strip()[:100]
+        label = str(request.data.get("label", "")).strip()[:120]
+        platform = str(request.data.get("platform", "")).strip()[:40]
+        if device_id:
+            device = DesktopDevice.objects.filter(
+                user=request.user, device_id=device_id
+            ).first()
+            if (
+                device is not None
+                and device.status == DesktopDevice.Status.REVOKED
+            ):
+                return Response(
+                    {"detail": "This device authorization was revoked."},
+                    status=403,
+                )
+        else:
+            # Adopt a row created before the client sent a label or platform,
+            # so upgrading does not leave a stale "设备 xxxx" entry behind.
+            device = (
+                DesktopDevice.objects.filter(
+                    user=request.user,
+                    status=DesktopDevice.Status.ACTIVE,
+                    label="",
+                    platform="",
+                )
+                .order_by("-last_seen_at", "-id")
+                .first()
+            )
+            if device is not None:
+                device_id = device.device_id
+        if device is None:
+            if not device_id:
+                device_id = secrets.token_urlsafe(24)
+            device = DesktopDevice.objects.create(
+                user=request.user,
+                device_id=device_id,
+                label=label or default_device_label(platform),
+                platform=platform,
+                status=DesktopDevice.Status.ACTIVE,
+                last_seen_at=timezone.now(),
+            )
+        else:
+            device.label = (
+                label
+                or device.label
+                or default_device_label(platform or device.platform)
+            )
+            device.platform = platform or device.platform
+            device.status = DesktopDevice.Status.ACTIVE
+            device.revoked_at = None
+            device.last_seen_at = timezone.now()
+            device.save(
+                update_fields=(
+                    "label",
+                    "platform",
+                    "status",
+                    "revoked_at",
+                    "last_seen_at",
+                )
+            )
+        return Response({"data": self._payload(device)}, status=201)
 
 
 class DesktopDeviceRevokeAPIView(APIView):

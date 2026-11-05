@@ -1,42 +1,48 @@
 <template>
   <AppLayout :padded="false">
-    <div class="settings">
-      <header class="settings-head">
-        <div class="settings-title">
-          <h1>设备与设置</h1>
-          <p>查看已绑定的客户端、空间处理默认值与云端数据用量。</p>
-        </div>
+    <div class="ws-pg">
+      <header class="ws-pghead">
+        <h1 class="ws-pgtitle">设备与设置</h1>
         <button
           type="button"
-          class="refresh-button"
+          class="ws-btn ghost head-refresh"
           :disabled="loading"
           @click="load"
         >
-          {{ loading ? '加载中…' : '刷新' }}
+          {{ loading ? '刷新中…' : '刷新' }}
         </button>
       </header>
 
-      <div v-if="error" class="page-alert" role="alert">{{ error }}</div>
+      <div v-if="error" class="ws-alert" role="alert">{{ error }}</div>
 
-      <div class="settings-body">
-        <div class="wrap">
-          <section class="sect">
+      <div class="ws-pgbody">
+        <div class="ws-wrap">
+          <section class="ws-sect">
             <div class="sh">
               <h2>
                 已绑定设备
-                <span v-if="!loading" class="sh-count">{{
+                <span v-if="devices.length" class="count">{{
                   devices.length
                 }}</span>
               </h2>
-              <p>在客户端登录这个账号即自动绑定；解除绑定后需要重新登录。</p>
+              <p>在客户端登录这个账号即自动绑定。</p>
             </div>
-            <div class="listcard">
-              <div v-if="loading && !devices.length" class="state">
+            <div class="ws-listcard">
+              <div v-if="loading && !devices.length" class="ws-state">
                 正在加载设备…
               </div>
-              <div v-else-if="!devices.length" class="state">
-                <strong>还没有绑定设备</strong>
-                <span>在桌面客户端登录后，设备会出现在这里。</span>
+              <div v-else-if="!devices.length" class="ws-state">
+                <strong>还没有登记设备</strong>
+                <span v-if="latestUpload">
+                  已检测到
+                  {{ formatDate(latestUpload.created_at) }}
+                  的桌面客户端上传<template v-if="latestUpload.platform"
+                    >（{{ platformText(latestUpload.platform) }}）</template
+                  >，但当前账号还没有可用的设备登记。
+                </span>
+                <span
+                  >请确认客户端与当前网页使用同一服务地址和账号；重启客户端或重新打开「账户」设置后会自动登记。</span
+                >
               </div>
               <template v-else>
                 <div
@@ -44,7 +50,7 @@
                   :key="device.device_id"
                   class="device-row"
                 >
-                  <div class="device-copy">
+                  <div class="device-main">
                     <div class="device-title">
                       <strong>{{ deviceName(device) }}</strong>
                       <span class="dot" :class="stateClass(device)"></span>
@@ -56,63 +62,65 @@
                         >最近活跃
                         {{ formatRelative(device.last_seen_at) }}</span
                       >
-                      <span v-if="shortId(device)" class="mono">{{
-                        shortId(device)
-                      }}</span>
                     </div>
                   </div>
-                  <span class="device-platform mono">{{
-                    platformText(device.platform)
-                  }}</span>
-                  <button
-                    type="button"
-                    class="revoke-button"
-                    :disabled="revoking === device.device_id"
-                    @click="revoke(device)"
-                  >
-                    {{ revoking === device.device_id ? '解除中…' : '解除绑定' }}
-                  </button>
+                  <div class="device-side">
+                    <span class="mono">{{
+                      platformText(device.platform)
+                    }}</span>
+                    <button
+                      type="button"
+                      class="revoke"
+                      :disabled="revoking === device.device_id"
+                      @click="revoke(device)"
+                    >
+                      {{
+                        revoking === device.device_id ? '解除中…' : '解除绑定'
+                      }}
+                    </button>
+                  </div>
                 </div>
               </template>
             </div>
           </section>
 
-          <section class="sect">
+          <section class="ws-sect">
             <div class="sh">
-              <h2>采集与分析</h2>
-              <p>
-                这个空间的处理默认值保存在服务端，客户端上传与云端分析都按它执行。
-              </p>
+              <h2>
+                采集与分析
+                <span class="ro">只读</span>
+              </h2>
+              <p>这些默认值保存在云端，客户端上传与云端分析都按它执行。</p>
             </div>
-            <div class="listcard">
-              <div v-if="!workflow" class="state">
+            <div class="ws-listcard">
+              <div v-if="!workflow" class="ws-state">
                 {{
                   loading ? '正在加载处理默认值…' : '暂时无法读取处理默认值。'
                 }}
               </div>
               <template v-else>
-                <div v-for="row in analysisRows" :key="row.label" class="kv">
+                <div v-for="row in analysisRows" :key="row.label" class="ws-kv">
                   <span class="k">{{ row.label }}</span>
-                  <span class="v">{{ row.value }}</span>
+                  <span>{{ row.value }}</span>
                   <span class="hint">{{ row.hint }}</span>
                 </div>
               </template>
             </div>
           </section>
 
-          <section class="sect">
+          <section class="ws-sect">
             <div class="sh">
               <h2>云端数据</h2>
               <p>
-                云端保存解析后的会话、消息与识别结果；本机数据由客户端自行管理。
+                本机原始数据库从不上传；云端只保存解析后的消息、识别结果与报告。
               </p>
             </div>
-            <div class="listcard">
-              <div v-if="!usage" class="state">
+            <div class="ws-listcard">
+              <div v-if="!usage" class="ws-state">
                 {{ loading ? '正在加载云端用量…' : '暂时无法读取云端用量。' }}
               </div>
               <template v-else>
-                <div class="kv">
+                <div class="ws-kv">
                   <span class="k">已用空间</span>
                   <span class="cloud-value">
                     <span class="mono">{{
@@ -126,12 +134,12 @@
                   </span>
                   <span class="hint">{{ storageLimitHint }}</span>
                 </div>
-                <div class="kv">
+                <div class="ws-kv">
                   <span class="k">成员</span>
                   <span>{{ number(usage.member_count) }} 人</span>
                   <span class="hint">{{ memberLimitHint }}</span>
                 </div>
-                <div class="kv">
+                <div class="ws-kv">
                   <span class="k">今日 AI 调用</span>
                   <span>{{ number(usage.daily_ai_calls_used) }} 次</span>
                   <span class="hint">{{ aiCallLimitHint }}</span>
@@ -159,6 +167,7 @@ const devices = ref([])
 const workflow = ref(null)
 const usage = ref(null)
 const quota = ref(null)
+const latestUpload = ref(null)
 const loading = ref(false)
 const revoking = ref('')
 const error = ref('')
@@ -224,11 +233,13 @@ const aiCallLimitHint = computed(() =>
 async function load() {
   loading.value = true
   error.value = ''
-  const [deviceResult, configResult, usageResult] = await Promise.allSettled([
-    authApi.getDesktopDevices(),
-    spacesApi.getWorkflowConfig(props.spaceId),
-    spacesApi.getQuotaUsage(props.spaceId)
-  ])
+  const [deviceResult, configResult, usageResult, uploadResult] =
+    await Promise.allSettled([
+      authApi.getDesktopDevices(),
+      spacesApi.getWorkflowConfig(props.spaceId),
+      spacesApi.getQuotaUsage(props.spaceId),
+      spacesApi.getUploads(props.spaceId, { page_size: 1 })
+    ])
   const failures = []
   if (deviceResult.status === 'fulfilled') {
     const data = unwrap(deviceResult.value)
@@ -237,6 +248,11 @@ async function load() {
     )
   } else {
     failures.push('设备列表')
+  }
+  if (uploadResult.status === 'fulfilled') {
+    const data = unwrap(uploadResult.value)
+    const rows = Array.isArray(data) ? data : data.list || []
+    latestUpload.value = rows[0] || null
   }
   if (configResult.status === 'fulfilled') {
     workflow.value = unwrap(configResult.value)
@@ -279,8 +295,6 @@ async function revoke(device) {
 
 const deviceName = (device) =>
   device.label || `桌面客户端 · ${String(device.device_id).slice(0, 6)}`
-const shortId = (device) =>
-  device.label ? String(device.device_id).slice(0, 8) : ''
 const platformText = (platform) => {
   const key = String(platform || '').toLowerCase()
   if (!key) return '平台未上报'
@@ -382,85 +396,13 @@ onMounted(load)
 </script>
 
 <style scoped>
-.settings {
-  --font-display: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  display: flex;
-  min-height: 100%;
-  flex: 1;
-  flex-direction: column;
-  background: rgb(var(--c-bg));
-  color: rgb(var(--c-tx));
-}
-.settings-head {
-  display: flex;
-  min-height: 56px;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  border-bottom: 1px solid rgb(var(--c-line));
-  padding: 10px 28px;
-}
-.settings-title h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.settings-title p {
-  margin: 3px 0 0;
-  color: rgb(var(--c-tx3));
-  font-size: 12px;
-}
-.refresh-button {
-  border: 1px solid rgb(var(--c-line));
-  border-radius: 7px;
-  background: rgb(var(--c-panel));
-  padding: 6px 11px;
-  color: rgb(var(--c-tx2));
-  font-size: 12px;
-}
-.refresh-button:hover {
-  border-color: rgb(var(--c-tx4));
-  color: rgb(var(--c-tx));
-}
-.refresh-button:disabled {
-  opacity: 0.5;
-}
-.page-alert {
-  flex: none;
-  margin: 12px 28px 0;
-  border: 1px solid rgb(var(--c-bad));
-  border-radius: 8px;
-  background: rgb(var(--c-bad-soft));
-  padding: 9px 12px;
-  color: rgb(var(--c-bad));
-  font-size: 12px;
-}
-.settings-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-.wrap {
-  display: flex;
-  max-width: 880px;
-  margin: 0 auto;
-  flex-direction: column;
-  gap: 30px;
-  padding: 28px 32px 56px;
-}
-.sect {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.head-refresh {
+  margin-left: auto;
 }
 .sh {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 .sh h2 {
   display: flex;
@@ -471,7 +413,12 @@ onMounted(load)
   font-size: 15px;
   font-weight: 600;
 }
-.sh-count {
+.sh p {
+  margin: 0;
+  color: rgb(var(--c-tx3));
+  font-size: 12.5px;
+}
+.sh .count {
   border-radius: 999px;
   background: rgb(var(--c-chip));
   padding: 1px 7px;
@@ -480,31 +427,27 @@ onMounted(load)
   font-size: 10.5px;
   font-weight: 400;
 }
-.sh p {
-  margin: 0;
-  color: rgb(var(--c-tx3));
-  font-size: 12.5px;
-}
-.listcard {
-  display: flex;
-  flex-direction: column;
-  border-radius: 10px;
-  background: rgb(var(--c-panel));
-  box-shadow: inset 0 0 0 1px rgb(var(--c-line));
+.ro {
+  border-radius: 4px;
+  background: rgb(var(--c-client-soft, var(--c-ac-soft)));
+  padding: 1px 6px;
+  color: rgb(var(--c-client, var(--c-ac)));
+  font-size: 11px;
+  font-weight: 400;
 }
 .device-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 14px;
   padding: 14px 16px;
 }
 .device-row + .device-row {
   border-top: 1px solid rgb(var(--c-line-soft));
 }
-.device-copy {
+.device-main {
   display: flex;
   min-width: 0;
+  flex: 1;
   flex-direction: column;
   gap: 5px;
 }
@@ -541,48 +484,28 @@ onMounted(load)
   color: rgb(var(--c-tx3));
   font-size: 12px;
 }
-.device-platform {
-  color: rgb(var(--c-tx3));
-  font-size: 12px;
-  white-space: nowrap;
+.device-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
-.revoke-button {
-  border: 1px solid transparent;
+.device-side .mono {
+  color: rgb(var(--c-tx3));
+}
+.revoke {
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 2px 0;
   color: rgb(var(--c-tx3));
   font-size: 12px;
   white-space: nowrap;
 }
-.revoke-button:hover {
-  border-color: rgb(var(--c-line));
-  background: rgb(var(--c-panel-sub));
+.revoke:hover {
   color: rgb(var(--c-bad));
 }
-.revoke-button:disabled {
+.revoke:disabled {
   opacity: 0.5;
-}
-.kv {
-  display: grid;
-  grid-template-columns: 148px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  font-size: 13.5px;
-}
-.kv + .kv {
-  border-top: 1px solid rgb(var(--c-line-soft));
-}
-.kv .k {
-  color: rgb(var(--c-tx2));
-}
-.kv .v {
-  min-width: 0;
-}
-.hint {
-  color: rgb(var(--c-tx3));
-  font-size: 12px;
-  text-align: right;
 }
 .cloud-value {
   display: flex;
@@ -598,45 +521,12 @@ onMounted(load)
   font-family: var(--font-mono);
   font-size: 12px;
 }
-.state {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 26px 16px;
-  color: rgb(var(--c-tx3));
-  font-size: 12px;
-}
-.state strong {
-  color: rgb(var(--c-tx2));
-  font-size: 13px;
-}
 @media (max-width: 720px) {
-  .settings-head {
-    padding: 10px 16px;
-  }
-  .wrap {
-    padding: 20px 16px 40px;
-  }
-  .page-alert {
-    margin: 12px 16px 0;
-  }
   .device-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: flex-start;
+    gap: 10px;
   }
-  .device-platform {
-    grid-column: 1;
-  }
-  .revoke-button {
-    grid-row: 1;
-    grid-column: 2;
-  }
-  .kv {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .kv .hint {
-    grid-column: 1 / -1;
-    text-align: left;
+  .device-side {
+    align-items: flex-end;
   }
 }
 </style>

@@ -92,6 +92,9 @@ def transition_batch(batch, status, *, error_message=None, save=True):
     if error_message is not None:
         batch.error_message = error_message
     update_fields = ["status", "error_message", "updated_at"]
+    if status == UploadBatch.Status.PROCESSING:
+        batch.parse_started_at = timezone.now()
+        update_fields.append("parse_started_at")
     if status == UploadBatch.Status.COMPLETED:
         batch.completed_at = timezone.now()
         update_fields.append("completed_at")
@@ -161,12 +164,14 @@ def store_archive(batch, uploaded_file):
         batch.error_message = ""
     batch.archive_sha256 = sha256
     batch.archive_size = size
+    batch.archive_received_at = timezone.now()
     batch.save(
         update_fields=(
             "status",
             "error_message",
             "archive_sha256",
             "archive_size",
+            "archive_received_at",
             "updated_at",
         )
     )

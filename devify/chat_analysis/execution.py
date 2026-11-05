@@ -545,11 +545,13 @@ def _enrich_note_with_llm(job, note, messages):
         # An unavailable LLM is an infrastructure failure, not a data gap:
         # keep the job's state and let the caller retry.
         logger.exception("LLM note structuring failed for job %s", job.pk)
+        raise RuntimeError("LLM note structuring failed") from None
     try:
         if not _extract_events(job, note, messages, payload, language):
             partial = True
     except Exception:
         logger.exception("LLM event extraction failed for job %s", job.pk)
+        raise RuntimeError("LLM event extraction failed") from None
     return partial
 
 
@@ -567,14 +569,17 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
     notes_written = int(checkpoint.get("notes_written", 0))
     partial = bool(checkpoint.get("partial", False))
 
+    batches = job.upload_batches.all()
     while True:
+        query = Message.objects.filter(
+            conversation_id=job.conversation_id,
+            ingest_seq__gt=last_seq,
+            ingest_seq__lte=job.end_seq,
+        )
+        if batches.exists():
+            query = query.filter(origins__upload_item__batch__in=batches).distinct()
         messages = list(
-            Message.objects.filter(
-                conversation_id=job.conversation_id,
-                ingest_seq__gt=last_seq,
-                ingest_seq__lte=job.end_seq,
-            )
-            .prefetch_related("parts")
+            query.prefetch_related("parts")
             .order_by("ingest_seq")[:ANALYSIS_CHUNK_SIZE]
         )
         if not messages:

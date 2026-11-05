@@ -135,17 +135,11 @@ class ChatPackage:
                 continue
             name = normalize_member_path(info.filename)
             if _is_symlink(info):
-                raise PackageInvalid(
-                    f"Archive member is a symlink: {name!r}."
-                )
+                raise PackageInvalid(f"Archive member is a symlink: {name!r}.")
             if name in self._members:
-                raise PackageInvalid(
-                    f"Duplicate archive member: {name!r}."
-                )
+                raise PackageInvalid(f"Duplicate archive member: {name!r}.")
             if info.file_size > max_member_bytes():
-                raise PackageInvalid(
-                    f"Archive member is too large: {name!r}."
-                )
+                raise PackageInvalid(f"Archive member is too large: {name!r}.")
             total += info.file_size
             self._members[name] = info
         if total > max_total_bytes():
@@ -250,21 +244,15 @@ class ChatPackage:
         namespace = str(payload.get("source_namespace") or "").strip()
         timezone = str(payload.get("timezone") or "").strip()
         if not schema_version:
-            raise ManifestInvalid(
-                "manifest.json requires a schema_version."
-            )
+            raise ManifestInvalid("manifest.json requires a schema_version.")
         if platform not in SUPPORTED_PLATFORMS:
-            raise ManifestInvalid(
-                "manifest.json has an unsupported platform."
-            )
+            raise ManifestInvalid("manifest.json has an unsupported platform.")
         if schema_version != f"{platform}.v1":
             raise ManifestInvalid(
                 "manifest.json schema_version does not match the platform."
             )
         if not namespace:
-            raise ManifestInvalid(
-                "manifest.json requires a source_namespace."
-            )
+            raise ManifestInvalid("manifest.json requires a source_namespace.")
         tzinfo = None
         if timezone:
             try:

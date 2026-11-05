@@ -98,13 +98,13 @@ from typing import Any, Dict, List, Optional
 
 from .jira_client import JiraClient
 from .jira_utils import (
+    DEFAULT_LANGUAGE,
+    build_description_field,
+    build_field_prompt,
     build_summary_field,
     get_grouped_configs,
     preprocess_api_data,
-    build_description_field,
-    build_field_prompt,
     remove_emoji,
-    DEFAULT_LANGUAGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -302,7 +302,7 @@ class JiraIssueHandler:
                     epic_keys = [epic["key"] for epic in epic_list[:5]]
                     logger.debug(f"Epic keys: {epic_keys}")
                 else:
-                    logger.warning(f"No epics found with provided JQL query")
+                    logger.warning("No epics found with provided JQL query")
 
                 return epic_list
 
@@ -752,12 +752,13 @@ from configuration."""
                 isinstance(value, str) and not value.strip()
             )
 
-            # Basic format validation for epic_link: must look like JIRA key (e.g., REQ-123)
-            # This is a fallback when allow_values is empty
+            # Basic format validation for epic_link: must look like a JIRA
+            # key (e.g., REQ-123). This is a fallback when allow_values is
+            # empty.
             if field_name == "epic_link" and value and not is_empty:
                 if isinstance(value, list):
                     value = value[0] if value else None
-                if value and not re.match(r'^[A-Z]+-\d+$', str(value).strip()):
+                if value and not re.match(r"^[A-Z]+-\d+$", str(value).strip()):
                     logger.warning(
                         f"LLM returned invalid epic_link format '{value}'. "
                         f"Will use default."
@@ -781,29 +782,41 @@ from configuration."""
                     continue
             elif allow_values:
                 # Validate against allow_values
-                # For epic_link: allow_values contain "KEY (Summary)" but LLM returns only KEY
+                # For epic_link: allow_values contain "KEY (Summary)" but
+                # the LLM returns only KEY.
                 if field_name == "epic_link":
                     # Extract KEY from "KEY (Summary)" format
                     valid_keys = [
                         str(av).split(" (")[0].strip() for av in allow_values
                     ]
                     if isinstance(value, list):
-                        normalized_value = [str(item).strip() for item in value]
-                        is_valid = all(item in valid_keys for item in normalized_value)
+                        normalized_value = [
+                            str(item).strip() for item in value
+                        ]
+                        is_valid = all(
+                            item in valid_keys for item in normalized_value
+                        )
                     else:
                         normalized_value = str(value).strip()
                         is_valid = normalized_value in valid_keys
                 else:
                     # Standard validation for other fields
                     if isinstance(value, list):
-                        normalized_value = [str(item).strip() for item in value]
-                        normalized_allow = [str(av).strip() for av in allow_values]
+                        normalized_value = [
+                            str(item).strip() for item in value
+                        ]
+                        normalized_allow = [
+                            str(av).strip() for av in allow_values
+                        ]
                         is_valid = all(
-                            item in normalized_allow for item in normalized_value
+                            item in normalized_allow
+                            for item in normalized_value
                         )
                     else:
                         normalized_value = str(value).strip()
-                        normalized_allow = [str(av).strip() for av in allow_values]
+                        normalized_allow = [
+                            str(av).strip() for av in allow_values
+                        ]
                         is_valid = normalized_value in normalized_allow
 
                 if not is_valid:
@@ -892,6 +905,7 @@ from configuration."""
         try:
             # Deferred: pulls litellm/agentcore chain (~14 s) on first call.
             from core.tracking import LLMTracker
+
             llm_response, _ = LLMTracker.call_and_track(
                 prompt=prompt,
                 content=summary_content,
@@ -945,7 +959,9 @@ from configuration."""
             summary_prefix = summary_config.get("prefix", "[AI]")
             add_timestamp = summary_config.get("add_timestamp", False)
             normalized_summary = remove_emoji(summary_title)
-            if summary_prefix and normalized_summary.startswith(summary_prefix):
+            if summary_prefix and normalized_summary.startswith(
+                summary_prefix
+            ):
                 summary_value = normalized_summary
             else:
                 summary_value = build_summary_field(
@@ -954,10 +970,15 @@ from configuration."""
                     add_timestamp=add_timestamp,
                 )
 
-            description_config = self.fields_config.get("description_config", {})
-            convert_to_jira_wiki = description_config.get("convert_to_jira_wiki", True)
+            description_config = self.fields_config.get(
+                "description_config", {}
+            )
+            convert_to_jira_wiki = description_config.get(
+                "convert_to_jira_wiki", True
+            )
 
             from .jira_utils import build_description_field
+
             description = build_description_field(
                 summary_content=summary_content,
                 llm_content=llm_content,
@@ -976,11 +997,16 @@ from configuration."""
             logger.info("Updated JIRA issue: %s", issue_key)
             return issue_key
         except Exception as e:
-            logger.error("Failed to update JIRA issue %s: %s", issue_key, e, exc_info=True)
+            logger.error(
+                "Failed to update JIRA issue %s: %s",
+                issue_key,
+                e,
+                exc_info=True,
+            )
             raise
 
     def get_issue_attachment_fingerprints(self, issue_key: str) -> list[str]:
-        """Return stable fingerprints for attachments already on a JIRA issue."""
+        """Return fingerprints for attachments already on a JIRA issue."""
         return self.client.get_issue_attachment_fingerprints(issue_key)
 
     def link_related_issues(
@@ -997,7 +1023,9 @@ from configuration."""
                 skipped_count += 1
                 continue
             try:
-                self.client.link_issue(issue_key, related_key, link_type=link_type)
+                self.client.link_issue(
+                    issue_key, related_key, link_type=link_type
+                )
                 linked_count += 1
             except Exception as e:
                 logger.warning(
@@ -1008,7 +1036,7 @@ from configuration."""
 
     @staticmethod
     def _attachment_keys(attachment: Dict[str, Any]) -> List[str]:
-        """Stable identities for one attachment, used to skip retried uploads."""
+        """Stable identity for one attachment, used to skip retries."""
         keys = []
         content_md5 = attachment.get("content_md5")
         if content_md5:
@@ -1018,9 +1046,7 @@ from configuration."""
             keys.append(f"id:{attachment_id}")
         filename = attachment.get("filename")
         if filename:
-            keys.append(
-                f"name:{filename}:{attachment.get('file_size', 0)}"
-            )
+            keys.append(f"name:{filename}:{attachment.get('file_size', 0)}")
         return keys
 
     def upload_attachments(

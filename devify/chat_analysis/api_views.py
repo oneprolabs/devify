@@ -152,7 +152,12 @@ class SpaceNoteListCreateAPIView(APIView):
         space, _ = self._space(request, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        question = get_object_or_404(QuestionAnswer, pk=question_id, space=space, created_by=request.user)
+        question = get_object_or_404(
+            QuestionAnswer,
+            pk=question_id,
+            space=space,
+            created_by=request.user,
+        )
         return Response({"data": QuestionAnswerSerializer(question).data})
 
     def post(self, request, space_id):
@@ -336,15 +341,19 @@ class SpaceEventListCreateAPIView(APIView):
         space, takeover = _authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        events = Event.objects.filter(space=space).prefetch_related("tag_assignments__tag").order_by(
-            "-last_activity_at", "-id"
+        events = (
+            Event.objects.filter(space=space)
+            .prefetch_related("tag_assignments__tag")
+            .order_by("-last_activity_at", "-id")
         )
         state = request.query_params.get("status")
         if state:
             events = events.filter(status=state)
         tag_key = request.query_params.get("tag_key", "").strip()
         if tag_key:
-            events = events.filter(tag_assignments__tag__tag_key=tag_key).distinct()
+            events = events.filter(
+                tag_assignments__tag__tag_key=tag_key
+            ).distinct()
         conversation_id = request.query_params.get(
             "conversation_id", ""
         ).strip()
@@ -413,14 +422,17 @@ class EventDetailAPIView(APIView):
         space, takeover = _authorized_space(request.user, event.space_id)
         if space is None:
             return Response({"detail": "Event not found."}, status=404)
-        event = Event.objects.prefetch_related("tag_assignments__tag").get(pk=event.pk)
+        event = Event.objects.prefetch_related("tag_assignments__tag").get(
+            pk=event.pk
+        )
         data = EventSerializer(event).data
         data["note_ids"] = list(
             event.note_links.order_by("id").values_list("note_id", flat=True)
         )
         data["evidence"] = EventEvidenceSerializer(
-            event.evidence.select_related("message")
-            .order_by("message__occurred_at", "id")[:200],
+            event.evidence.select_related("message").order_by(
+                "message__occurred_at", "id"
+            )[:200],
             many=True,
         ).data
         data["relation_ids"] = list(
@@ -502,14 +514,18 @@ class EventNotesAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, event_id):
-        event = get_object_or_404(Event.objects.select_related("space"), pk=event_id)
+        event = get_object_or_404(
+            Event.objects.select_related("space"), pk=event_id
+        )
         space, _ = _authorized_space(request.user, event.space_id)
         if space is None:
             return Response({"detail": "Event not found."}, status=404)
         paginator = AnalysisPagination()
-        notes = Note.objects.filter(
-            space=space, event_links__event=event
-        ).distinct().order_by("-start_at", "-id")
+        notes = (
+            Note.objects.filter(space=space, event_links__event=event)
+            .distinct()
+            .order_by("-start_at", "-id")
+        )
         page = paginator.paginate_queryset(notes, request, view=self)
         page = list(page)
         data = NoteSerializer(page, many=True).data
@@ -521,7 +537,9 @@ class EventNotesAPIView(APIView):
             evidence_by_note.setdefault(item["note_id"], []).append(item)
         for item in data:
             item["evidence"] = evidence_by_note.get(item["id"], [])
-        return Response({"data": {"list": data, "pagination": _pagination_data(paginator)}})
+        return Response(
+            {"data": {"list": data, "pagination": _pagination_data(paginator)}}
+        )
 
     @transaction.atomic
     def post(self, request, event_id):
@@ -707,8 +725,15 @@ class EventRelationDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _get(self, request, relation_id, *, write=False):
-        relation = get_object_or_404(EventRelation.objects.select_related("space", "left_event", "right_event"), pk=relation_id)
-        space, _ = _authorized_space(request.user, relation.space_id, write=write)
+        relation = get_object_or_404(
+            EventRelation.objects.select_related(
+                "space", "left_event", "right_event"
+            ),
+            pk=relation_id,
+        )
+        space, _ = _authorized_space(
+            request.user, relation.space_id, write=write
+        )
         return relation if space else None
 
     def get(self, request, relation_id):
@@ -722,23 +747,55 @@ class EventRelationDetailAPIView(APIView):
         relation = self._get(request, relation_id, write=True)
         if relation is None:
             return Response({"detail": "Relation not found."}, status=404)
-        serializer = EventRelationCreateSerializer(data={
-            "left_event_id": relation.left_event_id,
-            "right_event_id": relation.right_event_id,
-            "relation_kind": request.data.get("relation_kind", relation.relation_kind),
-            "decision": request.data.get("decision", relation.decision),
-            "reason": request.data.get("reason", relation.reason),
-            "source_note_ids": request.data.get("source_note_ids", relation.source_note_ids),
-        })
+        serializer = EventRelationCreateSerializer(
+            data={
+                "left_event_id": relation.left_event_id,
+                "right_event_id": relation.right_event_id,
+                "relation_kind": request.data.get(
+                    "relation_kind", relation.relation_kind
+                ),
+                "decision": request.data.get("decision", relation.decision),
+                "reason": request.data.get("reason", relation.reason),
+                "source_note_ids": request.data.get(
+                    "source_note_ids", relation.source_note_ids
+                ),
+            }
+        )
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
-        notes = list(Note.objects.filter(space=relation.space, pk__in=values["source_note_ids"]))
+        notes = list(
+            Note.objects.filter(
+                space=relation.space, pk__in=values["source_note_ids"]
+            )
+        )
         if len(notes) != len(set(values["source_note_ids"])):
-            return Response({"detail": "Source notes must be in this space."}, status=404)
+            return Response(
+                {"detail": "Source notes must be in this space."}, status=404
+            )
         try:
-            relation = upsert_event_relation(actor=request.user, space=relation.space, left_event=relation.left_event, right_event=relation.right_event, relation_kind=values["relation_kind"], decision=values["decision"], reason=values.get("reason", ""), source_note_ids=values["source_note_ids"])
-        except (ChatAnalysisPermissionError, ChatAnalysisConflict, ChatAnalysisError) as error:
-            return Response({"detail": str(error)}, status=403 if isinstance(error, ChatAnalysisPermissionError) else 409)
+            relation = upsert_event_relation(
+                actor=request.user,
+                space=relation.space,
+                left_event=relation.left_event,
+                right_event=relation.right_event,
+                relation_kind=values["relation_kind"],
+                decision=values["decision"],
+                reason=values.get("reason", ""),
+                source_note_ids=values["source_note_ids"],
+            )
+        except (
+            ChatAnalysisPermissionError,
+            ChatAnalysisConflict,
+            ChatAnalysisError,
+        ) as error:
+            return Response(
+                {"detail": str(error)},
+                status=(
+                    403
+                    if isinstance(error, ChatAnalysisPermissionError)
+                    else 409
+                ),
+            )
         return Response({"data": EventRelationSerializer(relation).data})
 
     @transaction.atomic
@@ -757,8 +814,16 @@ class SpaceTopicSubscriptionListCreateAPIView(APIView):
         space, _ = _authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        subscriptions = TopicSubscription.objects.filter(space=space, created_by=request.user)
-        return Response({"data": TopicSubscriptionSerializer(subscriptions, many=True).data})
+        subscriptions = TopicSubscription.objects.filter(
+            space=space, created_by=request.user
+        )
+        return Response(
+            {
+                "data": TopicSubscriptionSerializer(
+                    subscriptions, many=True
+                ).data
+            }
+        )
 
     def post(self, request, space_id):
         space, _ = _authorized_space(request.user, space_id, write=True)
@@ -766,15 +831,24 @@ class SpaceTopicSubscriptionListCreateAPIView(APIView):
             return Response({"detail": "Space not found."}, status=404)
         serializer = TopicSubscriptionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        subscription = TopicSubscription.objects.create(space=space, created_by=request.user, **serializer.validated_data)
-        return Response({"data": TopicSubscriptionSerializer(subscription).data}, status=201)
+        subscription = TopicSubscription.objects.create(
+            space=space, created_by=request.user, **serializer.validated_data
+        )
+        return Response(
+            {"data": TopicSubscriptionSerializer(subscription).data},
+            status=201,
+        )
 
 
 class TopicSubscriptionDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _get(self, request, topic_id, *, write=False):
-        topic = get_object_or_404(TopicSubscription.objects.select_related("space"), pk=topic_id, created_by=request.user)
+        topic = get_object_or_404(
+            TopicSubscription.objects.select_related("space"),
+            pk=topic_id,
+            created_by=request.user,
+        )
         space, _ = _authorized_space(request.user, topic.space_id, write=write)
         return topic if space else None
 
@@ -788,11 +862,15 @@ class TopicSubscriptionDetailAPIView(APIView):
         topic = self._get(request, topic_id, write=True)
         if topic is None:
             return Response({"detail": "Topic not found."}, status=404)
-        serializer = TopicSubscriptionCreateSerializer(data=request.data, partial=True)
+        serializer = TopicSubscriptionCreateSerializer(
+            data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
         for field, value in serializer.validated_data.items():
             setattr(topic, field, value)
-        topic.save(update_fields=tuple(serializer.validated_data) + ("updated_at",))
+        topic.save(
+            update_fields=tuple(serializer.validated_data) + ("updated_at",)
+        )
         return Response({"data": TopicSubscriptionSerializer(topic).data})
 
     def delete(self, request, topic_id):
@@ -807,31 +885,79 @@ class TopicRunAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, topic_id):
-        topic = get_object_or_404(TopicSubscription.objects.select_related("space"), pk=topic_id, created_by=request.user)
+        topic = get_object_or_404(
+            TopicSubscription.objects.select_related("space"),
+            pk=topic_id,
+            created_by=request.user,
+        )
         space, _ = _authorized_space(request.user, topic.space_id)
         if space is None:
             return Response({"detail": "Topic not found."}, status=404)
-        reports = Report.objects.filter(space=space, created_by=request.user, source_info__subscription_id=topic.pk).order_by("-created_at", "-id")[:50]
+        reports = Report.objects.filter(
+            space=space,
+            created_by=request.user,
+            source_info__subscription_id=topic.pk,
+        ).order_by("-created_at", "-id")[:50]
         return Response({"data": ReportSerializer(reports, many=True).data})
 
     @transaction.atomic
     def post(self, request, topic_id):
-        topic = get_object_or_404(TopicSubscription.objects.select_related("space"), pk=topic_id, created_by=request.user)
-        space, takeover = _authorized_space(request.user, topic.space_id, write=True)
+        topic = get_object_or_404(
+            TopicSubscription.objects.select_related("space"),
+            pk=topic_id,
+            created_by=request.user,
+        )
+        space, takeover = _authorized_space(
+            request.user, topic.space_id, write=True
+        )
         if space is None:
             return Response({"detail": "Topic not found."}, status=404)
-        request_key = f"topic-{topic.pk}-{timezone.now().strftime('%Y%m%d%H%M%S%f')}"
+        request_key = (
+            f"topic-{topic.pk}-{timezone.now().strftime('%Y%m%d%H%M%S%f')}"
+        )
         try:
-            report, created = create_report_snapshot(actor=request.user, space=space, request_key=request_key, title=topic.title, filters=topic.filters, include_open=topic.include_open)
+            report, created = create_report_snapshot(
+                actor=request.user,
+                space=space,
+                request_key=request_key,
+                title=topic.title,
+                filters=topic.filters,
+                include_open=topic.include_open,
+            )
         except (ChatAnalysisPermissionError, ChatAnalysisConflict) as error:
-            return Response({"detail": str(error)}, status=403 if isinstance(error, ChatAnalysisPermissionError) else 409)
+            return Response(
+                {"detail": str(error)},
+                status=(
+                    403
+                    if isinstance(error, ChatAnalysisPermissionError)
+                    else 409
+                ),
+            )
         if created:
-            report.source_info = {**(report.source_info or {}), "kind": "topic_subscription", "subscription_id": topic.pk}
+            report.source_info = {
+                **(report.source_info or {}),
+                "kind": "topic_subscription",
+                "subscription_id": topic.pk,
+            }
             report.status = Report.Status.QUEUED
-            report.processing = {**(report.processing or {}), "generator": "llm_pending", "version": "report.llm.v1"}
-            report.save(update_fields=("source_info", "status", "processing", "updated_at"))
+            report.processing = {
+                **(report.processing or {}),
+                "generator": "llm_pending",
+                "version": "report.llm.v1",
+            }
+            report.save(
+                update_fields=(
+                    "source_info",
+                    "status",
+                    "processing",
+                    "updated_at",
+                )
+            )
             transaction.on_commit(lambda: dispatch_report_generation(report))
-        return Response({"data": ReportSerializer(report).data}, status=202 if created else 200)
+        return Response(
+            {"data": ReportSerializer(report).data},
+            status=202 if created else 200,
+        )
 
 
 class SpaceQuestionAPIView(APIView):
@@ -844,8 +970,12 @@ class SpaceQuestionAPIView(APIView):
         space, _ = self._space(request, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        questions = QuestionAnswer.objects.filter(space=space, created_by=request.user)[:50]
-        return Response({"data": QuestionAnswerSerializer(questions, many=True).data})
+        questions = QuestionAnswer.objects.filter(
+            space=space, created_by=request.user
+        )[:50]
+        return Response(
+            {"data": QuestionAnswerSerializer(questions, many=True).data}
+        )
 
     def post(self, request, space_id):
         space, takeover = self._space(request, space_id)
@@ -856,11 +986,35 @@ class SpaceQuestionAPIView(APIView):
             return Response({"detail": quota_error}, status=429)
         serializer = QuestionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        question = QuestionAnswer.objects.create(space=space, created_by=request.user, question=serializer.validated_data["question"], scope={key: serializer.validated_data[key] for key in ("event_ids", "note_ids", "conversation_ids", "tag_keys", "keywords") if serializer.validated_data.get(key)})
+        question = QuestionAnswer.objects.create(
+            space=space,
+            created_by=request.user,
+            question=serializer.validated_data["question"],
+            scope={
+                key: serializer.validated_data[key]
+                for key in (
+                    "event_ids",
+                    "note_ids",
+                    "conversation_ids",
+                    "tag_keys",
+                    "keywords",
+                )
+                if serializer.validated_data.get(key)
+            },
+        )
         transaction.on_commit(lambda: dispatch_question_answer(question))
         if takeover:
-            audit_space_action(actor=request.user, space=space, action="chat.question_queued", resource_type="question", resource_id=question.pk, metadata={"takeover_id": takeover.pk})
-        return Response({"data": QuestionAnswerSerializer(question).data}, status=202)
+            audit_space_action(
+                actor=request.user,
+                space=space,
+                action="chat.question_queued",
+                resource_type="question",
+                resource_id=question.pk,
+                metadata={"takeover_id": takeover.pk},
+            )
+        return Response(
+            {"data": QuestionAnswerSerializer(question).data}, status=202
+        )
 
 
 class SpaceEventTagListCreateAPIView(APIView):
@@ -880,10 +1034,21 @@ class SpaceEventTagListCreateAPIView(APIView):
         serializer = EventTagCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            tag = EventTag.objects.create(space=space, created_by=request.user, **serializer.validated_data)
+            tag = EventTag.objects.create(
+                space=space,
+                created_by=request.user,
+                **serializer.validated_data,
+            )
         except IntegrityError:
             return Response({"detail": "This tag already exists."}, status=409)
-        audit_space_action(actor=request.user, space=space, action="chat.event_tag_created", resource_type="event_tag", resource_id=tag.pk, metadata={"takeover_id": takeover.pk if takeover else None})
+        audit_space_action(
+            actor=request.user,
+            space=space,
+            action="chat.event_tag_created",
+            resource_type="event_tag",
+            resource_id=tag.pk,
+            metadata={"takeover_id": takeover.pk if takeover else None},
+        )
         return Response({"data": EventTagSerializer(tag).data}, status=201)
 
 
@@ -891,13 +1056,19 @@ class EventTagDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _get(self, request, tag_id, *, write=False):
-        tag = get_object_or_404(EventTag.objects.select_related("space"), pk=tag_id)
+        tag = get_object_or_404(
+            EventTag.objects.select_related("space"), pk=tag_id
+        )
         space, _ = _authorized_space(request.user, tag.space_id, write=write)
         return tag if space else None
 
     def get(self, request, tag_id):
         tag = self._get(request, tag_id)
-        return Response({"data": EventTagSerializer(tag).data}) if tag else Response({"detail": "Tag not found."}, status=404)
+        return (
+            Response({"data": EventTagSerializer(tag).data})
+            if tag
+            else Response({"detail": "Tag not found."}, status=404)
+        )
 
     def patch(self, request, tag_id):
         tag = self._get(request, tag_id, write=True)
@@ -908,7 +1079,10 @@ class EventTagDetailAPIView(APIView):
         for field, value in serializer.validated_data.items():
             setattr(tag, field, value)
         try:
-            tag.save(update_fields=tuple(serializer.validated_data) + ("updated_at",))
+            tag.save(
+                update_fields=tuple(serializer.validated_data)
+                + ("updated_at",)
+            )
         except IntegrityError:
             return Response({"detail": "This tag already exists."}, status=409)
         return Response({"data": EventTagSerializer(tag).data})
@@ -925,28 +1099,44 @@ class EventTagAssignmentAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, event_id):
-        event = get_object_or_404(Event.objects.select_related("space"), pk=event_id)
+        event = get_object_or_404(
+            Event.objects.select_related("space"), pk=event_id
+        )
         space, _ = _authorized_space(request.user, event.space_id, write=True)
         if space is None:
             return Response({"detail": "Event not found."}, status=404)
         if not _editable(request.user, event):
-            return Response({"detail": "Event edit permission required."}, status=403)
+            return Response(
+                {"detail": "Event edit permission required."}, status=403
+            )
         serializer = EventTagAssignmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        tag = EventTag.objects.filter(space=space, pk=serializer.validated_data["tag_id"]).first()
+        tag = EventTag.objects.filter(
+            space=space, pk=serializer.validated_data["tag_id"]
+        ).first()
         if tag is None:
             return Response({"detail": "Tag not found."}, status=404)
-        assignment, _ = EventTagAssignment.objects.get_or_create(event=event, tag=tag, defaults={"created_by": request.user})
-        return Response({"data": EventTagAssignmentSerializer(assignment).data}, status=201)
+        assignment, _ = EventTagAssignment.objects.get_or_create(
+            event=event, tag=tag, defaults={"created_by": request.user}
+        )
+        return Response(
+            {"data": EventTagAssignmentSerializer(assignment).data}, status=201
+        )
 
     def delete(self, request, event_id, tag_id):
-        event = get_object_or_404(Event.objects.select_related("space"), pk=event_id)
+        event = get_object_or_404(
+            Event.objects.select_related("space"), pk=event_id
+        )
         space, _ = _authorized_space(request.user, event.space_id, write=True)
         if space is None or not _editable(request.user, event):
             return Response({"detail": "Event not found."}, status=404)
-        assignment = EventTagAssignment.objects.filter(event=event, tag_id=tag_id).first()
+        assignment = EventTagAssignment.objects.filter(
+            event=event, tag_id=tag_id
+        ).first()
         if assignment is None:
-            return Response({"detail": "Tag assignment not found."}, status=404)
+            return Response(
+                {"detail": "Tag assignment not found."}, status=404
+            )
         assignment.delete()
         return Response(status=204)
 
@@ -958,7 +1148,12 @@ class QuestionAnswerDetailAPIView(APIView):
         space, _ = _authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        question = get_object_or_404(QuestionAnswer, pk=question_id, space=space, created_by=request.user)
+        question = get_object_or_404(
+            QuestionAnswer,
+            pk=question_id,
+            space=space,
+            created_by=request.user,
+        )
         return Response({"data": QuestionAnswerSerializer(question).data})
 
 
@@ -972,34 +1167,153 @@ class SpaceResourceCopyAPIView(APIView):
         resource_type = request.data.get("resource_type")
         resource_ids = request.data.get("resource_ids", [])
         copy_notes = bool(request.data.get("copy_notes", False))
-        if not isinstance(resource_ids, list) or not resource_ids or resource_type not in ("note", "event"):
-            return Response({"detail": "resource_type and non-empty resource_ids are required."}, status=400)
+        if (
+            not isinstance(resource_ids, list)
+            or not resource_ids
+            or resource_type not in ("note", "event")
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "resource_type and non-empty resource_ids are "
+                        "required."
+                    )
+                },
+                status=400,
+            )
         source = get_object_or_404(Space, pk=source_id)
         if not SpacePermissionService.can_read(request.user, source):
             return Response({"detail": "Source space not found."}, status=404)
         if not SpacePermissionService.can_upload(request.user, target):
-            return Response({"detail": "Target space is not writable."}, status=403)
+            return Response(
+                {"detail": "Target space is not writable."}, status=403
+            )
         copied = []
         warnings = []
         if resource_type == "note":
             for note in Note.objects.filter(space=source, pk__in=resource_ids):
-                copied_note = Note.objects.create(space=target, created_by=request.user, note_key=f"copy-{source.pk}-{note.pk}-{uuid.uuid4().hex[:12]}", title=note.title, content=note.content, structured_data=note.structured_data, generation_version=note.generation_version, start_at=note.start_at, end_at=note.end_at, origin=Note.Origin.MANUAL, assignment_mode=Note.AssignmentMode.MANUAL)
-                copied.append({"source_id": note.pk, "id": copied_note.pk, "type": "note"})
-                warnings.append({"source_id": note.pk, "code": "evidence_not_copied", "detail": "原始消息证据仍属于源空间，未跨空间复制。"})
+                copied_note = Note.objects.create(
+                    space=target,
+                    created_by=request.user,
+                    note_key=(
+                        f"copy-{source.pk}-{note.pk}-"
+                        f"{uuid.uuid4().hex[:12]}"
+                    ),
+                    title=note.title,
+                    content=note.content,
+                    structured_data=note.structured_data,
+                    generation_version=note.generation_version,
+                    start_at=note.start_at,
+                    end_at=note.end_at,
+                    origin=Note.Origin.MANUAL,
+                    assignment_mode=Note.AssignmentMode.MANUAL,
+                )
+                copied.append(
+                    {
+                        "source_id": note.pk,
+                        "id": copied_note.pk,
+                        "type": "note",
+                    }
+                )
+                warnings.append(
+                    {
+                        "source_id": note.pk,
+                        "code": "evidence_not_copied",
+                        "detail": "原始消息证据仍属于源空间，未跨空间复制。",
+                    }
+                )
         else:
-            for event in Event.objects.filter(space=source, pk__in=resource_ids):
-                copied_event = Event.objects.create(space=target, created_by=request.user, event_key=f"copy-{source.pk}-{event.pk}-{uuid.uuid4().hex[:12]}", title=event.title, content=event.content, status=event.status, opened_at=event.opened_at, last_activity_at=event.last_activity_at)
-                copied.append({"source_id": event.pk, "id": copied_event.pk, "type": "event"})
-                source_notes = list(Note.objects.filter(space=source, event_links__event=event).distinct())
+            for event in Event.objects.filter(
+                space=source, pk__in=resource_ids
+            ):
+                copied_event = Event.objects.create(
+                    space=target,
+                    created_by=request.user,
+                    event_key=(
+                        f"copy-{source.pk}-{event.pk}-"
+                        f"{uuid.uuid4().hex[:12]}"
+                    ),
+                    title=event.title,
+                    content=event.content,
+                    status=event.status,
+                    opened_at=event.opened_at,
+                    last_activity_at=event.last_activity_at,
+                )
+                copied.append(
+                    {
+                        "source_id": event.pk,
+                        "id": copied_event.pk,
+                        "type": "event",
+                    }
+                )
+                source_notes = list(
+                    Note.objects.filter(
+                        space=source, event_links__event=event
+                    ).distinct()
+                )
                 if copy_notes:
                     copied_note_ids = []
                     for note in source_notes:
-                        copied_note = Note.objects.create(space=target, created_by=request.user, note_key=f"copy-{source.pk}-{note.pk}-{uuid.uuid4().hex[:12]}", title=note.title, content=note.content, structured_data=note.structured_data, generation_version=note.generation_version, start_at=note.start_at, end_at=note.end_at, origin=Note.Origin.MANUAL, assignment_mode=Note.AssignmentMode.MANUAL)
-                        EventNote.objects.create(event=copied_event, note=copied_note, created_by=request.user)
+                        copied_note = Note.objects.create(
+                            space=target,
+                            created_by=request.user,
+                            note_key=(
+                                f"copy-{source.pk}-{note.pk}-"
+                                f"{uuid.uuid4().hex[:12]}"
+                            ),
+                            title=note.title,
+                            content=note.content,
+                            structured_data=note.structured_data,
+                            generation_version=note.generation_version,
+                            start_at=note.start_at,
+                            end_at=note.end_at,
+                            origin=Note.Origin.MANUAL,
+                            assignment_mode=Note.AssignmentMode.MANUAL,
+                        )
+                        EventNote.objects.create(
+                            event=copied_event,
+                            note=copied_note,
+                            created_by=request.user,
+                        )
                         copied_note_ids.append(copied_note.pk)
-                        warnings.append({"source_id": note.pk, "code": "evidence_not_copied", "detail": "整理记录已复制，但原始消息证据仍属于源空间。"})
+                        warnings.append(
+                            {
+                                "source_id": note.pk,
+                                "code": "evidence_not_copied",
+                                "detail": "整理记录已复制，但原始消息证据仍属于源空间。",
+                            }
+                        )
                     copied[-1]["copied_note_ids"] = copied_note_ids
                 elif source_notes:
-                    warnings.append({"source_id": event.pk, "code": "notes_not_copied", "detail": "事件关联整理记录未复制；请求 copy_notes=true 可复制独立整理记录。"})
-        audit_space_action(actor=request.user, space=target, action="space.resource_copied", resource_type=resource_type, metadata={"source_space_id": source.pk, "copied": copied, "warnings": warnings})
-        return Response({"data": {"source_space_id": source.pk, "target_space_id": target.pk, "copied": copied, "warnings": warnings}}, status=201)
+                    warnings.append(
+                        {
+                            "source_id": event.pk,
+                            "code": "notes_not_copied",
+                            "detail": (
+                                "事件关联整理记录未复制；请求 "
+                                "copy_notes=true 可复制独立整理记录。"
+                            ),
+                        }
+                    )
+        audit_space_action(
+            actor=request.user,
+            space=target,
+            action="space.resource_copied",
+            resource_type=resource_type,
+            metadata={
+                "source_space_id": source.pk,
+                "copied": copied,
+                "warnings": warnings,
+            },
+        )
+        return Response(
+            {
+                "data": {
+                    "source_space_id": source.pk,
+                    "target_space_id": target.pk,
+                    "copied": copied,
+                    "warnings": warnings,
+                }
+            },
+            status=201,
+        )

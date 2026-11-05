@@ -34,61 +34,51 @@ class TestSubscriptionCreatedWebhook:
     Test customer.subscription.created webhook
     """
 
-    @patch('billing.webhooks.SubscriptionService.sync_from_djstripe')
-    def test_subscription_created_syncs_to_local(
-        self, mock_sync, test_user
-    ):
+    @patch("billing.webhooks.SubscriptionService.sync_from_djstripe")
+    def test_subscription_created_syncs_to_local(self, mock_sync, test_user):
         """
         subscription.created webhook syncs djstripe to local
         """
         djstripe_sub = Mock()
-        djstripe_sub.id = 'sub_created_123'
+        djstripe_sub.id = "sub_created_123"
         djstripe_sub.customer = Mock()
         djstripe_sub.customer.subscriber = test_user
         djstripe_sub.customer.email = test_user.email
 
         event = Mock()
-        event.data = {
-            'object': {
-                'id': 'sub_created_123'
-            }
-        }
+        event.data = {"object": {"id": "sub_created_123"}}
 
         with patch(
-            'billing.webhooks.DjstripeSubscription.objects.get',
-            return_value=djstripe_sub
+            "billing.webhooks.DjstripeSubscription.objects.get",
+            return_value=djstripe_sub,
         ):
             handle_subscription_created(None, event=event)
 
         mock_sync.assert_called_once_with(djstripe_sub)
 
-    @patch('billing.webhooks.SubscriptionService.sync_from_djstripe')
-    def test_subscription_created_skips_without_subscriber_even_if_metadata_matches(
+    @patch("billing.webhooks.SubscriptionService.sync_from_djstripe")
+    def test_subscription_created_skips_without_subscriber_with_metadata(
         self, mock_sync, test_user
     ):
         """
         Customer without subscriber linkage should not auto-link from metadata.
         """
         djstripe_sub = Mock()
-        djstripe_sub.id = 'sub_link_123'
+        djstripe_sub.id = "sub_link_123"
         djstripe_sub.customer = Mock()
         djstripe_sub.customer.subscriber = None
-        djstripe_sub.customer.email = 'wrong@example.com'
+        djstripe_sub.customer.email = "wrong@example.com"
         djstripe_sub.customer.metadata = {
-            'djstripe_subscriber': str(test_user.id),
+            "djstripe_subscriber": str(test_user.id),
         }
         djstripe_sub.customer.save = Mock()
 
         event = Mock()
-        event.data = {
-            'object': {
-                'id': 'sub_link_123'
-            }
-        }
+        event.data = {"object": {"id": "sub_link_123"}}
 
         with patch(
-            'billing.webhooks.DjstripeSubscription.objects.get',
-            return_value=djstripe_sub
+            "billing.webhooks.DjstripeSubscription.objects.get",
+            return_value=djstripe_sub,
         ):
             handle_subscription_created(None, event=event)
 
@@ -96,8 +86,8 @@ class TestSubscriptionCreatedWebhook:
         djstripe_sub.customer.save.assert_not_called()
         mock_sync.assert_not_called()
 
-    @patch('billing.webhooks.SubscriptionService.sync_from_djstripe')
-    def test_subscription_created_skips_without_subscriber_even_if_email_matches(
+    @patch("billing.webhooks.SubscriptionService.sync_from_djstripe")
+    def test_subscription_created_skips_without_subscriber_with_email(
         self, mock_sync, test_user
     ):
         """
@@ -105,7 +95,7 @@ class TestSubscriptionCreatedWebhook:
         from email alone.
         """
         djstripe_sub = Mock()
-        djstripe_sub.id = 'sub_link_124'
+        djstripe_sub.id = "sub_link_124"
         djstripe_sub.customer = Mock()
         djstripe_sub.customer.subscriber = None
         djstripe_sub.customer.email = test_user.email
@@ -113,15 +103,11 @@ class TestSubscriptionCreatedWebhook:
         djstripe_sub.customer.save = Mock()
 
         event = Mock()
-        event.data = {
-            'object': {
-                'id': 'sub_link_124'
-            }
-        }
+        event.data = {"object": {"id": "sub_link_124"}}
 
         with patch(
-            'billing.webhooks.DjstripeSubscription.objects.get',
-            return_value=djstripe_sub
+            "billing.webhooks.DjstripeSubscription.objects.get",
+            return_value=djstripe_sub,
         ):
             handle_subscription_created(None, event=event)
 
@@ -135,31 +121,25 @@ class TestSubscriptionUpdatedWebhook:
     Test customer.subscription.updated webhook
     """
 
-    @patch('billing.webhooks.SubscriptionService.sync_from_djstripe')
-    def test_subscription_updated_syncs_to_local(
-        self, mock_sync, test_user
-    ):
+    @patch("billing.webhooks.SubscriptionService.sync_from_djstripe")
+    def test_subscription_updated_syncs_to_local(self, mock_sync, test_user):
         """
         subscription.updated webhook syncs changes to local
         """
         djstripe_sub = Mock()
-        djstripe_sub.id = 'sub_updated_123'
+        djstripe_sub.id = "sub_updated_123"
         djstripe_sub.customer = Mock()
         djstripe_sub.customer.subscriber = test_user
         djstripe_sub.customer.metadata = {
-            'djstripe_subscriber': str(test_user.id),
+            "djstripe_subscriber": str(test_user.id),
         }
 
         event = Mock()
-        event.data = {
-            'object': {
-                'id': 'sub_updated_123'
-            }
-        }
+        event.data = {"object": {"id": "sub_updated_123"}}
 
         with patch(
-            'billing.webhooks.DjstripeSubscription.objects.get',
-            return_value=djstripe_sub
+            "billing.webhooks.DjstripeSubscription.objects.get",
+            return_value=djstripe_sub,
         ):
             handle_subscription_updated(None, event=event)
 
@@ -172,7 +152,7 @@ class TestSubscriptionDeletedWebhook:
     Test customer.subscription.deleted webhook
     """
 
-    @patch('billing.webhooks.SubscriptionService.handle_cancellation')
+    @patch("billing.webhooks.SubscriptionService.handle_cancellation")
     def test_subscription_deleted_calls_cancellation(
         self, mock_handle_cancellation
     ):
@@ -180,15 +160,11 @@ class TestSubscriptionDeletedWebhook:
         subscription.deleted webhook calls handle_cancellation
         """
         event = Mock()
-        event.data = {
-            'object': {
-                'id': 'sub_deleted_123'
-            }
-        }
+        event.data = {"object": {"id": "sub_deleted_123"}}
 
         handle_subscription_deleted(None, event=event)
 
-        mock_handle_cancellation.assert_called_once_with('sub_deleted_123')
+        mock_handle_cancellation.assert_called_once_with("sub_deleted_123")
 
 
 @pytest.mark.django_db
@@ -197,16 +173,21 @@ class TestPaymentSucceededWebhook:
     Test invoice.payment_succeeded webhook
     """
 
-    @patch('billing.webhooks.SubscriptionService.handle_payment_success')
-    @patch('billing.webhooks.upsert_payment_record_from_stripe_invoice')
-    @patch('billing.webhooks.send_payment_success_notification.delay')
-    @patch('billing.webhooks.Subscription.objects.filter')
-    @patch('billing.webhooks.DjstripeSubscription.objects.filter')
+    @patch("billing.webhooks.SubscriptionService.handle_payment_success")
+    @patch("billing.webhooks.upsert_payment_record_from_stripe_invoice")
+    @patch("billing.webhooks.send_payment_success_notification.delay")
+    @patch("billing.webhooks.Subscription.objects.filter")
+    @patch("billing.webhooks.DjstripeSubscription.objects.filter")
     def test_payment_succeeded_recovers_past_due_subscription(
-        self, mock_djstripe_filter, mock_subscription_filter,
-        mock_send_email, mock_upsert_payment_record,
+        self,
+        mock_djstripe_filter,
+        mock_subscription_filter,
+        mock_send_email,
+        mock_upsert_payment_record,
         mock_handle_payment_success,
-        test_user, starter_plan, payment_provider,
+        test_user,
+        starter_plan,
+        payment_provider,
         django_capture_on_commit_callbacks,
     ):
         """
@@ -216,22 +197,22 @@ class TestPaymentSucceededWebhook:
             user=test_user,
             plan=starter_plan,
             provider=payment_provider,
-            status='past_due',
+            status="past_due",
             auto_renew=True,
             current_period_start=timezone.now(),
             current_period_end=timezone.now() + timedelta(days=30),
         )
 
         djstripe_sub = Mock()
-        djstripe_sub.id = 'sub_payment_success'
+        djstripe_sub.id = "sub_payment_success"
 
         event = Mock()
         event.data = {
-            'object': {
-                'id': 'inv_123',
-                'customer': 'cus_123',
-                'subscription': 'sub_payment_success',
-                'amount_paid': 2999
+            "object": {
+                "id": "inv_123",
+                "customer": "cus_123",
+                "subscription": "sub_payment_success",
+                "amount_paid": 2999,
             }
         }
 
@@ -241,45 +222,49 @@ class TestPaymentSucceededWebhook:
             skipped=False,
             created=True,
             updated=False,
-            reason='',
+            reason="",
         )
 
         with django_capture_on_commit_callbacks(execute=True):
             handle_payment_succeeded(None, event=event)
 
         subscription.refresh_from_db()
-        assert subscription.status == 'active'
+        assert subscription.status == "active"
 
         mock_send_email.assert_called_once_with(
-            user_id=test_user.id,
-            amount=29.99
+            user_id=test_user.id, amount=29.99
         )
         # handle_payment_success now takes the Stripe customer id.
-        mock_handle_payment_success.assert_called_once_with('cus_123')
+        mock_handle_payment_success.assert_called_once_with("cus_123")
         mock_upsert_payment_record.assert_called_once()
 
-    @patch('billing.webhooks.upsert_payment_record_from_stripe_invoice')
-    @patch('billing.webhooks.send_payment_success_notification.delay')
-    @patch('billing.webhooks.Subscription.objects.filter')
-    @patch('billing.webhooks.DjstripeSubscription.objects.filter')
+    @patch("billing.webhooks.upsert_payment_record_from_stripe_invoice")
+    @patch("billing.webhooks.send_payment_success_notification.delay")
+    @patch("billing.webhooks.Subscription.objects.filter")
+    @patch("billing.webhooks.DjstripeSubscription.objects.filter")
     def test_payment_succeeded_active_subscription_no_change(
-        self, mock_djstripe_filter, mock_subscription_filter,
-        mock_send_email, mock_upsert_payment_record,
-        test_user, starter_plan, payment_provider
+        self,
+        mock_djstripe_filter,
+        mock_subscription_filter,
+        mock_send_email,
+        mock_upsert_payment_record,
+        test_user,
+        starter_plan,
+        payment_provider,
     ):
         """
         Payment success for active subscription does not send email
         """
         djstripe_sub = Mock()
-        djstripe_sub.id = 'sub_already_active'
+        djstripe_sub.id = "sub_already_active"
 
         event = Mock()
         event.data = {
-            'object': {
-                'id': 'inv_456',
-                'customer': 'cus_456',
-                'subscription': 'sub_already_active',
-                'amount_paid': 2999
+            "object": {
+                "id": "inv_456",
+                "customer": "cus_456",
+                "subscription": "sub_already_active",
+                "amount_paid": 2999,
             }
         }
 
@@ -289,7 +274,7 @@ class TestPaymentSucceededWebhook:
             skipped=False,
             created=True,
             updated=False,
-            reason='',
+            reason="",
         )
 
         handle_payment_succeeded(None, event=event)
@@ -304,14 +289,19 @@ class TestPaymentFailedWebhook:
     Test invoice.payment_failed webhook
     """
 
-    @patch('billing.webhooks.upsert_payment_record_from_stripe_invoice')
-    @patch('billing.webhooks.send_payment_failure_notification.delay')
-    @patch('billing.webhooks.Subscription.objects.filter')
-    @patch('billing.webhooks.DjstripeSubscription.objects.filter')
+    @patch("billing.webhooks.upsert_payment_record_from_stripe_invoice")
+    @patch("billing.webhooks.send_payment_failure_notification.delay")
+    @patch("billing.webhooks.Subscription.objects.filter")
+    @patch("billing.webhooks.DjstripeSubscription.objects.filter")
     def test_payment_failed_sets_past_due_status(
-        self, mock_djstripe_filter, mock_subscription_filter,
-        mock_send_email, mock_upsert_payment_record,
-        test_user, starter_plan, payment_provider
+        self,
+        mock_djstripe_filter,
+        mock_subscription_filter,
+        mock_send_email,
+        mock_upsert_payment_record,
+        test_user,
+        starter_plan,
+        payment_provider,
     ):
         """
         Payment failure sets subscription to past_due
@@ -320,25 +310,23 @@ class TestPaymentFailedWebhook:
             user=test_user,
             plan=starter_plan,
             provider=payment_provider,
-            status='active',
+            status="active",
             auto_renew=True,
             current_period_start=timezone.now(),
             current_period_end=timezone.now() + timedelta(days=30),
         )
 
         djstripe_sub = Mock()
-        djstripe_sub.id = 'sub_payment_failed'
+        djstripe_sub.id = "sub_payment_failed"
 
         event = Mock()
         event.data = {
-            'object': {
-                'id': 'inv_fail_123',
-                'customer': 'cus_fail_123',
-                'subscription': 'sub_payment_failed',
-                'attempt_count': 2,
-                'last_payment_error': {
-                    'message': 'Card declined'
-                }
+            "object": {
+                "id": "inv_fail_123",
+                "customer": "cus_fail_123",
+                "subscription": "sub_payment_failed",
+                "attempt_count": 2,
+                "last_payment_error": {"message": "Card declined"},
             }
         }
 
@@ -348,46 +336,49 @@ class TestPaymentFailedWebhook:
             skipped=False,
             created=True,
             updated=False,
-            reason='',
+            reason="",
         )
 
         handle_payment_failed(None, event=event)
 
         subscription.refresh_from_db()
-        assert subscription.status == 'past_due'
+        assert subscription.status == "past_due"
 
         mock_send_email.assert_called_once_with(
             user_id=test_user.id,
             attempt_count=2,
-            failure_reason='Card declined'
+            failure_reason="Card declined",
         )
         mock_upsert_payment_record.assert_called_once()
 
-    @patch('billing.webhooks.upsert_payment_record_from_stripe_invoice')
-    @patch('billing.webhooks.send_payment_failure_notification.delay')
-    @patch('billing.webhooks.Subscription.objects.filter')
-    @patch('billing.webhooks.DjstripeSubscription.objects.filter')
+    @patch("billing.webhooks.upsert_payment_record_from_stripe_invoice")
+    @patch("billing.webhooks.send_payment_failure_notification.delay")
+    @patch("billing.webhooks.Subscription.objects.filter")
+    @patch("billing.webhooks.DjstripeSubscription.objects.filter")
     def test_payment_failed_past_due_subscription_no_duplicate_email(
-        self, mock_djstripe_filter, mock_subscription_filter,
-        mock_send_email, mock_upsert_payment_record,
-        test_user, starter_plan, payment_provider
+        self,
+        mock_djstripe_filter,
+        mock_subscription_filter,
+        mock_send_email,
+        mock_upsert_payment_record,
+        test_user,
+        starter_plan,
+        payment_provider,
     ):
         """
         Payment failure for already past_due subscription
         """
         djstripe_sub = Mock()
-        djstripe_sub.id = 'sub_already_past_due'
+        djstripe_sub.id = "sub_already_past_due"
 
         event = Mock()
         event.data = {
-            'object': {
-                'id': 'inv_fail_456',
-                'customer': 'cus_fail_456',
-                'subscription': 'sub_already_past_due',
-                'attempt_count': 3,
-                'last_payment_error': {
-                    'message': 'Insufficient funds'
-                }
+            "object": {
+                "id": "inv_fail_456",
+                "customer": "cus_fail_456",
+                "subscription": "sub_already_past_due",
+                "attempt_count": 3,
+                "last_payment_error": {"message": "Insufficient funds"},
             }
         }
 
@@ -397,7 +388,7 @@ class TestPaymentFailedWebhook:
             skipped=False,
             created=True,
             updated=False,
-            reason='',
+            reason="",
         )
 
         handle_payment_failed(None, event=event)

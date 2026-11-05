@@ -1,6 +1,5 @@
-from rest_framework import serializers
-
 from chat_sources.models import Source, SourceImport
+from rest_framework import serializers
 
 
 class SourceCreateSerializer(serializers.Serializer):

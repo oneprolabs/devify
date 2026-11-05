@@ -4,9 +4,10 @@ from chat_ingestion.views import (
     UploadBatchArchiveAPIView,
     UploadBatchCancelAPIView,
     UploadBatchCompleteAPIView,
-    UploadBatchRetryAPIView, UploadBatchItemDetailAPIView,
     UploadBatchCreateAPIView,
     UploadBatchDetailAPIView,
+    UploadBatchItemDetailAPIView,
+    UploadBatchRetryAPIView,
 )
 
 urlpatterns = [

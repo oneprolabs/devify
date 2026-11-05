@@ -24,7 +24,7 @@ app.conf.update(result_backend="django-db")
 # Celery loads any tasks defined in each app's tasks.py module.
 app.autodiscover_tasks()
 
-import chat_analysis.celery_bootstrap  # noqa: F401
+import chat_analysis.celery_bootstrap  # noqa: E402,F401
 
 # Register Celery worker bootstrap hooks.
-import threadline.celery_bootstrap  # noqa: F401
+import threadline.celery_bootstrap  # noqa: E402,F401

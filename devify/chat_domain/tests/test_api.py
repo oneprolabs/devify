@@ -1,6 +1,7 @@
+import zipfile
 from datetime import datetime
 from datetime import timezone as dt_timezone
-import zipfile
+
 import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
@@ -101,16 +102,24 @@ def test_non_member_cannot_read_conversations_or_messages():
     client = APIClient()
     client.force_authenticate(user=outsider)
 
-    assert client.get(
-        f"/api/v1/spaces/{space.pk}/conversations"
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/spaces/{space.pk}/conversations/{conversation.pk}/messages"
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/spaces/{space.pk}/conversations/"
-        f"{conversation.pk}/messages/{message.pk}"
-    ).status_code == 404
+    assert (
+        client.get(f"/api/v1/spaces/{space.pk}/conversations").status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/spaces/{space.pk}/conversations/"
+            f"{conversation.pk}/messages"
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/spaces/{space.pk}/conversations/"
+            f"{conversation.pk}/messages/{message.pk}"
+        ).status_code
+        == 404
+    )
 
 
 def test_same_user_cannot_read_conversation_from_another_space():
@@ -143,9 +152,7 @@ def test_global_admin_requires_takeover_and_access_is_audited():
         reason="support investigation",
     )
     assert client.get(url).status_code == 200
-    assert client.get(
-        f"{url}/{conversation.pk}"
-    ).status_code == 200
+    assert client.get(f"{url}/{conversation.pk}").status_code == 200
 
 
 def test_conversation_and_message_list_expose_readable_previews():
@@ -465,9 +472,7 @@ def test_avatar_endpoint_rejects_an_unknown_digest(settings, tmp_path):
     client = APIClient()
     client.force_authenticate(user=owner)
 
-    response = client.get(
-        f"/api/v1/spaces/{space.pk}/avatars/{'0' * 64}"
-    )
+    response = client.get(f"/api/v1/spaces/{space.pk}/avatars/{'0' * 64}")
     assert response.status_code == 404
 
 
@@ -508,7 +513,8 @@ def test_message_media_is_streamed_only_to_space_members(settings, tmp_path):
     client = APIClient()
     client.force_authenticate(user=owner)
     detail = client.get(
-        f"/api/v1/spaces/{space.pk}/conversations/{conversation.pk}/messages/{message.pk}"
+        f"/api/v1/spaces/{space.pk}/conversations/"
+        f"{conversation.pk}/messages/{message.pk}"
     )
     assert detail.status_code == 200
     part = detail.data["data"]["parts"][0]

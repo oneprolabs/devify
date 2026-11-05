@@ -17,9 +17,11 @@ from threadline.serializers.space_email import (
 def authorized_space(user, space_id):
     space = get_object_or_404(Space.objects.select_for_update(), pk=space_id)
     if user.is_staff:
-        takeover = SpaceTakeover.objects.select_for_update().filter(
-            space=space, admin=user, active=True
-        ).first()
+        takeover = (
+            SpaceTakeover.objects.select_for_update()
+            .filter(space=space, admin=user, active=True)
+            .first()
+        )
         if not takeover:
             return None, None
         return space, takeover
@@ -61,15 +63,19 @@ class SpaceEmailListAPIView(APIView):
                     "page": paginator.page.number,
                 },
             )
-        return Response({"data": {
-            "list": data,
-            "pagination": {
-                "total": paginator.page.paginator.count,
-                "page": paginator.page.number,
-                "next": paginator.get_next_link(),
-                "previous": paginator.get_previous_link(),
-            },
-        }})
+        return Response(
+            {
+                "data": {
+                    "list": data,
+                    "pagination": {
+                        "total": paginator.page.paginator.count,
+                        "page": paginator.page.number,
+                        "next": paginator.get_next_link(),
+                        "previous": paginator.get_previous_link(),
+                    },
+                }
+            }
+        )
 
 
 class SpaceEmailDetailAPIView(APIView):

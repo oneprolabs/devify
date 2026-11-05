@@ -141,17 +141,49 @@ def test_report_sources_survive_deletion():
 
     owner = User.objects.create_user(username="report-delete-owner")
     space = make_space(owner, "report-delete-team")
-    event = Event.objects.create(space=space, created_by=owner, event_key="event-delete", title="Event", content="Event original", status=Event.Status.OPEN)
-    note = Note.objects.create(space=space, created_by=owner, note_key="note-delete", title="Note", content="Note original")
+    event = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="event-delete",
+        title="Event",
+        content="Event original",
+        status=Event.Status.OPEN,
+    )
+    note = Note.objects.create(
+        space=space,
+        created_by=owner,
+        note_key="note-delete",
+        title="Note",
+        content="Note original",
+    )
     client = APIClient()
     client.force_authenticate(user=owner)
-    response = client.post(f"/api/v1/spaces/{space.pk}/reports", {"request_key": "delete-report", "title": "Report"}, format="json")
+    response = client.post(
+        f"/api/v1/spaces/{space.pk}/reports",
+        {"request_key": "delete-report", "title": "Report"},
+        format="json",
+    )
     report_id = response.data["data"]["id"]
     delete_event(actor=owner, event=event)
     delete_note(actor=owner, note=note)
     detail = client.get(f"/api/v1/reports/{report_id}")
     assert detail.status_code == 200
-    sources = [source for section in detail.data["data"]["sections"] for item in section["items"] for source in item["sources"]]
-    assert any(source["event_id"] is None and source["event_snapshot"] and source["event_snapshot"]["content"] == "Event original" for source in sources)
-    assert any(source["note_id"] is None and source["note_snapshot"] and source["note_snapshot"]["content"] == "Note original" for source in sources)
+    sources = [
+        source
+        for section in detail.data["data"]["sections"]
+        for item in section["items"]
+        for source in item["sources"]
+    ]
+    assert any(
+        source["event_id"] is None
+        and source["event_snapshot"]
+        and source["event_snapshot"]["content"] == "Event original"
+        for source in sources
+    )
+    assert any(
+        source["note_id"] is None
+        and source["note_snapshot"]
+        and source["note_snapshot"]["content"] == "Note original"
+        for source in sources
+    )
     assert client.get(f"/api/v1/spaces/{space.pk}/reports").status_code == 200

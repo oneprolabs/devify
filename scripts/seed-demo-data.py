@@ -2,7 +2,8 @@
 
 Run from the repository root:
   docker compose -f docker-compose.dev.yml exec -T devify-api bash -lc \
-    'cd /opt/devify && PYTHONPATH=/opt/devify DJANGO_SETTINGS_MODULE=core.settings \
+    'cd /opt/devify && PYTHONPATH=/opt/devify \
+     DJANGO_SETTINGS_MODULE=core.settings \
      /opt/venv/bin/python manage.py shell' < scripts/seed-demo-data.py
 
 Every row created here is prefixed with ``demo:`` (or marked with a ``demo``
@@ -11,15 +12,30 @@ resets the demo rows first.
 
 Cleanup:
   docker compose -f docker-compose.dev.yml exec -T devify-api bash -lc \
-    'cd /opt/devify && PYTHONPATH=/opt/devify DJANGO_SETTINGS_MODULE=core.settings \
+    'cd /opt/devify && PYTHONPATH=/opt/devify \
+     DJANGO_SETTINGS_MODULE=core.settings \
      /opt/venv/bin/python manage.py shell -c "
-from chat_analysis.models import Event, Report, TopicSubscription, QuestionAnswer
+from chat_analysis.models import (
+    Event, Report, TopicSubscription, QuestionAnswer
+)
 from chat_ingestion.models import UploadBatch
 Event.objects.filter(space_id=3, event_key__startswith=\"demo:\").delete()
-Report.objects.filter(space_id=3, request_key__startswith=\"demo:\").delete()
-UploadBatch.objects.filter(space_id=3, idempotency_key__startswith=\"demo:\").delete()
-[o.delete() for o in TopicSubscription.objects.filter(space_id=3) if (o.filters or {}).get(\"demo\")]
-[o.delete() for o in QuestionAnswer.objects.filter(space_id=3) if (o.usage or {}).get(\"demo\")]
+Report.objects.filter(
+    space_id=3, request_key__startswith=\"demo:\"
+).delete()
+UploadBatch.objects.filter(
+    space_id=3, idempotency_key__startswith=\"demo:\"
+).delete()
+[
+    o.delete()
+    for o in TopicSubscription.objects.filter(space_id=3)
+    if (o.filters or {}).get(\"demo\")
+]
+[
+    o.delete()
+    for o in QuestionAnswer.objects.filter(space_id=3)
+    if (o.usage or {}).get(\"demo\")
+]
 "'
 """
 
@@ -32,7 +48,6 @@ from chat_analysis.models import (
     EventNote,
     EventTag,
     EventTagAssignment,
-    Note,
     QuestionAnswer,
     Report,
     TopicSubscription,
@@ -61,7 +76,9 @@ Report.objects.filter(space=space, request_key__startswith="demo:").delete()
 for question in QuestionAnswer.objects.filter(space=space):
     if (question.usage or {}).get("demo"):
         question.delete()
-UploadBatch.objects.filter(space=space, idempotency_key__startswith="demo:").delete()
+UploadBatch.objects.filter(
+    space=space, idempotency_key__startswith="demo:"
+).delete()
 
 # -------------------------------------------------------------------- tags
 tag_specs = [
@@ -224,11 +241,20 @@ topic_specs = [
         "",
     ),
 ]
-for topic_filters, (title, instruction, period, run_time, last_run, last_error) in zip(
-    [{"demo": True, "tag_keys": ["demo:customer"]},
-     {"demo": True},
-     {"demo": True, "tag_keys": ["demo:collab"]},
-     {"demo": True}],
+for topic_filters, (
+    title,
+    instruction,
+    period,
+    run_time,
+    last_run,
+    last_error,
+) in zip(
+    [
+        {"demo": True, "tag_keys": ["demo:customer"]},
+        {"demo": True},
+        {"demo": True, "tag_keys": ["demo:collab"]},
+        {"demo": True},
+    ],
     topic_specs,
 ):
     TopicSubscription.objects.create(
@@ -301,6 +327,7 @@ for spec in report_specs:
         generated_at=spec["generated"],
     )
 
+
 # --------------------------------------------------------------- questions
 def cite_event(key, excerpt):
     event = events_by_key[key]
@@ -332,9 +359,18 @@ question_specs = [
             "建议先处理报价，因为它会直接影响后续签约节奏。"
         ),
         "citations": [
-            cite_event("demo:saas-log-fix", "客户第三次追问修复时间，临时绕过方案已失效。"),
-            cite_event("demo:latam-quote", "同一份报价出现两个版本，差额来自实施服务。"),
-            cite_message(latest_messages[0], "麻烦确认一下今晚能不能恢复，我们这边在等。"),
+            cite_event(
+                "demo:saas-log-fix",
+                "客户第三次追问修复时间，临时绕过方案已失效。",
+            ),
+            cite_event(
+                "demo:latam-quote",
+                "同一份报价出现两个版本，差额来自实施服务。",
+            ),
+            cite_message(
+                latest_messages[0],
+                "麻烦确认一下今晚能不能恢复，我们这边在等。",
+            ),
         ],
         "scope": {"event_ids": [], "note_ids": [], "conversation_ids": []},
         "created": now - dt.timedelta(hours=3),
@@ -349,9 +385,15 @@ question_specs = [
             "其余两件事已经完成，不需要再投入时间。"
         ),
         "citations": [
-            cite_event("demo:review-1730", "刘立祥希望今天 17:30 前过一遍需求说明。"),
-            cite_event("demo:saas-log-fix", "修复窗口定在 20:30，需要客户确认。"),
-            cite_event("demo:agi-overseas", "英文版方案周五前交付，正文完成约 70%。"),
+            cite_event(
+                "demo:review-1730", "刘立祥希望今天 17:30 前过一遍需求说明。"
+            ),
+            cite_event(
+                "demo:saas-log-fix", "修复窗口定在 20:30，需要客户确认。"
+            ),
+            cite_event(
+                "demo:agi-overseas", "英文版方案周五前交付，正文完成约 70%。"
+            ),
         ],
         "scope": {"event_ids": [], "note_ids": [], "conversation_ids": []},
         "created": now - dt.timedelta(days=1, hours=4),
@@ -364,8 +406,12 @@ question_specs = [
             "「发票管家 10 月账单核对」已经有结论，差额 0.42 元不调整，可以归档。"
         ),
         "citations": [
-            cite_event("demo:meeting-room", "会议室变更已通知，参会人确认收到。"),
-            cite_event("demo:invoice-oct", "账单差异 0.42 元，以财务系统为准。"),
+            cite_event(
+                "demo:meeting-room", "会议室变更已通知，参会人确认收到。"
+            ),
+            cite_event(
+                "demo:invoice-oct", "账单差异 0.42 元，以财务系统为准。"
+            ),
         ],
         "scope": {"event_ids": [], "note_ids": [], "conversation_ids": []},
         "created": now - dt.timedelta(days=3),
@@ -388,13 +434,36 @@ for spec in question_specs:
         },
         status=QuestionAnswer.Status.READY,
     )
-    QuestionAnswer.objects.filter(pk=answer.pk).update(created_at=spec["created"])
+    QuestionAnswer.objects.filter(pk=answer.pk).update(
+        created_at=spec["created"]
+    )
 
 # ----------------------------------------------------------------- uploads
 upload_specs = [
-    ("demo:sync-whatsapp-1102", UploadBatch.SourceType.WHATSAPP, 412, UploadBatch.Status.COMPLETED, now - dt.timedelta(hours=4), ""),
-    ("demo:sync-wechat-1101", UploadBatch.SourceType.WECHAT, 96, UploadBatch.Status.COMPLETED, now - dt.timedelta(days=1, hours=6), ""),
-    ("demo:sync-wechat-1030", UploadBatch.SourceType.WECHAT, 0, UploadBatch.Status.FAILED, now - dt.timedelta(days=3), "压缩包缺少会话索引文件，已跳过本次同步。"),
+    (
+        "demo:sync-whatsapp-1102",
+        UploadBatch.SourceType.WHATSAPP,
+        412,
+        UploadBatch.Status.COMPLETED,
+        now - dt.timedelta(hours=4),
+        "",
+    ),
+    (
+        "demo:sync-wechat-1101",
+        UploadBatch.SourceType.WECHAT,
+        96,
+        UploadBatch.Status.COMPLETED,
+        now - dt.timedelta(days=1, hours=6),
+        "",
+    ),
+    (
+        "demo:sync-wechat-1030",
+        UploadBatch.SourceType.WECHAT,
+        0,
+        UploadBatch.Status.FAILED,
+        now - dt.timedelta(days=3),
+        "压缩包缺少会话索引文件，已跳过本次同步。",
+    ),
 ]
 for key, source_type, count, status, created, error in upload_specs:
     batch = UploadBatch.objects.create(
@@ -411,10 +480,24 @@ for key, source_type, count, status, created, error in upload_specs:
 print(
     "demo data seeded:",
     {
-        "events": Event.objects.filter(space=space, event_key__startswith="demo:").count(),
-        "topics": sum(1 for t in TopicSubscription.objects.filter(space=space) if (t.filters or {}).get("demo")),
-        "reports": Report.objects.filter(space=space, request_key__startswith="demo:").count(),
-        "questions": sum(1 for q in QuestionAnswer.objects.filter(space=space) if (q.usage or {}).get("demo")),
-        "uploads": UploadBatch.objects.filter(space=space, idempotency_key__startswith="demo:").count(),
+        "events": Event.objects.filter(
+            space=space, event_key__startswith="demo:"
+        ).count(),
+        "topics": sum(
+            1
+            for t in TopicSubscription.objects.filter(space=space)
+            if (t.filters or {}).get("demo")
+        ),
+        "reports": Report.objects.filter(
+            space=space, request_key__startswith="demo:"
+        ).count(),
+        "questions": sum(
+            1
+            for q in QuestionAnswer.objects.filter(space=space)
+            if (q.usage or {}).get("demo")
+        ),
+        "uploads": UploadBatch.objects.filter(
+            space=space, idempotency_key__startswith="demo:"
+        ).count(),
     },
 )

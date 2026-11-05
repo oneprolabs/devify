@@ -55,7 +55,8 @@ def test_complete_registration_rolls_back_temp_user_when_creation_fails():
 
     client = APIClient()
     with patch(
-        "accounts.views.registration.RegistrationService.create_user_with_config",
+        "accounts.views.registration.RegistrationService."
+        "create_user_with_config",
         side_effect=RuntimeError("boom"),
     ):
         response = client.post(

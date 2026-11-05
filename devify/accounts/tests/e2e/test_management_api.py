@@ -4,7 +4,8 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from threadline.models import EmailAlias, Settings as ThreadlineSettings
+from threadline.models import EmailAlias
+from threadline.models import Settings as ThreadlineSettings
 
 
 @pytest.mark.django_db

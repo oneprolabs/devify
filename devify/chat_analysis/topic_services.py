@@ -10,11 +10,12 @@ from chat_domain.models import Message
 from core.tracking import LLMTracker
 from spaces.services import SpacePermissionService
 
-QUESTION_PROMPT = """You answer questions about a user's imported conversation analysis.
-Use only the supplied records. If the records do not establish an answer, say so
-clearly; do not invent people, dates, decisions, or commitments.
-Return JSON with exactly: answer (string), citations (array of objects with kind,
-id, title, and excerpt). Cite only supplied event, note, or message IDs.
+QUESTION_PROMPT = """You answer questions about a user's imported
+conversation analysis.
+Use only the supplied records. If the records do not establish an answer, say
+so clearly; do not invent people, dates, decisions, or commitments.
+Return JSON with exactly: answer (string), citations (array of objects with
+kind, id, title, and excerpt). Cite only supplied event, note, or message IDs.
 """
 
 
@@ -74,14 +75,24 @@ def _fill_budget(values, budget, item_chars):
     return selected, used, truncated
 
 
-def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=None, tag_keys=None, keywords=None):
+def question_context(
+    *,
+    space,
+    event_ids=None,
+    note_ids=None,
+    conversation_ids=None,
+    tag_keys=None,
+    keywords=None,
+):
     event_ids = _ids(event_ids)
     note_ids = _ids(note_ids)
     conversation_ids = _ids(conversation_ids)
     events = Event.objects.filter(space=space)
     notes = Note.objects.filter(space=space)
     if conversation_ids:
-        notes = notes.filter(evidence__message__conversation_id__in=conversation_ids).distinct()
+        notes = notes.filter(
+            evidence__message__conversation_id__in=conversation_ids
+        ).distinct()
         events = events.filter(note_links__note__in=notes).distinct()
     if note_ids:
         notes = notes.filter(id__in=note_ids)
@@ -90,16 +101,28 @@ def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=N
         events = events.filter(id__in=event_ids)
         notes = notes.filter(event_links__event_id__in=event_ids).distinct()
     if tag_keys:
-        events = events.filter(tag_assignments__tag__tag_key__in=tag_keys).distinct()
+        events = events.filter(
+            tag_assignments__tag__tag_key__in=tag_keys
+        ).distinct()
     if keywords:
         event_query = Q()
         note_query = Q()
         for keyword in keywords:
-            event_query |= Q(title__icontains=keyword) | Q(content__icontains=keyword)
-            note_query |= Q(title__icontains=keyword) | Q(content__icontains=keyword)
+            event_query |= Q(title__icontains=keyword) | Q(
+                content__icontains=keyword
+            )
+            note_query |= Q(title__icontains=keyword) | Q(
+                content__icontains=keyword
+            )
         events = events.filter(event_query)
         notes = notes.filter(note_query)
-    if not event_ids and not note_ids and not conversation_ids and not tag_keys and not keywords:
+    if (
+        not event_ids
+        and not note_ids
+        and not conversation_ids
+        and not tag_keys
+        and not keywords
+    ):
         events = events.order_by("-last_activity_at", "-id")
         notes = notes.order_by("-start_at", "-id")
     event_rows = list(events[:101])
@@ -123,7 +146,12 @@ def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=N
         item_chars,
     )
     selected_events = [
-        {"id": event.pk, "title": event.title, "content": text, "status": event.status}
+        {
+            "id": event.pk,
+            "title": event.title,
+            "content": text,
+            "status": event.status,
+        }
         for event, text in zip(event_rows, event_texts)
     ]
     allowed_event_ids = {event["id"] for event in selected_events}
@@ -132,7 +160,9 @@ def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=N
     if conversation_ids:
         messages = messages.filter(conversation_id__in=conversation_ids)
     elif allowed_note_ids:
-        messages = messages.filter(chat_note_evidence__note_id__in=allowed_note_ids).distinct()
+        messages = messages.filter(
+            chat_note_evidence__note_id__in=allowed_note_ids
+        ).distinct()
     message_rows = list(messages.order_by("-occurred_at", "-id")[:101])
     rows_truncated = rows_truncated or len(message_rows) > 100
     message_rows = message_rows[:100]
@@ -140,8 +170,9 @@ def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=N
         [
             " ".join(
                 part
-                for part in message.parts.order_by("ordinal", "id")
-                .values_list("text", flat=True)[:3]
+                for part in message.parts.order_by(
+                    "ordinal", "id"
+                ).values_list("text", flat=True)[:3]
                 if part
             )
             for message in message_rows
@@ -154,7 +185,11 @@ def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=N
             "id": message.pk,
             "conversation_id": message.conversation_id,
             "sender": message.sender_name or message.sender_key,
-            "occurred_at": message.occurred_at.isoformat() if message.occurred_at else None,
+            "occurred_at": (
+                message.occurred_at.isoformat()
+                if message.occurred_at
+                else None
+            ),
             "parts": [text] if text else [],
         }
         for message, text in zip(message_rows, message_texts)
@@ -166,29 +201,64 @@ def question_context(*, space, event_ids=None, note_ids=None, conversation_ids=N
         "scope": {
             "event_ids": sorted(allowed_event_ids),
             "note_ids": sorted(allowed_note_ids),
-            "conversation_ids": sorted({message["conversation_id"] for message in selected_messages} | conversation_ids),
-            "context_truncated": rows_truncated or notes_truncated or events_truncated or messages_truncated,
+            "conversation_ids": sorted(
+                {message["conversation_id"] for message in selected_messages}
+                | conversation_ids
+            ),
+            "context_truncated": rows_truncated
+            or notes_truncated
+            or events_truncated
+            or messages_truncated,
         },
     }
 
 
-def answer_question(*, actor, space, question, event_ids=None, note_ids=None, conversation_ids=None, tag_keys=None, keywords=None):
+def answer_question(
+    *,
+    actor,
+    space,
+    question,
+    event_ids=None,
+    note_ids=None,
+    conversation_ids=None,
+    tag_keys=None,
+    keywords=None,
+):
     if not SpacePermissionService.can_read(actor, space):
         raise PermissionError("Space is not visible to this user.")
-    context = question_context(space=space, event_ids=event_ids, note_ids=note_ids, conversation_ids=conversation_ids, tag_keys=tag_keys, keywords=keywords)
+    context = question_context(
+        space=space,
+        event_ids=event_ids,
+        note_ids=note_ids,
+        conversation_ids=conversation_ids,
+        tag_keys=tag_keys,
+        keywords=keywords,
+    )
     output, usage = LLMTracker.call_and_track(
         prompt=QUESTION_PROMPT,
-        content=json.dumps({"question": question, "records": context}, ensure_ascii=False, sort_keys=True),
+        content=json.dumps(
+            {"question": question, "records": context},
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
         json_mode=True,
         max_retries=1,
         node_name="chat_question_answering",
     )
-    if not isinstance(output, dict) or not isinstance(output.get("answer"), str) or not output["answer"].strip():
+    if (
+        not isinstance(output, dict)
+        or not isinstance(output.get("answer"), str)
+        or not output["answer"].strip()
+    ):
         raise ValueError("The question model returned an empty answer.")
     citations = output.get("citations", [])
     if not isinstance(citations, list):
         citations = []
-    valid = {("event", item["id"]): item for item in context["events"]} | {("note", item["id"]): item for item in context["notes"]} | {("message", item["id"]): item for item in context["messages"]}
+    valid = (
+        {("event", item["id"]): item for item in context["events"]}
+        | {("note", item["id"]): item for item in context["notes"]}
+        | {("message", item["id"]): item for item in context["messages"]}
+    )
     normalized_citations = []
     for item in citations:
         if not isinstance(item, dict):
@@ -198,16 +268,35 @@ def answer_question(*, actor, space, question, event_ids=None, note_ids=None, co
             continue
         if item["kind"] == "message":
             title = source["sender"] or f"消息 #{source['id']}"
-            excerpt = " ".join(part for part in source["parts"] if part).strip()
-            normalized_citations.append({
-                "kind": item["kind"],
-                "id": source["id"],
-                "conversation_id": source["conversation_id"],
-                "title": title,
-                "excerpt": excerpt[:500],
-            })
+            excerpt = " ".join(
+                part for part in source["parts"] if part
+            ).strip()
+            normalized_citations.append(
+                {
+                    "kind": item["kind"],
+                    "id": source["id"],
+                    "conversation_id": source["conversation_id"],
+                    "title": title,
+                    "excerpt": excerpt[:500],
+                }
+            )
         else:
             title = source["title"]
             excerpt = source["content"]
-            normalized_citations.append({"kind": item["kind"], "id": source["id"], "title": title, "excerpt": excerpt[:500]})
-    return {"question": question, "answer": output["answer"].strip(), "citations": normalized_citations, "scope": context["scope"], "usage": {"model": usage.get("model")} if isinstance(usage, dict) else {}}
+            normalized_citations.append(
+                {
+                    "kind": item["kind"],
+                    "id": source["id"],
+                    "title": title,
+                    "excerpt": excerpt[:500],
+                }
+            )
+    return {
+        "question": question,
+        "answer": output["answer"].strip(),
+        "citations": normalized_citations,
+        "scope": context["scope"],
+        "usage": (
+            {"model": usage.get("model")} if isinstance(usage, dict) else {}
+        ),
+    }

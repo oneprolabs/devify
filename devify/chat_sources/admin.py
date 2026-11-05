@@ -1,6 +1,5 @@
-from django.contrib import admin
-
 from chat_sources.models import Source, SourceImport
+from django.contrib import admin
 
 
 @admin.register(Source)

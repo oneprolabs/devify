@@ -152,8 +152,7 @@ def review_event_suggestion(
                 "created_by": actor,
                 "title": suggestion.title,
                 "content": suggestion.summary,
-                "status": suggestion.proposed_status
-                or Event.Status.OPEN,
+                "status": suggestion.proposed_status or Event.Status.OPEN,
                 "entity_key": suggestion.entity_key,
             },
         )
@@ -168,9 +167,7 @@ def review_event_suggestion(
             note=suggestion.note,
             defaults={"created_by": actor},
         )
-        _apply_tags(
-            actor=actor, event=event, tags=suggestion.proposed_tags
-        )
+        _apply_tags(actor=actor, event=event, tags=suggestion.proposed_tags)
         if source_messages:
             EventEvidence.objects.bulk_create(
                 [

@@ -314,7 +314,9 @@ def test_resource_copy_requires_target_write_permission(world):
         role=SpaceMembership.Role.GUEST,
     )
     target = Space.objects.create(
-        name="guest-target", slug="guest-target", kind=Space.Kind.TEAM,
+        name="guest-target",
+        slug="guest-target",
+        kind=Space.Kind.TEAM,
         owner=world["owner"],
     )
     SpaceMembership.objects.create(

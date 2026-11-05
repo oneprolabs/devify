@@ -1,12 +1,11 @@
 from django.urls import path
 
 from chat_analysis.views import (
+    AnalysisJobCancelAPIView,
     AnalysisJobDetailAPIView,
     AnalysisJobRetryAPIView,
-    AnalysisJobCancelAPIView,
     SpaceAnalysisJobListCreateAPIView,
 )
-
 
 urlpatterns = [
     path(

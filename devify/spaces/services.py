@@ -146,13 +146,17 @@ def invite_member(*, actor, space, user, role):
         singleton_key="default"
     )
     if policy.max_invited_users is not None:
-        member_count = SpaceMembership.objects.filter(
-            space=space,
-            status__in=(
-                SpaceMembership.Status.ACTIVE,
-                SpaceMembership.Status.INVITED,
-            ),
-        ).exclude(user_id=space.owner_id).count()
+        member_count = (
+            SpaceMembership.objects.filter(
+                space=space,
+                status__in=(
+                    SpaceMembership.Status.ACTIVE,
+                    SpaceMembership.Status.INVITED,
+                ),
+            )
+            .exclude(user_id=space.owner_id)
+            .count()
+        )
         if member_count >= policy.max_invited_users:
             raise ValueError("The space member limit has been reached.")
     if membership:
@@ -236,19 +240,27 @@ def transfer_space_ownership(*, actor, space, user):
         raise PermissionError("Only the current owner can transfer ownership.")
     if user.pk == actor.pk:
         raise ValueError("The new owner must be another member.")
-    target = SpaceMembership.objects.select_for_update().filter(
-        space=space,
-        user=user,
-        status=SpaceMembership.Status.ACTIVE,
-    ).first()
+    target = (
+        SpaceMembership.objects.select_for_update()
+        .filter(
+            space=space,
+            user=user,
+            status=SpaceMembership.Status.ACTIVE,
+        )
+        .first()
+    )
     if not target:
         raise ValueError("The new owner must be an active space member.")
-    current_owner = SpaceMembership.objects.select_for_update().filter(
-        space=space,
-        user_id=space.owner_id,
-        status=SpaceMembership.Status.ACTIVE,
-        role=SpaceMembership.Role.OWNER,
-    ).first()
+    current_owner = (
+        SpaceMembership.objects.select_for_update()
+        .filter(
+            space=space,
+            user_id=space.owner_id,
+            status=SpaceMembership.Status.ACTIVE,
+            role=SpaceMembership.Role.OWNER,
+        )
+        .first()
+    )
     if not current_owner:
         raise ValueError("The current owner membership is missing.")
     current_owner.role = SpaceMembership.Role.MAINTAINER
@@ -289,6 +301,7 @@ def audit_space_action(
 
 def get_space_quota(space):
     from spaces.models import SpaceQuota
+
     quota, _ = SpaceQuota.objects.get_or_create(space=space)
     return quota
 
@@ -308,6 +321,7 @@ def check_daily_ai_quota(space):
     if quota.daily_ai_calls is None:
         return None
     from chat_analysis.models import QuestionAnswer
+
     start = timezone.localtime(timezone.now()).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
@@ -324,6 +338,7 @@ def check_storage_quota(space, additional_bytes=0):
     if quota.storage_limit_bytes is None:
         return None
     from chat_ingestion.models import UploadBatch
+
     used = (
         UploadBatch.objects.filter(space=space)
         .exclude(status="cancelled")

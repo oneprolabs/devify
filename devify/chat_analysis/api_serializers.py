@@ -60,15 +60,28 @@ class NoteSerializer(serializers.ModelSerializer):
 
 
 class NoteEvidenceSerializer(serializers.ModelSerializer):
-    conversation_id = serializers.IntegerField(source="message.conversation_id", read_only=True)
-    sender_name = serializers.CharField(source="message.sender_name", read_only=True)
-    occurred_at = serializers.DateTimeField(source="message.occurred_at", read_only=True)
+    conversation_id = serializers.IntegerField(
+        source="message.conversation_id", read_only=True
+    )
+    sender_name = serializers.CharField(
+        source="message.sender_name", read_only=True
+    )
+    occurred_at = serializers.DateTimeField(
+        source="message.occurred_at", read_only=True
+    )
 
     class Meta:
         model = NoteEvidence
         fields = (
-            "id", "note_id", "message_id", "message_part_id", "reference_key",
-            "conversation_id", "sender_name", "occurred_at", "created_at",
+            "id",
+            "note_id",
+            "message_id",
+            "message_part_id",
+            "reference_key",
+            "conversation_id",
+            "sender_name",
+            "occurred_at",
+            "created_at",
         )
         read_only_fields = fields
 
@@ -113,8 +126,12 @@ class EventSerializer(serializers.ModelSerializer):
     tags = serializers.SerializerMethodField()
 
     def get_tags(self, obj):
-        assignments = getattr(obj, "_prefetched_objects_cache", {}).get("tag_assignments", obj.tag_assignments.all())
-        return EventTagSerializer([assignment.tag for assignment in assignments], many=True).data
+        assignments = getattr(obj, "_prefetched_objects_cache", {}).get(
+            "tag_assignments", obj.tag_assignments.all()
+        )
+        return EventTagSerializer(
+            [assignment.tag for assignment in assignments], many=True
+        ).data
 
     class Meta:
         model = Event
@@ -356,9 +373,15 @@ class TopicSubscriptionCreateSerializer(serializers.Serializer):
     instruction = serializers.CharField(max_length=5000)
     filters = serializers.DictField(required=False, default=dict)
     include_open = serializers.BooleanField(required=False, default=True)
-    period = serializers.ChoiceField(choices=TopicSubscription.Period.choices, required=False, default=TopicSubscription.Period.WEEK)
+    period = serializers.ChoiceField(
+        choices=TopicSubscription.Period.choices,
+        required=False,
+        default=TopicSubscription.Period.WEEK,
+    )
     time_local = serializers.TimeField(required=False, allow_null=True)
-    timezone = serializers.CharField(max_length=64, required=False, default="Asia/Shanghai")
+    timezone = serializers.CharField(
+        max_length=64, required=False, default="Asia/Shanghai"
+    )
     enabled = serializers.BooleanField(required=False, default=True)
 
     def validate_title(self, value):
@@ -374,33 +397,98 @@ class TopicSubscriptionCreateSerializer(serializers.Serializer):
         return value
 
     def validate_filters(self, value):
-        allowed = {"event_ids", "note_ids", "conversation_ids", "tag_keys", "keywords"}
+        allowed = {
+            "event_ids",
+            "note_ids",
+            "conversation_ids",
+            "tag_keys",
+            "keywords",
+        }
         unknown = set(value) - allowed
         if unknown:
-            raise serializers.ValidationError({key: "Unsupported filter." for key in sorted(unknown)})
+            raise serializers.ValidationError(
+                {key: "Unsupported filter." for key in sorted(unknown)}
+            )
         for key in ("event_ids", "note_ids", "conversation_ids"):
-            if key in value and (not isinstance(value[key], list) or any(not isinstance(item, int) or item < 1 for item in value[key])):
-                raise serializers.ValidationError({key: "Must be a list of positive integers."})
+            if key in value and (
+                not isinstance(value[key], list)
+                or any(
+                    not isinstance(item, int) or item < 1
+                    for item in value[key]
+                )
+            ):
+                raise serializers.ValidationError(
+                    {key: "Must be a list of positive integers."}
+                )
         for key in ("tag_keys", "keywords"):
-            if key in value and (not isinstance(value[key], list) or any(not isinstance(item, str) or not item.strip() for item in value[key])):
-                raise serializers.ValidationError({key: "Must be a list of non-empty strings."})
+            if key in value and (
+                not isinstance(value[key], list)
+                or any(
+                    not isinstance(item, str) or not item.strip()
+                    for item in value[key]
+                )
+            ):
+                raise serializers.ValidationError(
+                    {key: "Must be a list of non-empty strings."}
+                )
         return value
 
 
 class TopicSubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = TopicSubscription
-        fields = ("id", "space_id", "created_by_id", "title", "instruction", "filters", "include_open", "period", "time_local", "timezone", "enabled", "last_run_at", "last_error", "created_at", "updated_at")
+        fields = (
+            "id",
+            "space_id",
+            "created_by_id",
+            "title",
+            "instruction",
+            "filters",
+            "include_open",
+            "period",
+            "time_local",
+            "timezone",
+            "enabled",
+            "last_run_at",
+            "last_error",
+            "created_at",
+            "updated_at",
+        )
         read_only_fields = fields
 
 
 class QuestionCreateSerializer(serializers.Serializer):
     question = serializers.CharField(max_length=2000)
-    event_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, allow_empty=True, default=list)
-    note_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, allow_empty=True, default=list)
-    conversation_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, allow_empty=True, default=list)
-    tag_keys = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True, default=list)
-    keywords = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True, default=list)
+    event_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+    note_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+    conversation_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+    tag_keys = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
+    keywords = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
 
     def validate_question(self, value):
         value = value.strip()
@@ -412,7 +500,21 @@ class QuestionCreateSerializer(serializers.Serializer):
 class QuestionAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuestionAnswer
-        fields = ("id", "uuid", "space_id", "created_by_id", "question", "scope", "answer", "citations", "usage", "status", "error", "created_at", "updated_at")
+        fields = (
+            "id",
+            "uuid",
+            "space_id",
+            "created_by_id",
+            "question",
+            "scope",
+            "answer",
+            "citations",
+            "usage",
+            "status",
+            "error",
+            "created_at",
+            "updated_at",
+        )
         read_only_fields = fields
 
 
@@ -433,7 +535,15 @@ class EventTagCreateSerializer(serializers.Serializer):
 class EventTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventTag
-        fields = ("id", "space_id", "created_by_id", "tag_key", "label", "created_at", "updated_at")
+        fields = (
+            "id",
+            "space_id",
+            "created_by_id",
+            "tag_key",
+            "label",
+            "created_at",
+            "updated_at",
+        )
         read_only_fields = fields
 
 
@@ -446,5 +556,12 @@ class EventTagAssignmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EventTagAssignment
-        fields = ("id", "event_id", "tag_id", "tag", "created_by_id", "created_at")
+        fields = (
+            "id",
+            "event_id",
+            "tag_id",
+            "tag",
+            "created_by_id",
+            "created_at",
+        )
         read_only_fields = fields

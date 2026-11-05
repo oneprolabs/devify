@@ -49,15 +49,6 @@
               {{ filter.label }}<span>{{ filter.count }}</span>
             </button>
           </div>
-          <label v-if="tags.length" class="ws-filter-line">
-            <span>标签</span>
-            <select v-model="tagFilter" aria-label="按标签筛选">
-              <option value="">全部</option>
-              <option v-for="tag in tags" :key="tag.id" :value="tag.tag_key">
-                {{ tag.label }}
-              </option>
-            </select>
-          </label>
         </div>
         <div class="ws-rail-body">
           <div v-if="loading" class="ws-rail-hint" aria-busy="true">
@@ -88,14 +79,6 @@
             <span class="ws-row-main">
               <span class="ws-row-title">{{ event.title }}</span>
               <span class="ws-row-sub">{{ eventMeta(event) }}</span>
-              <span v-if="event.tags?.length" class="ws-row-meta">
-                <span v-for="tag in event.tags" :key="tag.id" class="ws-tag">{{
-                  tag.label
-                }}</span>
-              </span>
-              <span v-else-if="event.entity_key" class="ws-row-meta">
-                <span class="ws-tag">{{ event.entity_key }}</span>
-              </span>
             </span>
           </button>
           <button
@@ -166,25 +149,19 @@
               <div class="ws-meta-line">{{ metaLine(selected) }}</div>
             </div>
 
-            <section
-              class="ws-soft ws-current-state"
-              aria-labelledby="event-current-state-title"
-            >
-              <div class="ws-sectt">
-                <span id="event-current-state-title">当前情况</span>
-                <span v-if="selected.content" class="ws-tag">已整理</span>
-              </div>
-              <p class="ws-summary">{{ selected.content || '暂无情况描述' }}</p>
-            </section>
+            <div class="ws-event-summary">
+              <p class="ws-summary">{{ summaryText }}</p>
+              <button
+                v-if="summaryIsLong"
+                type="button"
+                class="ws-link"
+                @click="summaryExpanded = !summaryExpanded"
+              >
+                {{ summaryExpanded ? '收起' : '展开全文' }}
+              </button>
+            </div>
 
-            <StructuredSummary
-              :entries="notes"
-              title="整理结论"
-              title-id="event-structured-title"
-              subtitle="按事实、行动、风险和决定归类"
-            />
-
-            <div v-if="canEdit" class="ws-tag-edit">
+            <div v-if="canEdit || selected.tags?.length" class="ws-tag-edit">
               <span
                 v-for="tag in selected.tags || []"
                 :key="tag.id"
@@ -192,6 +169,7 @@
               >
                 {{ tag.label }}
                 <button
+                  v-if="canEdit"
                   type="button"
                   :aria-label="`移除标签 ${tag.label}`"
                   @click="removeTag(tag)"
@@ -200,6 +178,7 @@
                 </button>
               </span>
               <select
+                v-if="canEdit"
                 v-model="tagToAdd"
                 aria-label="添加事件标签"
                 @change="
@@ -220,14 +199,19 @@
                   {{ tag.label }}
                 </option>
               </select>
-              <button type="button" class="ws-link" @click="createTag">
+              <button
+                v-if="canEdit"
+                type="button"
+                class="ws-link"
+                @click="createTag"
+              >
                 ＋ 新建标签
               </button>
             </div>
 
             <section class="ws-sect" aria-labelledby="event-timeline-title">
               <div class="ws-sectt">
-                <span id="event-timeline-title">变化记录</span>
+                <span id="event-timeline-title">时间线</span>
                 <span class="spacer"></span>
                 <button
                   v-if="selected.note_ids?.length"
@@ -338,7 +322,7 @@
 
             <div class="ws-clhint">
               <span class="ws-clmark">a</span>
-              整理结论按类型归拢，变化记录保留完整时间顺序；原始消息请到会话中查看。
+              原始消息请到会话中查看。
             </div>
           </div>
         </div>
@@ -379,7 +363,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { spacesApi } from '@/api/spaces'
-import StructuredSummary from './StructuredSummary.vue'
 
 const props = defineProps({
   spaceId: { type: [String, Number], required: true },
@@ -407,9 +390,18 @@ const search = ref('')
 const activeFilter = ref('all')
 const mobileDetail = ref(false)
 const tags = ref([])
-const tagFilter = ref('')
 const tagToAdd = ref('')
 const followup = ref('')
+const summaryExpanded = ref(false)
+const summaryIsLong = computed(
+  () => (props.selected?.content || '').length > 240
+)
+const summaryText = computed(() => {
+  const content = props.selected?.content || '暂无情况描述'
+  return summaryIsLong.value && !summaryExpanded.value
+    ? `${content.slice(0, 240)}…`
+    : content
+})
 const notes = ref([])
 const notesLoading = ref(false)
 const notesError = ref(false)
@@ -466,15 +458,8 @@ const filtered = computed(() =>
       (activeFilter.value === 'done'
         ? item.status === 'done'
         : item.status !== 'done')
-    const matchesTag =
-      !tagFilter.value ||
-      item.tags?.some((tag) => tag.tag_key === tagFilter.value)
     const haystack = `${item.title} ${item.content || ''}`.toLowerCase()
-    return (
-      matchesFilter &&
-      matchesTag &&
-      haystack.includes(search.value.toLowerCase())
-    )
+    return matchesFilter && haystack.includes(search.value.toLowerCase())
   })
 )
 const statusLabel = (status) =>
@@ -615,6 +600,7 @@ watch(
     notesError.value = false
     notesLoading.value = false
     followup.value = ''
+    summaryExpanded.value = false
     if (props.detailLoading || !props.selected?.note_ids?.length) return
     notesLoading.value = true
     try {
@@ -639,7 +625,6 @@ watch(
   () => {
     search.value = ''
     activeFilter.value = 'all'
-    tagFilter.value = ''
     mobileDetail.value = false
     loadTags()
   },
@@ -648,14 +633,11 @@ watch(
 </script>
 
 <style scoped>
-.ws-current-state {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-}
-.ws-current-state .ws-summary {
+.ws-event-summary .ws-summary {
   color: rgb(var(--c-tx));
+}
+.ws-event-summary .ws-link {
+  margin-top: 6px;
 }
 .ws-det-intro {
   display: flex;

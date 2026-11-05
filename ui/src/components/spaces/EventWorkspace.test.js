@@ -85,7 +85,7 @@ describe('EventWorkspace', () => {
     })
   })
 
-  it('groups structured note results into a readable summary', async () => {
+  it('keeps the event summary concise without duplicating structured notes', async () => {
     spacesApi.getEventNotes.mockResolvedValue({
       data: {
         data: {
@@ -93,12 +93,9 @@ describe('EventWorkspace', () => {
             {
               id: 3,
               title: '报价讨论',
-              content: '原始整理文本',
               structured_data: {
                 facts: [{ text: '客户需要年度报价' }],
-                actions: [{ text: '周四前发送报价' }],
-                risks: [{ text: '客户尚未确认范围' }],
-                decisions: []
+                actions: [{ text: '周四前发送报价' }]
               }
             }
           ],
@@ -106,13 +103,32 @@ describe('EventWorkspace', () => {
         }
       }
     })
-    const wrapper = render({ selected: { ...events[0], note_ids: [3] } })
+    const longContent = '摘要'.repeat(130)
+    const wrapper = render({
+      selected: { ...events[0], content: longContent, note_ids: [3] }
+    })
     await flushPromises()
-    expect(wrapper.find('#event-structured-title').text()).toContain('整理结论')
-    expect(wrapper.findAll('.ws-structured-card')).toHaveLength(3)
-    expect(wrapper.text()).toContain('客户需要年度报价')
-    expect(wrapper.text()).toContain('周四前发送报价')
-    expect(wrapper.text()).not.toContain('原始整理文本')
+    expect(wrapper.find('.ws-event-summary').text()).not.toContain(longContent)
+    expect(wrapper.find('.ws-structured').exists()).toBe(false)
+    expect(wrapper.find('#event-timeline-title').text()).toBe('时间线')
+    await wrapper.find('.ws-event-summary button').trigger('click')
+    expect(wrapper.find('.ws-event-summary').text()).toContain(longContent)
+    await wrapper.setProps({ selected: { ...events[1], content: longContent } })
+    expect(wrapper.find('.ws-event-summary').text()).not.toContain(longContent)
+  })
+
+  it('shows event labels in details, not in the sidebar', async () => {
+    const tagged = {
+      ...events[0],
+      tags: [{ id: 1, tag_key: 'urgent', label: '紧急' }]
+    }
+    spacesApi.getEventTags.mockResolvedValue({ data: { data: tagged.tags } })
+    const wrapper = render({ events: [tagged], selected: tagged })
+    await flushPromises()
+    expect(wrapper.find('.ws-rail').text()).not.toContain('紧急')
+    expect(wrapper.find('[aria-label="按标签筛选"]').exists()).toBe(false)
+    expect(wrapper.find('.ws-det .ws-tag-edit').text()).toContain('紧急')
+    expect(wrapper.find('[aria-label="移除标签 紧急"]').exists()).toBe(false)
   })
 
   it('reports a linked note loading error', async () => {

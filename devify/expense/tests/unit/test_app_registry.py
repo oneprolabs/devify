@@ -4,7 +4,6 @@ import pytest
 
 from core.app_registry import AppRegistry
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -97,15 +96,58 @@ class TestRegisteredApps:
 
 def test_scope_filters_before_reading_stats():
     registry = AppRegistry()
-    counter = lambda user: pytest.fail("personal stats must not be read in team context")
-    registry.register(key="expense", name="Expense", name_zh="发票", path="/expense", description="", space_kinds=("personal",), stats=counter)
-    registry.register(key="team", name="Team", name_zh="团队", path="/team", description="", space_kinds=("team",))
-    registry.register(key="both", name="Both", name_zh="通用", path="/both", description="", space_kinds=("personal", "team"))
-    registry.register(key="legacy", name="Legacy", name_zh="旧应用", path="/legacy", description="")
-    assert {item["key"] for item in registry.list_apps(user=object(), space_kind="team")} == {"team", "both"}
-    assert {item["key"] for item in registry.list_apps(space_kind="personal")} == {"expense", "both", "legacy"}
+
+    def counter(user):
+        pytest.fail("personal stats must not be read in team context")
+
+    registry.register(
+        key="expense",
+        name="Expense",
+        name_zh="发票",
+        path="/expense",
+        description="",
+        space_kinds=("personal",),
+        stats=counter,
+    )
+    registry.register(
+        key="team",
+        name="Team",
+        name_zh="团队",
+        path="/team",
+        description="",
+        space_kinds=("team",),
+    )
+    registry.register(
+        key="both",
+        name="Both",
+        name_zh="通用",
+        path="/both",
+        description="",
+        space_kinds=("personal", "team"),
+    )
+    registry.register(
+        key="legacy",
+        name="Legacy",
+        name_zh="旧应用",
+        path="/legacy",
+        description="",
+    )
+    assert {
+        item["key"]
+        for item in registry.list_apps(user=object(), space_kind="team")
+    } == {"team", "both"}
+    assert {
+        item["key"] for item in registry.list_apps(space_kind="personal")
+    } == {"expense", "both", "legacy"}
 
 
 def test_invalid_scope_is_rejected():
     with pytest.raises(ValueError):
-        AppRegistry().register(key="bad", name="Bad", name_zh="坏", path="/bad", description="", space_kinds=("unknown",))
+        AppRegistry().register(
+            key="bad",
+            name="Bad",
+            name_zh="坏",
+            path="/bad",
+            description="",
+            space_kinds=("unknown",),
+        )

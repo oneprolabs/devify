@@ -55,10 +55,7 @@ class SocialAccountHelper:
                 picture = google.extra_data.get('picture')
         """
         try:
-            return SocialAccount.objects.get(
-                user=user,
-                provider='google'
-            )
+            return SocialAccount.objects.get(user=user, provider="google")
         except SocialAccount.DoesNotExist:
             return None
 
@@ -81,10 +78,7 @@ class SocialAccountHelper:
                 nickname = wechat.extra_data.get('nickname')
         """
         try:
-            return SocialAccount.objects.get(
-                user=user,
-                provider='weixin'
-            )
+            return SocialAccount.objects.get(user=user, provider="weixin")
         except SocialAccount.DoesNotExist:
             return None
 
@@ -107,10 +101,7 @@ class SocialAccountHelper:
                 avatar = github.extra_data.get('avatar_url')
         """
         try:
-            return SocialAccount.objects.get(
-                user=user,
-                provider='github'
-            )
+            return SocialAccount.objects.get(user=user, provider="github")
         except SocialAccount.DoesNotExist:
             return None
 
@@ -151,8 +142,7 @@ class SocialAccountHelper:
                 print("User has Google account")
         """
         return SocialAccount.objects.filter(
-            user=user,
-            provider=provider
+            user=user, provider=provider
         ).exists()
 
     @staticmethod
@@ -179,8 +169,7 @@ class SocialAccountHelper:
                 print(f"Google ID: {google_id}")
         """
         account = SocialAccount.objects.filter(
-            user=user,
-            provider=provider
+            user=user, provider=provider
         ).first()
         return account.uid if account else None
 

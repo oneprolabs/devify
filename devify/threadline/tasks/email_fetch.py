@@ -7,21 +7,20 @@ File: devify/threadline/tasks/email_fetch.py
 """
 
 import logging
-from typing import Dict
-
-from celery import shared_task
-from django.utils import timezone
-from django.conf import settings
 
 from agentcore_task.adapters.django import prevent_duplicate_task
-from threadline.models import EmailMailbox, EmailMessage, Settings
+from celery import shared_task
+from django.conf import settings
+from django.utils import timezone
+
+from threadline.models import EmailMailbox, EmailMessage
 from threadline.services.processing_control import is_processing_paused
+from threadline.tasks.email_merge import process_email_merge
 from threadline.utils.email import (
     EmailProcessor,
     EmailSaveService,
 )
 from threadline.utils.task_tracer import TaskTracer
-from threadline.tasks.email_merge import process_email_merge
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,6 @@ def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
         return
 
     process_email_merge.delay(str(email_msg.id))
-
 
 
 def _record_mailbox_success(mailbox) -> None:
@@ -130,8 +128,7 @@ def imap_email_fetch():
         for mailbox in mailboxes:
             user = mailbox.user
             user_display = (
-                f"{user.username} (ID: {user.id}) "
-                f"[{mailbox.display_name}]"
+                f"{user.username} (ID: {user.id}) " f"[{mailbox.display_name}]"
             )
             try:
                 logger.info(f"{context} Processing mailbox {user_display}")
@@ -367,7 +364,8 @@ def fetch_user_imap_emails(
         imap_host = imap_config.get("imap_host", "unknown")
         use_ssl = imap_config.get("use_ssl", True)
         imap_port = imap_config.get(
-            "imap_ssl_port", imap_config.get("imap_port", 993 if use_ssl else 143)
+            "imap_ssl_port",
+            imap_config.get("imap_port", 993 if use_ssl else 143),
         )
         folder = imap_config.get("folder", "INBOX")
 

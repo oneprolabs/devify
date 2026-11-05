@@ -1,9 +1,3 @@
-from django.db import IntegrityError, transaction
-from django.shortcuts import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
 from chat_sources.adapters import capabilities_for
 from chat_sources.models import Source, SourceImport
 from chat_sources.serializers import (
@@ -13,6 +7,12 @@ from chat_sources.serializers import (
     SourceUpdateSerializer,
 )
 from chat_sources.services import can_manage_source
+from django.db import IntegrityError, transaction
+from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from spaces.models import Space, SpaceMembership, SpaceTakeover
 from spaces.services import SpacePermissionService, audit_space_action
 
@@ -198,15 +198,29 @@ class SourceVerifyAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, source_id):
-        source = get_object_or_404(Source.objects.select_related("space"), pk=source_id)
+        source = get_object_or_404(
+            Source.objects.select_related("space"), pk=source_id
+        )
         space, takeover = authorized_space(request.user, source.space_id)
         if space is None:
             return Response({"detail": "Source not found."}, status=404)
-        adapter_capabilities = capabilities_for(source.channel_type, source.provider)
+        adapter_capabilities = capabilities_for(
+            source.channel_type, source.provider
+        )
         if source.provider == "tauri_upload":
-            result = {"verified": False, "status": "not_applicable", "reason": "本机上传来源不能由服务端远程验证。", "capabilities": adapter_capabilities}
+            result = {
+                "verified": False,
+                "status": "not_applicable",
+                "reason": "本机上传来源不能由服务端远程验证。",
+                "capabilities": adapter_capabilities,
+            }
         else:
-            result = {"verified": False, "status": "unsupported", "reason": "当前来源适配器没有连接验证器。", "capabilities": adapter_capabilities}
+            result = {
+                "verified": False,
+                "status": "unsupported",
+                "reason": "当前来源适配器没有连接验证器。",
+                "capabilities": adapter_capabilities,
+            }
         return Response({"data": {"source_id": source.pk, **result}})
 
 
@@ -214,21 +228,41 @@ class SourceStatusAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, source_id):
-        source = get_object_or_404(Source.objects.select_related("space"), pk=source_id)
+        source = get_object_or_404(
+            Source.objects.select_related("space"), pk=source_id
+        )
         space, _ = authorized_space(request.user, source.space_id)
         if space is None:
             return Response({"detail": "Source not found."}, status=404)
         latest_import = source.imports.order_by("-created_at", "-id").first()
-        return Response({"data": {"source_id": source.pk, "status": source.status, "last_seen_at": source.last_seen_at, "capabilities": source.capabilities, "latest_import": SourceImportSerializer(latest_import).data if latest_import else None}})
+        return Response(
+            {
+                "data": {
+                    "source_id": source.pk,
+                    "status": source.status,
+                    "last_seen_at": source.last_seen_at,
+                    "capabilities": source.capabilities,
+                    "latest_import": (
+                        SourceImportSerializer(latest_import).data
+                        if latest_import
+                        else None
+                    ),
+                }
+            }
+        )
 
 
 class SourceImportListAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, source_id):
-        source = get_object_or_404(Source.objects.select_related("space"), pk=source_id)
+        source = get_object_or_404(
+            Source.objects.select_related("space"), pk=source_id
+        )
         space, _ = authorized_space(request.user, source.space_id)
         if space is None:
             return Response({"detail": "Source not found."}, status=404)
         imports = source.imports.order_by("-created_at", "-id")[:100]
-        return Response({"data": SourceImportSerializer(imports, many=True).data})
+        return Response(
+            {"data": SourceImportSerializer(imports, many=True).data}
+        )

@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django_celery_beat.models import CrontabSchedule, PeriodicTask
 from rest_framework.test import APIClient
 
-
 User = get_user_model()
 
 

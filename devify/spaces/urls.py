@@ -2,6 +2,7 @@ from django.urls import path
 
 from spaces.views import (
     OwnerlessSpaceListAPIView,
+    SpaceAuditLogListAPIView,
     SpaceDetailAPIView,
     SpaceInvitationListAPIView,
     SpaceListCreateAPIView,
@@ -10,9 +11,10 @@ from spaces.views import (
     SpaceMemberListCreateAPIView,
     SpaceOwnershipAPIView,
     SpacePolicyAPIView,
-    SpaceWorkflowConfigAPIView,
-    SpaceAuditLogListAPIView, SpaceQuotaAPIView, SpaceQuotaUsageAPIView,
+    SpaceQuotaAPIView,
+    SpaceQuotaUsageAPIView,
     SpaceTakeoverAPIView,
+    SpaceWorkflowConfigAPIView,
 )
 
 urlpatterns = [

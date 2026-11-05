@@ -520,9 +520,7 @@ def _extract_events(job, note, messages, payload, language):
                 decision=EventSuggestion.Status.ACCEPTED,
             )
             if suggestion.event_id and not source_messages:
-                refresh_event_window(
-                    suggestion.event, messages=messages
-                )
+                refresh_event_window(suggestion.event, messages=messages)
     return True
 
 
@@ -577,10 +575,13 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             ingest_seq__lte=job.end_seq,
         )
         if batches.exists():
-            query = query.filter(origins__upload_item__batch__in=batches).distinct()
+            query = query.filter(
+                origins__upload_item__batch__in=batches
+            ).distinct()
         messages = list(
-            query.prefetch_related("parts")
-            .order_by("ingest_seq")[:ANALYSIS_CHUNK_SIZE]
+            query.prefetch_related("parts").order_by("ingest_seq")[
+                :ANALYSIS_CHUNK_SIZE
+            ]
         )
         if not messages:
             break

@@ -188,9 +188,7 @@ def test_repeated_execution_does_not_duplicate_notes_or_evidence(monkeypatch):
     assert job.state == AnalysisJob.State.READY
     assert job.attempts == 2
     assert Note.objects.filter(analysis_job=job).count() == 2
-    assert NoteEvidence.objects.filter(
-        note__analysis_job=job
-    ).count() == 3
+    assert NoteEvidence.objects.filter(note__analysis_job=job).count() == 3
 
 
 def test_manual_note_with_the_same_key_is_not_overwritten(monkeypatch):
@@ -320,8 +318,12 @@ def test_celery_task_runs_the_job():
     assert Note.objects.filter(analysis_job=job).count() == 1
 
 
-@pytest.mark.parametrize("failing_call", ["_summarize_note", "_extract_events"])
-def test_llm_exception_does_not_complete_job(settings, monkeypatch, failing_call):
+@pytest.mark.parametrize(
+    "failing_call", ["_summarize_note", "_extract_events"]
+)
+def test_llm_exception_does_not_complete_job(
+    settings, monkeypatch, failing_call
+):
     settings.CHAT_ANALYSIS_LLM_ENABLED = True
     owner = User.objects.create_user(username=f"llm-failure-{failing_call}")
     space = make_space(owner, slug=f"llm-failure-{failing_call}")
@@ -329,7 +331,11 @@ def test_llm_exception_does_not_complete_job(settings, monkeypatch, failing_call
     add_message(conversation, 1)
     job = make_job(space, owner, conversation, end_seq=1)
     monkeypatch.setattr(execution, "_summarize_note", lambda *args: True)
-    monkeypatch.setattr(execution, failing_call, lambda *args: (_ for _ in ()).throw(ValueError("LLM unavailable")))
+    monkeypatch.setattr(
+        execution,
+        failing_call,
+        lambda *args: (_ for _ in ()).throw(ValueError("LLM unavailable")),
+    )
 
     result = execute_analysis_job_task.run(job.pk, worker_id="llm-test")
     assert result["state"] == AnalysisJob.State.QUEUED
@@ -337,7 +343,9 @@ def test_llm_exception_does_not_complete_job(settings, monkeypatch, failing_call
     assert job.checkpoint.get("last_ingest_seq", 0) == 0
 
 
-def test_analysis_filters_interleaved_batches_and_deduplicates_origins(monkeypatch):
+def test_analysis_filters_interleaved_batches_and_deduplicates_origins(
+    monkeypatch,
+):
     from chat_domain.models import MessageOrigin
     from chat_ingestion.models import UploadBatch, UploadItem
 
@@ -345,16 +353,43 @@ def test_analysis_filters_interleaved_batches_and_deduplicates_origins(monkeypat
     owner = User.objects.create_user(username="batch-filter-owner")
     space = make_space(owner, slug="batch-filter")
     conversation = make_conversation(space)
-    batches = [UploadBatch.objects.create(space=space, uploaded_by=owner, source_type="wechat", idempotency_key=f"batch-{i}") for i in range(2)]
-    items = [UploadItem.objects.create(batch=batch, path="messages") for batch in batches]
+    batches = [
+        UploadBatch.objects.create(
+            space=space,
+            uploaded_by=owner,
+            source_type="wechat",
+            idempotency_key=f"batch-{i}",
+        )
+        for i in range(2)
+    ]
+    items = [
+        UploadItem.objects.create(batch=batch, path="messages")
+        for batch in batches
+    ]
     messages = [add_message(conversation, i) for i in range(1, 5)]
     for i, message in enumerate(messages):
-        MessageOrigin.objects.create(message=message, upload_item=items[i % 2], locator_key=str(i), parser_version="1")
-    MessageOrigin.objects.create(message=messages[0], upload_item=items[0], locator_key="duplicate", parser_version="1")
+        MessageOrigin.objects.create(
+            message=message,
+            upload_item=items[i % 2],
+            locator_key=str(i),
+            parser_version="1",
+        )
+    MessageOrigin.objects.create(
+        message=messages[0],
+        upload_item=items[0],
+        locator_key="duplicate",
+        parser_version="1",
+    )
     for i, batch in enumerate(batches):
-        job = make_job(space, owner, conversation, end_seq=4, key=f"filtered-{i}")
+        job = make_job(
+            space, owner, conversation, end_seq=4, key=f"filtered-{i}"
+        )
         job.upload_batches.add(batch)
         execute_analysis_job(job.pk, worker_id=f"filter-{i}")
-        assert set(NoteEvidence.objects.filter(note__analysis_job=job).values_list("message_id", flat=True)) == {messages[i].pk, messages[i + 2].pk}
+        assert set(
+            NoteEvidence.objects.filter(note__analysis_job=job).values_list(
+                "message_id", flat=True
+            )
+        ) == {messages[i].pk, messages[i + 2].pk}
         job.refresh_from_db()
         assert job.checkpoint["messages_processed"] == 2

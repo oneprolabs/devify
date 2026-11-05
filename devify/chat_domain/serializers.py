@@ -125,21 +125,33 @@ class MessagePartSerializer(serializers.ModelSerializer):
     media_size = serializers.SerializerMethodField()
 
     def get_media_url(self, obj):
-        if obj.kind not in (
-            MessagePart.Kind.IMAGE,
-            MessagePart.Kind.VIDEO,
-            MessagePart.Kind.AUDIO,
-            MessagePart.Kind.FILE,
-        ) or obj.binding_state != MessagePart.BindingState.AVAILABLE:
+        if (
+            obj.kind
+            not in (
+                MessagePart.Kind.IMAGE,
+                MessagePart.Kind.VIDEO,
+                MessagePart.Kind.AUDIO,
+                MessagePart.Kind.FILE,
+            )
+            or obj.binding_state != MessagePart.BindingState.AVAILABLE
+        ):
             return ""
         item = obj.upload_item
-        return media_url(self.context.get("space_id"), item.pk if item else None)
+        return media_url(
+            self.context.get("space_id"), item.pk if item else None
+        )
 
     def get_media_content_type(self, obj):
-        return getattr(obj.upload_item, "content_type", "") if obj.upload_item else ""
+        return (
+            getattr(obj.upload_item, "content_type", "")
+            if obj.upload_item
+            else ""
+        )
 
     def get_media_size(self, obj):
-        return getattr(obj.upload_item, "size", None) if obj.upload_item else None
+        return (
+            getattr(obj.upload_item, "size", None) if obj.upload_item else None
+        )
 
     class Meta:
         model = MessagePart
@@ -214,9 +226,7 @@ class MessageListSerializer(serializers.ModelSerializer):
     def get_sender_avatar_url(self, obj):
         if not obj.sender_key:
             return ""
-        avatar = (self.context.get("sender_avatars") or {}).get(
-            obj.sender_key
-        )
+        avatar = (self.context.get("sender_avatars") or {}).get(obj.sender_key)
         if avatar is None:
             return ""
         return avatar_url(self.context.get("space_id"), avatar.sha256)

@@ -4,6 +4,28 @@ Utility functions for working with user accounts and social authentication.
 
 from allauth.socialaccount.models import SocialAccount
 
+PLATFORM_LABELS = {
+    "macos": "macOS",
+    "mac": "macOS",
+    "darwin": "macOS",
+    "windows": "Windows",
+    "win": "Windows",
+    "win32": "Windows",
+    "linux": "Linux",
+    "ios": "iOS",
+    "android": "Android",
+}
+
+
+def platform_display_name(platform):
+    value = str(platform or "").strip()
+    return PLATFORM_LABELS.get(value.lower(), value)
+
+
+def default_device_label(platform=""):
+    display = platform_display_name(platform)
+    return f"桌面客户端 · {display}" if display else "桌面客户端"
+
 
 class SocialAccountHelper:
     """

@@ -527,8 +527,8 @@ class TestSyncUserSubscriptionFromStripe:
             return_value=SimpleNamespace(id='acct_test_123'),
         )
         mocker.patch(
-            'billing.services.subscription_service.Customer.objects.filter',
-            return_value=SimpleNamespace(first=lambda: customer),
+            'billing.services.subscription_service.resolve_customer_for_user',
+            return_value=customer,
         )
         mocker.patch(
             'billing.services.subscription_service.stripe.Subscription.list',
@@ -600,8 +600,8 @@ class TestSyncUserSubscriptionFromStripe:
             return_value=SimpleNamespace(id='acct_test_123'),
         )
         mocker.patch(
-            'billing.services.subscription_service.Customer.objects.filter',
-            return_value=SimpleNamespace(first=lambda: customer),
+            'billing.services.subscription_service.resolve_customer_for_user',
+            return_value=customer,
         )
         mocker.patch(
             'billing.services.subscription_service.stripe.Subscription.list',

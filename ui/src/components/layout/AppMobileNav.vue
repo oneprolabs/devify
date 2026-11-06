@@ -32,8 +32,8 @@ const tabs = computed(() => [
     icon: IconChats
   },
   {
-    to: '/apps',
-    match: ['/apps', '/todos'],
+    to: route.params.spaceId ? `/spaces/${route.params.spaceId}/apps` : '/apps',
+    match: ['/apps', '/todos', `/spaces/${route.params.spaceId}/apps`],
     label: t('nav.tabApps'),
     icon: IconApps
   },

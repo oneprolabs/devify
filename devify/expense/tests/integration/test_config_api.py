@@ -285,3 +285,21 @@ class TestAppsAPI:
 
         assert "expense" in keys
         assert "relay" in keys
+
+    def test_apps_are_filtered_by_authorized_space(self, api_client, user, other_user):
+        from spaces.models import Space, SpaceMembership
+        from spaces.services import SpaceBootstrapService
+
+        personal = SpaceBootstrapService.ensure_personal_space(user)
+        team = Space.objects.create(name="Team", slug="scope-test-team", kind=Space.Kind.TEAM, owner=user, created_by=user)
+        SpaceMembership.objects.create(space=team, user=user, role=SpaceMembership.Role.OWNER, status=SpaceMembership.Status.ACTIVE)
+        other = SpaceBootstrapService.ensure_personal_space(other_user)
+        api_client.force_authenticate(user=user)
+        personal_response = api_client.get(APPS_URL, {"space_id": personal.pk})
+        team_response = api_client.get(APPS_URL, {"space_id": team.pk})
+        assert personal_response.status_code == 200
+        assert any(app["key"] == "expense" and app["space_kinds"] == ["personal"] for app in personal_response.data["data"])
+        assert team_response.status_code == 200
+        assert not any(app["key"] == "expense" for app in team_response.data["data"])
+        assert api_client.get(APPS_URL, {"space_id": other.pk}).status_code == 404
+        assert api_client.get(APPS_URL, {"space_id": "invalid"}).status_code == 400

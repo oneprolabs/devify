@@ -22,3 +22,17 @@ import pytest
 
 from .fixtures.conftest import *
 from .fixtures.factories import *
+
+
+@pytest.fixture(autouse=True)
+def eager_celery_tasks(settings):
+    """Run queued Celery work inline so audit rows exist during the test.
+
+    The environment variable above is only read while Django loads settings,
+    which pytest-django has usually done already. Overriding the setting per
+    test is what actually makes ``queue_billing_audit_event`` write the row
+    instead of handing it to a broker.
+    """
+
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    settings.CELERY_TASK_EAGER_PROPAGATES = True

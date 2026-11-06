@@ -1,5 +1,6 @@
-from celery import Celery
 import os
+
+from celery import Celery
 
 # Set the Django project's settings module. This ensures Django can load
 # the appropriate configuration. The 'DJANGO_SETTINGS_MODULE' environment
@@ -22,6 +23,8 @@ app.conf.update(result_backend="django-db")
 # Automatically discover all task modules registered in the Django project.
 # Celery loads any tasks defined in each app's tasks.py module.
 app.autodiscover_tasks()
+
+import chat_analysis.celery_bootstrap  # noqa: F401
 
 # Register Celery worker bootstrap hooks.
 import threadline.celery_bootstrap  # noqa: F401

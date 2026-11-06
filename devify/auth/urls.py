@@ -21,6 +21,13 @@ from accounts.views import (
     SendRegistrationEmailView,
     VerifyRegistrationTokenView,
 )
+from accounts.views.desktop_auth import (
+    DesktopAuthorizeAPIView,
+    DesktopConfigAPIView,
+    DesktopDeviceListAPIView,
+    DesktopDeviceRevokeAPIView,
+    DesktopTokenAPIView,
+)
 
 class CustomLoginView(LoginView):
     permission_classes = [AllowAny]
@@ -42,6 +49,31 @@ urlpatterns = [
         'api/v1/auth/token/refresh',
         CustomTokenRefreshView.as_view(),
         name='rest_token_refresh'
+    ),
+    path(
+        'api/v1/auth/desktop/authorize',
+        DesktopAuthorizeAPIView.as_view(),
+        name='desktop_authorize'
+    ),
+    path(
+        'api/v1/auth/desktop/config',
+        DesktopConfigAPIView.as_view(),
+        name='desktop_config',
+    ),
+    path(
+        'api/v1/auth/desktop/token',
+        DesktopTokenAPIView.as_view(),
+        name='desktop_token'
+    ),
+    path(
+        'api/v1/auth/desktop/devices',
+        DesktopDeviceListAPIView.as_view(),
+        name='desktop_devices'
+    ),
+    path(
+        'api/v1/auth/desktop/devices/<str:device_id>',
+        DesktopDeviceRevokeAPIView.as_view(),
+        name='desktop_device_revoke'
     ),
     # Get or update user details
     path(

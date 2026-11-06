@@ -25,6 +25,7 @@ Other methods to extend the User model:
 """
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 
 
 class Profile(models.Model):
@@ -121,3 +122,58 @@ class Profile(models.Model):
         representation of the Profile instance.
         """
         return self.user.username
+
+
+class DesktopAuthorizationCode(models.Model):
+    """One-time authorization code for the native desktop client."""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="desktop_authorization_codes",
+    )
+    code_hash = models.CharField(max_length=128, unique=True)
+    client_id = models.CharField(max_length=100)
+    redirect_uri = models.CharField(max_length=500)
+    code_challenge = models.CharField(max_length=128)
+    device_label = models.CharField(max_length=120, blank=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("user", "created_at")),
+            models.Index(fields=("expires_at", "used_at")),
+        ]
+
+    @property
+    def is_expired(self):
+        return self.expires_at <= timezone.now()
+
+
+class DesktopDevice(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REVOKED = "revoked", "Revoked"
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="desktop_devices"
+    )
+    device_id = models.CharField(max_length=100)
+    label = models.CharField(max_length=120, blank=True)
+    platform = models.CharField(max_length=40, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.ACTIVE
+    )
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "device_id"), name="unique_desktop_device"
+            )
+        ]
+        indexes = [models.Index(fields=("user", "status", "last_seen_at"))]

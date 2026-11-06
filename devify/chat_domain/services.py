@@ -486,6 +486,7 @@ def ingest_message(
     origin=None,
     source_namespace="",
     alias_key="",
+    refresh_counters=True,
     **fields,
 ):
     """Store one normalized message with parts and its origin.
@@ -538,7 +539,7 @@ def ingest_message(
         # again even though the earlier contribution was withdrawn.
         message.orphaned_at = None
         message.save(update_fields=("orphaned_at", "updated_at"))
-    if created:
+    if created and refresh_counters:
         refresh_conversation_counters(conversation)
     return MessageIngestResult(
         message=message,

@@ -226,7 +226,11 @@ def upsert_message(
     if sequence_cache is not None and conversation.pk in sequence_cache:
         next_seq = sequence_cache[conversation.pk]
     else:
-        next_seq = (Message.objects.filter(conversation=conversation).aggregate(last=Max("ingest_seq"))["last"] or 0) + 1
+        next_seq = (
+            Message.objects.filter(conversation=conversation).aggregate(
+                last=Max("ingest_seq")
+            )["last"] or 0
+        ) + 1
     try:
         with transaction.atomic():
             message = Message.objects.create(

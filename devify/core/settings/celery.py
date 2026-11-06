@@ -54,8 +54,11 @@ CELERY_TASK_SOFT_TIME_LIMIT = 3000
 
 # Enable only after a worker consumes this queue and shares upload archives.
 CELERY_TASK_ROUTES = (
-    {"chat_ingestion.tasks.parse_chat_upload_task": {"queue": "chat_ingestion"}}
-    if os.getenv("CHAT_UPLOAD_DEDICATED_QUEUE", "false").lower() in {"1", "true", "yes"}
+    {"chat_ingestion.tasks.parse_chat_upload_task": {
+        "queue": "chat_ingestion",
+    }}
+    if os.getenv("CHAT_UPLOAD_DEDICATED_QUEUE", "false").lower()
+    in {"1", "true", "yes"}
     else {}
 )
 

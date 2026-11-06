@@ -175,6 +175,37 @@ class ChatPackage:
             raise PackageInvalid(f"Archive member is too large: {name!r}.")
         return data
 
+    def extract_to(self, name, path, expected_sha256=None):
+        """Stream one member into ``path`` and return ``(sha256, size)``.
+
+        The bytes are hashed while copying, so a media file is never trusted
+        twice: ``expected_sha256`` fails the whole package when the member
+        changed after its digest was taken.
+        """
+        if name not in self._members:
+            raise PackageInvalid(f"Missing archive member: {name}.")
+        digest = hashlib.sha256()
+        size = 0
+        limit = max_member_bytes()
+        with self._zip.open(name) as source, open(path, "wb") as target:
+            while True:
+                chunk = source.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > limit:
+                    raise PackageInvalid(
+                        f"Archive member is too large: {name!r}."
+                    )
+                digest.update(chunk)
+                target.write(chunk)
+        sha256 = digest.hexdigest()
+        if expected_sha256 and sha256 != expected_sha256:
+            raise PackageInvalid(
+                f"Archive member digest changed: {name!r}."
+            )
+        return sha256, size
+
     def digest(self, name):
         """Stream one member and return ``(sha256_hex, size_bytes)``."""
         if name not in self._members:

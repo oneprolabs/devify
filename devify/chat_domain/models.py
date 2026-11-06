@@ -131,6 +131,15 @@ class Message(models.Model):
         blank=True,
     )
     source_fields = models.JSONField(default=dict, blank=True)
+    # Portable content identity: two accounts in the same group see the same
+    # message under different local ids, so the fingerprint (time, sender,
+    # kind and content) is what lets their uploads collapse into one row.
+    content_fingerprint = models.CharField(
+        max_length=64, blank=True, db_index=True
+    )
+    # Set when the last upload that carried this message was withdrawn. The
+    # message stops feeding new analysis but stays readable for audit.
+    orphaned_at = models.DateTimeField(null=True, blank=True)
     normalization_state = models.CharField(
         max_length=20,
         choices=NormalizationState.choices,
@@ -203,6 +212,11 @@ class MessagePart(models.Model):
         blank=True,
         related_name="chat_message_parts",
     )
+    # Content address of the media bytes. The archive belongs to one uploader,
+    # so a part must not depend on it to stay readable: the file is stored
+    # once by digest and shared by every upload that carries it.
+    media_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    media_content_type = models.CharField(max_length=120, blank=True)
     binding_state = models.CharField(
         max_length=20,
         choices=BindingState.choices,
@@ -262,6 +276,45 @@ class MessageOrigin(models.Model):
 
     def __str__(self):
         return f"{self.message_id}@{self.upload_item_id}"
+
+
+class MessageAlias(models.Model):
+    """A source-local message key that resolves to one merged message.
+
+    Local ids are only unique inside one account's database, so the same key
+    from two uploaders may name two different messages. The alias row keeps
+    that per-namespace meaning while the message itself stays a single row.
+    """
+
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name="message_aliases",
+    )
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name="aliases",
+    )
+    source_namespace = models.CharField(max_length=255)
+    alias_key = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("id",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("conversation", "source_namespace", "alias_key"),
+                name="unique_chat_message_alias",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("message", "conversation")),
+            models.Index(fields=("conversation", "alias_key")),
+        ]
+
+    def __str__(self):
+        return f"{self.source_namespace}:{self.alias_key}"
 
 
 class ConversationAvatar(models.Model):

@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 
 from chat_analysis.models import Event
 from chat_domain.avatars import avatar_path
+from chat_domain.media import media_path
 from chat_domain.models import (
     Conversation,
     ConversationAvatar,
@@ -424,6 +425,45 @@ class SpaceMediaAPIView(APIView):
             content_type=item.content_type or "application/octet-stream",
         )
         response["Content-Length"] = str(info.file_size)
+        response["Content-Disposition"] = "inline"
+        response["Cache-Control"] = "private, max-age=86400"
+        return response
+
+
+class SpaceMediaDigestAPIView(APIView):
+    """Stream one content-addressed media file.
+
+    The digest address is stable across uploads: the same picture packed by
+    two people resolves to one file, and deleting one archive does not break
+    the other upload's message.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, space_id, sha256):
+        space, _takeover = _authorized_space(request.user, space_id)
+        if space is None:
+            return Response({"detail": "Space not found."}, status=404)
+        sha256 = (sha256 or "").lower()
+        if len(sha256) != 64:
+            return Response({"detail": "Media not found."}, status=404)
+        part = (
+            MessagePart.objects.filter(
+                media_sha256=sha256,
+                message__conversation__space=space,
+            )
+            .only("media_content_type")
+            .first()
+        )
+        if part is None:
+            return Response({"detail": "Media not found."}, status=404)
+        path = media_path(sha256)
+        if not path.is_file():
+            return Response({"detail": "Media not found."}, status=404)
+        response = FileResponse(
+            path.open("rb"),
+            content_type=part.media_content_type or "application/octet-stream",
+        )
         response["Content-Disposition"] = "inline"
         response["Cache-Control"] = "private, max-age=86400"
         return response

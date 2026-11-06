@@ -95,6 +95,48 @@ def test_member_can_create_upload_and_repeat_is_idempotent():
     assert UploadBatch.objects.get().archive_sha256 == "a" * 64
 
 
+@pytest.mark.django_db(transaction=True)
+def test_create_upload_does_not_wait_for_shared_space_lock():
+    from threading import Event, Thread
+
+    from django.db import close_old_connections, connection, transaction
+
+    from spaces.services import get_space_quota
+
+    if connection.vendor != "mysql":
+        pytest.skip("MariaDB foreign-key locking regression")
+    owner = User.objects.create_user(username="shared-lock-owner")
+    space = make_team(owner, slug="shared-lock-space")
+    get_space_quota(space)
+    finished = Event()
+    results = []
+
+    def create():
+        close_old_connections()
+        try:
+            results.append(
+                auth_client(owner)
+                .post(create_url(space), payload(), format="json")
+                .status_code
+            )
+        finally:
+            close_old_connections()
+            finished.set()
+
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id FROM spaces_space WHERE id = %s LOCK IN SHARE MODE",
+                [space.pk],
+            )
+        worker = Thread(target=create)
+        worker.start()
+        completed_without_waiting = finished.wait(5)
+    worker.join(timeout=10)
+    assert completed_without_waiting
+    assert results == [201]
+
+
 def test_desktop_upload_records_the_device_from_its_token():
     from rest_framework_simplejwt.tokens import AccessToken
 

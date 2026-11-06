@@ -128,6 +128,27 @@ describe('SpaceChats', () => {
     expect(wrapper.text()).toContain('云端 1229 条 · 6 人 · 5 个事件 · 待处理')
   })
 
+  it('aligns only explicitly outgoing messages on the right', async () => {
+    spacesApi.getMessages.mockResolvedValue({
+      data: {
+        data: {
+          list: [
+            message,
+            { ...message, id: 12, direction: 'outgoing' },
+            { ...message, id: 13, direction: 'unknown' }
+          ],
+          pagination: { page: 1 }
+        }
+      }
+    })
+
+    const wrapper = await mountPage()
+    const rows = wrapper.findAll('.msg')
+    expect(rows[0].classes()).not.toContain('msg-outgoing')
+    expect(rows[1].classes()).toContain('msg-outgoing')
+    expect(rows[2].classes()).not.toContain('msg-outgoing')
+  })
+
   it('loads events only when the event tab opens', async () => {
     const wrapper = await mountPage()
 

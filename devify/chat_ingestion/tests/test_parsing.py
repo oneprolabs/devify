@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
+from chat_analysis.models import AnalysisJob, Note
 from chat_domain.models import (
     Conversation,
     ConversationAvatar,
@@ -15,7 +16,6 @@ from chat_domain.models import (
     MessagePart,
     SenderAvatar,
 )
-from chat_analysis.models import AnalysisJob, Note
 from chat_ingestion.models import UploadBatch, UploadItem
 from chat_ingestion.tests.archives import (
     DEFAULT_PARTS,
@@ -75,6 +75,111 @@ def start_upload(client, space, key, content):
 
 def complete(client, batch):
     return client.post(f"/api/v1/chat/uploads/{batch.pk}/complete")
+
+
+def test_batch_refreshes_conversation_counters_once(monkeypatch):
+    import chat_domain.services as services
+    calls = []
+    original = services.refresh_conversation_counters
+
+    def record(conversation):
+        calls.append(conversation.pk)
+        return original(conversation)
+
+    monkeypatch.setattr(services, "refresh_conversation_counters", record)
+    owner = User.objects.create_user(username="batch-counter-owner")
+    space = make_team(owner, "batch-counter")
+    batch = start_upload(
+        auth_client(owner), space, "batch-counter", build_archive()
+    )
+    assert complete(auth_client(owner), batch).status_code == 200
+    assert len(calls) == len(set(calls)) == 1
+    assert Conversation.objects.get(space=space).message_count == 2
+
+
+def test_batch_allocates_message_sequence_once_per_conversation():
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+    owner = User.objects.create_user(username="batch-sequence-owner")
+    space = make_team(owner, "batch-sequence")
+    client = auth_client(owner)
+    batch = start_upload(client, space, "batch-sequence", build_archive())
+    with CaptureQueriesContext(connection) as queries:
+        assert complete(client, batch).status_code == 200
+    scans = [
+        q for q in queries.captured_queries
+        if q["sql"].upper().startswith("SELECT MAX(")
+        and "ingest_seq" in q["sql"].lower()
+    ]
+    assert len(scans) == 1
+    assert list(Message.objects.filter(conversation__space=space).order_by(
+        "ingest_seq"
+    ).values_list("ingest_seq", flat=True)) == [1, 2]
+
+
+def test_batch_sequence_handles_duplicates_between_new_messages():
+    owner = User.objects.create_user(username="sequence-duplicate-owner")
+    space = make_team(owner, "sequence-duplicate")
+    client = auth_client(owner)
+    records = [
+        {"conversation_id": "group-a", "message_key": key}
+        for key in ("first", "first", "second")
+    ]
+    batch = start_upload(
+        client, space, "sequence-duplicate",
+        build_archive(messages=records, parts=[], media={}),
+    )
+    assert complete(client, batch).status_code == 200
+    batch.refresh_from_db()
+    assert (batch.message_count, batch.duplicate_count) == (2, 1)
+    assert list(Message.objects.filter(conversation__space=space).order_by(
+        "ingest_seq"
+    ).values_list("ingest_seq", flat=True)) == [1, 2]
+
+
+def test_parse_error_rolls_back_before_recording_failure(monkeypatch):
+    from django.db import transaction
+
+    from chat_ingestion import parsing
+    owner = User.objects.create_user(username="broken-transaction-owner")
+    space = make_team(owner, "broken-transaction")
+    batch = start_upload(
+        auth_client(owner), space, "broken-transaction", build_archive()
+    )
+    batch.status = UploadBatch.Status.PROCESSING
+    batch.save(update_fields=("status",))
+
+    def fail(_batch):
+        transaction.set_rollback(True)
+        raise parsing.ArchiveParseError("invalid archive")
+
+    monkeypatch.setattr(parsing, "_parse_locked", fail)
+    parsing.parse_archive(batch)
+    batch.refresh_from_db()
+    assert batch.status == UploadBatch.Status.FAILED
+    assert batch.error_message == "invalid archive"
+
+
+def test_database_error_marks_batch_failed_after_rollback(monkeypatch):
+    from django.db import OperationalError, transaction
+
+    from chat_ingestion import parsing
+    owner = User.objects.create_user(username="database-error-owner")
+    space = make_team(owner, "database-error")
+    batch = start_upload(
+        auth_client(owner), space, "database-error", build_archive()
+    )
+    batch.status = UploadBatch.Status.PROCESSING
+    batch.save(update_fields=("status",))
+
+    def fail(_batch):
+        transaction.set_rollback(True)
+        raise OperationalError("database error")
+
+    monkeypatch.setattr(parsing, "_parse_locked", fail)
+    parsing.parse_archive(batch, retry_transient=True)
+    batch.refresh_from_db()
+    assert batch.status == UploadBatch.Status.FAILED
 
 
 def test_complete_parses_archive_into_conversations_messages_and_parts():
@@ -803,7 +908,9 @@ def test_voice_transcript_part_is_ingested_without_audio_upload():
         },
         *DEFAULT_PARTS[1:],
     ]
-    batch = start_upload(client, space, "parse-voice", build_archive(parts=parts))
+    batch = start_upload(
+        client, space, "parse-voice", build_archive(parts=parts)
+    )
 
     response = complete(client, batch)
 

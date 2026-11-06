@@ -1,3 +1,5 @@
+from chat_sources.models import SourceImport
+from chat_sources.services import get_or_create_upload_source
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
@@ -33,13 +35,12 @@ from chat_ingestion.tasks import (
     dispatch_parse_chat_upload,
     parse_chat_upload_task,
 )
-from chat_sources.models import SourceImport
-from chat_sources.services import get_or_create_upload_source
-from spaces.models import Space, SpaceTakeover
+from spaces.models import Space, SpaceQuota, SpaceTakeover
 from spaces.services import (
     SpacePermissionService,
     audit_space_action,
     check_storage_quota,
+    get_space_quota,
 )
 
 CONFLICT_FIELDS = (
@@ -397,11 +398,13 @@ class UploadBatchCreateAPIView(APIView):
 
     @transaction.atomic
     def post(self, request, space_id):
-        # Locking the space serializes batch creation for the same space, so
-        # the idempotency filter/create pair cannot race on the unique key.
-        space = _authorized_space(request.user, space_id, lock=True)
+        space = _authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
+        # Serialize quota checks and idempotency without locking the space row:
+        # long imports hold a foreign-key lock on that row until they commit.
+        quota = get_space_quota(space)
+        SpaceQuota.objects.select_for_update().get(pk=quota.pk)
         serializer = UploadBatchCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data

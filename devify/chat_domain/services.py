@@ -533,6 +533,11 @@ def ingest_message(
             **origin,
         )
         origins_created += int(origin_created)
+    if message.orphaned_at is not None and message.origins.exists():
+        # The message came back with a fresh upload: it may feed analysis
+        # again even though the earlier contribution was withdrawn.
+        message.orphaned_at = None
+        message.save(update_fields=("orphaned_at", "updated_at"))
     if created:
         refresh_conversation_counters(conversation)
     return MessageIngestResult(

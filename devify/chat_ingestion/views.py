@@ -1,5 +1,3 @@
-from chat_sources.models import SourceImport
-from chat_sources.services import get_or_create_upload_source
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
@@ -25,9 +23,11 @@ from chat_ingestion.services import (
     ArchiveMismatch,
     ArchiveMissing,
     ArchiveTooLarge,
+    RevokeRejected,
     UploadTransitionError,
     cancel_upload,
     complete_upload,
+    revoke_upload,
     store_archive,
     transition_batch,
 )
@@ -35,6 +35,8 @@ from chat_ingestion.tasks import (
     dispatch_parse_chat_upload,
     parse_chat_upload_task,
 )
+from chat_sources.models import SourceImport
+from chat_sources.services import get_or_create_upload_source
 from spaces.models import Space, SpaceTakeover
 from spaces.services import (
     SpacePermissionService,
@@ -482,6 +484,29 @@ class UploadBatchDetailAPIView(APIView):
                 metadata={"takeover_id": takeover.pk},
             )
         return _batch_response(batch)
+
+    @transaction.atomic
+    def delete(self, request, batch_id):
+        batch = _visible_batch(request.user, batch_id, lock=True)
+        if batch is None:
+            return Response({"detail": "Upload not found."}, status=404)
+        if batch.space.status != Space.Status.ACTIVE:
+            return _read_only_response()
+        try:
+            result = revoke_upload(batch, actor=request.user)
+        except PermissionError as error:
+            return Response({"detail": str(error)}, status=403)
+        except RevokeRejected as error:
+            return Response({"detail": str(error)}, status=409)
+        audit_space_action(
+            actor=request.user,
+            space=batch.space,
+            action="chat.upload_revoked",
+            resource_type="upload_batch",
+            resource_id=batch_id,
+            metadata=result,
+        )
+        return Response(status=204)
 
 
 class UploadBatchArchiveAPIView(APIView):

@@ -573,6 +573,7 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             conversation_id=job.conversation_id,
             ingest_seq__gt=last_seq,
             ingest_seq__lte=job.end_seq,
+            orphaned_at__isnull=True,
         )
         if batches.exists():
             query = query.filter(

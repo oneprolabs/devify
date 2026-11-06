@@ -324,6 +324,7 @@ def _parse_messages(
     created_ids = set()
     records = 0
     changed_conversations = {}
+    sequence_cache = {}
     name = MESSAGES_MEMBER
 
     for number, record in package.iter_jsonl(name):
@@ -349,6 +350,7 @@ def _parse_messages(
         result = ingest_message(
             conversation=conversation,
             refresh_counters=False,
+            sequence_cache=sequence_cache,
             message_key=message_key or None,
             source_message_id=source_message_id,
             revision=revision,

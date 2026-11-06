@@ -389,7 +389,9 @@ def refresh_conversation_counters(conversation):
 
 
 @transaction.atomic
-def ingest_message(*, conversation, parts=(), origin=None, **fields):
+def ingest_message(
+    *, conversation, parts=(), origin=None, refresh_counters=True, **fields
+):
     """Store one normalized message with parts and its origin.
 
     Duplicate messages return the existing record and only append any new
@@ -410,7 +412,7 @@ def ingest_message(*, conversation, parts=(), origin=None, **fields):
             **origin,
         )
         origins_created += int(origin_created)
-    if created:
+    if created and refresh_counters:
         refresh_conversation_counters(conversation)
     return MessageIngestResult(
         message=message,

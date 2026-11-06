@@ -15,8 +15,9 @@ import zipfile
 from dataclasses import dataclass
 
 from django.conf import settings
-from django.db import transaction
+from django.db import DatabaseError, transaction
 
+from chat_domain import services as domain_services
 from chat_domain.avatars import (
     MAX_AVATAR_BYTES,
     save_conversation_avatar,
@@ -318,6 +319,7 @@ def _parse_messages(
     created_count = 0
     duplicate_count = 0
     records = 0
+    changed_conversations = {}
     name = MESSAGES_MEMBER
 
     for number, record in package.iter_jsonl(name):
@@ -342,6 +344,7 @@ def _parse_messages(
 
         result = ingest_message(
             conversation=conversation,
+            refresh_counters=False,
             message_key=message_key or None,
             source_message_id=source_message_id,
             revision=revision,
@@ -396,6 +399,7 @@ def _parse_messages(
             messages[(conversation.pk, message_key)] = result.message
         if result.created:
             created_count += 1
+            changed_conversations[conversation.pk] = conversation
         else:
             duplicate_count += 1
 
@@ -404,6 +408,8 @@ def _parse_messages(
             f"{name}: manifest counts {manifest.message_count} messages "
             f"but the archive contains {records}."
         )
+    for conversation in changed_conversations.values():
+        domain_services.refresh_conversation_counters(conversation)
     return messages, created_count, duplicate_count
 
 
@@ -711,25 +717,27 @@ def parse_archive(batch, *, retry_transient=False):
     parsed rows and records the failure on the batch instead.
     """
 
-    with transaction.atomic():
-        batch = UploadBatch.objects.select_for_update().get(pk=batch.pk)
-        if batch.status != UploadBatch.Status.PROCESSING:
-            raise UploadTransitionError(
-                "Only a processing upload can be parsed."
-            )
-        try:
+    try:
+        with transaction.atomic():
+            batch = UploadBatch.objects.select_for_update().get(pk=batch.pk)
+            if batch.status != UploadBatch.Status.PROCESSING:
+                raise UploadTransitionError(
+                    "Only a processing upload can be parsed."
+                )
             _parse_locked(batch)
-        except (
-            ArchiveParseError,
-            PackageError,
-            RuntimeError,
-            UnicodeDecodeError,
-            zipfile.BadZipFile,
-            OSError,
-        ) as error:
-            if retry_transient and isinstance(error, (RuntimeError, OSError)):
-                raise
-            batch.refresh_from_db(fields=("status", "error_message"))
+    except (
+        ArchiveParseError,
+        PackageError,
+        DatabaseError,
+        RuntimeError,
+        UnicodeDecodeError,
+        zipfile.BadZipFile,
+        OSError,
+    ) as error:
+        if retry_transient and isinstance(error, (RuntimeError, OSError)):
+            raise
+        with transaction.atomic():
+            batch = UploadBatch.objects.select_for_update().get(pk=batch.pk)
             if batch.status == UploadBatch.Status.PROCESSING:
                 message = str(error) or error.__class__.__name__
                 transition_batch(
@@ -737,4 +745,4 @@ def parse_archive(batch, *, retry_transient=False):
                     UploadBatch.Status.FAILED,
                     error_message=message,
                 )
-        return batch
+    return batch

@@ -97,6 +97,35 @@ def test_batch_refreshes_conversation_counters_once(monkeypatch):
     assert Conversation.objects.get(space=space).message_count == 2
 
 
+def test_batch_allocates_message_sequence_once_per_conversation():
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+    owner = User.objects.create_user(username="batch-sequence-owner")
+    space = make_team(owner, "batch-sequence")
+    client = auth_client(owner)
+    batch = start_upload(client, space, "batch-sequence", build_archive())
+    with CaptureQueriesContext(connection) as queries:
+        assert complete(client, batch).status_code == 200
+    scans = [q for q in queries.captured_queries if q["sql"].upper().startswith("SELECT MAX(") and "ingest_seq" in q["sql"].lower()]
+    assert len(scans) == 1
+    assert list(Message.objects.filter(conversation__space=space).order_by("ingest_seq").values_list("ingest_seq", flat=True)) == [1, 2]
+
+
+def test_batch_sequence_handles_duplicates_between_new_messages():
+    owner = User.objects.create_user(username="sequence-duplicate-owner")
+    space = make_team(owner, "sequence-duplicate")
+    client = auth_client(owner)
+    records = [
+        {"conversation_id": "group-a", "message_key": key}
+        for key in ("first", "first", "second")
+    ]
+    batch = start_upload(client, space, "sequence-duplicate", build_archive(messages=records, parts=[], media={}))
+    assert complete(client, batch).status_code == 200
+    batch.refresh_from_db()
+    assert (batch.message_count, batch.duplicate_count) == (2, 1)
+    assert list(Message.objects.filter(conversation__space=space).order_by("ingest_seq").values_list("ingest_seq", flat=True)) == [1, 2]
+
+
 def test_parse_error_rolls_back_before_recording_failure(monkeypatch):
     from django.db import transaction
     from chat_ingestion import parsing

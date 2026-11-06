@@ -25,6 +25,8 @@ services:
         PIP_TRUSTED_HOST: pypi.tuna.tsinghua.edu.cn
     env_file:
       - ./.env.dev
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ./data.dev/django/staticfiles:/opt/devify/core/staticfiles
       - ./data.dev/logs/api:/var/log/gunicorn
@@ -71,6 +73,33 @@ services:
       redis:
         condition: service_healthy
     command: celery
+
+  devify-upload-worker:
+    image: devify:latest
+    container_name: devify-upload-worker-dev
+    restart: unless-stopped
+    stop_grace_period: 60s
+    logging: *default-logging
+    env_file:
+      - ./.env.dev
+    volumes:
+      - ./cache.dev:/opt/cache
+      - ./data.dev/logs/upload-worker:/var/log/celery
+      - ./devify:/opt/devify
+      - ./data.dev/haraka/emails:/opt/haraka/emails
+      - ./data.dev/haraka/email_attachments:/opt/haraka/email_attachments
+      - ./data.dev/email_attachments:/opt/email_attachments
+    networks:
+      - devify_network
+    depends_on:
+      devify-api:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["celery"]
+    command: ["-A", "core", "worker", "--loglevel=INFO", "--concurrency=1", "--hostname=chat-upload@%h", "--queues=chat_ingestion"]
 
   devify-scheduler:
     image: devify:latest

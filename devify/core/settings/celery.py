@@ -52,6 +52,13 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 CELERY_TASK_TIME_LIMIT = 3600
 CELERY_TASK_SOFT_TIME_LIMIT = 3000
 
+# Enable only after a worker consumes this queue and shares upload archives.
+CELERY_TASK_ROUTES = (
+    {"chat_ingestion.tasks.parse_chat_upload_task": {"queue": "chat_ingestion"}}
+    if os.getenv("CHAT_UPLOAD_DEDICATED_QUEUE", "false").lower() in {"1", "true", "yes"}
+    else {}
+)
+
 # Per-task overrides. A single stuck mailbox must not occupy a worker slot for
 # the global hour: fetches are cut off much earlier so the rest of the queue
 # keeps moving and beat does not build up a backlog behind them.

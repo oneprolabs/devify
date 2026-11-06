@@ -363,7 +363,10 @@
                       <div
                         :id="`msg-${message.id}`"
                         class="msg"
-                        :class="{ 'is-open': expandedMessageId === message.id }"
+                        :class="{
+                          'is-open': expandedMessageId === message.id,
+                          'msg-outgoing': message.direction === 'outgoing'
+                        }"
                       >
                         <span class="av msg-av">
                           <img
@@ -1052,7 +1055,7 @@ onMounted(loadConversations)
   flex: none;
   flex-direction: column;
   border-right: 1px solid rgb(var(--c-line));
-  background: rgb(var(--c-panel-sub));
+  background: rgb(var(--c-panel));
 }
 .rail-head {
   display: flex;
@@ -1182,7 +1185,7 @@ onMounted(loadConversations)
   background: rgb(var(--c-chip));
 }
 .conv-row.on {
-  background: rgb(var(--c-ac-soft));
+  background: #e8f5eb;
 }
 .av {
   display: flex;
@@ -1330,10 +1333,11 @@ onMounted(loadConversations)
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  background: rgb(var(--c-panel-sub));
 }
 .det-inner {
   display: flex;
-  max-width: 820px;
+  max-width: 1000px;
   margin: 0 auto;
   flex-direction: column;
   gap: 18px;
@@ -1486,6 +1490,8 @@ onMounted(loadConversations)
   gap: 12px;
   color: rgb(var(--c-tx3));
   font-size: 11.5px;
+  justify-content: center;
+  padding: 8px 0;
 }
 .daysep::before,
 .daysep::after {
@@ -1500,6 +1506,15 @@ onMounted(loadConversations)
   gap: 10px;
   scroll-margin: 80px;
 }
+.msg-outgoing {
+  flex-direction: row-reverse;
+}
+.msg-outgoing .msg-main {
+  align-items: flex-end;
+}
+.msg-outgoing .msg-meta {
+  text-align: right;
+}
 .msg-av {
   width: 30px;
   height: 30px;
@@ -1509,6 +1524,7 @@ onMounted(loadConversations)
 .msg-main {
   display: flex;
   min-width: 0;
+  max-width: min(75%, 560px);
   flex-direction: column;
   gap: 4px;
 }
@@ -1528,7 +1544,7 @@ onMounted(loadConversations)
 .bub {
   max-width: 560px;
   border-radius: 10px;
-  background: rgb(var(--c-bg-sub));
+  background: rgb(var(--c-panel));
   padding: 9px 12px;
   color: rgb(var(--c-tx2));
   font-size: 13.5px;
@@ -1541,7 +1557,7 @@ onMounted(loadConversations)
   box-shadow: inset 0 0 0 1px rgb(var(--c-line));
 }
 .bub.me {
-  background: rgb(var(--c-ac-soft));
+  background: #d9f3de;
   color: rgb(var(--c-tx));
 }
 .bub-media {
@@ -1811,6 +1827,9 @@ onMounted(loadConversations)
   }
   .det-inner {
     padding: 18px 16px 40px;
+  }
+  .msg-main {
+    max-width: 82%;
   }
 }
 </style>

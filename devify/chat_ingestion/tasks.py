@@ -4,6 +4,7 @@ import logging
 
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
+from chat_sources.models import SourceImport
 from django.conf import settings
 from django.db import models
 from django.shortcuts import get_object_or_404
@@ -17,7 +18,6 @@ from chat_domain.models import Conversation, Message
 from chat_ingestion.models import UploadBatch
 from chat_ingestion.parsing import parse_archive
 from chat_ingestion.services import UploadTransitionError, transition_batch
-from chat_sources.models import SourceImport
 from spaces.services import SpacePermissionService, audit_space_action
 
 logger = logging.getLogger(__name__)
@@ -159,12 +159,17 @@ def parse_chat_upload_task(self, batch_id):
     except SoftTimeLimitExceeded:
         batch.refresh_from_db()
         if batch.status == UploadBatch.Status.PROCESSING:
-            transition_batch(batch, UploadBatch.Status.FAILED, error_message="Upload processing exceeded the time limit.")
+            transition_batch(
+                batch, UploadBatch.Status.FAILED,
+                error_message="Upload processing exceeded the time limit.",
+            )
         if source_import:
             source_import.status = SourceImport.Status.FAILED
             source_import.error_message = batch.error_message
             source_import.completed_at = timezone.now()
-            source_import.save(update_fields=("status", "error_message", "completed_at", "updated_at"))
+            source_import.save(update_fields=(
+                "status", "error_message", "completed_at", "updated_at",
+            ))
         return {"batch_id": batch.pk, "status": batch.status}
     except (RuntimeError, OSError) as error:
         if getattr(self.request, "retries", 0) >= self.max_retries:

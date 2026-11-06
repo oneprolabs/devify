@@ -106,9 +106,15 @@ def test_batch_allocates_message_sequence_once_per_conversation():
     batch = start_upload(client, space, "batch-sequence", build_archive())
     with CaptureQueriesContext(connection) as queries:
         assert complete(client, batch).status_code == 200
-    scans = [q for q in queries.captured_queries if q["sql"].upper().startswith("SELECT MAX(") and "ingest_seq" in q["sql"].lower()]
+    scans = [
+        q for q in queries.captured_queries
+        if q["sql"].upper().startswith("SELECT MAX(")
+        and "ingest_seq" in q["sql"].lower()
+    ]
     assert len(scans) == 1
-    assert list(Message.objects.filter(conversation__space=space).order_by("ingest_seq").values_list("ingest_seq", flat=True)) == [1, 2]
+    assert list(Message.objects.filter(conversation__space=space).order_by(
+        "ingest_seq"
+    ).values_list("ingest_seq", flat=True)) == [1, 2]
 
 
 def test_batch_sequence_handles_duplicates_between_new_messages():
@@ -119,15 +125,21 @@ def test_batch_sequence_handles_duplicates_between_new_messages():
         {"conversation_id": "group-a", "message_key": key}
         for key in ("first", "first", "second")
     ]
-    batch = start_upload(client, space, "sequence-duplicate", build_archive(messages=records, parts=[], media={}))
+    batch = start_upload(
+        client, space, "sequence-duplicate",
+        build_archive(messages=records, parts=[], media={}),
+    )
     assert complete(client, batch).status_code == 200
     batch.refresh_from_db()
     assert (batch.message_count, batch.duplicate_count) == (2, 1)
-    assert list(Message.objects.filter(conversation__space=space).order_by("ingest_seq").values_list("ingest_seq", flat=True)) == [1, 2]
+    assert list(Message.objects.filter(conversation__space=space).order_by(
+        "ingest_seq"
+    ).values_list("ingest_seq", flat=True)) == [1, 2]
 
 
 def test_parse_error_rolls_back_before_recording_failure(monkeypatch):
     from django.db import transaction
+
     from chat_ingestion import parsing
     owner = User.objects.create_user(username="broken-transaction-owner")
     space = make_team(owner, "broken-transaction")
@@ -150,6 +162,7 @@ def test_parse_error_rolls_back_before_recording_failure(monkeypatch):
 
 def test_database_error_marks_batch_failed_after_rollback(monkeypatch):
     from django.db import OperationalError, transaction
+
     from chat_ingestion import parsing
     owner = User.objects.create_user(username="database-error-owner")
     space = make_team(owner, "database-error")

@@ -98,7 +98,9 @@ def test_member_can_create_upload_and_repeat_is_idempotent():
 @pytest.mark.django_db(transaction=True)
 def test_create_upload_does_not_wait_for_shared_space_lock():
     from threading import Event, Thread
+
     from django.db import close_old_connections, connection, transaction
+
     from spaces.services import get_space_quota
 
     if connection.vendor != "mysql":

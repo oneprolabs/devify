@@ -83,7 +83,10 @@ def test_parser_task_retries_transient_parser_errors():
 def test_parser_task_marks_timeout_failed():
     owner = User.objects.create_user(username="task-timeout-owner")
     batch = make_batch(owner, "task-timeout-team")
-    with patch("chat_ingestion.tasks.parse_archive", side_effect=SoftTimeLimitExceeded()):
+    with patch(
+        "chat_ingestion.tasks.parse_archive",
+        side_effect=SoftTimeLimitExceeded(),
+    ):
         result = parse_chat_upload_task.run(batch.pk)
     batch.refresh_from_db()
     assert result["status"] == UploadBatch.Status.FAILED

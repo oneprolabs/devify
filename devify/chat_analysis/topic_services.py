@@ -156,7 +156,9 @@ def question_context(
     ]
     allowed_event_ids = {event["id"] for event in selected_events}
     allowed_note_ids = {note["id"] for note in selected_notes}
-    messages = Message.objects.filter(conversation__space=space)
+    messages = Message.objects.filter(
+        conversation__space=space, orphaned_at__isnull=True
+    )
     if conversation_ids:
         messages = messages.filter(conversation_id__in=conversation_ids)
     elif allowed_note_ids:

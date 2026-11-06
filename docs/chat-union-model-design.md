@@ -1,6 +1,6 @@
 # 多人上传并集模型设计说明
 
-- 状态：设计已定稿；S1（媒体内容寻址）、S2（会话归一 + 消息指纹/别名）已实现，S3–S4 待实现
+- 状态：设计已定稿；S1（媒体内容寻址）、S2（会话归一 + 消息指纹/别名）、S3（撤回与孤儿消息）已实现，S4 待实现
 - 日期：2026-11-06
 - 涉及：`chat_ingestion` / `chat_domain` / `chat_analysis` / `chat_sources`
 - 相关：`docs/wechat.v1-contract.md`（包契约）、`docs/wechat-devify-ingestion-design.md`（导入方向）
@@ -96,10 +96,11 @@ DELETE /api/v1/chat/uploads/{id}     # 上传者本人 / 空间管理员
 3. 受影响消息按剩余 origin 分类：
    - `> 0`：消息保留；`MessagePart.media_sha256` 保证媒体仍可访问。
    - `= 0`：`Message.orphaned_at = now()`，从后续分析、问答、报告取数中排除。
-4. 删除批次归档文件与 `UploadItem`，释放配额。
+4. 删除批次归档文件、`UploadItem` 与批次行，释放配额；审计 `chat.upload_revoked` 保留消息数、孤儿数与 origin 数。
 5. 会话无任何消息时保留空会话（可后续归档），不做级联删除。
+6. 重新上传命中同一消息时清除 `orphaned_at`，该消息重新进入分析与问答。
 
-延迟清理任务（默认 30 天，可配置）物理删除 `orphaned` 消息，连带 CASCADE 证据；Note/Event 不重算，沿用“允许删除 + 快照保底”的既有决策（`ReportItemSource` 的 `SET_NULL` + snapshot）。
+延迟清理命令 `purge_orphaned_messages --days 30 --apply`（默认 dry-run）物理删除超过保留期的 orphaned 消息，连带 CASCADE parts/origins/aliases/证据；Note/Event 不重算，沿用“允许删除 + 快照保底”的既有决策（`ReportItemSource` 的 `SET_NULL` + snapshot）。孤儿消息不进入新的分析窗口，也不进入问答上下文（`question_context` 过滤 `orphaned_at`）。
 
 **语义边界**：A、B 都上传了同一条消息时，A 撤回后 B 仍能看到——这是并集模型的必然结果，不是缺陷。若产品需要“A 撤回后对 A 也不可见”，那属于按贡献者的可见性过滤，另立需求。
 
@@ -131,7 +132,7 @@ DELETE /api/v1/chat/uploads/{id}     # 上传者本人 / 空间管理员
 |---|---|---|
 | S1 | 媒体内容寻址：`CHAT_MEDIA_DIR`、解析落盘、新读取接口、`backfill_chat_media` | 删除批次后，其他批次引用同一张图仍可访问 **（已实现）** |
 | S2 | 会话归一 + 消息指纹 + `MessageAlias` + `merge_chat_messages` 命令 | 两个账号先后上传同一个群：`Conversation` 1 条、消息并集、`duplicate_count` 正确 **（已实现）** |
-| S3 | 删除/撤回接口 + `orphaned` 状态 + 延迟清理任务 | A 撤回后 B 的消息与媒体完整；`orphaned` 消息不再进入问答/报告 |
+| S3 | 删除/撤回接口 + `orphaned` 状态 + 延迟清理任务 | A 撤回后 B 的消息与媒体完整；`orphaned` 消息不再进入问答/报告 **（已实现）** |
 | S4 | `AnalysisChunk` 桶级分析 + Note key 改 `chunk:` | 两组重叠上传只调用一次模型、只产生一份 Note |
 
 S1 → S2 可并行，S3 依赖 S1，S4 依赖 S2。

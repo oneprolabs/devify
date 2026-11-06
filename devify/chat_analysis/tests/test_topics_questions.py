@@ -635,3 +635,46 @@ def test_question_context_reports_message_row_limit():
     context = question_context(space=space)
     assert len(context["messages"]) == 100
     assert context["scope"]["context_truncated"] is True
+
+
+def test_question_context_skips_messages_withdrawn_by_their_uploader():
+    owner = User.objects.create_user(username="orphan-owner")
+    space = make_space(owner, "orphan-team")
+    conversation = Conversation.objects.create(
+        space=space,
+        platform=Conversation.Platform.WECHAT,
+        source_namespace="test",
+        source_conversation_id="orphan-group",
+        identity_key=f"wechat:orphan-group-{space.pk}",
+    )
+    kept = Message.objects.create(
+        conversation=conversation,
+        message_key="orphan-kept",
+        ingest_seq=1,
+        sender_name="Alice",
+    )
+    MessagePart.objects.create(
+        message=kept,
+        part_key="part-1",
+        kind=MessagePart.Kind.TEXT,
+        text="仍然有效的内容",
+    )
+    dropped = Message.objects.create(
+        conversation=conversation,
+        message_key="orphan-dropped",
+        ingest_seq=2,
+        sender_name="Alice",
+        orphaned_at=timezone.now(),
+    )
+    MessagePart.objects.create(
+        message=dropped,
+        part_key="part-1",
+        kind=MessagePart.Kind.TEXT,
+        text="已经撤回的内容",
+    )
+
+    context = question_context(space=space)
+
+    message_ids = {item["id"] for item in context["messages"]}
+    assert kept.pk in message_ids
+    assert dropped.pk not in message_ids

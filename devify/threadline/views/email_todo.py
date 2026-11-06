@@ -6,22 +6,27 @@ This module contains APIView classes for EmailTodo model CRUD operations.
 
 import logging
 
-from django.db.models import Count
-from rest_framework import status, serializers
-from rest_framework.response import Response
+from django.db.models import Count, Q
 from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, status
+from rest_framework.response import Response
+
 from core.swagger import (
-    response, error_response, pagination_response,
-    pagination_params, ordering_param, search_param
+    error_response,
+    ordering_param,
+    pagination_params,
+    pagination_response,
+    response,
+    search_param,
 )
 
-from .base import BaseAPIView
 from ..models import EmailTodo
 from ..serializers import (
-    EmailTodoSerializer,
+    EmailTodoFilterSerializer,
     EmailTodoListSerializer,
-    EmailTodoFilterSerializer
+    EmailTodoSerializer,
 )
+from .base import BaseAPIView
 
 logger = logging.getLogger(__name__)
 
@@ -81,14 +86,22 @@ class EmailTodoAPIView(BaseAPIView):
             if owner:
                 queryset = queryset.filter(owner__icontains=owner)
 
-            # Filter by deadline range
+            # List views may include undated TODOs alongside the date range.
+            # Keep the default strict for calendar views and existing clients.
             deadline_before = request.query_params.get('deadline_before')
-            if deadline_before:
-                queryset = queryset.filter(deadline__lte=deadline_before)
-
             deadline_after = request.query_params.get('deadline_after')
-            if deadline_after:
-                queryset = queryset.filter(deadline__gte=deadline_after)
+            if deadline_before or deadline_after:
+                deadline_filter = Q()
+                if deadline_before:
+                    deadline_filter &= Q(deadline__lte=deadline_before)
+                if deadline_after:
+                    deadline_filter &= Q(deadline__gte=deadline_after)
+                include_no_deadline = request.query_params.get(
+                    'include_no_deadline', 'false'
+                ).lower() == 'true'
+                if include_no_deadline:
+                    deadline_filter |= Q(deadline__isnull=True)
+                queryset = queryset.filter(deadline_filter)
 
             # Search in content
             search = request.query_params.get('search')

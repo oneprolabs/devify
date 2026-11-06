@@ -37,6 +37,7 @@ EVENT_KEY = "quote-risk"
 @pytest.fixture(autouse=True)
 def chain(settings, tmp_path):
     settings.CHAT_UPLOAD_ARCHIVE_DIR = str(tmp_path / "chat_archives")
+    settings.CHAT_MEDIA_DIR = str(tmp_path / "chat_media")
     settings.CHAT_UPLOAD_PARSE_INLINE = True
     settings.CHAT_UPLOAD_ANALYSIS_INLINE = True
     settings.CHAT_ANALYSIS_LLM_ENABLED = True

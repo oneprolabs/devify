@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass
 from urllib.parse import quote
 
@@ -7,9 +8,20 @@ from django.db.models import Count, Max
 from chat_domain.models import (
     Conversation,
     Message,
+    MessageAlias,
     MessageOrigin,
     MessagePart,
 )
+
+MEDIA_PART_KINDS = frozenset(
+    {
+        MessagePart.Kind.IMAGE,
+        MessagePart.Kind.VIDEO,
+        MessagePart.Kind.AUDIO,
+        MessagePart.Kind.FILE,
+    }
+)
+FINGERPRINT_VERSION = "fp.v1"
 
 
 @dataclass(frozen=True)
@@ -33,27 +45,27 @@ def _clean(value):
 def build_identity_key(
     *,
     platform,
-    source_namespace,
+    source_namespace="",
     source_conversation_id="",
     scope_key="",
 ):
     """Build the canonical conversation identity key.
 
-    The source conversation id is authoritative. When the source has no
-    stable conversation id, callers must pass a deterministic import scope
-    key instead; a display title is never used as an identity.
+    The uploading account is deliberately absent from the key. Two people in
+    one space exporting the same group must land on the same conversation;
+    ``source_namespace`` stays in the signature for callers and older data,
+    but it is stored as a source attribute instead of an identity.
     """
     platform = _clean(platform)
-    namespace = _clean(source_namespace)
     conversation_id = _clean(source_conversation_id)
     scope = _clean(scope_key)
-    if not platform or not namespace:
-        raise ValueError("platform and source_namespace are required.")
+    if not platform:
+        raise ValueError("platform is required.")
     if not conversation_id and not scope:
         raise ValueError("source_conversation_id or scope_key is required.")
     component = conversation_id or f"scope:{scope}"
     key = ":".join(
-        quote(part, safe="") for part in (platform, namespace, component)
+        quote(part, safe="") for part in (platform, component)
     )
     if len(key) > 700:
         raise ValueError("Conversation identity key is too long.")
@@ -88,6 +100,62 @@ def build_message_key(
             "and file_sha256."
         )
     return f"loc:{quote(digest, safe='')}#{quote(locator, safe='')}"
+
+
+def message_fingerprint(
+    *,
+    occurred_at,
+    sender_key,
+    record_kind,
+    parts,
+):
+    """Hash the portable content identity of one message.
+
+    Local ids are per account and display names are per contact book, so
+    neither can identify a message two people exported. Time, sender id, kind
+    and the visible content can. Direction is excluded on purpose: the same
+    message is outgoing for its author and incoming for everyone else.
+
+    ``parts`` accepts mappings with ``kind``, ``ordinal``, ``text`` and
+    ``media_sha256``. A message without a timestamp is never fingerprinted:
+    guessing would merge unrelated messages.
+    """
+    if occurred_at is None:
+        return ""
+    ordered = sorted(
+        parts,
+        key=lambda part: (
+            part.get("ordinal") or 0,
+            part.get("part_key") or "",
+        ),
+    )
+    texts = [
+        part.get("text") or ""
+        for part in ordered
+        if part.get("kind") == MessagePart.Kind.TEXT
+    ]
+    media = [
+        part.get("media_sha256") or ""
+        for part in ordered
+        if part.get("kind") in MEDIA_PART_KINDS
+    ]
+    if not any(texts) and not media:
+        # A record with no visible content (a bare system line, for example)
+        # carries nothing that distinguishes it from its neighbours in the
+        # same second, so it must never be merged by fingerprint.
+        return ""
+    raw = "|".join(
+        (
+            FINGERPRINT_VERSION,
+            str(int(occurred_at.timestamp())),
+            _clean(sender_key),
+            _clean(record_kind),
+            "\n".join(texts),
+            str(len(media)),
+            "\n".join(media),
+        )
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 @transaction.atomic
@@ -164,6 +232,22 @@ def upsert_conversation(
             updates["self_sender_key"] = self_sender_key
     if metadata:
         merged = {**(conversation.metadata or {}), **metadata}
+        if merged != conversation.metadata:
+            updates["metadata"] = merged
+    namespace = _clean(source_namespace)
+    if (
+        namespace
+        and conversation.source_namespace
+        and namespace != conversation.source_namespace
+    ):
+        namespaces = list(
+            (conversation.metadata or {}).get("source_namespaces") or []
+        )
+        for value in (conversation.source_namespace, namespace):
+            if value not in namespaces:
+                namespaces.append(value)
+        merged = {**(updates.get("metadata") or conversation.metadata or {})}
+        merged["source_namespaces"] = namespaces
         if merged != conversation.metadata:
             updates["metadata"] = merged
     if updates:
@@ -274,6 +358,8 @@ def upsert_message_part(
     parent_part=None,
     upload_item=None,
     binding_state=None,
+    media_sha256=None,
+    media_content_type=None,
     source_locator=None,
     source_header=None,
 ):
@@ -292,6 +378,8 @@ def upsert_message_part(
             "text": text or "",
             "parent_part": parent_part,
             "upload_item": upload_item,
+            "media_sha256": media_sha256 or "",
+            "media_content_type": media_content_type or "",
             "binding_state": (
                 binding_state or MessagePart.BindingState.AVAILABLE
             ),
@@ -312,6 +400,10 @@ def upsert_message_part(
         values["parent_part"] = parent_part
     if upload_item is not None:
         values["upload_item"] = upload_item
+    if media_sha256:
+        values["media_sha256"] = media_sha256
+    if media_content_type:
+        values["media_content_type"] = media_content_type
     if binding_state is not None:
         values["binding_state"] = binding_state
     if source_locator is not None:
@@ -387,16 +479,49 @@ def refresh_conversation_counters(conversation):
 
 
 @transaction.atomic
-def ingest_message(*, conversation, parts=(), origin=None, **fields):
+def ingest_message(
+    *,
+    conversation,
+    parts=(),
+    origin=None,
+    source_namespace="",
+    alias_key="",
+    **fields,
+):
     """Store one normalized message with parts and its origin.
 
     Duplicate messages return the existing record and only append any new
-    origins or parts, so repeated uploads stay idempotent.
+    origins or parts, so repeated uploads stay idempotent. ``alias_key`` is
+    the key this uploader used locally; when another account already created
+    the same message under a different key, the alias resolves to it.
     """
-    message, created = upsert_message(
-        conversation=conversation,
-        **fields,
-    )
+
+    message = None
+    created = False
+    if alias_key and source_namespace:
+        alias = (
+            MessageAlias.objects.select_related("message")
+            .filter(
+                conversation=conversation,
+                source_namespace=_clean(source_namespace),
+                alias_key=_clean(alias_key),
+            )
+            .first()
+        )
+        if alias is not None:
+            message = alias.message
+    if message is None:
+        message, created = upsert_message(
+            conversation=conversation,
+            **fields,
+        )
+    if alias_key and source_namespace and alias_key != message.message_key:
+        MessageAlias.objects.get_or_create(
+            conversation=conversation,
+            source_namespace=_clean(source_namespace),
+            alias_key=_clean(alias_key),
+            defaults={"message": message},
+        )
     parts_created = 0
     for part in parts:
         _, part_created = upsert_message_part(message=message, **part)
@@ -416,3 +541,154 @@ def ingest_message(*, conversation, parts=(), origin=None, **fields):
         parts_created=parts_created,
         origins_created=origins_created,
     )
+
+
+def set_message_fingerprint(message, fingerprint):
+    if not fingerprint or message.content_fingerprint == fingerprint:
+        return message
+    message.content_fingerprint = fingerprint
+    message.save(update_fields=("content_fingerprint", "updated_at"))
+    return message
+
+
+def apply_message_fingerprints(message_ids):
+    """Compute the portable fingerprint for freshly parsed messages."""
+
+    messages = Message.objects.filter(pk__in=message_ids).prefetch_related(
+        "parts"
+    )
+    updated = 0
+    for message in messages:
+        parts = [
+            {
+                "kind": part.kind,
+                "ordinal": part.ordinal,
+                "part_key": part.part_key,
+                "text": part.text,
+                "media_sha256": part.media_sha256,
+            }
+            for part in message.parts.all()
+        ]
+        fingerprint = message_fingerprint(
+            occurred_at=message.occurred_at,
+            sender_key=message.sender_key,
+            record_kind=message.record_kind,
+            parts=parts,
+        )
+        if fingerprint:
+            set_message_fingerprint(message, fingerprint)
+            updated += 1
+    return updated
+
+
+@transaction.atomic
+def merge_messages(*, source, target):
+    """Fold one message row into another, keeping every source record.
+
+    Only the duplicate message row disappears. Origins, parts, reply links
+    and analysis evidence are re-pointed at the survivor, so a later upload
+    by either account still finds the message and the space keeps a single
+    copy of the content.
+    """
+
+    if source.pk == target.pk:
+        return target
+
+    Message.objects.filter(reply_to_id=source.pk).update(reply_to=target)
+    MessageOrigin.objects.filter(message=source).update(message=target)
+
+    for part in list(MessagePart.objects.filter(message=source)):
+        existing = MessagePart.objects.filter(
+            message=target, part_key=part.part_key
+        ).first()
+        if existing is None:
+            part.message = target
+            part.save(update_fields=("message", "updated_at"))
+            continue
+        updates = []
+        if not existing.media_sha256 and part.media_sha256:
+            existing.media_sha256 = part.media_sha256
+            updates.append("media_sha256")
+        if not existing.media_content_type and part.media_content_type:
+            existing.media_content_type = part.media_content_type
+            updates.append("media_content_type")
+        if updates:
+            existing.save(update_fields=(*updates, "updated_at"))
+        part.delete()
+
+    # Imported lazily: analysis depends on chat_domain, not the other way.
+    from chat_analysis.models import EventEvidence, NoteEvidence
+
+    for evidence in list(NoteEvidence.objects.filter(message=source)):
+        if NoteEvidence.objects.filter(
+            note_id=evidence.note_id, message=target
+        ).exists():
+            evidence.delete()
+            continue
+        evidence.message = target
+        evidence.reference_key = NoteEvidence.build_reference_key(
+            target.pk, evidence.message_part_id
+        )
+        if NoteEvidence.objects.filter(
+            note_id=evidence.note_id, reference_key=evidence.reference_key
+        ).exists():
+            evidence.delete()
+            continue
+        evidence.save(
+            update_fields=("message", "reference_key")
+        )
+
+    for evidence in list(EventEvidence.objects.filter(message=source)):
+        EventEvidence.objects.get_or_create(
+            event_id=evidence.event_id,
+            message=target,
+            defaults={"created_by_id": evidence.created_by_id},
+        )
+        evidence.delete()
+
+    source.delete()
+    return target
+
+
+def consolidate_conversation_messages(conversation, *, fingerprints=None):
+    """Merge messages of one conversation that share a fingerprint.
+
+    Returns ``(source_id, target_id)`` pairs so the caller can tell how many
+    rows this batch created that turned out to be duplicates.
+    """
+
+    query = Message.objects.filter(
+        conversation=conversation
+    ).exclude(content_fingerprint="")
+    if fingerprints:
+        query = query.filter(content_fingerprint__in=fingerprints)
+    groups = list(
+        query.values("content_fingerprint")
+        .annotate(total=Count("id"))
+        .filter(total__gt=1)
+    )
+    merges = []
+    for group in groups:
+        messages = list(
+            Message.objects.filter(
+                conversation=conversation,
+                content_fingerprint=group["content_fingerprint"],
+            ).order_by("id")
+        )
+        target = next(
+            (
+                message
+                for message in messages
+                if message.message_key.startswith("srv:")
+            ),
+            messages[0],
+        )
+        for source in messages:
+            if source.pk == target.pk:
+                continue
+            source_id = source.pk
+            merge_messages(source=source, target=target)
+            merges.append((source_id, target.pk))
+    if merges:
+        refresh_conversation_counters(conversation)
+    return merges

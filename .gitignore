@@ -269,5 +269,6 @@ cache/
 /node_modules/
 devify/chat_upload_archives/
 devify/chat_avatars/
+devify/chat_media/
 
 test_report.html

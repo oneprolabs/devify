@@ -22,8 +22,11 @@ from chat_domain.avatars import (
     save_conversation_avatar,
     save_sender_avatar,
 )
+from chat_domain.media import media_exists, store_media
 from chat_domain.models import Conversation, Message, MessagePart
 from chat_domain.services import (
+    apply_message_fingerprints,
+    consolidate_conversation_messages,
     ingest_message,
     record_message_origin,
     upsert_conversation,
@@ -317,6 +320,7 @@ def _parse_messages(
     messages = {}
     created_count = 0
     duplicate_count = 0
+    created_ids = set()
     records = 0
     name = MESSAGES_MEMBER
 
@@ -347,6 +351,8 @@ def _parse_messages(
             revision=revision,
             record_locator_key=locator_key,
             file_sha256=message_digest,
+            source_namespace=manifest.source_namespace,
+            alias_key=message_key,
             record_kind=_choice(
                 record,
                 "record_kind",
@@ -396,6 +402,7 @@ def _parse_messages(
             messages[(conversation.pk, message_key)] = result.message
         if result.created:
             created_count += 1
+            created_ids.add(result.message.pk)
         else:
             duplicate_count += 1
 
@@ -404,7 +411,7 @@ def _parse_messages(
             f"{name}: manifest counts {manifest.message_count} messages "
             f"but the archive contains {records}."
         )
-    return messages, created_count, duplicate_count
+    return messages, created_count, duplicate_count, created_ids
 
 
 def _message(messages, conversation, record, where):
@@ -470,6 +477,23 @@ def _parse_parts(package, conversations, messages, items):
         else:
             binding_state = MessagePart.BindingState.AVAILABLE
 
+        media_sha256 = ""
+        media_content_type = ""
+        if upload_item is not None and kind in _MEDIA_KINDS:
+            media_sha256 = upload_item.sha256 or ""
+            media_content_type = upload_item.content_type or ""
+            if media_sha256 and not media_exists(media_sha256):
+                try:
+                    store_media(package, upload_item.path, media_sha256)
+                except PackageError as error:
+                    raise ArchiveParseError(
+                        f"{where}: media file is not readable: {error}"
+                    ) from None
+                except OSError as error:
+                    raise ArchiveParseError(
+                        f"{where}: media file could not be stored: {error}"
+                    ) from None
+
         part, _ = upsert_message_part(
             message=message,
             part_key=part_key,
@@ -479,6 +503,8 @@ def _parse_parts(package, conversations, messages, items):
             parent_part=parent,
             upload_item=upload_item,
             binding_state=binding_state,
+            media_sha256=media_sha256,
+            media_content_type=media_content_type,
             source_locator=_mapping(record, "source_locator", where),
             source_header=_mapping(record, "source_header", where),
         )
@@ -571,42 +597,43 @@ def _parse_origins(package, manifest, conversations, messages, items):
         )
 
 
-def _content_digests(messages):
+def _content_digests(batch):
     """Hash the normalised content, per conversation and for the whole batch.
 
-    The digest deliberately ignores the zip layout and the uploader: two
-    people exporting the same group produce the same value, so the caller can
-    skip analysing data that has already been processed.
+    The digest deliberately ignores the zip layout, the uploader and the
+    local message ids: two people exporting the same group produce the same
+    value, so the caller can skip analysing data that has already been
+    processed. The portable fingerprint stands in for the local message key
+    once it is known.
     """
 
     by_conversation = {}
-    seen = set()
-    for message in messages.values():
-        if message.pk in seen:
-            continue
-        seen.add(message.pk)
+    rows = (
+        Message.objects.filter(origins__upload_item__batch=batch)
+        .distinct()
+        .prefetch_related("parts")
+    )
+    for message in rows:
         parts = [
             [
                 part.kind,
                 part.ordinal,
                 part.text,
-                part.upload_item.sha256 if part.upload_item_id else "",
+                part.media_sha256,
             ]
-            for part in MessagePart.objects.filter(
-                message_id=message.pk
-            ).order_by("ordinal", "pk")
+            for part in sorted(
+                message.parts.all(), key=lambda part: (part.ordinal, part.pk)
+            )
         ]
         by_conversation.setdefault(message.conversation_id, []).append(
             {
-                "key": message.message_key,
+                "key": message.content_fingerprint or message.message_key,
                 "at": (
                     message.occurred_at.isoformat()
                     if message.occurred_at
                     else ""
                 ),
                 "sender": message.sender_key,
-                "name": message.sender_name,
-                "direction": message.direction,
                 "kind": message.record_kind,
                 "parts": parts,
             }
@@ -669,7 +696,12 @@ def _parse_locked(batch):
             items[name] = item
 
         conversations = _parse_conversations(batch, manifest, package)
-        messages, created_count, duplicate_count = _parse_messages(
+        (
+            messages,
+            created_count,
+            duplicate_count,
+            created_ids,
+        ) = _parse_messages(
             manifest,
             package,
             conversations,
@@ -679,7 +711,34 @@ def _parse_locked(batch):
         _parse_parts(package, conversations, messages, items)
         _parse_origins(package, manifest, conversations, messages, items)
         _parse_avatars(package, batch.space, conversations)
-        content_sha256, conversation_digests = _content_digests(messages)
+
+        # A second account sees the same messages under different local ids.
+        # Fingerprints collapse those rows before the batch reports counts and
+        # before the analysis job decides whether the content is new.
+        apply_message_fingerprints(
+            created_ids | {message.pk for message in messages.values()}
+        )
+        fingerprints = set(
+            Message.objects.filter(pk__in=created_ids)
+            .exclude(content_fingerprint="")
+            .values_list("content_fingerprint", flat=True)
+        )
+        merges = []
+        for conversation in {
+            conversation.pk: conversation
+            for conversation in conversations.values()
+        }.values():
+            merges.extend(
+                consolidate_conversation_messages(
+                    conversation, fingerprints=fingerprints or None
+                )
+            )
+        merged_created = sum(
+            1 for source_id, _target in merges if source_id in created_ids
+        )
+        created_count -= merged_created
+        duplicate_count += merged_created
+        content_sha256, conversation_digests = _content_digests(batch)
 
     message_item = items[MESSAGES_MEMBER]
     message_item.message_count = created_count

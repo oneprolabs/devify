@@ -5,6 +5,7 @@ from chat_domain.views import (
     SpaceConversationDetailAPIView,
     SpaceConversationListAPIView,
     SpaceMediaAPIView,
+    SpaceMediaDigestAPIView,
     SpaceMessageDetailAPIView,
     SpaceMessageListAPIView,
 )
@@ -14,6 +15,11 @@ urlpatterns = [
         "spaces/<int:space_id>/media/<int:item_id>",
         SpaceMediaAPIView.as_view(),
         name="chat-media",
+    ),
+    path(
+        "spaces/<int:space_id>/chat-media/<str:sha256>",
+        SpaceMediaDigestAPIView.as_view(),
+        name="chat-media-digest",
     ),
     path(
         "spaces/<int:space_id>/avatars/<str:sha256>",

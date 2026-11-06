@@ -505,7 +505,7 @@ def test_duplicate_conversation_record_in_one_package_is_rejected():
     assert Conversation.objects.count() == 0
 
 
-def test_same_conversation_id_in_another_namespace_stays_separate():
+def test_same_conversation_id_in_another_namespace_merges_into_one():
     owner = User.objects.create_user(username="parse-namespace-owner")
     space = make_team(owner, slug="parse-namespace-team")
     client = auth_client(owner)
@@ -522,9 +522,13 @@ def test_same_conversation_id_in_another_namespace_stays_separate():
     response = complete(client, second)
 
     assert response.status_code == 200
-    response.data["data"]["message_count"] == 2
-    assert Conversation.objects.filter(space=space).count() == 2
-    assert Message.objects.count() == 4
+    # The account is not part of the conversation identity any more, so the
+    # second export lands on the same group and its messages are duplicates.
+    assert Conversation.objects.filter(space=space).count() == 1
+    assert Message.objects.count() == 2
+    second.refresh_from_db()
+    assert second.message_count == 0
+    assert second.duplicate_count == 2
 
 
 @pytest.mark.parametrize(

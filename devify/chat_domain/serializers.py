@@ -42,6 +42,17 @@ def media_url(space_id, upload_item_id):
     return f"/v1/spaces/{space_id}/media/{upload_item_id}"
 
 
+def chat_media_url(space_id, sha256):
+    """API-relative URL for one content-addressed media file.
+
+    The digest address survives deletion of the archive that first carried
+    the file, which the upload-item address cannot.
+    """
+    if not space_id or not sha256:
+        return ""
+    return f"/v1/spaces/{space_id}/chat-media/{sha256}"
+
+
 def message_preview(message, limit=280):
     """Flatten a message's parts into one readable line for list views."""
     if message is None:
@@ -136,13 +147,14 @@ class MessagePartSerializer(serializers.ModelSerializer):
             or obj.binding_state != MessagePart.BindingState.AVAILABLE
         ):
             return ""
+        space_id = self.context.get("space_id")
+        if obj.media_sha256:
+            return chat_media_url(space_id, obj.media_sha256)
         item = obj.upload_item
-        return media_url(
-            self.context.get("space_id"), item.pk if item else None
-        )
+        return media_url(space_id, item.pk if item else None)
 
     def get_media_content_type(self, obj):
-        return (
+        return obj.media_content_type or (
             getattr(obj.upload_item, "content_type", "")
             if obj.upload_item
             else ""
@@ -195,8 +207,10 @@ class MessageMediaSerializer(serializers.ModelSerializer):
     def get_media_url(self, obj):
         if obj.binding_state != MessagePart.BindingState.AVAILABLE:
             return ""
-        item = obj.upload_item
         space_id = self.context.get("space_id")
+        if obj.media_sha256:
+            return chat_media_url(space_id, obj.media_sha256)
+        item = obj.upload_item
         return media_url(space_id, item.pk if item else None)
 
     class Meta:

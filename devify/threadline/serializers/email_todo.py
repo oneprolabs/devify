@@ -77,6 +77,7 @@ class EmailTodoListSerializer(serializers.ModelSerializer):
         if obj.email_message:
             return {
                 'id': obj.email_message.id,
+                'uuid': str(obj.email_message.uuid),
                 'subject': obj.email_message.subject,
                 'summary_title': obj.email_message.summary_title,
                 'metadata': obj.email_message.metadata or {}

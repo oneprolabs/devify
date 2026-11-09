@@ -278,6 +278,7 @@ def upsert_message(
     relation_kind="",
     source_fields=None,
     normalization_state=Message.NormalizationState.READY,
+    sequence_cache=None,
 ):
     """Get or create one message, deduplicating by (conversation, key).
 
@@ -303,12 +304,15 @@ def upsert_message(
         return existing, False
     if reply_to is not None and reply_to.conversation_id != conversation.pk:
         raise ValueError("reply_to must belong to the same conversation.")
-    next_seq = (
-        Message.objects.filter(conversation=conversation).aggregate(
-            last=Max("ingest_seq")
-        )["last"]
-        or 0
-    ) + 1
+    # The parser holds the conversation lock for its enclosing transaction.
+    if sequence_cache is not None and conversation.pk in sequence_cache:
+        next_seq = sequence_cache[conversation.pk]
+    else:
+        next_seq = (
+            Message.objects.filter(conversation=conversation).aggregate(
+                last=Max("ingest_seq")
+            )["last"] or 0
+        ) + 1
     try:
         with transaction.atomic():
             message = Message.objects.create(
@@ -334,6 +338,8 @@ def upsert_message(
             message_key=key,
         )
         return message, False
+    if sequence_cache is not None:
+        sequence_cache[conversation.pk] = next_seq + 1
     return message, True
 
 
@@ -486,6 +492,7 @@ def ingest_message(
     origin=None,
     source_namespace="",
     alias_key="",
+    refresh_counters=True,
     **fields,
 ):
     """Store one normalized message with parts and its origin.
@@ -538,7 +545,7 @@ def ingest_message(
         # again even though the earlier contribution was withdrawn.
         message.orphaned_at = None
         message.save(update_fields=("orphaned_at", "updated_at"))
-    if created:
+    if created and refresh_counters:
         refresh_conversation_counters(conversation)
     return MessageIngestResult(
         message=message,

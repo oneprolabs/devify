@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 import pytest
-from celery.exceptions import Retry
+from celery.exceptions import Retry, SoftTimeLimitExceeded
 from django.contrib.auth.models import User
 
 from chat_ingestion.models import UploadBatch
@@ -78,6 +78,20 @@ def test_parser_task_retries_transient_parser_errors():
             parse_chat_upload_task.run(batch.pk)
 
     retry.assert_called_once()
+
+
+def test_parser_task_marks_timeout_failed():
+    owner = User.objects.create_user(username="task-timeout-owner")
+    batch = make_batch(owner, "task-timeout-team")
+    with patch(
+        "chat_ingestion.tasks.parse_archive",
+        side_effect=SoftTimeLimitExceeded(),
+    ):
+        result = parse_chat_upload_task.run(batch.pk)
+    batch.refresh_from_db()
+    assert result["status"] == UploadBatch.Status.FAILED
+    assert batch.status == UploadBatch.Status.FAILED
+    assert "time limit" in batch.error_message
 
 
 def test_completed_batch_recovers_missing_analysis_once():

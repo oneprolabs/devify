@@ -1,3 +1,5 @@
+from chat_sources.models import SourceImport
+from chat_sources.services import get_or_create_upload_source
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
@@ -35,8 +37,6 @@ from chat_ingestion.tasks import (
     dispatch_parse_chat_upload,
     parse_chat_upload_task,
 )
-from chat_sources.models import SourceImport
-from chat_sources.services import get_or_create_upload_source
 from spaces.models import Space, SpaceTakeover
 from spaces.services import (
     SpacePermissionService,

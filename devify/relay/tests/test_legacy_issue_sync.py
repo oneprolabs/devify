@@ -65,7 +65,7 @@ def test_sync_legacy_issues_for_user_creates_relay_history():
         password="secret",
     )
     email = _create_email_message(user)
-    Issue.objects.create(
+    issue = Issue.objects.create(
         user=user,
         email_message=email,
         title="Legacy Jira issue",
@@ -87,11 +87,11 @@ def test_sync_legacy_issues_for_user_creates_relay_history():
 
     delivery = RelayDelivery.objects.select_related("event", "subscription").get()
     assert delivery.status == RelayDelivery.Status.SUCCESS
-    assert delivery.idempotency_key == "legacy_issue:1"
+    assert delivery.idempotency_key == f"legacy_issue:{issue.pk}"
     assert delivery.external_id == "REQ-123"
     assert delivery.external_url == "https://jira.example.com/browse/REQ-123"
     assert delivery.subscription.name == "Legacy Jira Channel"
-    assert delivery.event.artifact_snapshot["legacy_issue_id"] == 1
+    assert delivery.event.artifact_snapshot["legacy_issue_id"] == issue.pk
     assert delivery.event.artifact_snapshot["title"] == "Legacy Jira issue"
 
 

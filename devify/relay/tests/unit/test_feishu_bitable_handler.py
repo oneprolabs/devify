@@ -3,9 +3,9 @@ Relay-owned unit tests for Feishu Bitable upload and field mapping behavior.
 """
 
 import json
-from unittest.mock import Mock, patch
 
 import pytest
+from unittest.mock import Mock, patch
 
 from relay.services.drivers.feishu_bitable_handler import (
     FeishuBitableIssueHandler,
@@ -62,7 +62,7 @@ class TestFeishuBitableIssueHandler:
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.status_code = 200
-        mock_response.text = '{"code":0}'
+        mock_response.text = "{\"code\":0}"
         mock_response.json.return_value = {
             "code": 0,
             "data": {
@@ -126,7 +126,7 @@ class TestFeishuBitableIssueHandler:
         upload_response = Mock()
         upload_response.raise_for_status.return_value = None
         upload_response.status_code = 200
-        upload_response.text = '{"code":0}'
+        upload_response.text = "{\"code\":0}"
         upload_response.json.return_value = {
             "code": 0,
             "data": {
@@ -137,7 +137,7 @@ class TestFeishuBitableIssueHandler:
         create_response = Mock()
         create_response.raise_for_status.return_value = None
         create_response.status_code = 200
-        create_response.text = '{"code":0}'
+        create_response.text = "{\"code\":0}"
         create_response.json.return_value = {
             "code": 0,
             "data": {
@@ -207,7 +207,7 @@ class TestFeishuBitableIssueHandler:
         upload_response = Mock()
         upload_response.raise_for_status.return_value = None
         upload_response.status_code = 200
-        upload_response.text = '{"code":0}'
+        upload_response.text = "{\"code\":0}"
         upload_response.json.return_value = {
             "code": 0,
             "data": {
@@ -218,7 +218,7 @@ class TestFeishuBitableIssueHandler:
         create_response = Mock()
         create_response.raise_for_status.return_value = None
         create_response.status_code = 200
-        create_response.text = '{"code":0}'
+        create_response.text = "{\"code\":0}"
         create_response.json.return_value = {
             "code": 0,
             "data": {
@@ -253,12 +253,10 @@ class TestFeishuBitableIssueHandler:
         upload_payload = mock_post.call_args_list[0].kwargs["data"]
         assert upload_payload["parent_node"] == "bascn123"
 
-    @patch("threadline.utils.issues.feishu_bitable_handler.requests.get")
     @patch("threadline.utils.issues.feishu_bitable_handler.requests.post")
     def test_create_issue_uploads_attachment_tokens_in_wiki_mode(
         self,
         mock_post,
-        mock_get,
         tmp_path,
     ):
         attachment_file = tmp_path / "demo.pdf"
@@ -277,14 +275,12 @@ class TestFeishuBitableIssueHandler:
                 }
             }
         )
-        wiki_handler._sdk_available = (  # type: ignore[attr-defined]
-            lambda: False
-        )
+        wiki_handler._sdk_available = lambda: False  # type: ignore[attr-defined]
 
         upload_response = Mock()
         upload_response.raise_for_status.return_value = None
         upload_response.status_code = 200
-        upload_response.text = '{"code":0}'
+        upload_response.text = "{\"code\":0}"
         upload_response.json.return_value = {
             "code": 0,
             "data": {
@@ -295,7 +291,7 @@ class TestFeishuBitableIssueHandler:
         create_response = Mock()
         create_response.raise_for_status.return_value = None
         create_response.status_code = 200
-        create_response.text = '{"code":0}'
+        create_response.text = "{\"code\":0}"
         create_response.json.return_value = {
             "code": 0,
             "data": {
@@ -305,16 +301,6 @@ class TestFeishuBitableIssueHandler:
             },
         }
 
-        node_response = Mock()
-        node_response.raise_for_status.return_value = None
-        node_response.status_code = 200
-        node_response.text = '{"code":0}'
-        node_response.json.return_value = {
-            "code": 0,
-            "data": {"node": {"obj_token": "obj-token-456"}},
-        }
-
-        mock_get.return_value = node_response
         mock_post.side_effect = [upload_response, create_response]
 
         record_id = wiki_handler.create_issue(
@@ -365,14 +351,12 @@ class TestFeishuBitableIssueHandler:
                 }
             }
         )
-        wiki_handler._sdk_available = (  # type: ignore[attr-defined]
-            lambda: False
-        )
+        wiki_handler._sdk_available = lambda: False  # type: ignore[attr-defined]
 
         node_response = Mock()
         node_response.raise_for_status.return_value = None
         node_response.status_code = 200
-        node_response.text = '{"code":0}'
+        node_response.text = "{\"code\":0}"
         node_response.json.return_value = {
             "code": 0,
             "data": {
@@ -385,7 +369,7 @@ class TestFeishuBitableIssueHandler:
         upload_response = Mock()
         upload_response.raise_for_status.return_value = None
         upload_response.status_code = 200
-        upload_response.text = '{"code":0}'
+        upload_response.text = "{\"code\":0}"
         upload_response.json.return_value = {
             "code": 0,
             "data": {
@@ -396,7 +380,7 @@ class TestFeishuBitableIssueHandler:
         create_response = Mock()
         create_response.raise_for_status.return_value = None
         create_response.status_code = 200
-        create_response.text = '{"code":0}'
+        create_response.text = "{\"code\":0}"
         create_response.json.return_value = {
             "code": 0,
             "data": {
@@ -436,8 +420,7 @@ class TestFeishuBitableIssueHandler:
         assert upload_payload["parent_node"] == "obj-token-456"
 
     @patch(
-        "threadline.utils.issues.feishu_bitable_handler."
-        "FeishuBitableIssueHandler._upload_single_file"
+        "threadline.utils.issues.feishu_bitable_handler.FeishuBitableIssueHandler._upload_single_file"
     )
     def test_create_issue_raises_when_attachment_upload_fails(
         self,
@@ -498,14 +481,12 @@ class TestFeishuBitableIssueHandler:
                 }
             }
         )
-        wiki_handler._sdk_available = (  # type: ignore[attr-defined]
-            lambda: False
-        )
+        wiki_handler._sdk_available = lambda: False  # type: ignore[attr-defined]
 
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.status_code = 200
-        mock_response.text = '{"code":0}'
+        mock_response.text = "{\"code\":0}"
         mock_response.json.return_value = {"code": 0}
         mock_put.return_value = mock_response
 

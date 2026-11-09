@@ -83,17 +83,6 @@ export const authApi = {
     return api.get('/v1/auth/scenes', {
       params: { language }
     })
-  },
-
-  // Desktop clients bound to the current account
-  getDesktopDevices() {
-    return api.get('/v1/auth/desktop/devices')
-  },
-
-  revokeDesktopDevice(deviceId) {
-    return api.delete(
-      `/v1/auth/desktop/devices/${encodeURIComponent(deviceId)}`
-    )
   }
 }
 
@@ -114,7 +103,5 @@ export const {
   completeOAuthSetup,
   completeGoogleSetup,
   checkUsernameAvailability,
-  getAvailableScenes,
-  getDesktopDevices,
-  revokeDesktopDevice
+  getAvailableScenes
 } = authApi

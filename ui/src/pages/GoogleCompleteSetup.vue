@@ -83,7 +83,7 @@ const handleComplete = async (formValues) => {
       // Wait for next tick to ensure all reactive updates are complete
       await nextTick()
 
-      router.push('/workspace')
+      router.push('/chats')
     }
   } catch (error) {
     console.error('Google setup completion error:', error)
@@ -119,7 +119,7 @@ onMounted(async () => {
       }
 
       if (userStore.user.profile?.registration_completed) {
-        router.push('/workspace')
+        router.push('/chats')
       }
     } else {
       router.push('/login')

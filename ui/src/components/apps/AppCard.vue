@@ -54,8 +54,6 @@
       </button>
     </div>
 
-    <button v-if="!stats.length" type="button" class="font-display hidden h-8 self-end rounded-md bg-accent px-[15px] text-[calc(12.5px*var(--fs))] font-medium text-accent-on md:flex md:items-center" @click="$emit('open')">{{ t('apps.openApp') }}</button>
-
     <div v-if="tags.length" class="hidden gap-[7px] md:flex">
       <span
         v-for="tag in tags"

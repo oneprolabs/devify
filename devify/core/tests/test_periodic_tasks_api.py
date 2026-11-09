@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django_celery_beat.models import CrontabSchedule, PeriodicTask
 from rest_framework.test import APIClient
 
+
 User = get_user_model()
 
 
@@ -74,23 +75,6 @@ def test_patch_periodic_task_settings_updates_rows(db):
         is_staff=True,
         is_superuser=True,
     )
-
-    # The admin page may only edit rows produced by the registry, so seed
-    # the tasks and their schedules first (a missing row is a 400 by design).
-    # Seed the schedule each task is about to be moved to as well: the
-    # endpoint refuses to create an unregistered crontab row.
-    for name, minute, hour in (
-        ("threadline-haraka-cleanup", "0", "1"),
-        ("threadline-share-link-cleanup", "10", "*"),
-    ):
-        PeriodicTask.objects.create(
-            name=name,
-            task="threadline.tasks.scheduler.noop",
-            args="[]",
-            kwargs="{}",
-            enabled=True,
-            crontab=_create_crontab(minute, hour),
-        )
 
     client = _auth_client(admin)
     response = client.patch(

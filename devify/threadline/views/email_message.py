@@ -8,36 +8,35 @@ import logging
 import re
 from datetime import datetime, time, timedelta
 
-from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import serializers, status
+from rest_framework import status, serializers
 from rest_framework.response import Response
+from django.db.models import Q
+from django.db import transaction
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
+from core.swagger import response, error_response, pagination_response
 
-from core.swagger import error_response, pagination_response, response
-
+from .base import BaseAPIView
 from ..models import EmailMessage
+from ..state_machine import EmailStatus
 from ..serializers import (
-    EmailMessageBatchRetrySerializer,
-    EmailMessageCreateSerializer,
-    EmailMessageListRetryFlowSerializer,
-    EmailMessageListSerializer,
-    EmailMessageMergeSerializer,
-    EmailMessageRetryFlowSerializer,
     EmailMessageSerializer,
+    EmailMessageListSerializer,
+    EmailMessageListRetryFlowSerializer,
+    EmailMessageRetryFlowSerializer,
+    EmailMessageCreateSerializer,
     EmailMessageUpdateSerializer,
+    EmailMessageMergeSerializer,
+    EmailMessageBatchRetrySerializer,
 )
 from ..services import (
     ManualMergeService,
+    enqueue_merge_workflow as _enqueue_merge_workflow,
+    enqueue_merge_workflows as _enqueue_merge_workflows,
 )
-from ..services import enqueue_merge_workflow as _enqueue_merge_workflow
-from ..services import enqueue_merge_workflows as _enqueue_merge_workflows
-from ..state_machine import EmailStatus
-from .base import BaseAPIView, email_visibility_q
 
 logger = logging.getLogger(__name__)
 
@@ -253,8 +252,8 @@ class EmailMessageAPIView(BaseAPIView):
 
                 logger.info(f"Search query parsed into keywords: {keywords}")
 
-                # Build AND logic: each keyword must match at least one field.
                 if keywords:
+                # Build AND logic: each keyword must match at least one field.
                     for keyword in keywords:
                         logger.debug(f"Filtering by keyword: '{keyword}'")
                         queryset = queryset.filter(
@@ -322,12 +321,9 @@ class EmailMessageAPIView(BaseAPIView):
 
             # Ordering
             ALLOWED_ORDERING_FIELDS = {
-                "received_at",
-                "-received_at",
-                "created_at",
-                "-created_at",
-                "subject",
-                "-subject",
+                "received_at", "-received_at",
+                "created_at", "-created_at",
+                "subject", "-subject",
             }
             ordering = request.query_params.get("ordering", "-received_at")
             if ordering not in ALLOWED_ORDERING_FIELDS:
@@ -740,7 +736,9 @@ class EmailMessageBatchRetryAPIView(BaseAPIView):
                 message_text = _("Batch retry failed")
                 response_status = status.HTTP_503_SERVICE_UNAVAILABLE
             else:
-                message_text = _("Batch retry triggered with partial failures")
+                message_text = _(
+                    "Batch retry triggered with partial failures"
+                )
                 response_status = status.HTTP_200_OK
 
             return Response(
@@ -800,11 +798,7 @@ class EmailMessageDetailAPIView(BaseAPIView):
         """
         Get email message by UUID with user ownership validation
         """
-        return (
-            self.get_queryset()
-            .filter(email_visibility_q(self.request.user))
-            .get(uuid=uuid, user=self.request.user)
-        )
+        return self.get_queryset().get(uuid=uuid, user=self.request.user)
 
     @extend_schema(
         operation_id="threadlines_retrieve",
@@ -1106,11 +1100,7 @@ class EmailMessageIssueClusterAPIView(BaseAPIView):
         )
 
     def get_object(self, uuid):
-        return (
-            self.get_queryset()
-            .filter(email_visibility_q(self.request.user))
-            .get(uuid=uuid, user=self.request.user)
-        )
+        return self.get_queryset().get(uuid=uuid, user=self.request.user)
 
     @extend_schema(
         operation_id="threadlines_issue_cluster",
@@ -1164,9 +1154,7 @@ class EmailMessageMetadataAPIView(BaseAPIView):
 
     def get_object(self, uuid):
         """Get email message by UUID with user ownership validation."""
-        return EmailMessage.objects.filter(
-            email_visibility_q(self.request.user)
-        ).get(uuid=uuid, user=self.request.user)
+        return EmailMessage.objects.get(uuid=uuid, user=self.request.user)
 
     @extend_schema(
         operation_id="threadlines_update_metadata",

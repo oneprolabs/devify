@@ -17,8 +17,8 @@ Below, JWTAuthentication is used, requiring tokens in the request header.
 
 DRF Parameters:
 - DEFAULT_RENDERER_CLASSES: Renders API responses in standardized format.
-  - CustomJSONRenderer: Ensures consistent response structure with code,
-    message and data.
+  - CustomJSONRenderer: Ensures consistent response structure with code, message
+    and data.
   - BrowsableAPIRenderer: Provides a browsable API interface.
 - DEFAULT_PARSER_CLASSES: Parses incoming camelCase request data to snake_case.
   - CamelCaseJSONParser: Handles JSON with camelCase keys for internal
@@ -28,54 +28,61 @@ DRF Parameters:
 from datetime import timedelta
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "accounts.authentication.DeviceAwareJWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ),
-    "DEFAULT_RENDERER_CLASSES": (
-        "core.settings.renders.CustomJSONRenderer",
-        "rest_framework.renderers.BrowsableAPIRenderer",
+    'DEFAULT_RENDERER_CLASSES': (
+        'core.settings.renders.CustomJSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
     ),
-    "DEFAULT_PARSER_CLASSES": (
-        "djangorestframework_camel_case.parser.CamelCaseJSONParser",
+    'DEFAULT_PARSER_CLASSES': (
+        'djangorestframework_camel_case.parser.CamelCaseJSONParser',
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
     ),
     # Schema generation for API documentation
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
     # Pagination Settings
     # -----------------
     # DEFAULT_PAGINATION_CLASS options:
     # - PageNumberPagination: Classic page-based style (?page=2)
     # - LimitOffsetPagination: Limit/skip style (?limit=10&offset=20)
     # - CursorPagination: Cursor-based for large datasets, prevents skipping
-    "DEFAULT_PAGINATION_CLASS": (
-        "rest_framework.pagination.PageNumberPagination"
-    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+
     # PAGE_SIZE: Number of items per page
     # Can be overridden per view using:
     # - pagination_class attribute
     # - page_size attribute
-    "PAGE_SIZE": 10,
+    'PAGE_SIZE': 10,
+
     # Additional pagination settings (optional):
     # ---------------------------------------
     # 'PAGINATE_BY_PARAM': 'page_size',  # Allow client to override page size
     # 'MAX_PAGE_SIZE': 100,              # Maximum limit for page size
-    # 'PAGE_QUERY_PARAM': 'p',           # Custom page param (default: page)
+    # 'PAGE_QUERY_PARAM': 'p',           # Custom page parameter (default: page)
     # 'PAGE_SIZE_QUERY_PARAM': 'size',   # Allow client to set page size
+
     # --- Sorting Configuration ---
     # DEFAULT_FILTER_BACKENDS: Enable ordering filter backend
-    # OrderingFilter lets clients sort results via ?ordering=field_name
+    # Using OrderingFilter allows clients to sort results via ?ordering=field_name
     # Example: ?ordering=-created_date for descending sort
-    "DEFAULT_FILTER_BACKENDS": ("rest_framework.filters.OrderingFilter",),
+    'DEFAULT_FILTER_BACKENDS': (
+        'rest_framework.filters.OrderingFilter',
+    ),
+
     # Optional sorting parameters:
     # -----------------------------------------------------------------
     # ORDERING_PARAM: Custom query parameter name (default: 'ordering')
     # 'ORDERING_PARAM': 'sort_by',
+
     # ORDERING_FIELDS: Explicitly declare allowed sorting fields in views
     # Note: Must be defined per view using ordering_fields attribute
     # 'ORDERING_FIELDS': ['created_date', 'updated_date'],
+
     # DEFAULT_ORDERING: Default sorting when no parameter is provided
     # Example: '-created_date' for default descending sort by creation date
     # 'DEFAULT_ORDERING': '-created_date',
@@ -99,5 +106,7 @@ REST_AUTH = {
     "USE_JWT": True,
     "JWT_AUTH_HTTPONLY": False,
     "SESSION_LOGIN": False,
-    "USER_DETAILS_SERIALIZER": ("accounts.serializers.UserDetailsSerializer"),
+    "USER_DETAILS_SERIALIZER": (
+        "accounts.serializers.UserDetailsSerializer"
+    ),
 }

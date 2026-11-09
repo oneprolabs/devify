@@ -98,13 +98,13 @@ from typing import Any, Dict, List, Optional
 
 from .jira_client import JiraClient
 from .jira_utils import (
-    DEFAULT_LANGUAGE,
-    build_description_field,
-    build_field_prompt,
     build_summary_field,
     get_grouped_configs,
     preprocess_api_data,
+    build_description_field,
+    build_field_prompt,
     remove_emoji,
+    DEFAULT_LANGUAGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -302,7 +302,7 @@ class JiraIssueHandler:
                     epic_keys = [epic["key"] for epic in epic_list[:5]]
                     logger.debug(f"Epic keys: {epic_keys}")
                 else:
-                    logger.warning("No epics found with provided JQL query")
+                    logger.warning(f"No epics found with provided JQL query")
 
                 return epic_list
 
@@ -752,13 +752,12 @@ from configuration."""
                 isinstance(value, str) and not value.strip()
             )
 
-            # Basic format validation for epic_link: must look like a JIRA
-            # key (e.g., REQ-123). This is a fallback when allow_values is
-            # empty.
+            # Basic format validation for epic_link: must look like JIRA key (e.g., REQ-123)
+            # This is a fallback when allow_values is empty
             if field_name == "epic_link" and value and not is_empty:
                 if isinstance(value, list):
                     value = value[0] if value else None
-                if value and not re.match(r"^[A-Z]+-\d+$", str(value).strip()):
+                if value and not re.match(r'^[A-Z]+-\d+$', str(value).strip()):
                     logger.warning(
                         f"LLM returned invalid epic_link format '{value}'. "
                         f"Will use default."
@@ -782,41 +781,29 @@ from configuration."""
                     continue
             elif allow_values:
                 # Validate against allow_values
-                # For epic_link: allow_values contain "KEY (Summary)" but
-                # the LLM returns only KEY.
+                # For epic_link: allow_values contain "KEY (Summary)" but LLM returns only KEY
                 if field_name == "epic_link":
                     # Extract KEY from "KEY (Summary)" format
                     valid_keys = [
                         str(av).split(" (")[0].strip() for av in allow_values
                     ]
                     if isinstance(value, list):
-                        normalized_value = [
-                            str(item).strip() for item in value
-                        ]
-                        is_valid = all(
-                            item in valid_keys for item in normalized_value
-                        )
+                        normalized_value = [str(item).strip() for item in value]
+                        is_valid = all(item in valid_keys for item in normalized_value)
                     else:
                         normalized_value = str(value).strip()
                         is_valid = normalized_value in valid_keys
                 else:
                     # Standard validation for other fields
                     if isinstance(value, list):
-                        normalized_value = [
-                            str(item).strip() for item in value
-                        ]
-                        normalized_allow = [
-                            str(av).strip() for av in allow_values
-                        ]
+                        normalized_value = [str(item).strip() for item in value]
+                        normalized_allow = [str(av).strip() for av in allow_values]
                         is_valid = all(
-                            item in normalized_allow
-                            for item in normalized_value
+                            item in normalized_allow for item in normalized_value
                         )
                     else:
                         normalized_value = str(value).strip()
-                        normalized_allow = [
-                            str(av).strip() for av in allow_values
-                        ]
+                        normalized_allow = [str(av).strip() for av in allow_values]
                         is_valid = normalized_value in normalized_allow
 
                 if not is_valid:
@@ -905,7 +892,6 @@ from configuration."""
         try:
             # Deferred: pulls litellm/agentcore chain (~14 s) on first call.
             from core.tracking import LLMTracker
-
             llm_response, _ = LLMTracker.call_and_track(
                 prompt=prompt,
                 content=summary_content,
@@ -959,9 +945,7 @@ from configuration."""
             summary_prefix = summary_config.get("prefix", "[AI]")
             add_timestamp = summary_config.get("add_timestamp", False)
             normalized_summary = remove_emoji(summary_title)
-            if summary_prefix and normalized_summary.startswith(
-                summary_prefix
-            ):
+            if summary_prefix and normalized_summary.startswith(summary_prefix):
                 summary_value = normalized_summary
             else:
                 summary_value = build_summary_field(
@@ -970,15 +954,10 @@ from configuration."""
                     add_timestamp=add_timestamp,
                 )
 
-            description_config = self.fields_config.get(
-                "description_config", {}
-            )
-            convert_to_jira_wiki = description_config.get(
-                "convert_to_jira_wiki", True
-            )
+            description_config = self.fields_config.get("description_config", {})
+            convert_to_jira_wiki = description_config.get("convert_to_jira_wiki", True)
 
             from .jira_utils import build_description_field
-
             description = build_description_field(
                 summary_content=summary_content,
                 llm_content=llm_content,
@@ -997,16 +976,11 @@ from configuration."""
             logger.info("Updated JIRA issue: %s", issue_key)
             return issue_key
         except Exception as e:
-            logger.error(
-                "Failed to update JIRA issue %s: %s",
-                issue_key,
-                e,
-                exc_info=True,
-            )
+            logger.error("Failed to update JIRA issue %s: %s", issue_key, e, exc_info=True)
             raise
 
     def get_issue_attachment_fingerprints(self, issue_key: str) -> list[str]:
-        """Return fingerprints for attachments already on a JIRA issue."""
+        """Return stable fingerprints for attachments already on a JIRA issue."""
         return self.client.get_issue_attachment_fingerprints(issue_key)
 
     def link_related_issues(
@@ -1023,9 +997,7 @@ from configuration."""
                 skipped_count += 1
                 continue
             try:
-                self.client.link_issue(
-                    issue_key, related_key, link_type=link_type
-                )
+                self.client.link_issue(issue_key, related_key, link_type=link_type)
                 linked_count += 1
             except Exception as e:
                 logger.warning(
@@ -1034,24 +1006,9 @@ from configuration."""
                 skipped_count += 1
         return {"linked_count": linked_count, "skipped_count": skipped_count}
 
-    @staticmethod
-    def _attachment_keys(attachment: Dict[str, Any]) -> List[str]:
-        """Stable identity for one attachment, used to skip retries."""
-        keys = []
-        content_md5 = attachment.get("content_md5")
-        if content_md5:
-            keys.append(f"md5:{content_md5}")
-        attachment_id = attachment.get("id")
-        if attachment_id:
-            keys.append(f"id:{attachment_id}")
-        filename = attachment.get("filename")
-        if filename:
-            keys.append(f"name:{filename}:{attachment.get('file_size', 0)}")
-        return keys
-
     def upload_attachments(
         self, issue_key: str, attachments: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, int]:
         """
         Upload attachments to JIRA issue from pure data (no ORM objects).
 
@@ -1066,16 +1023,12 @@ from configuration."""
                 - file_size: File size in bytes
 
         Returns:
-            Dict: Upload results with counts and attachment identities
+            Dict: Upload results with counts
                 - uploaded_count: Number of uploaded files
                 - skipped_count: Number of skipped files
-                - uploaded_attachment_keys: Identities of uploaded files
-                - skipped_attachment_keys: Identities of skipped files
         """
         uploaded_count = 0
         skipped_count = 0
-        uploaded_attachment_keys: List[str] = []
-        skipped_attachment_keys: List[str] = []
 
         try:
             logger.info(
@@ -1089,7 +1042,12 @@ from configuration."""
                 is_image = attachment.get("is_image", False)
                 file_path = attachment.get("file_path", "")
                 file_size = attachment.get("file_size", 0)
-                attachment_keys = self._attachment_keys(attachment)
+
+                # Only process image attachments
+                if not is_image:
+                    logger.debug(f"Skipping non-image attachment: {filename}")
+                    skipped_count += 1
+                    continue
 
                 logger.info(
                     f"Processing image attachment: {filename} "
@@ -1101,7 +1059,6 @@ from configuration."""
                 if not os.path.exists(file_path):
                     logger.warning(f"Attachment file not found: {file_path}")
                     skipped_count += 1
-                    skipped_attachment_keys.extend(attachment_keys)
                     continue
 
                 should_upload = True
@@ -1126,7 +1083,6 @@ from configuration."""
                             issue=issue_key, file_path=file_path
                         )
                         uploaded_count += 1
-                        uploaded_attachment_keys.extend(attachment_keys)
                         logger.info(
                             f"Successfully uploaded attachment {filename} "
                             f"({content_type}) to {issue_key}"
@@ -1136,10 +1092,8 @@ from configuration."""
                             f"Failed to upload attachment {filename}: {e}"
                         )
                         skipped_count += 1
-                        skipped_attachment_keys.extend(attachment_keys)
                 else:
                     skipped_count += 1
-                    skipped_attachment_keys.extend(attachment_keys)
                     logger.debug(
                         f"Skipped attachment {filename} ({skip_reason})"
                     )
@@ -1154,10 +1108,4 @@ from configuration."""
         return {
             "uploaded_count": uploaded_count,
             "skipped_count": skipped_count,
-            "uploaded_attachment_keys": list(
-                dict.fromkeys(uploaded_attachment_keys)
-            ),
-            "skipped_attachment_keys": list(
-                dict.fromkeys(skipped_attachment_keys)
-            ),
         }

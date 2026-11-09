@@ -4,8 +4,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from threadline.models import EmailAlias
-from threadline.models import Settings as ThreadlineSettings
+from threadline.models import EmailAlias, Settings as ThreadlineSettings
 
 
 @pytest.mark.django_db
@@ -90,7 +89,7 @@ def test_management_list_users_returns_serialized_payloads():
 
     assert response.status_code == 200
 
-    payload = response.json()["data"]
+    payload = response.json()
     assert payload["count"] == 2
     assert len(payload["results"]) == 2
     assert all(item is not None for item in payload["results"])

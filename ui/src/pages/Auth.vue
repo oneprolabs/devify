@@ -54,9 +54,7 @@
               class="flex flex-col gap-1"
               :class="index < pitchSteps.length - 1 ? 'pb-[22px]' : ''"
             >
-              <span
-                class="text-sm font-semibold leading-[calc(18px*var(--fs))] text-ink"
-              >
+              <span class="text-sm font-semibold leading-[calc(18px*var(--fs))] text-ink">
                 {{ t(`auth.pitch.${step.key}.title`) }}
               </span>
               <span
@@ -79,11 +77,7 @@
         </ol>
       </div>
 
-      <p
-        class="text-[calc(11px*var(--fs))] leading-[calc(13px*var(--fs))] text-ink-4"
-      >
-        © 2026 AImyChats
-      </p>
+      <p class="text-[calc(11px*var(--fs))] leading-[calc(13px*var(--fs))] text-ink-4">© 2026 AImyChats</p>
     </aside>
 
     <div
@@ -100,9 +94,7 @@
                 alt=""
                 class="h-[30px] w-[30px] rounded-[8px]"
               />
-              <span
-                class="text-[calc(16.5px*var(--fs))] font-semibold text-ink"
-              >
+              <span class="text-[calc(16.5px*var(--fs))] font-semibold text-ink">
                 AImyChats
               </span>
             </div>
@@ -245,10 +237,7 @@
                 @{{ emailDomain }}
               </span>
             </div>
-            <p
-              v-if="errors.username"
-              class="text-[calc(11.5px*var(--fs))] text-bad"
-            >
+            <p v-if="errors.username" class="text-[calc(11.5px*var(--fs))] text-bad">
               {{ errors.username }}
             </p>
           </div>
@@ -341,10 +330,7 @@
           </BaseButton>
         </form>
 
-        <p
-          v-if="!emailSent"
-          class="text-center text-[calc(12.5px*var(--fs))] text-ink-3"
-        >
+        <p v-if="!emailSent" class="text-center text-[calc(12.5px*var(--fs))] text-ink-3">
           {{
             activeTab === 'login'
               ? t('auth.noAccountYet')
@@ -670,9 +656,7 @@ const handleLogin = async () => {
       password: formData.password
     })
 
-    const next =
-      typeof route.query.next === 'string' ? route.query.next : '/workspace'
-    router.push(next)
+    router.push('/chats')
   } catch (error) {
     console.error('Login error:', error)
     errorMessage.value = t('auth.loginError')

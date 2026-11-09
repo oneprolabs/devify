@@ -12,8 +12,6 @@
 - `cd ui && npm install` installs frontend dependencies; `cd ui && npm run dev` starts the Vite dev server.
 - `cd ui && npm run build` produces a production frontend bundle; `cd ui && npm run lint` checks and auto-fixes Vue/JS files.
 - `pytest` runs the backend test suite; use `pytest devify/threadline/tests -v` for focused runs.
-- Inside the dev container the backend lives at `/opt/devify` and the repo root is not mounted, so run `docker exec devify-api-dev sh -lc 'cd /opt/devify && DJANGO_SETTINGS_MODULE=core.settings /opt/venv/bin/python -m pytest -q -p no:sugar'`. Never run two pytest sessions against the same test database at once; when another session may be testing, point `DATABASE_URL` at a different database name so each run gets its own test database.
-- The release gate (backend on MariaDB, frontend unit tests, production build, migration check) is documented in `docs/test-gate.md` and enforced by `.github/workflows/test-gate.yml`.
 
 ## Coding Style & Naming Conventions
 - Python follows PEP 8 with 4-space indentation, `snake_case` for functions/modules, and `PascalCase` for classes.

@@ -55,8 +55,7 @@ def test_complete_registration_rolls_back_temp_user_when_creation_fails():
 
     client = APIClient()
     with patch(
-        "accounts.views.registration.RegistrationService."
-        "create_user_with_config",
+        "accounts.views.registration.RegistrationService.create_user_with_config",
         side_effect=RuntimeError("boom"),
     ):
         response = client.post(
@@ -78,6 +77,6 @@ def test_complete_registration_rolls_back_temp_user_when_creation_fails():
     temp_profile.refresh_from_db()
 
     assert User.objects.filter(email=email).exists()
-    assert temp_profile.user_id == temp_user.id
+    assert temp_user.profile_id == temp_profile.id
     assert temp_profile.registration_token == token
     assert temp_profile.registration_completed is False

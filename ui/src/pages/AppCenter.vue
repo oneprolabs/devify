@@ -7,7 +7,6 @@
     />
 
     <div class="min-h-0 flex-1 overflow-y-auto p-4 md:p-7">
-      <router-link v-if="route.params.spaceId" :to="`/spaces/${route.params.spaceId}/overview`" class="mb-4 inline-block text-xs text-accent">← {{ t('apps.backToWorkspace') }}</router-link>
       <div class="flex flex-col gap-3.5 md:gap-[22px]">
         <div class="flex max-w-[720px] flex-col gap-[7px]">
           <h1
@@ -21,9 +20,6 @@
         </div>
 
         <BaseLoading v-if="loading" />
-
-        <p v-else-if="loadError" role="alert" class="text-sm text-ink-3">{{ loadError }} <button type="button" class="text-accent" @click="loadApps">{{ t('common.refresh') }}</button></p>
-        <p v-else-if="!apps.length" class="text-sm text-ink-3">{{ t('apps.noSpaceApps') }}</p>
 
         <div
           v-else
@@ -46,9 +42,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -67,8 +63,6 @@ import { usePreferencesStore } from '@/store/preferences'
 
 const { t } = useI18n()
 const router = useRouter()
-const route = useRoute()
-let requestId = 0
 const { showError } = useToast()
 const preferences = usePreferencesStore()
 
@@ -110,7 +104,6 @@ const APP_STATS = {
 
 const loading = ref(false)
 const apps = ref([])
-const loadError = ref('')
 
 const isChinese = computed(() => preferences.currentLanguage === 'zh-CN')
 
@@ -140,21 +133,14 @@ const appStats = (app) =>
     }))
 
 async function loadApps() {
-  const current = ++requestId
   loading.value = true
-  apps.value = []
-  loadError.value = ''
   try {
-    const data = await relayApi.getApps(route.params.spaceId)
-    if (current !== requestId) return
+    const data = await relayApi.getApps()
     apps.value = Array.isArray(data) ? data : []
   } catch (error) {
-    if (current === requestId) {
-      loadError.value = extractErrorMessage(error, t('common.error'))
-      showError(loadError.value)
-    }
+    showError(extractErrorMessage(error, t('common.error')))
   } finally {
-    if (current === requestId) loading.value = false
+    loading.value = false
   }
 }
 
@@ -162,5 +148,5 @@ function openApp(app) {
   if (app?.path) router.push(app.path)
 }
 
-watch(() => route.params.spaceId, loadApps, { immediate: true })
+onMounted(loadApps)
 </script>

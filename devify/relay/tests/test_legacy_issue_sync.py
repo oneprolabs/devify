@@ -13,6 +13,7 @@ from relay.services.legacy_issue_sync import (
 )
 from threadline.models import EmailMessage, Issue, Settings
 
+
 User = get_user_model()
 
 
@@ -64,7 +65,7 @@ def test_sync_legacy_issues_for_user_creates_relay_history():
         password="secret",
     )
     email = _create_email_message(user)
-    issue = Issue.objects.create(
+    Issue.objects.create(
         user=user,
         email_message=email,
         title="Legacy Jira issue",
@@ -80,24 +81,17 @@ def test_sync_legacy_issues_for_user_creates_relay_history():
 
     assert result["status"] == "success"
     assert result["created"] == 1
-    assert (
-        RelaySubscription.objects.filter(
-            user=user, target_type="jira"
-        ).count()
-        == 1
-    )
+    assert RelaySubscription.objects.filter(user=user, target_type="jira").count() == 1
     assert RelayEvent.objects.count() == 1
     assert RelayDelivery.objects.count() == 1
 
-    delivery = RelayDelivery.objects.select_related(
-        "event", "subscription"
-    ).get()
+    delivery = RelayDelivery.objects.select_related("event", "subscription").get()
     assert delivery.status == RelayDelivery.Status.SUCCESS
-    assert delivery.idempotency_key == f"legacy_issue:{issue.pk}"
+    assert delivery.idempotency_key == "legacy_issue:1"
     assert delivery.external_id == "REQ-123"
     assert delivery.external_url == "https://jira.example.com/browse/REQ-123"
     assert delivery.subscription.name == "Legacy Jira Channel"
-    assert delivery.event.artifact_snapshot["legacy_issue_id"] == issue.pk
+    assert delivery.event.artifact_snapshot["legacy_issue_id"] == 1
     assert delivery.event.artifact_snapshot["title"] == "Legacy Jira issue"
 
 
@@ -166,9 +160,7 @@ def test_sync_legacy_issues_for_user_is_idempotent():
 @pytest.mark.django_db
 @patch("relay.services.legacy_issue_sync.acquire_task_lock", return_value=True)
 @patch("relay.services.legacy_issue_sync.release_task_lock")
-def test_sync_all_legacy_issues_uses_background_lock(
-    mock_release, mock_acquire
-):
+def test_sync_all_legacy_issues_uses_background_lock(mock_release, mock_acquire):
     user = User.objects.create_user(
         username="relay-issue-user-3",
         email="relay-issue3@example.com",

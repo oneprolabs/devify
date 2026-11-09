@@ -11,14 +11,10 @@
         {{ userInitial }}
       </span>
       <span v-if="showName" class="flex min-w-0 flex-col">
-        <span
-          class="truncate text-[calc(12.5px*var(--fs))] font-medium text-ink"
-        >
+        <span class="truncate text-[calc(12.5px*var(--fs))] font-medium text-ink">
           {{ displayName }}
         </span>
-        <span class="truncate text-[calc(11px*var(--fs))] text-ink-3">{{
-          planName
-        }}</span>
+        <span class="truncate text-[calc(11px*var(--fs))] text-ink-3">{{ planName }}</span>
       </span>
     </button>
 
@@ -150,7 +146,6 @@ import { useUserStore } from '@/store/user'
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher.vue'
 import ThemeSwitcher from '@/components/ui/ThemeSwitcher.vue'
 import FontSizeSwitcher from '@/components/ui/FontSizeSwitcher.vue'
-import { resetScopedAppsCache } from '@/composables/sidebarApps'
 
 defineProps({
   placement: {
@@ -216,7 +211,6 @@ const handleLogout = async () => {
     console.error('Logout failed:', error)
   } finally {
     open.value = false
-    resetScopedAppsCache()
     router.push('/login')
   }
 }

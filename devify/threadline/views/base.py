@@ -7,31 +7,11 @@ and common patterns.
 """
 
 import logging
-
-from django.db import models
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from spaces.services import SpacePermissionService
-
 logger = logging.getLogger(__name__)
-
-
-def email_visibility_q(user, prefix=""):
-    """Rows whose space the user may read right now.
-
-    Legacy endpoints filter by ``user`` alone; that is not enough once a
-    message belongs to a space, because a removed member would keep reading
-    it. Everything space-bound must also pass the current space check.
-    """
-    return models.Q(**{f"{prefix}space__isnull": True}) | models.Q(
-        **{
-            f"{prefix}space_id__in": (
-                SpacePermissionService.readable_space_ids(user)
-            )
-        }
-    )
 
 
 class BaseAPIView(APIView):
@@ -71,13 +51,7 @@ class BaseAPIView(APIView):
         Returns:
             QuerySet: Filtered queryset containing only user's objects
         """
-        queryset = queryset.filter(user=self.request.user)
-        field_names = {
-            field.name for field in queryset.model._meta.get_fields()
-        }
-        if "space" in field_names:
-            queryset = queryset.filter(email_visibility_q(self.request.user))
-        return queryset
+        return queryset.filter(user=self.request.user)
 
     def get_object(self, pk):
         """

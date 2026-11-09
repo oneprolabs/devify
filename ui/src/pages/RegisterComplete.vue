@@ -152,7 +152,7 @@ const handleComplete = async (formValues) => {
       // like virtual_email and auth_info
       await userStore.checkAuth()
 
-      router.push('/chats')
+      router.push('/workspace')
     }
   } catch (error) {
     console.error('Registration completion error:', error)

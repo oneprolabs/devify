@@ -17,12 +17,10 @@ from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
-from .database import *
-
 # Import module-specific configurations
 from .billing import *
+from .database import *
 from .email_system import *
-
 from .logging_config import configure_logging
 from .sentry import *
 
@@ -55,6 +53,23 @@ load_dotenv(ENV_DIR)
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "django-insecure-$k0f0!qp@0k%1xa_)zy!+xvwpv)+&$q&!d69ma@l615bdc2ytd",
+)
+
+CHAT_ANALYSIS_LLM_ENABLED = os.getenv(
+    "CHAT_ANALYSIS_LLM_ENABLED", "false"
+).lower() in {"1", "true", "yes"}
+
+CHAT_ANALYSIS_AUTO_CREATE_EVENTS = os.getenv(
+    "CHAT_ANALYSIS_AUTO_CREATE_EVENTS", "false"
+).lower() in {"1", "true", "yes"}
+
+# A queued question or report with no worker result after this many seconds is
+# moved to a terminal state by the stale-task sweep.
+CHAT_ANALYSIS_QUESTION_TIMEOUT_SECONDS = int(
+    os.getenv("CHAT_ANALYSIS_QUESTION_TIMEOUT_SECONDS", "900")
+)
+CHAT_ANALYSIS_REPORT_TIMEOUT_SECONDS = int(
+    os.getenv("CHAT_ANALYSIS_REPORT_TIMEOUT_SECONDS", "1800")
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -131,6 +146,11 @@ INSTALLED_APPS += [
     "core",
     "billing",
     "accounts",
+    "spaces.apps.SpacesConfig",
+    "chat_sources.apps.ChatSourcesConfig",
+    "chat_ingestion.apps.ChatIngestionConfig",
+    "chat_analysis",
+    "chat_domain.apps.ChatDomainConfig",
     "threadline",
     "relay",
     "expense",
@@ -208,8 +228,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         "NAME": (
-            "django.contrib.auth.password_validation."
-            "MinimumLengthValidator"
+            "django.contrib.auth.password_validation." "MinimumLengthValidator"
         ),
     },
     {
@@ -467,11 +486,11 @@ CSRF_COOKIE_HTTPONLY = False
 # External Libraries Configuration
 # ============================
 from .accounts import *
+from .billing import *
+from .cache import *
 from .celery import *
 from .rest import *
 from .swagger import *
-from .cache import *
-from .billing import *
 
 # ============================
 # DRF Spectacular Configuration

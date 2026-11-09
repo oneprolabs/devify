@@ -7,18 +7,23 @@ import os
 from copy import deepcopy
 from types import SimpleNamespace
 
-from django.shortcuts import get_object_or_404
+from agentcore_metering.adapters.django.models import LLMConfig
+from agentcore_task.adapters.django.models import TaskExecution
 from django.db.models import Count
+from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from agentcore_task.adapters.django.models import TaskExecution
-from agentcore_metering.adapters.django.models import LLMConfig
 from core.app_registry import APP_REGISTRY
-from relay.models import RelayAppConfig, RelayDelivery, RelayEvent, RelaySubscription
+from relay.models import (
+    RelayAppConfig,
+    RelayDelivery,
+    RelayEvent,
+    RelaySubscription,
+)
 from relay.serializers import (
     RelayAppConfigSerializer,
     RelayDeliverySerializer,
@@ -30,15 +35,15 @@ from relay.services.test_attachments import (
     BUILTIN_TEST_ATTACHMENT,
     build_test_attachments,
 )
-from relay.tasks import process_relay_delivery
-from relay.tasks import process_relay_event
-
+from relay.tasks import process_relay_delivery, process_relay_event
 
 logger = logging.getLogger(__name__)
 
 
 def _response(data, message="ok", code=200, status_code=status.HTTP_200_OK):
-    return Response({"code": code, "message": message, "data": data}, status=status_code)
+    return Response(
+        {"code": code, "message": message, "data": data}, status=status_code
+    )
 
 
 def _deep_merge_dicts(base, override):
@@ -83,7 +88,32 @@ class AppsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return _response(APP_REGISTRY.list_apps(request.user))
+        space_id = request.query_params.get("space_id")
+        if space_id is None:
+            return _response(APP_REGISTRY.list_apps(request.user))
+        if (
+            not space_id.isascii()
+            or not space_id.isdecimal()
+            or len(space_id) > 19
+            or not 0 < int(space_id) <= 9223372036854775807
+        ):
+            return _response(
+                {"detail": "Invalid space."}, code=400, status_code=400
+            )
+        from spaces.models import Space
+        from spaces.services import SpacePermissionService
+
+        space = get_object_or_404(Space, pk=int(space_id))
+        if not SpacePermissionService.can_read(request.user, space) or (
+            space.kind == Space.Kind.PERSONAL
+            and space.personal_owner_id != request.user.id
+        ):
+            return _response(
+                {"detail": "Space not found."}, code=404, status_code=404
+            )
+        return _response(
+            APP_REGISTRY.list_apps(request.user, space_kind=space.kind)
+        )
 
 
 class RelayStatsAPIView(APIView):
@@ -120,7 +150,9 @@ class RelaySubscriptionListAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         obj = serializer.save()
         return _response(
-            RelaySubscriptionSerializer(obj, context={"request": request}).data,
+            RelaySubscriptionSerializer(
+                obj, context={"request": request}
+            ).data,
             message=_("created"),
             code=201,
             status_code=status.HTTP_201_CREATED,
@@ -169,9 +201,7 @@ class RelayTestAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        draft_target_type = (
-            draft_subscription or {}
-        ).get("target_type")
+        draft_target_type = (draft_subscription or {}).get("target_type")
         target_type = (
             draft_target_type
             or (subscription.target_type if subscription else None)
@@ -276,7 +306,8 @@ class RelayTestAPIView(APIView):
                 )
             except ValueError as exc:
                 logger.warning(
-                    "Invalid relay test attachments received; falling back to builtin sample: %s",
+                    "Invalid relay test attachments received; falling back "
+                    "to builtin sample: %s",
                     exc,
                 )
                 test_attachments, temp_paths = [], []
@@ -328,7 +359,8 @@ class RelayTestAPIView(APIView):
                         os.remove(path)
                 except OSError:
                     logger.warning(
-                        "Failed to remove temporary relay test attachment file: %s",
+                        "Failed to remove temporary relay test attachment "
+                        "file: %s",
                         path,
                     )
 
@@ -349,7 +381,9 @@ class RelayDeliveryListAPIView(APIView):
         except (TypeError, ValueError):
             page_size = 20
 
-        qs = RelayDelivery.objects.filter(event__user=request.user).select_related(
+        qs = RelayDelivery.objects.filter(
+            event__user=request.user
+        ).select_related(
             "event",
             "subscription",
         )
@@ -508,9 +542,9 @@ class RelayEventRetryAPIView(APIView):
     @staticmethod
     def _task_rebuilt_needed(event: RelayEvent) -> bool:
         task_ids = list(
-            event.deliveries.exclude(agentcore_task_id__isnull=True).exclude(
-                agentcore_task_id=""
-            ).values_list("agentcore_task_id", flat=True)
+            event.deliveries.exclude(agentcore_task_id__isnull=True)
+            .exclude(agentcore_task_id="")
+            .values_list("agentcore_task_id", flat=True)
         )
         if not task_ids:
             return False

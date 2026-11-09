@@ -14,24 +14,24 @@ Public API endpoints:
 from django.urls import path
 
 from .views import (
-    SettingsAPIView,
-    SettingsDetailAPIView,
-    SettingsImapValidateAPIView,
     EmailMessageAPIView,
-    EmailMessageDetailAPIView,
     EmailMessageBatchMergeAPIView,
     EmailMessageBatchRetryAPIView,
+    EmailMessageDetailAPIView,
     EmailMessageIssueClusterAPIView,
     EmailMessageMetadataAPIView,
     EmailMessageStatsAPIView,
     EmailTodoAPIView,
+    EmailTodoBatchAPIView,
     EmailTodoDetailAPIView,
     EmailTodoStatsAPIView,
-    EmailTodoBatchAPIView,
-    ThreadlineShareLinkAPIView,
-    ThreadlineShareLinkDetailAPIView,
     PublicShareLinkAPIView,
     PublicShareLinkVerifyAPIView,
+    SettingsAPIView,
+    SettingsDetailAPIView,
+    SettingsImapValidateAPIView,
+    ThreadlineShareLinkAPIView,
+    ThreadlineShareLinkDetailAPIView,
 )
 from .views.email_alias import (
     EmailAliasAPIView,
@@ -42,20 +42,60 @@ from .views.email_mailbox import (
     EmailMailboxDetailAPIView,
     EmailMailboxListAPIView,
     EmailMailboxTestAPIView,
+    SpaceEmailSourceDetailAPIView,
+    SpaceEmailSourceListAPIView,
+    SpaceEmailSourceSyncAPIView,
+    SpaceEmailSourceTestAPIView,
 )
 from .views.monitoring import (
+    clear_metrics_cache,
+    email_processing_metrics,
+    health_check,
+    monitoring_dashboard,
+    simple_health,
+    simple_metrics,
     task_metrics,
     task_status_summary,
-    email_processing_metrics,
-    monitoring_dashboard,
-    clear_metrics_cache,
-    health_check,
-    simple_metrics,
-    simple_health,
 )
+from .views.space_email import SpaceEmailDetailAPIView, SpaceEmailListAPIView
 
 # URL patterns for Threadline API endpoints
 urlpatterns = [
+    path(
+        "spaces/<int:space_id>/email-sources",
+        SpaceEmailSourceListAPIView.as_view(),
+        name="space-email-sources",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>/sync",
+        SpaceEmailSourceSyncAPIView.as_view(),
+        name="space-email-source-sync",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/test",
+        SpaceEmailSourceTestAPIView.as_view(),
+        name="space-email-source-test-draft",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>/test",
+        SpaceEmailSourceTestAPIView.as_view(),
+        name="space-email-source-test",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>",
+        SpaceEmailSourceDetailAPIView.as_view(),
+        name="space-email-source-detail",
+    ),
+    path(
+        "spaces/<int:space_id>/emails",
+        SpaceEmailListAPIView.as_view(),
+        name="space-email-list",
+    ),
+    path(
+        "spaces/<int:space_id>/emails/<uuid:email_uuid>",
+        SpaceEmailDetailAPIView.as_view(),
+        name="space-email-detail",
+    ),
     # Settings endpoints
     path("settings", SettingsAPIView.as_view(), name="settings-list"),
     path(

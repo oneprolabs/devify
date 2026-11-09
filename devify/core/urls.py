@@ -1,9 +1,10 @@
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import path, include
+from django.urls import include, path
 
 from accounts.views import OAuthCallbackRedirectView
-from .swagger import schema_view, swagger_view, redoc_view
+
+from .swagger import redoc_view, schema_view, swagger_view
 
 # Define project URL routing configuration
 urlpatterns = [
@@ -46,6 +47,14 @@ urlpatterns = [
     # Threadline API routes
     # Email processing and threadline management endpoints
     path("api/v1/", include("threadline.urls")),
+    path("api/v1/", include("spaces.urls")),
+    path("api/v1/", include("chat_ingestion.urls")),
+    path("api/v1/", include("chat_sources.urls")),
+    path("api/v1/", include("chat_domain.urls")),
+    path("api/v1/", include("chat_analysis.urls")),
+    path("api/v1/", include("chat_analysis.api_urls")),
+    path("api/v1/", include("chat_analysis.report_urls")),
+    path("api/v1/", include("chat_analysis.suggestion_urls")),
     path("api/v1/", include("relay.urls")),
     path("api/v1/", include("expense.urls")),
     # Agentcore task execution API

@@ -106,10 +106,10 @@ DELETE /api/v1/chat/uploads/{id}     # 上传者本人 / 空间管理员
 
 ## 5. 数据迁移
 
-分三步，前两步可独立回滚：
+分三步；第 1、2 步已合并进 `chat_domain/0001_initial`（身份重写是 `RunPython`，正向执行、反向 noop），第 3 步仍需单独运行：
 
 1. **schema**：新增 `MessageAlias`、`Message.content_fingerprint`、`Message.orphaned_at`、`MessagePart.media_sha256/media_content_type`。纯增量，不改既有列。
-2. **身份重写**：迁移 `0004` 把 `Conversation.identity_key` 重算为 `platform:conversation_id`，并把同空间内冲突的会话合并（保留最早 id，消息按 `ingest_seq` 续号迁移，冲突的 `message_key` 改为 `legacy:<旧会话>:<键>` 并登记 alias）。**已实现并已在开发库执行**。
+2. **身份重写**：`chat_domain/0001_initial` 的 `RunPython` 把 `Conversation.identity_key` 重算为 `platform:conversation_id`，并把同空间内冲突的会话合并（保留最早 id，消息按 `ingest_seq` 续号迁移，冲突的 `message_key` 改为 `legacy:<旧会话>:<键>` 并登记 alias）。该步骤排在唯一约束创建之前，因此改写不会撞约束。**已实现并已在开发库执行**。
 3. **指纹回填**：`merge_chat_messages` 命令按会话计算指纹并合并重复消息（含 NoteEvidence 的 `reference_key` 重算与去重），默认 dry-run。**已实现**；开发库回填 17475 条、合并 63 条重复。
 
 合并消息时注意：

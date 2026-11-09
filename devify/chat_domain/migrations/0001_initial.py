@@ -2,6 +2,132 @@
 
 import django.db.models.deletion
 from django.db import migrations, models
+from django.db.models import Count, Max
+
+
+def _new_identity_key(identity_key):
+    """``platform:namespace:component`` -> ``platform:component``."""
+    parts = identity_key.split(":")
+    if len(parts) < 3:
+        return ""
+    return f"{parts[0]}:{parts[-1]}"
+
+
+def merge_conversations_across_accounts(apps, schema_editor):
+    """Drop the uploading account from the conversation identity.
+
+    Conversations were keyed by ``platform + source namespace + source
+    conversation``, so two people exporting the same group produced two rows.
+    The key is now ``platform + source conversation``; rows that collide are
+    folded into the oldest conversation.
+
+    This runs before the ``(space, identity_key)`` unique constraint is added,
+    which is what lets the key rewrite and the merge happen in one pass.
+    Messages are moved without being reinterpreted: a message key that already
+    exists in the surviving conversation is renamed to a ``legacy:`` key and
+    the original name is registered as a per-namespace alias.
+    """
+    Conversation = apps.get_model("chat_domain", "Conversation")
+    Message = apps.get_model("chat_domain", "Message")
+    MessageAlias = apps.get_model("chat_domain", "MessageAlias")
+
+    # ``chat_analysis`` migrates after ``chat_domain``, so its table does not
+    # exist on a clean install. Only a database that already has rows needs
+    # its analysis jobs moved with the messages.
+    has_analysis_jobs = (
+        "chat_analysis_analysisjob"
+        in schema_editor.connection.introspection.table_names()
+    )
+
+    for conversation in Conversation.objects.all().iterator():
+        new_key = _new_identity_key(conversation.identity_key)
+        if new_key and conversation.identity_key != new_key:
+            conversation.identity_key = new_key
+            conversation.save(update_fields=("identity_key", "updated_at"))
+
+    groups = list(
+        Conversation.objects.values("space_id", "identity_key")
+        .annotate(total=Count("id"))
+        .filter(total__gt=1)
+    )
+    for group in groups:
+        siblings = list(
+            Conversation.objects.filter(
+                space_id=group["space_id"], identity_key=group["identity_key"]
+            ).order_by("id")
+        )
+        target, extras = siblings[0], siblings[1:]
+        existing = set(
+            Message.objects.filter(conversation=target).values_list(
+                "message_key", flat=True
+            )
+        )
+        next_seq = (
+            Message.objects.filter(conversation=target).aggregate(
+                last=Max("ingest_seq")
+            )["last"]
+            or 0
+        )
+        namespaces = list(
+            (target.metadata or {}).get("source_namespaces") or []
+        )
+        for extra in extras:
+            for message in Message.objects.filter(
+                conversation=extra
+            ).order_by("ingest_seq", "id"):
+                original_key = message.message_key
+                if original_key in existing:
+                    MessageAlias.objects.get_or_create(
+                        conversation=target,
+                        source_namespace=extra.source_namespace,
+                        alias_key=original_key[:500],
+                        defaults={"message": message},
+                    )
+                    message.message_key = (
+                        f"legacy:{extra.pk}:{original_key}"[:500]
+                    )
+                next_seq += 1
+                message.conversation_id = target.pk
+                message.ingest_seq = next_seq
+                message.save(
+                    update_fields=(
+                        "conversation",
+                        "ingest_seq",
+                        "message_key",
+                    )
+                )
+                existing.add(message.message_key)
+            if extra.source_namespace and (
+                extra.source_namespace not in namespaces
+            ):
+                namespaces.append(extra.source_namespace)
+            if has_analysis_jobs:
+                schema_editor.execute(
+                    "UPDATE chat_analysis_analysisjob "
+                    "SET conversation_id = %s WHERE conversation_id = %s",
+                    [target.pk, extra.pk],
+                )
+            extra.delete()
+
+        summary = Message.objects.filter(conversation=target).aggregate(
+            last=Max("occurred_at")
+        )
+        target.message_count = Message.objects.filter(
+            conversation=target
+        ).count()
+        target.last_message_at = summary["last"]
+        metadata = dict(target.metadata or {})
+        if namespaces:
+            metadata["source_namespaces"] = namespaces
+        target.metadata = metadata
+        target.save(
+            update_fields=(
+                "message_count",
+                "last_message_at",
+                "metadata",
+                "updated_at",
+            )
+        )
 
 
 class Migration(migrations.Migration):
@@ -65,6 +191,8 @@ class Migration(migrations.Migration):
                 ('target_source_id', models.CharField(blank=True, max_length=255)),
                 ('relation_kind', models.CharField(blank=True, choices=[('reply', 'Reply'), ('edit', 'Edit'), ('revoke', 'Revoke')], max_length=20)),
                 ('source_fields', models.JSONField(blank=True, default=dict)),
+                ('content_fingerprint', models.CharField(blank=True, db_index=True, max_length=64)),
+                ('orphaned_at', models.DateTimeField(blank=True, null=True)),
                 ('normalization_state', models.CharField(choices=[('waiting', 'Waiting'), ('ready', 'Ready'), ('partial', 'Partial'), ('failed', 'Failed')], default='ready', max_length=20)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
@@ -73,6 +201,20 @@ class Migration(migrations.Migration):
             ],
             options={
                 'ordering': ('ingest_seq', 'id'),
+            },
+        ),
+        migrations.CreateModel(
+            name='MessageAlias',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('source_namespace', models.CharField(max_length=255)),
+                ('alias_key', models.CharField(max_length=500)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('conversation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='message_aliases', to='chat_domain.conversation')),
+                ('message', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='aliases', to='chat_domain.message')),
+            ],
+            options={
+                'ordering': ('id',),
             },
         ),
         migrations.CreateModel(
@@ -98,6 +240,8 @@ class Migration(migrations.Migration):
                 ('ordinal', models.PositiveIntegerField(default=0)),
                 ('kind', models.CharField(choices=[('text', 'Text'), ('image', 'Image'), ('video', 'Video'), ('audio', 'Audio'), ('file', 'File'), ('quote', 'Quote'), ('forwarded_item', 'Forwarded item'), ('unknown', 'Unknown')], max_length=20)),
                 ('text', models.TextField(blank=True)),
+                ('media_sha256', models.CharField(blank=True, db_index=True, max_length=64)),
+                ('media_content_type', models.CharField(blank=True, max_length=120)),
                 ('binding_state', models.CharField(choices=[('available', 'Available'), ('missing', 'Missing'), ('omitted', 'Omitted'), ('unsupported', 'Unsupported'), ('unresolved', 'Unresolved')], default='available', max_length=20)),
                 ('source_locator', models.JSONField(blank=True, default=dict)),
                 ('source_header', models.JSONField(blank=True, default=dict)),
@@ -127,6 +271,13 @@ class Migration(migrations.Migration):
                 'ordering': ('sender_key', 'id'),
             },
         ),
+        # Fold conversations that differ only by uploading account. This must
+        # stay before the unique constraints below: it rewrites identity keys
+        # and moves messages between conversations.
+        migrations.RunPython(
+            merge_conversations_across_accounts,
+            migrations.RunPython.noop,
+        ),
         migrations.AddIndex(
             model_name='conversation',
             index=models.Index(fields=['space', 'last_message_at', 'id'], name='chat_domain_space_i_571006_idx'),
@@ -152,8 +303,20 @@ class Migration(migrations.Migration):
             constraint=models.UniqueConstraint(fields=('conversation', 'ingest_seq'), name='unique_chat_message_ingest_seq'),
         ),
         migrations.AddIndex(
+            model_name='messagealias',
+            index=models.Index(fields=['message', 'conversation'], name='chat_domain_message_8b7c62_idx'),
+        ),
+        migrations.AddIndex(
+            model_name='messagealias',
+            index=models.Index(fields=['conversation', 'alias_key'], name='chat_domain_convers_9be770_idx'),
+        ),
+        migrations.AddIndex(
             model_name='messageorigin',
             index=models.Index(fields=['message', 'upload_item'], name='chat_domain_message_42bd33_idx'),
+        ),
+        migrations.AddConstraint(
+            model_name='messagealias',
+            constraint=models.UniqueConstraint(fields=('conversation', 'source_namespace', 'alias_key'), name='unique_chat_message_alias'),
         ),
         migrations.AddConstraint(
             model_name='messageorigin',

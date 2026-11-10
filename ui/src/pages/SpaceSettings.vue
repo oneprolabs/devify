@@ -177,6 +177,53 @@ const unwrap = (response) => response.data.data || response.data
 const analysisRows = computed(() => {
   const config = workflow.value
   if (!config) return []
+  const preferences = config.chat_analysis_preferences
+  const analysisPreferences = preferences
+    ? [
+        {
+          label: '分析范围',
+          value: (preferences.conversation_types || [])
+            .map(
+              (type) => ({ direct: '个人聊天', group: '群聊' })[type] || type
+            )
+            .join('、'),
+          hint: '参与分析的聊天类型'
+        },
+        {
+          label: '时间范围',
+          value: preferences.lookback_days
+            ? `最近 ${preferences.lookback_days} 天`
+            : '全部记录',
+          hint: '任务创建时固定'
+        },
+        {
+          label: '事件粒度',
+          value:
+            { fine: '更细', balanced: '平衡', coarse: '更粗' }[
+              preferences.event_granularity
+            ] || '未知',
+          hint: '控制事件划分的粗细'
+        },
+        {
+          label: '摘要风格',
+          value:
+            {
+              concise: '简洁概述',
+              narrative: '背景与经过',
+              actions: '行动与后续'
+            }[preferences.summary_style] || '未知',
+          hint: '摘要的表达方式'
+        },
+        {
+          label: '摘要详略',
+          value:
+            { short: '简短', standard: '标准', detailed: '详细' }[
+              preferences.summary_length
+            ] || '未知',
+          hint: '摘要内容的详细程度'
+        }
+      ]
+    : []
   return [
     {
       label: '自动处理',
@@ -204,6 +251,7 @@ const analysisRows = computed(() => {
       value: sceneText(config.scene),
       hint: '默认的提示词与分析口径'
     },
+    ...analysisPreferences,
     {
       label: '配置版本',
       value: `v${config.version}`,

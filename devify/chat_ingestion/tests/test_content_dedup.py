@@ -18,7 +18,7 @@ from chat_ingestion.tests.archives import (
     DEFAULT_MESSAGES,
     build_archive,
 )
-from spaces.models import Space, SpaceMembership
+from spaces.models import Space, SpaceMembership, SpaceWorkflowConfig
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -189,3 +189,142 @@ def test_parse_task_reports_skipped_duplicates():
 
     # The batch is already completed, so the task is a no-op.
     assert result["status"] == UploadBatch.Status.COMPLETED
+
+
+def text_archive():
+    return build_archive(parts=[
+        {"conversation_id": "group-a", "message_key": f"srv:{seq}",
+         "part_key": "p0", "kind": "text", "ordinal": 0, "text": f"message {seq}"}
+        for seq in (1, 2)
+    ])
+
+
+def test_same_content_reanalyzed_only_after_preferences_change():
+    owner = User.objects.create_user(username="dedup-preferences-owner")
+    space = make_team(owner, slug="dedup-preferences-team")
+    client = client_for(owner)
+    config = SpaceWorkflowConfig.objects.create(space=space)
+    content = text_archive()
+    first = upload(client, space, "prefs-1", content)
+    first_job = first.analysis_jobs.get()
+    assert first_job.state == AnalysisJob.State.READY
+
+    config.chat_analysis_preferences = dict(config.chat_analysis_preferences, event_granularity="coarse")
+    config.save()
+    assert AnalysisJob.objects.count() == 1  # No automatic historical recomputation.
+    second = upload(client, space, "prefs-2", content)
+    second_job = second.analysis_jobs.get()
+    assert second_job.pk != first_job.pk
+    assert second_job.specification["chat_analysis_preferences"]["event_granularity"] == "coarse"
+    assert second_job.state == AnalysisJob.State.READY
+
+    third = upload(client, space, "prefs-3", content)
+    assert third.analysis_jobs.get().pk == second_job.pk
+    assert AnalysisJob.objects.count() == 2
+
+
+def test_upload_key_and_snapshot_share_one_preference_read(monkeypatch):
+    import chat_ingestion.tasks as tasks
+
+    owner = User.objects.create_user(username="dedup-race-owner")
+    space = make_team(owner, slug="dedup-race-team")
+    client = client_for(owner)
+    config = SpaceWorkflowConfig.objects.create(space=space)
+    content = text_archive()
+    original_create = tasks.create_analysis_job
+
+    def change_config_before_create(**kwargs):
+        config.chat_analysis_preferences = dict(config.chat_analysis_preferences, event_granularity="fine")
+        config.save()
+        return original_create(**kwargs)
+
+    monkeypatch.setattr(tasks, "create_analysis_job", change_config_before_create)
+    first = upload(client, space, "race-1", content)
+    first_job = first.analysis_jobs.get()
+    assert first_job.specification["chat_analysis_preferences"]["event_granularity"] == "balanced"
+    second = upload(client, space, "race-2", content)
+    second_job = second.analysis_jobs.get()
+    assert second_job.pk != first_job.pk
+    assert second_job.specification["chat_analysis_preferences"]["event_granularity"] == "fine"
+    config.chat_analysis_preferences = dict(config.chat_analysis_preferences, event_granularity="balanced")
+    config.save()
+    third = upload(client, space, "race-3", content)
+    assert third.analysis_jobs.get().pk == first_job.pk
+    assert AnalysisJob.objects.count() == 2
+
+
+@pytest.mark.parametrize("snapshot,changed,reused", [
+    (False, False, True),
+    (False, True, False),
+    (True, False, True),
+    (True, True, False),
+])
+def test_legacy_digest_key_reused_only_for_matching_preferences(snapshot, changed, reused):
+    owner = User.objects.create_user(username="dedup-legacy-owner")
+    space = make_team(owner, slug="dedup-legacy-team")
+    client = client_for(owner)
+    config = SpaceWorkflowConfig.objects.create(space=space)
+    content = text_archive()
+    first = upload(client, space, "legacy-1", content)
+    job = first.analysis_jobs.get()
+    digest = first.conversation_digests[str(job.conversation_id)]
+    job.request_key = f"upload:{job.conversation_id}:{digest}"
+    if not snapshot:
+        job.specification = {}
+    job.save(update_fields=("request_key", "specification"))
+    if changed:
+        config.chat_analysis_preferences = dict(config.chat_analysis_preferences, summary_style="actions")
+        config.save()
+    second = upload(client, space, "legacy-2", content)
+    second_job = second.analysis_jobs.get()
+    assert (second_job.pk == job.pk) is reused
+    assert AnalysisJob.objects.count() == (1 if reused else 2)
+    if changed:
+        assert second_job.specification["chat_analysis_preferences"]["summary_style"] == "actions"
+
+
+def test_reordered_conversation_types_reuse_existing_job():
+    owner = User.objects.create_user(username="dedup-order-owner")
+    space = make_team(owner, slug="dedup-order-team")
+    client = client_for(owner)
+    config = SpaceWorkflowConfig.objects.create(space=space)
+    content = text_archive()
+    first = upload(client, space, "order-1", content)
+    original = first.analysis_jobs.get()
+    config.chat_analysis_preferences = dict(
+        config.chat_analysis_preferences,
+        conversation_types=["group", "direct", "group"],
+    )
+    config.save()
+    second = upload(client, space, "order-2", content)
+    assert second.analysis_jobs.get().pk == original.pk
+    assert AnalysisJob.objects.count() == 1
+    config.refresh_from_db()
+    assert config.chat_analysis_preferences["conversation_types"] == ["group", "direct", "group"]
+
+
+@pytest.mark.parametrize("snapshot", [False, True])
+def test_reordered_conversation_types_reuse_legacy_job(snapshot):
+    owner = User.objects.create_user(username="dedup-legacy-order-owner")
+    space = make_team(owner, slug="dedup-legacy-order-team")
+    client = client_for(owner)
+    config = SpaceWorkflowConfig.objects.create(space=space)
+    content = text_archive()
+    first = upload(client, space, "legacy-order-1", content)
+    job = first.analysis_jobs.get()
+    digest = first.conversation_digests[str(job.conversation_id)]
+    job.request_key = f"upload:{job.conversation_id}:{digest}"
+    if snapshot:
+        job.specification["chat_analysis_preferences"]["conversation_types"] = [
+            "group", "direct", "group"
+        ]
+    else:
+        job.specification = {}
+    job.save(update_fields=("request_key", "specification"))
+    config.chat_analysis_preferences = dict(
+        config.chat_analysis_preferences, conversation_types=["group", "direct"]
+    )
+    config.save()
+    second = upload(client, space, "legacy-order-2", content)
+    assert second.analysis_jobs.get().pk == job.pk
+    assert AnalysisJob.objects.count() == 1

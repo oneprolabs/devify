@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -12,6 +14,7 @@ from chat_analysis.models import (
     NoteEvidence,
     ReportItemSource,
 )
+from spaces.models import SpaceWorkflowConfig, effective_chat_analysis_preferences
 from spaces.services import SpacePermissionService
 
 
@@ -64,6 +67,13 @@ def ensure_can_delete(user, instance):
         )
 
 
+def get_analysis_preferences(space):
+    config = SpaceWorkflowConfig.objects.filter(space=space).first()
+    return effective_chat_analysis_preferences(
+        config.chat_analysis_preferences if config else None
+    )
+
+
 @transaction.atomic
 def create_analysis_job(
     *,
@@ -75,10 +85,23 @@ def create_analysis_job(
     input_version,
     start_seq=0,
     specification=None,
+    analysis_preferences=None,
 ):
     ensure_can_contribute(actor, space)
     if conversation.space_id != space.pk:
         raise ChatAnalysisError("Conversation must belong to the same space.")
+    preferences = (
+        effective_chat_analysis_preferences(analysis_preferences)
+        if analysis_preferences is not None
+        else get_analysis_preferences(space)
+    )
+    cutoff_days = preferences.get("lookback_days", 0)
+    snapshot = dict(specification or {})
+    snapshot["chat_analysis_preferences"] = preferences
+    snapshot["analysis_cutoff"] = (
+        (timezone.now() - timedelta(days=cutoff_days)).isoformat()
+        if cutoff_days else None
+    )
     job, created = AnalysisJob.objects.get_or_create(
         space=space,
         request_key=request_key,
@@ -88,7 +111,7 @@ def create_analysis_job(
             "start_seq": start_seq,
             "end_seq": end_seq,
             "input_version": input_version,
-            "specification": specification or {},
+            "specification": snapshot,
         },
     )
     if not created and (

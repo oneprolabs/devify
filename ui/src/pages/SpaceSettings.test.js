@@ -48,6 +48,13 @@ describe('SpaceSettings', () => {
           attachment_policy: 'available',
           language: 'zh-CN',
           scene: 'chat',
+          chat_analysis_preferences: {
+            conversation_types: ['direct', 'group'],
+            lookback_days: 30,
+            event_granularity: 'coarse',
+            summary_style: 'concise',
+            summary_length: 'standard'
+          },
           version: 3,
           updated_at: '2026-11-01T10:00:00Z'
         }
@@ -100,6 +107,10 @@ describe('SpaceSettings', () => {
     expect(wrapper.text()).toContain('开启')
     expect(wrapper.text()).toContain('简体中文')
     expect(wrapper.text()).toContain('v3')
+    expect(wrapper.text()).toContain('个人聊天、群聊')
+    expect(wrapper.text()).toContain('最近 30 天')
+    expect(wrapper.text()).toContain('更粗')
+    expect(wrapper.text()).toContain('简洁概述')
   })
 
   it('renders real cloud usage numbers', async () => {

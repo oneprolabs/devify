@@ -417,12 +417,16 @@ def _call_json(*, prompt, content, node_name):
     return output if isinstance(output, dict) else None
 
 
-def _summarize_note(note, payload, language):
+def _summarize_note(note, payload, language, preferences=None):
+    preferences = preferences or {}
+    style = preferences.get("summary_style", "concise")
+    length = preferences.get("summary_length", "standard")
     prompt = (
         "Summarize one chunk of chat messages. Return JSON with exactly the "
         "keys facts, actions, risks and decisions. Every item must be an "
         "object with a short text field. Do not include events. Do not "
-        f"invent facts. Write all text in {language}."
+        f"invent facts. Write all text in {language}. "
+        f"Summary style: {style}; level of detail: {length}."
     )
     output = _call_json(
         prompt=prompt,
@@ -444,6 +448,8 @@ def _summarize_note(note, payload, language):
 
 
 def _extract_events(job, note, messages, payload, language):
+    preferences = (job.specification or {}).get("chat_analysis_preferences", {})
+    granularity = preferences.get("event_granularity", "balanced")
     prompt = (
         "Extract ongoing matters (events) from one chunk of chat messages. "
         'Return JSON: {"events": [...]}. Each event must have event_key, '
@@ -454,7 +460,22 @@ def _extract_events(job, note, messages, payload, language):
         "in_progress, done; source_seqs must be seq numbers from the given "
         "messages; tags are at most five short labels such as customer, "
         f"product or incident id. Return at most {MAX_EVENTS_PER_CHUNK} "
-        f"events. Write title and summary in {language}. Do not invent facts."
+        f"events. Write title and summary in {language}. Do not invent facts. "
+        "Do not create events for greetings, acknowledgements, jokes or isolated "
+        "comments without a substantive actionable matter. Routine personal "
+        "conversations about meals, going out, casual invitations, or short "
+        "replies are not events, even if they mention a plan, unless they "
+        "contain a consequential commitment that needs follow-up. Previous "
+        "events may include false positives: an existing matching title or key "
+        "does not justify creating or updating an event for trivial chat. "
+        "When nothing qualifies return an empty events list. A single important "
+        "decision or commitment can still be an event. Existing events may "
+        "originate in other conversations: reuse their key only when the "
+        "specific matter is clearly the same, not merely a similar topic. "
+        f"Event granularity: {granularity}. For coarse granularity combine "
+        "related developments of the same matter rather than creating fragments. "
+        f"Summary style: {preferences.get('summary_style', 'concise')}; "
+        f"detail: {preferences.get('summary_length', 'standard')}."
     )
     content = json.dumps(
         {
@@ -537,7 +558,7 @@ def _enrich_note_with_llm(job, note, messages):
     language = _output_language(note.space)
     partial = False
     try:
-        if not _summarize_note(note, payload, language):
+        if not _summarize_note(note, payload, language, (job.specification or {}).get("chat_analysis_preferences")):
             partial = True
     except Exception:
         # An unavailable LLM is an infrastructure failure, not a data gap:
@@ -567,14 +588,25 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
     notes_written = int(checkpoint.get("notes_written", 0))
     partial = bool(checkpoint.get("partial", False))
 
+    preferences = (job.specification or {}).get("chat_analysis_preferences")
+    cutoff = (job.specification or {}).get("analysis_cutoff")
+    conversation_types = preferences.get("conversation_types", []) if preferences else []
+    kind = job.conversation.kind
+    excluded = bool(
+        preferences
+        and kind in ("direct", "group")
+        and kind not in conversation_types
+    )
     batches = job.upload_batches.all()
-    while True:
+    while not excluded:
         query = Message.objects.filter(
             conversation_id=job.conversation_id,
             ingest_seq__gt=last_seq,
             ingest_seq__lte=job.end_seq,
             orphaned_at__isnull=True,
         )
+        if cutoff:
+            query = query.filter(occurred_at__gte=cutoff)
         if batches.exists():
             query = query.filter(
                 origins__upload_item__batch__in=batches

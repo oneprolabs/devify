@@ -2,129 +2,190 @@
   <AppLayout :padded="false">
     <div class="overview-page">
       <header class="overview-head">
-        <div>
-          <h1>概览</h1>
-          <span class="crumb">云端副本 · 截至 {{ latestAt ? formatDate(latestAt) : '暂无同步' }}</span>
+        <div class="breadcrumb">
+          <span>聊天记录</span><span aria-hidden="true">/</span
+          ><strong>概览</strong>
         </div>
-        <button type="button" class="refresh" :disabled="loading" @click="load">刷新</button>
+        <div class="head-actions">
+          <span v-if="refreshedAt" class="updated-at"
+            >更新于 {{ formatDate(refreshedAt) }}</span
+          >
+          <button
+            type="button"
+            class="refresh"
+            :disabled="loading"
+            @click="load"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M20 7v5h-5M4 17v-5h5" />
+              <path
+                d="M5.3 9a7 7 0 0 1 11.3-2L20 12M4 12l3.4 5A7 7 0 0 0 19 15"
+              />
+            </svg>
+            刷新
+          </button>
+        </div>
       </header>
+
       <main class="overview-body">
+        <div class="page-title">
+          <div>
+            <span class="eyebrow">CHAT WORKSPACE</span>
+            <h1>概览</h1>
+            <p>你的聊天记录、待处理事项与同步情况，一目了然。</p>
+          </div>
+          <span class="workspace-label">个人工作台</span>
+        </div>
+
         <div v-if="error" class="error" role="alert">{{ error }}</div>
-        <div v-if="loading" class="state" aria-busy="true">正在加载个人工作台…</div>
-        <template v-else-if="needsTakeover">
+        <div v-if="loading && !showOverview" class="state" aria-busy="true">
+          正在加载个人工作台…
+        </div>
+        <template v-if="!loading && needsTakeover">
           <section class="device-card takeover">
             <div class="device-main">
-              <div class="device-title"><strong>准备个人工作台</strong></div>
-              <p>当前空间还没有为这个账号准备个人工作台，准备好后即可查看概览。</p>
+              <strong>准备个人工作台</strong>
+              <p>
+                当前空间还没有为这个账号准备个人工作台，准备好后即可查看概览。
+              </p>
             </div>
-            <button type="button" class="primary" :disabled="takingOver" @click="prepareWorkspace">
+            <button
+              type="button"
+              class="primary"
+              :disabled="takingOver"
+              @click="prepareWorkspace"
+            >
               {{ takingOver ? '准备中…' : '开始准备' }}
             </button>
           </section>
         </template>
-        <template v-else>
-          <section class="device-card">
+        <template v-else-if="showOverview && !needsTakeover">
+          <section class="device-card" aria-label="个人工作台状态">
             <span class="device-icon" aria-hidden="true">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">
-                <rect x="3.5" y="4.5" width="17" height="11.5" rx="2"></rect>
-                <path d="M2 19.5h20"></path>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+                stroke-linecap="round"
+              >
+                <rect x="3.5" y="4.5" width="17" height="11.5" rx="2" />
+                <path d="M2 19.5h20" />
               </svg>
             </span>
             <div class="device-main">
-              <div class="device-title">
-                <strong>个人工作台</strong>
-                <span class="device-dot" :class="{ offline: !latestAt }"></span>
-                <span class="device-state">{{ latestAt ? '在线' : '待同步' }}</span>
-              </div>
-              <p>{{ sourceSummary }}</p>
+              <strong>个人工作台</strong>
+              <p>查看聊天数据与最近同步情况</p>
             </div>
             <div class="device-side">
-              <time>{{ latestAt ? `最近上传 ${formatDate(latestAt)}` : '还没有上传记录' }}</time>
-              <small>{{ latestUpload ? `${latestUpload.message_count} 条消息 · ${statusText(latestUpload.status)}` : '上传后自动分析' }}</small>
+              <span>最近一次上传</span>
+              <div v-if="latestUpload" class="device-upload">
+                <time>{{
+                  formatDate(latestUpload.created_at) || '时间未知'
+                }}</time>
+                <span class="upload-status" :class="latestUpload.status">{{
+                  uploadStatusText(latestUpload.status)
+                }}</span>
+              </div>
+              <strong v-else>{{
+                uploads === null ? '上传记录暂不可用' : '还没有上传记录'
+              }}</strong>
             </div>
           </section>
 
-          <section class="stats">
-            <button type="button" @click="go('chats')">
-              <span>云端会话</span>
-              <strong>{{ conversations.length }}</strong>
-              <small>已上传的会话</small>
-            </button>
-            <button type="button" @click="go('events')">
-              <span>未完成事件</span>
-              <strong>{{ openEvents }}</strong>
-              <small>{{ openEvents ? `其中 ${openEvents} 个需要跟进` : '需要继续跟进' }}</small>
-            </button>
-            <button type="button" @click="go('topics')">
-              <span>主题订阅</span>
-              <strong>{{ topics.length }}</strong>
-              <small>{{ enabledTopics }} 个运行中</small>
-            </button>
-            <button type="button" @click="go('sync')">
-              <span>本周消息</span>
-              <strong>{{ messageCount }}</strong>
-              <small>已上传并分析</small>
+          <section class="stats" aria-label="概览指标">
+            <button
+              v-for="stat in stats"
+              :key="stat.target"
+              type="button"
+              class="stat-card"
+              @click="go(stat.target)"
+            >
+              <span class="stat-heading">{{ stat.label }}</span>
+              <strong>{{ stat.value }}</strong>
+              <small>{{ stat.detail }}</small>
+              <span class="stat-icon" :class="stat.target" aria-hidden="true">
+                <svg
+                  v-if="stat.target === 'chats'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                >
+                  <path
+                    d="M20 11.5a8 8 0 0 1-8 8 8.5 8.5 0 0 1-3-.5L4 20l1.3-4a8 8 0 1 1 14.7-4.5Z"
+                  />
+                </svg>
+                <svg
+                  v-else-if="stat.target === 'events'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                >
+                  <circle cx="12" cy="12" r="8.5" />
+                  <path d="m8.5 12 2.2 2.2 4.8-5" />
+                </svg>
+                <svg
+                  v-else-if="stat.target === 'topics'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                >
+                  <path d="M5 21V4m0 0c5-3 8 3 14 0v11c-6 3-9-3-14 0" />
+                </svg>
+                <svg
+                  v-else
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                >
+                  <path d="M6 3h8l4 4v14H6z" />
+                  <path d="M14 3v5h4M9 12h6M9 16h6" />
+                </svg>
+              </span>
             </button>
           </section>
 
-          <section class="section">
-            <div class="section-title">
-              <h2>需要你处理<span v-if="openEventsList.length" class="count">{{ openEventsList.length }}</span></h2>
-              <button type="button" @click="go('events')">全部事件 →</button>
-            </div>
-            <div class="list-card">
-              <button
-                v-for="event in openEventsList"
-                :key="event.id"
-                type="button"
-                class="event-row"
-                @click="openEvent(event)"
-              >
-                <span class="ring"></span>
-                <strong>{{ event.title }}</strong>
-                <span class="event-source">{{ eventSource(event) }}</span>
-                <span class="tag">{{ statusLabel(event.status) }}</span>
-              </button>
-              <div v-if="!openEventsList.length" class="empty">暂无未完成事件</div>
-            </div>
-          </section>
-
-          <div class="two-cols">
-            <section class="section">
-              <div class="section-title">
-                <h2>最新报告</h2>
-                <button type="button" @click="go('reports')">全部报告 →</button>
-              </div>
-              <button v-if="latestReport" type="button" class="report-card" @click="go('reports')">
-                <div class="report-head">
-                  <span class="tag">报告</span>
-                  <strong>{{ latestReport.title }}</strong>
-                  <small>{{ formatDate(latestReport.generated_at || latestReport.created_at) }} 生成</small>
-                </div>
-                <p>{{ latestReport.body || '报告正在生成或暂无正文。' }}</p>
-              </button>
-              <div v-else class="empty soft">还没有报告</div>
-            </section>
-            <section class="section">
-              <div class="section-title">
-                <h2>最近同步</h2>
-                <button type="button" @click="go('sync')">同步记录 →</button>
-              </div>
-              <div class="list-card sync-list">
-                <div v-for="upload in uploads.slice(0, 4)" :key="upload.id" class="sync-row">
-                  <span class="sync-id">#{{ upload.id }}</span>
-                  <span class="sync-time">{{ formatDate(upload.created_at) }}</span>
-                  <span class="sync-count">{{ upload.message_count }} 条</span>
-                  <span class="tag" :class="upload.status">{{ statusText(upload.status) }}</span>
-                </div>
-                <div v-if="!uploads.length" class="empty">暂无同步记录</div>
-              </div>
-            </section>
-          </div>
+          <OverviewActivity
+            :events="openEventsList"
+            :events-available="eventsAvailable"
+            :uploads="uploads || []"
+            :uploads-available="uploads !== null"
+            @events="go('events')"
+            @sync="go('sync')"
+            @open-event="openEvent"
+          />
+          <OverviewReport
+            :report="latestReport"
+            :available="reports !== null"
+            @open="go('reports')"
+          />
 
           <section class="ask-card">
             <span class="kicker" aria-hidden="true">✦</span>
-            <p>不在电脑旁？可以直接在网页上问，例如「这周客户有哪些没回复的问题？」</p>
+            <p>
+              不在电脑旁？可以直接在网页上问，例如「这周客户有哪些没回复的问题？」
+            </p>
             <button type="button" @click="go('ask')">去问答 →</button>
           </section>
         </template>
@@ -132,99 +193,242 @@
     </div>
   </AppLayout>
 </template>
+
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import OverviewActivity from '@/components/overview/OverviewActivity.vue'
+import OverviewReport from '@/components/overview/OverviewReport.vue'
+import {
+  formatDate,
+  uploadStatusText,
+  validCount
+} from '@/components/overview/formatters'
 import { spacesApi } from '@/api/spaces'
 
-const props = defineProps({ spaceId: { type: [String, Number], required: true } })
+const props = defineProps({
+  spaceId: { type: [String, Number], required: true }
+})
 const router = useRouter()
 const loading = ref(false)
 const needsTakeover = ref(false)
+const showOverview = ref(false)
 const takingOver = ref(false)
 const error = ref('')
-const events = ref([])
-const reports = ref([])
-const uploads = ref([])
-const conversations = ref([])
-const topics = ref([])
+const refreshedAt = ref(null)
+const openEvents = ref(null)
+const inProgressEvents = ref(null)
+const reports = ref(null)
+const uploads = ref(null)
+const conversations = ref(null)
+const topics = ref(null)
+let requestVersion = 0
 
-const openEvents = computed(() => events.value.filter(item => item.status !== 'done').length)
-const openEventsList = computed(() => events.value.filter(item => item.status !== 'done').slice(0, 5))
-const enabledTopics = computed(() => topics.value.filter(item => item.enabled).length)
-const latestReport = computed(() => reports.value[0] || null)
-const latestUpload = computed(() => uploads.value[0] || null)
-const messageCount = computed(() =>
-  conversations.value.reduce((total, item) => total + Number(item.message_count || 0), 0).toLocaleString('zh-CN')
+// Each status is ordered by the server. Merging its first page of up to 100
+// items is sufficient for the first 100 across both known unfinished statuses.
+const eventsAvailable = computed(
+  () => openEvents.value !== null && inProgressEvents.value !== null
 )
-const latestAt = computed(() =>
-  [events.value[0]?.last_activity_at, reports.value[0]?.created_at, uploads.value[0]?.created_at]
-    .filter(Boolean)
-    .sort()
-    .at(-1)
+const mergedEvents = computed(() =>
+  [...(openEvents.value || []), ...(inProgressEvents.value || [])]
+    .sort((a, b) => {
+      const date = (item) => {
+        const value = Date.parse(item.last_activity_at)
+        return Number.isNaN(value) ? -Infinity : value
+      }
+      const aDate = date(a)
+      const bDate = date(b)
+      if (aDate !== bDate) return bDate > aDate ? 1 : -1
+      // Date.parse truncates microseconds, but the backend orders by them.
+      const micros = (item) =>
+        Number(
+          (
+            String(item.last_activity_at || '').match(
+              /\.(\d+)(?=Z|[+-]\d\d:\d\d$)/
+            )?.[1] || ''
+          )
+            .padEnd(6, '0')
+            .slice(3, 6)
+        )
+      const difference = micros(b) - micros(a)
+      return difference || Number(b.id) - Number(a.id)
+    })
+    .slice(0, 100)
 )
-const sourceSummary = computed(() => {
-  const types = [...new Set(uploads.value.map(item => item.source_type).filter(Boolean))]
-  const sources = types.length ? types.join(' · ') : '微信 · 邮件'
-  return `${sources} · 上传后自动解析整理`
+const openEventsList = computed(() => mergedEvents.value.slice(0, 5))
+const enabledTopics = computed(() => {
+  if (
+    !topics.value ||
+    !topics.value.every((item) => typeof item.enabled === 'boolean')
+  )
+    return null
+  return topics.value.filter((item) => item.enabled).length
 })
+const latestReport = computed(() => reports.value?.[0] || null)
+const latestUpload = computed(() => uploads.value?.[0] || null)
+const messageCount = computed(() => {
+  if (
+    !conversations.value ||
+    !conversations.value.every((item) => validCount(item.message_count))
+  )
+    return '—'
+  const total = conversations.value.reduce(
+    (sum, item) => sum + Number(item.message_count),
+    0
+  )
+  return Number.isSafeInteger(total) ? total.toLocaleString('zh-CN') : '—'
+})
+const stats = computed(() => [
+  {
+    target: 'chats',
+    label: '云端会话',
+    value: conversations.value?.length ?? '—',
+    detail: '当前加载的会话'
+  },
+  {
+    target: 'events',
+    label: '未完成事件',
+    value: eventsAvailable.value ? mergedEvents.value.length : '—',
+    detail: '最多加载前 100 个已知状态的未完成事件'
+  },
+  {
+    target: 'topics',
+    label: '主题订阅',
+    value: topics.value?.length ?? '—',
+    detail:
+      topics.value === null
+        ? '数据暂不可用'
+        : enabledTopics.value === null
+          ? '启用状态未知'
+          : `${enabledTopics.value} 个已启用`
+  },
+  {
+    target: 'sync',
+    label: '会话消息',
+    value: messageCount.value,
+    detail: '已列出会话的消息数'
+  }
+])
 
-const unwrap = response => (response.data.data || response.data)
-const list = response => unwrap(response).list || []
-const statusLabel = status => ({ open: '未完成', in_progress: '进行中', done: '已完成' })[status] || '待确认'
-const statusText = status => ({ completed: '已完成', processing: '解析中', pending: '排队中', failed: '失败' })[status] || status || '待确认'
-const formatDate = value => value
-  ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  : ''
-const eventSource = event => {
-  const labels = (event.tags || []).map(tag => tag.label).filter(Boolean)
-  return labels.length ? labels.slice(0, 2).join(' · ') : '云端记录'
+const unwrap = (response) => response?.data?.data ?? response?.data
+const list = (response) => {
+  const data = unwrap(response)
+  if (!Array.isArray(data?.list)) throw new Error('列表数据格式无效')
+  return data.list
 }
 
 async function load() {
+  const version = ++requestVersion
+  const spaceId = props.spaceId
   loading.value = true
   error.value = ''
   try {
     const spacesResponse = await spacesApi.getSpaces()
-    const spaces = spacesResponse.data.data || spacesResponse.data || []
-    const current = (Array.isArray(spaces) ? spaces : spaces.list || []).find(
-      item => String(item.id) === String(props.spaceId)
+    if (version !== requestVersion) return
+    const spaces = unwrap(spacesResponse)
+    const spaceList = Array.isArray(spaces) ? spaces : spaces?.list
+    if (!Array.isArray(spaceList)) throw new Error('空间列表数据格式无效')
+    const current = spaceList.find(
+      (item) => String(item.id) === String(spaceId)
     )
     if (current?.is_global_admin && !current.admin_takeover_active) {
       needsTakeover.value = true
       return
     }
-    const [eventsResponse, reportsResponse, uploadsResponse, conversationsResponse, topicsResponse] = await Promise.all([
-      spacesApi.getEvents(props.spaceId, { page_size: 100 }),
-      spacesApi.getReports(props.spaceId, { page_size: 20 }),
-      spacesApi.getUploads(props.spaceId, { page_size: 20 }),
-      spacesApi.getConversations(props.spaceId, { page_size: 100 }),
-      spacesApi.getTopics(props.spaceId)
-    ])
-    events.value = list(eventsResponse)
-    reports.value = list(reportsResponse)
-    uploads.value = list(uploadsResponse)
-    conversations.value = list(conversationsResponse)
-    const topicData = topicsResponse.data.data || topicsResponse.data
-    topics.value = Array.isArray(topicData) ? topicData : []
+    needsTakeover.value = false
+    showOverview.value = true
+    const sources = [
+      {
+        name: '未完成事件',
+        target: openEvents,
+        fetch: () =>
+          spacesApi.getEvents(spaceId, { status: 'open', page_size: 100 }),
+        parse: list
+      },
+      {
+        name: '进行中事件',
+        target: inProgressEvents,
+        fetch: () =>
+          spacesApi.getEvents(spaceId, {
+            status: 'in_progress',
+            page_size: 100
+          }),
+        parse: list
+      },
+      {
+        name: '报告',
+        target: reports,
+        fetch: () => spacesApi.getReports(spaceId, { page_size: 20 }),
+        parse: list
+      },
+      {
+        name: '同步记录',
+        target: uploads,
+        fetch: () => spacesApi.getUploads(spaceId, { page_size: 20 }),
+        parse: list
+      },
+      {
+        name: '会话',
+        target: conversations,
+        fetch: () => spacesApi.getConversations(spaceId, { page_size: 100 }),
+        parse: list
+      },
+      {
+        name: '主题',
+        target: topics,
+        fetch: () => spacesApi.getTopics(spaceId),
+        parse: (response) => {
+          const data = unwrap(response)
+          if (!Array.isArray(data)) throw new Error('主题数据格式无效')
+          return data
+        }
+      }
+    ]
+    const results = await Promise.allSettled(
+      sources.map(({ fetch, parse }) =>
+        Promise.resolve().then(fetch).then(parse)
+      )
+    )
+    if (version !== requestVersion) return
+    const failed = []
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled')
+        sources[index].target.value = result.value
+      else failed.push({ name: sources[index].name, reason: result.reason })
+    })
+    if (failed.length) {
+      const detail = failed
+        .map(({ reason }) => reason?.response?.data?.detail)
+        .find((value) => typeof value === 'string')
+      error.value = `${failed.map(({ name }) => name).join('、')}加载失败${detail ? `：${detail}` : '。'} 已展示可用数据，之前的数据可能已过期。`
+    } else {
+      refreshedAt.value = new Date()
+    }
   } catch (requestError) {
-    error.value = requestError.response?.data?.detail || '无法加载个人工作台。'
+    if (version === requestVersion)
+      error.value = `${requestError.response?.data?.detail || '无法加载个人工作台。'} 已有数据可能已过期。`
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
 }
 
 async function prepareWorkspace() {
+  const spaceId = props.spaceId
   takingOver.value = true
+  error.value = ''
   try {
-    await spacesApi.takeoverSpace(props.spaceId, 'Prepare default personal workspace')
+    await spacesApi.takeoverSpace(spaceId, 'Prepare default personal workspace')
+    if (String(spaceId) !== String(props.spaceId)) return
     needsTakeover.value = false
     await load()
   } catch (requestError) {
-    error.value = requestError.response?.data?.detail || '无法准备个人工作台。'
+    if (String(spaceId) === String(props.spaceId)) {
+      error.value =
+        requestError.response?.data?.detail || '无法准备个人工作台。'
+    }
   } finally {
-    takingOver.value = false
+    if (String(spaceId) === String(props.spaceId)) takingOver.value = false
   }
 }
 
@@ -244,68 +448,387 @@ function openEvent(event) {
   router.push(`/spaces/${props.spaceId}/analysis?event=${event.id}`)
 }
 
-onMounted(load)
+watch(
+  () => props.spaceId,
+  () => {
+    needsTakeover.value = false
+    showOverview.value = false
+    takingOver.value = false
+    refreshedAt.value = null
+    openEvents.value = null
+    inProgressEvents.value = null
+    reports.value = null
+    uploads.value = null
+    conversations.value = null
+    topics.value = null
+    load()
+  },
+  { immediate: true }
+)
 </script>
+
 <style scoped>
-.overview-page{min-height:100%;overflow:auto;background:rgb(var(--c-bg));color:rgb(var(--c-tx))}
-.overview-head{display:flex;min-height:56px;align-items:center;justify-content:space-between;border-bottom:1px solid rgb(var(--c-line));padding:0 28px}
-.overview-head h1{margin:0;font-family:var(--font-display);font-size:16px;font-weight:600;letter-spacing:-.01em}
-.crumb{color:rgb(var(--c-tx3));font-size:13px}
-.refresh,.section-title button{color:rgb(var(--c-ac));font-size:12px}
-.overview-body{max-width:1000px;margin:0 auto;padding:28px 32px 56px}
-.error{border:1px solid rgb(var(--c-bad));border-radius:8px;background:rgb(var(--c-bad-soft));padding:10px;color:rgb(var(--c-bad));font-size:12px}
-.state,.empty{color:rgb(var(--c-tx3));font-size:12px}
-.device-card{display:flex;align-items:center;gap:14px;border:1px solid rgb(var(--c-line));border-radius:10px;background:rgb(var(--c-panel));padding:16px 18px}
-.device-icon{display:flex;width:38px;height:38px;flex:none;align-items:center;justify-content:center;border:1px solid rgb(var(--c-line));border-radius:9px;background:rgb(var(--c-bg-sub));color:rgb(var(--c-tx2))}
-.device-main{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px}
-.device-title{display:flex;align-items:center;gap:8px}
-.device-title strong{font-size:14px;font-weight:500}
-.device-dot{width:7px;height:7px;border-radius:50%;background:rgb(var(--c-ok))}
-.device-dot.offline{background:rgb(var(--c-tx4))}
-.device-state{color:rgb(var(--c-tx2));font-size:12px}
-.device-main p{margin:0;color:rgb(var(--c-tx3));font-size:12px}
-.device-side{display:flex;flex:none;flex-direction:column;align-items:flex-end;gap:3px}
-.device-side time{color:rgb(var(--c-tx2));font-family:var(--font-mono);font-size:12.5px}
-.device-side small{color:rgb(var(--c-tx3));font-size:11.5px}
-.takeover .primary{margin-left:auto;flex:none;border-radius:7px;background:rgb(var(--c-ac));padding:8px 13px;color:rgb(var(--c-ac-on));font-size:12px}
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:18px;overflow:hidden;border:1px solid rgb(var(--c-line));border-radius:10px;background:rgb(var(--c-panel))}
-.stats button{padding:14px 16px;text-align:left}
-.stats button+button{border-left:1px solid rgb(var(--c-line-soft))}
-.stats span,.stats small{display:block;color:rgb(var(--c-tx3));font-size:12px}
-.stats small{font-size:11.5px}
-.stats strong{display:block;margin:6px 0 3px;font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:-.02em}
-.section{margin-top:26px}
-.section-title{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-.section-title h2{display:flex;align-items:center;gap:6px;margin:0;color:rgb(var(--c-tx2));font-size:12.5px;font-weight:600}
-.section-title .count{border-radius:999px;background:rgb(var(--c-chip));padding:1px 6px;color:rgb(var(--c-tx3));font-family:var(--font-mono);font-size:10.5px}
-.section-title button{margin-left:auto}
-.list-card,.report-card{border:1px solid rgb(var(--c-line));border-radius:10px;background:rgb(var(--c-panel))}
-.list-card .empty,.report-card .empty{padding:14px 16px}
-.empty.soft{border:1px solid rgb(var(--c-line));border-radius:10px;background:rgb(var(--c-panel));padding:16px 18px}
-.event-row{display:flex;width:100%;align-items:center;gap:10px;padding:12px 16px;text-align:left}
-.event-row+.event-row,.sync-row+.sync-row{border-top:1px solid rgb(var(--c-line-soft))}
-.event-row:hover,.sync-row:hover{background:rgb(var(--c-panel-sub))}
-.ring{width:14px;height:14px;flex:none;border:1.5px solid rgb(var(--c-tx4));border-radius:50%}
-.event-row strong{overflow:hidden;flex:1;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:400}
-.event-source{color:rgb(var(--c-tx3));font-size:12px}
-.tag{flex:none;border-radius:4px;background:rgb(var(--c-warn-soft));padding:3px 7px;color:rgb(var(--c-warn));font-size:11px}
-.tag.completed,.tag.done{background:rgb(var(--c-ok-soft));color:rgb(var(--c-ok))}
-.tag.failed{background:rgb(var(--c-bad-soft));color:rgb(var(--c-bad))}
-.two-cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;margin-top:26px}
-.two-cols .section{margin-top:0}
-.report-card{display:flex;flex-direction:column;gap:10px;padding:16px 18px;text-align:left}
-.report-head{display:flex;align-items:center;gap:8px}
-.report-head .tag{background:rgb(var(--c-chip));color:rgb(var(--c-tx2))}
-.report-head strong{min-width:0;overflow:hidden;flex:1;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500}
-.report-head small{flex:none;color:rgb(var(--c-tx3));font-size:12px}
-.report-card p{margin:0;color:rgb(var(--c-tx2));font-size:13px;line-height:1.8}
-.sync-row{display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:12.5px}
-.sync-id{color:rgb(var(--c-tx2));font-family:var(--font-mono);font-size:11.5px}
-.sync-time{color:rgb(var(--c-tx3));font-size:12px}
-.sync-count{margin-left:auto;color:rgb(var(--c-tx2));font-size:12px}
-.ask-card{display:flex;align-items:center;gap:12px;margin-top:28px;border:1px solid rgb(var(--c-line));border-radius:10px;background:rgb(var(--c-panel-sub));padding:12px 16px}
-.ask-card .kicker{color:rgb(var(--c-ac));font-size:14px;line-height:1}
-.ask-card p{margin:0;color:rgb(var(--c-tx2));font-size:12.5px;line-height:1.6}
-.ask-card button{margin-left:auto;flex:none;color:rgb(var(--c-ac));font-size:12px}
-@media(max-width:800px){.overview-body{padding:20px 18px 48px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats button:nth-child(3){border-left:0;border-top:1px solid rgb(var(--c-line-soft))}.stats button:nth-child(4){border-top:1px solid rgb(var(--c-line-soft))}.two-cols{grid-template-columns:minmax(0,1fr)}.event-source{display:none}}
+.overview-page {
+  min-height: 100%;
+  overflow: auto;
+  background: rgb(var(--c-bg-sub));
+  color: rgb(var(--c-tx));
+}
+.overview-head {
+  display: flex;
+  min-height: 69px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid rgb(var(--c-line));
+  background: rgb(var(--c-panel));
+  padding: 0 52px;
+}
+.breadcrumb {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  color: rgb(var(--c-tx3));
+  font-size: 13px;
+}
+.breadcrumb strong {
+  color: rgb(var(--c-tx));
+  font-weight: 650;
+}
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.updated-at {
+  color: rgb(var(--c-tx3));
+  font-size: 12px;
+  white-space: nowrap;
+}
+.refresh {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 8px;
+  background: rgb(var(--c-panel));
+  padding: 0 12px;
+  color: rgb(var(--c-tx2));
+  font-size: 12px;
+}
+.refresh svg {
+  width: 14px;
+  height: 14px;
+}
+.refresh:disabled {
+  opacity: 0.6;
+}
+.overview-body {
+  max-width: 1580px;
+  margin: 0 auto;
+  padding: 29px 42px 48px;
+}
+.page-title {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 21px;
+}
+.eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: rgb(var(--c-tx3));
+  font-size: 12px;
+}
+.page-title h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.page-title p {
+  margin: 7px 0 0;
+  color: rgb(var(--c-tx3));
+  font-size: 13px;
+}
+.workspace-label {
+  flex: none;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 8px;
+  background: rgb(var(--c-panel));
+  padding: 8px 11px;
+  color: rgb(var(--c-tx3));
+  font-size: 12px;
+}
+.error {
+  margin-bottom: 16px;
+  border: 1px solid rgb(var(--c-bad));
+  border-radius: 10px;
+  background: rgb(var(--c-bad-soft));
+  padding: 12px 14px;
+  color: rgb(var(--c-bad));
+  font-size: 12px;
+}
+.state {
+  padding: 20px 0;
+  color: rgb(var(--c-tx3));
+  font-size: 13px;
+}
+.device-card {
+  display: flex;
+  min-width: 0;
+  min-height: 84px;
+  align-items: center;
+  gap: 15px;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 14px;
+  background: linear-gradient(
+    103deg,
+    rgb(var(--c-ac-soft)) 0%,
+    rgb(var(--c-panel)) 80%
+  );
+  padding: 16px 23px;
+}
+.device-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  place-items: center;
+  border-radius: 12px;
+  background: rgb(var(--c-panel));
+  color: rgb(var(--c-ac));
+  box-shadow: 0 1px 5px rgb(40 52 93 / 8%);
+}
+.device-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.device-main {
+  min-width: 0;
+  flex: 1;
+}
+.device-main strong {
+  color: rgb(var(--c-tx));
+  font-size: 15px;
+  font-weight: 650;
+}
+.device-main p {
+  margin: 6px 0 0;
+  color: rgb(var(--c-tx3));
+  font-size: 12px;
+}
+.device-side {
+  min-width: 204px;
+  flex: none;
+  border-left: 1px solid rgb(var(--c-line));
+  padding-left: 23px;
+}
+.device-side > span {
+  display: block;
+  margin-bottom: 5px;
+  color: rgb(var(--c-tx3));
+  font-size: 11px;
+}
+.device-side strong,
+.device-upload time {
+  color: rgb(var(--c-tx2));
+  font-size: 13px;
+  font-weight: 650;
+}
+.device-upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.upload-status {
+  border-radius: 7px;
+  background: rgb(var(--c-chip));
+  padding: 4px 8px;
+  color: rgb(var(--c-tx2));
+  font-size: 11px;
+}
+.upload-status.completed {
+  background: rgb(var(--c-ok-soft));
+  color: rgb(var(--c-ok));
+}
+.upload-status.failed,
+.upload-status.cancelled {
+  background: rgb(var(--c-bad-soft));
+  color: rgb(var(--c-bad));
+}
+.upload-status.processing,
+.upload-status.uploading {
+  background: rgb(var(--c-ac-soft));
+  color: rgb(var(--c-ac));
+}
+.takeover .primary {
+  flex: none;
+  border-radius: 8px;
+  background: rgb(var(--c-ac));
+  padding: 9px 13px;
+  color: rgb(var(--c-ac-on));
+  font-size: 12px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.stat-card {
+  position: relative;
+  min-width: 0;
+  min-height: 111px;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 13px;
+  background: rgb(var(--c-panel));
+  padding: 16px 19px;
+  text-align: left;
+  box-shadow: 0 3px 14px rgb(40 52 93 / 3%);
+}
+.stat-card:hover {
+  border-color: rgb(var(--c-ac) / 45%);
+}
+.stat-card span.stat-heading,
+.stat-card small {
+  display: block;
+  padding-right: 34px;
+  color: rgb(var(--c-tx3));
+  font-size: 12px;
+}
+.stat-card small {
+  padding-right: 0;
+  font-size: 11px;
+}
+.stat-card strong {
+  display: block;
+  margin: 11px 0 7px;
+  color: rgb(var(--c-tx));
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.stat-icon {
+  position: absolute;
+  top: 17px;
+  right: 18px;
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border-radius: 9px;
+  background: rgb(var(--c-ac-soft));
+  color: rgb(var(--c-ac));
+}
+.stat-icon.events {
+  background: rgb(var(--c-warn-soft));
+  color: rgb(var(--c-warn));
+}
+.stat-icon.sync {
+  background: rgb(var(--c-ok-soft));
+  color: rgb(var(--c-ok));
+}
+.stat-icon svg {
+  width: 15px;
+  height: 15px;
+}
+.ask-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 12px;
+  background: rgb(var(--c-panel));
+  padding: 13px 20px;
+}
+.ask-card .kicker {
+  color: rgb(var(--c-ac));
+  font-size: 15px;
+}
+.ask-card p {
+  margin: 0;
+  color: rgb(var(--c-tx2));
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ask-card button {
+  flex: none;
+  margin-left: auto;
+  color: rgb(var(--c-ac));
+  font-size: 12px;
+}
+.refresh:focus-visible,
+.stat-card:focus-visible,
+.ask-card button:focus-visible,
+.primary:focus-visible {
+  outline: 2px solid rgb(var(--c-ac));
+  outline-offset: 2px;
+}
+@media (max-width: 1100px) {
+  .overview-head {
+    padding-right: 30px;
+    padding-left: 30px;
+  }
+  .overview-body {
+    padding-right: 26px;
+    padding-left: 26px;
+  }
+}
+@media (max-width: 800px) {
+  .overview-head {
+    min-height: 58px;
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+  .overview-body {
+    padding: 22px 18px 48px;
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .page-title h1 {
+    font-size: 24px;
+  }
+}
+@media (max-width: 540px) {
+  .updated-at,
+  .workspace-label {
+    display: none;
+  }
+  .device-card {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+  .device-side {
+    min-width: 0;
+    flex-basis: 100%;
+    border-top: 1px solid rgb(var(--c-line));
+    border-left: 0;
+    padding: 12px 0 0;
+  }
+  .stats {
+    gap: 10px;
+  }
+  .stat-card {
+    padding: 14px;
+  }
+  .stat-card strong {
+    font-size: 24px;
+  }
+  .ask-card {
+    flex-wrap: wrap;
+  }
+  .ask-card button {
+    margin-left: 0;
+  }
+}
 </style>

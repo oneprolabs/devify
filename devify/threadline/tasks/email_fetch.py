@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from threadline.models import EmailMailbox, EmailMessage
 from threadline.services.processing_control import is_processing_paused
+from threadline.services.space_email import email_ai_allowed
 from threadline.tasks.email_merge import process_email_merge
 from threadline.utils.email import (
     EmailProcessor,
@@ -32,6 +33,12 @@ def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
     if not isinstance(email_msg, EmailMessage):
         logger.debug(
             "Skipping merge queue for non-model email record: %r", email_msg
+        )
+        return
+
+    if not email_ai_allowed(email_msg):
+        logger.info(
+            "Skipping merge/AI for team-space email %s", email_msg.id
         )
         return
 
@@ -140,6 +147,7 @@ def imap_email_fetch():
                     user.id,
                     mailbox.to_email_config(),
                     user_display=user_display,
+                    mailbox=mailbox,
                 )
                 processed_count += 1
                 emails_processed += result.get("emails_processed", 0)
@@ -340,7 +348,7 @@ def haraka_email_fetch():
     timeout=settings.TASK_TIMEOUT_MINUTES * 60,
 )
 def fetch_user_imap_emails(
-    user_id: int, email_config: dict, user_display: str = None
+    user_id: int, email_config: dict, user_display: str = None, mailbox=None
 ):
     """
     Fetch IMAP emails for specific user
@@ -350,6 +358,8 @@ def fetch_user_imap_emails(
         email_config: Pre-fetched email configuration for optimization.
         user_display: User display string for logging (optional, e.g.
                       "admin (ID: 1)")
+        mailbox: The EmailMailbox row being fetched. Its space becomes the
+            message's primary space and its id is the dedup key.
     """
     if not user_display:
         user_display = f"User ID: {user_id}"
@@ -388,7 +398,9 @@ def fetch_user_imap_emails(
 
         for email_data in processor.process_emails():
             try:
-                email_msg = save_service.save_email(user_id, email_data)
+                email_msg = save_service.save_email(
+                    user_id, email_data, mailbox=mailbox
+                )
 
                 if email_msg is None:
                     logger.info(

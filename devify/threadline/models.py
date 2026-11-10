@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import uuid as uuid_lib
 
@@ -39,6 +40,26 @@ def _assign_personal_space(instance):
         return
     if instance.user_id:
         instance.space_id = _ensure_personal_space_id(instance.user_id)
+
+
+def compute_mailbox_source_key(
+    imap_host, imap_port, username, folder="INBOX", use_ssl=True
+):
+    """Stable identity of one IMAP source across users and spaces.
+
+    The same account must only be configured once; spaces share the single
+    row through ``EmailMailboxShare`` instead of creating another mailbox.
+    """
+    raw = "|".join(
+        (
+            str(imap_host or "").strip().lower(),
+            str(int(imap_port or 993)),
+            str(username or "").strip(),
+            str(folder or "INBOX").strip() or "INBOX",
+            "1" if use_ssl else "0",
+        )
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 class Settings(models.Model):
@@ -323,6 +344,13 @@ class EmailMessage(models.Model):
         blank=True,
         related_name="email_messages",
     )
+    mailbox = models.ForeignKey(
+        "EmailMailbox",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="messages",
+    )
     message_id = models.CharField(
         max_length=255,
         verbose_name=_("Message ID"),
@@ -471,8 +499,9 @@ class EmailMessage(models.Model):
             models.Index(fields=["user", "status"]),
             models.Index(fields=["user", "raw_message_id"]),
             models.Index(fields=["received_at"]),
+            models.Index(fields=["mailbox", "received_at"]),
         ]
-        unique_together = ["user", "message_id"]
+        unique_together = ["mailbox", "message_id"]
 
     def __str__(self):
         return f"{self.subject} - {self.sender}"
@@ -568,6 +597,8 @@ class EmailMessage(models.Model):
         """
         Override save to automatically validate status transitions
         """
+        if self._state.adding and self.space_id is None and self.mailbox_id:
+            self.space_id = self.mailbox.space_id
         _assign_personal_space(self)
         update_fields = kwargs.get("update_fields")
         update_fields_set = (
@@ -1065,6 +1096,19 @@ class EmailMailbox(models.Model):
         blank=True,
         related_name="email_mailboxes",
     )
+    # One IMAP source is stored once and shared to spaces; see
+    # ``EmailMailboxShare``. ``created_by`` is audit only, and ``user`` is
+    # the technical holder of the IMAP credentials.
+    source_key = models.CharField(
+        max_length=64, unique=True, editable=False, db_index=True
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_email_mailboxes",
+    )
     name = models.CharField(
         max_length=100,
         blank=True,
@@ -1133,20 +1177,42 @@ class EmailMailbox(models.Model):
         verbose_name = _("Email Mailbox")
         verbose_name_plural = _("Email Mailboxes")
         ordering = ["created_at"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "imap_host", "username"],
-                name="threadline_mailbox_user_host_username_uniq",
-            )
-        ]
         indexes = [models.Index(fields=["enabled"])]
 
     def __str__(self) -> str:
         return f"{self.display_name} -> {self.user_id}"
 
     def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        # Keep the key in sync when the source fields are edited, but leave
+        # the ``merged:<pk>`` placeholder used by the dedup migration.
+        if not (self.source_key or "").startswith("merged:"):
+            self.source_key = compute_mailbox_source_key(
+                self.imap_host,
+                self.imap_port,
+                self.username,
+                self.folder,
+                self.use_ssl,
+            )
         _assign_personal_space(self)
         super().save(*args, **kwargs)
+
+        update_fields = kwargs.get("update_fields")
+        owner_share_needed = (
+            is_new
+            or not update_fields
+            or "space" in update_fields
+            or "space_id" in update_fields
+        )
+        if self.space_id and owner_share_needed:
+            EmailMailboxShare.objects.get_or_create(
+                mailbox=self,
+                space_id=self.space_id,
+                defaults={
+                    "permission": EmailMailboxShare.Permission.MANAGE,
+                    "created_by_id": self.created_by_id,
+                },
+            )
 
     @property
     def display_name(self) -> str:
@@ -1206,6 +1272,52 @@ class EmailMailbox(models.Model):
         from expense.services.routing import subject_terms
 
         return subject_terms(self.user)
+
+
+class EmailMailboxShare(models.Model):
+    """One visibility grant from a mailbox source to a space.
+
+    A mailbox belongs to its owner space and may be shared to more spaces.
+    The message rows stay single; the share only decides who can read them.
+    """
+
+    class Permission(models.TextChoices):
+        READ = "read", "Read"
+        MANAGE = "manage", "Manage"
+
+    mailbox = models.ForeignKey(
+        EmailMailbox,
+        on_delete=models.CASCADE,
+        related_name="shares",
+    )
+    space = models.ForeignKey(
+        "spaces.Space",
+        on_delete=models.CASCADE,
+        related_name="email_mailbox_shares",
+    )
+    permission = models.CharField(
+        max_length=20,
+        choices=Permission.choices,
+        default=Permission.READ,
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_email_mailbox_shares",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Email Mailbox Share")
+        verbose_name_plural = _("Email Mailbox Shares")
+        ordering = ["id"]
+        unique_together = ["mailbox", "space"]
+        indexes = [models.Index(fields=["space", "mailbox"])]
+
+    def __str__(self) -> str:
+        return f"{self.mailbox_id}@{self.space_id}:{self.permission}"
 
 
 class EmailAlias(models.Model):

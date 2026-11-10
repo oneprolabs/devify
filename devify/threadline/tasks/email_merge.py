@@ -10,19 +10,20 @@ from __future__ import annotations
 
 import logging
 
+from agentcore_task.adapters.django import prevent_duplicate_task
 from celery import shared_task
 from django.conf import settings
 
-from agentcore_task.adapters.django import prevent_duplicate_task
 from threadline.models import EmailMessage
 from threadline.services.email_merge import EmailMergeService
-from threadline.tasks.email_workflow import process_email_workflow
-from threadline.utils.task_tracer import TaskTracer
+from threadline.services.space_email import email_ai_allowed
 from threadline.state_machine import (
     EMAIL_STATE_MACHINE,
     EmailStatus,
     can_transition_to,
 )
+from threadline.tasks.email_workflow import process_email_workflow
+from threadline.utils.task_tracer import TaskTracer
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +79,14 @@ def process_email_merge(
     email = None
 
     try:
-        email = EmailMessage.objects.select_related("user", "merged_into").get(
-            id=email_id
-        )
+        email = EmailMessage.objects.select_related(
+            "user", "merged_into", "space"
+        ).get(id=email_id)
+        if not email_ai_allowed(email):
+            logger.info(
+                "[Merge] Team-space email %s skips AI/merge in v1", email.id
+            )
+            return "team_ai_disabled"
         has_merged_children = email.merged_children.exists()
         merge_result = {
             "email_id": str(email.id),
@@ -184,7 +190,9 @@ def process_email_merge(
         except Exception as exc:
             merge_failure_logged = True
             logger.error(
-                f"[Merge] Failed to enqueue workflow for email " f"{email.id}: {exc}"
+                "[Merge] Failed to enqueue workflow for email %s: %s",
+                email.id,
+                exc,
             )
             _mark_email_failed(email, str(exc))
             tracer.fail_task(

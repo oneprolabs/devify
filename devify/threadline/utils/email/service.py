@@ -20,7 +20,6 @@ from threadline.models import (
     EmailAttachment,
     EmailMessage,
     EmailStatus,
-    Settings,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,24 +41,31 @@ class EmailSaveService:
         self._user_cache = {}
         self._mappings_loaded = False
 
-    def save_email(self, user_id: int, email_data: Dict) -> EmailMessage:
+    def save_email(
+        self, user_id: int, email_data: Dict, mailbox=None
+    ) -> EmailMessage:
         """
         Save email to database
 
         Args:
             user_id: User ID
             email_data: Parsed email data
+            mailbox: EmailMailbox that produced the message, when known.
+                Messages are deduplicated per mailbox source so the same
+                account can be shared to several spaces without duplicating
+                storage or processing.
 
         Returns:
             EmailMessage instance or None if duplicate
 
         Note:
             Uses get_or_create to handle duplicate emails gracefully.
-            If email already exists (same user_id + message_id),
+            If email already exists (same mailbox + message_id),
             returns None to skip processing.
         """
         try:
             create_data = {
+                "user_id": user_id,
                 "subject": email_data["subject"],
                 "sender": email_data["sender"],
                 "recipients": email_data["recipients"],
@@ -72,12 +78,21 @@ class EmailSaveService:
                 "references": email_data.get("references", []) or [],
                 "status": EmailStatus.FETCHED.value,
             }
+            if mailbox is not None:
+                create_data["mailbox_id"] = mailbox.pk
+                create_data["space_id"] = mailbox.space_id
 
-            # Use get_or_create to handle duplicate emails
+            # Deduplicate on the source mailbox when one is known; keep the
+            # legacy user/message key for the Haraka path and old callers.
+            lookup = {"message_id": email_data["message_id"]}
+            if mailbox is not None:
+                lookup["mailbox_id"] = mailbox.pk
+            else:
+                lookup["user_id"] = user_id
+
             email_msg, created = EmailMessage.objects.get_or_create(
-                user_id=user_id,
-                message_id=email_data["message_id"],
                 defaults=create_data,
+                **lookup,
             )
 
             if not created:

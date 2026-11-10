@@ -42,6 +42,13 @@ DEFAULT_LANGUAGE = os.getenv('DEFAULT_LANGUAGE', 'en-US')
 # - Note: Affects LLM prompt templates and processing behavior
 DEFAULT_SCENE = os.getenv('DEFAULT_SCENE', 'chat')
 
+# EMAIL_TEAM_AI_ENABLED: run merge/workflow/LLM for team-space email.
+# First release keeps team mail receive-and-read only; the pipeline is
+# skipped until space billing/quotas are decided.
+EMAIL_TEAM_AI_ENABLED = os.getenv(
+    'EMAIL_TEAM_AI_ENABLED', 'false'
+).strip().lower() in {'1', 'true', 'yes', 'on'}
+
 # ============================
 # Threadline Configuration
 # ============================

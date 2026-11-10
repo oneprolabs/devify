@@ -44,8 +44,10 @@ from .views.email_mailbox import (
     EmailMailboxTestAPIView,
     SpaceEmailSourceDetailAPIView,
     SpaceEmailSourceListAPIView,
+    SpaceEmailSourceShareAPIView,
     SpaceEmailSourceSyncAPIView,
     SpaceEmailSourceTestAPIView,
+    SpaceEmailSourceTransferAPIView,
 )
 from .views.monitoring import (
     clear_metrics_cache,
@@ -85,6 +87,16 @@ urlpatterns = [
         "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>",
         SpaceEmailSourceDetailAPIView.as_view(),
         name="space-email-source-detail",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>/shares",
+        SpaceEmailSourceShareAPIView.as_view(),
+        name="space-email-source-shares",
+    ),
+    path(
+        "spaces/<int:space_id>/email-sources/<uuid:mailbox_uuid>/transfer",
+        SpaceEmailSourceTransferAPIView.as_view(),
+        name="space-email-source-transfer",
     ),
     path(
         "spaces/<int:space_id>/emails",

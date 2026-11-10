@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -32,6 +33,13 @@ def authorized_space(user, space_id):
     return space, None
 
 
+def space_email_q(space):
+    """Messages visible through a shared mailbox or a legacy space row."""
+    return Q(mailbox__shares__space=space) | Q(
+        mailbox__isnull=True, space=space
+    )
+
+
 class SpaceEmailPagination(PageNumberPagination):
     page_size = 25
     page_size_query_param = "page_size"
@@ -46,9 +54,14 @@ class SpaceEmailListAPIView(APIView):
         space, takeover = authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        emails = EmailMessage.objects.filter(
-            space=space, merged_into__isnull=True
-        ).order_by("-received_at", "-id")
+        emails = (
+            EmailMessage.objects.filter(
+                space_email_q(space), merged_into__isnull=True
+            )
+            .select_related("mailbox")
+            .distinct()
+            .order_by("-received_at", "-id")
+        )
         paginator = SpaceEmailPagination()
         page = paginator.paginate_queryset(emails, request, view=self)
         data = SpaceEmailSerializer(page, many=True).data
@@ -86,7 +99,10 @@ class SpaceEmailDetailAPIView(APIView):
         space, takeover = authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        email = get_object_or_404(EmailMessage, space=space, uuid=email_uuid)
+        email = get_object_or_404(
+            EmailMessage.objects.filter(space_email_q(space)),
+            uuid=email_uuid,
+        )
         data = SpaceEmailDetailSerializer(email).data
         if takeover:
             audit_space_action(
@@ -104,7 +120,10 @@ class SpaceEmailDetailAPIView(APIView):
         space, takeover = authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        email = get_object_or_404(EmailMessage, space=space, uuid=email_uuid)
+        email = get_object_or_404(
+            EmailMessage.objects.filter(space_email_q(space)),
+            uuid=email_uuid,
+        )
         if space.status != Space.Status.ACTIVE:
             return Response(
                 {"detail": "Archived spaces are read-only."}, status=409

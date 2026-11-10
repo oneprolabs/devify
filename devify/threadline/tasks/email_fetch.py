@@ -11,6 +11,7 @@ import logging
 from agentcore_task.adapters.django import prevent_duplicate_task
 from celery import shared_task
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 
 from threadline.models import EmailMailbox, EmailMessage
@@ -24,6 +25,46 @@ from threadline.utils.email import (
 from threadline.utils.task_tracer import TaskTracer
 
 logger = logging.getLogger(__name__)
+
+
+def fetchable_mailboxes():
+    """Mailboxes the scheduler may poll.
+
+    Personal sources still need an active credential holder. Team sources
+    belong to the space, so they keep being fetched even when the creator was
+    deactivated or removed.
+    """
+    return (
+        EmailMailbox.objects.filter(enabled=True)
+        .filter(Q(user__is_active=True) | Q(space__kind="team"))
+        .select_related("user", "space", "created_by")
+        .order_by("user_id", "id")
+    )
+
+
+def resolve_mailbox_owner(mailbox):
+    """Return the user that owns messages received from this source."""
+    if mailbox.user_id:
+        return mailbox.user
+    if mailbox.created_by_id:
+        return mailbox.created_by
+    space = mailbox.space
+    if space is None:
+        return None
+    if space.owner_id:
+        return space.owner
+    if space.personal_owner_id:
+        return space.personal_owner
+    if space.created_by_id:
+        return space.created_by
+    membership = (
+        space.memberships.filter(
+            status="active", role__in=("owner", "maintainer")
+        )
+        .select_related("user")
+        .first()
+    )
+    return membership.user if membership else None
 
 
 def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
@@ -126,14 +167,19 @@ def imap_email_fetch():
         # Every enabled mailbox is polled, whatever else the user has
         # configured. Mailboxes and the virtual address are parallel
         # channels now, not alternatives.
-        mailboxes = (
-            EmailMailbox.objects.filter(enabled=True, user__is_active=True)
-            .select_related("user")
-            .order_by("user_id", "id")
-        )
+        mailboxes = fetchable_mailboxes()
 
         for mailbox in mailboxes:
-            user = mailbox.user
+            owner = resolve_mailbox_owner(mailbox)
+            if owner is None:
+                logger.warning(
+                    "Skipping mailbox %s: no user or space manager to own "
+                    "the messages",
+                    mailbox.pk,
+                )
+                error_count += 1
+                continue
+            user = owner
             user_display = (
                 f"{user.username} (ID: {user.id}) " f"[{mailbox.display_name}]"
             )

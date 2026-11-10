@@ -1,5 +1,9 @@
+from pathlib import Path
+
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -8,7 +12,7 @@ from rest_framework.views import APIView
 
 from spaces.models import Space, SpaceMembership, SpaceTakeover
 from spaces.services import SpacePermissionService, audit_space_action
-from threadline.models import EmailMessage
+from threadline.models import EmailAttachment, EmailMessage
 from threadline.serializers.space_email import (
     SpaceEmailDetailSerializer,
     SpaceEmailSerializer,
@@ -103,7 +107,9 @@ class SpaceEmailDetailAPIView(APIView):
             EmailMessage.objects.filter(space_email_q(space)),
             uuid=email_uuid,
         )
-        data = SpaceEmailDetailSerializer(email).data
+        data = SpaceEmailDetailSerializer(
+            email, context={"space_id": space.pk}
+        ).data
         if takeover:
             audit_space_action(
                 actor=request.user,
@@ -148,3 +154,37 @@ class SpaceEmailDetailAPIView(APIView):
         )
         email.delete()
         return Response(status=204)
+
+
+class SpaceEmailAttachmentDownloadAPIView(APIView):
+    """Download an attachment from a message visible in this space."""
+
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def get(self, request, space_id, email_uuid, attachment_uuid):
+        space, _ = authorized_space(request.user, space_id)
+        if space is None:
+            return Response({"detail": "Space not found."}, status=404)
+        email = get_object_or_404(
+            EmailMessage.objects.filter(space_email_q(space)),
+            uuid=email_uuid,
+        )
+        attachment = get_object_or_404(
+            EmailAttachment,
+            uuid=attachment_uuid,
+            email_message=email,
+        )
+        root = Path(settings.EMAIL_ATTACHMENT_DIR).resolve()
+        path = Path(attachment.file_path or "").resolve()
+        if not path.is_file() or (
+            path != root and root not in path.parents
+        ):
+            return Response(
+                {"detail": "Attachment not found."}, status=404
+            )
+        return FileResponse(
+            open(path, "rb"),
+            as_attachment=True,
+            filename=attachment.filename,
+        )

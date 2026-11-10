@@ -20,6 +20,8 @@ from threadline.services.space_email import email_ai_allowed
 from threadline.tasks.email_fetch import (
     _queue_merge_for_saved_email,
     fetch_user_imap_emails,
+    fetchable_mailboxes,
+    resolve_mailbox_owner,
 )
 from threadline.tasks.email_merge import process_email_merge
 from threadline.tasks.email_workflow import process_email_workflow
@@ -543,3 +545,113 @@ def test_fetch_user_imap_emails_passes_the_mailbox_to_save(
         owner.id, email, mailbox=mailbox
     )
     assert result["status"] == "completed"
+
+
+def test_deleting_the_creator_keeps_the_team_mailbox():
+    owner = User.objects.create_user(username="sharing-survive-owner")
+    team = make_team(owner, slug="sharing-survive-team")
+    mailbox = make_mailbox(owner, team, username="survive@example.com")
+    add_owner_share(mailbox)
+
+    owner.delete()
+
+    mailbox.refresh_from_db()
+    assert mailbox.user_id is None
+    assert mailbox.space_id == team.pk
+    assert EmailMailboxShare.objects.filter(mailbox=mailbox).exists()
+
+
+def test_fetchable_mailboxes_keeps_team_sources_when_creator_is_inactive():
+    owner = User.objects.create_user(username="sharing-fetchable-owner")
+    team = make_team(owner, slug="sharing-fetchable-team")
+    team_mailbox = make_mailbox(
+        owner, team, username="fetchable-team@example.com"
+    )
+    add_owner_share(team_mailbox)
+    owner.is_active = False
+    owner.save(update_fields=("is_active",))
+
+    personal = Space.objects.get(personal_owner=owner)
+    personal_mailbox = make_mailbox(
+        owner, personal, username="fetchable-personal@example.com"
+    )
+
+    active = User.objects.create_user(username="sharing-fetchable-active")
+    active_personal = Space.objects.get(personal_owner=active)
+    active_mailbox = make_mailbox(
+        active, active_personal, username="fetchable-active@example.com"
+    )
+
+    ids = set(fetchable_mailboxes().values_list("pk", flat=True))
+
+    assert team_mailbox.pk in ids
+    assert personal_mailbox.pk not in ids
+    assert active_mailbox.pk in ids
+
+
+def test_resolve_mailbox_owner_falls_back_to_the_space_owner():
+    owner = User.objects.create_user(username="sharing-owner-fallback")
+    team = make_team(owner, slug="sharing-owner-fallback-team")
+    mailbox = make_mailbox(owner, team, username="owner-fallback@example.com")
+    mailbox.user = None
+    mailbox.created_by = None
+    mailbox.save(update_fields=("user", "created_by"))
+
+    assert resolve_mailbox_owner(mailbox) == owner
+
+
+def test_team_attachment_downloads_through_the_space_endpoint(
+    tmp_path, settings
+):
+    settings.EMAIL_ATTACHMENT_DIR = str(tmp_path)
+    owner = User.objects.create_user(username="sharing-download-owner")
+    team = make_team(owner, slug="sharing-download-team")
+    mailbox = make_mailbox(owner, team, username="download@example.com")
+    add_owner_share(mailbox)
+    message = EmailMessage.objects.create(
+        user=owner,
+        mailbox=mailbox,
+        space=team,
+        message_id="<download@example.com>",
+        subject="Download",
+        sender="a@example.com",
+        recipients="b@example.com",
+        received_at=timezone.now(),
+    )
+    attachment_dir = tmp_path / "attachments"
+    attachment_dir.mkdir()
+    file_path = attachment_dir / "quote.pdf"
+    file_path.write_bytes(b"quote")
+    attachment = EmailAttachment.objects.create(
+        user=owner,
+        email_message=message,
+        filename="quote.pdf",
+        safe_filename="quote.pdf",
+        content_type="application/pdf",
+        file_size=5,
+        file_path=str(file_path),
+    )
+
+    download_url = reverse(
+        "space-email-attachment-download",
+        kwargs={
+            "space_id": team.pk,
+            "email_uuid": message.uuid,
+            "attachment_uuid": attachment.uuid,
+        },
+    )
+    response = client_for(owner).get(download_url)
+    detail = client_for(owner).get(
+        reverse(
+            "space-email-detail",
+            kwargs={"space_id": team.pk, "email_uuid": message.uuid},
+        )
+    )
+    outsider = User.objects.create_user(username="sharing-download-outsider")
+    outsider_response = client_for(outsider).get(download_url)
+
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content) == b"quote"
+    assert detail.status_code == 200
+    assert detail.data["data"]["attachments"][0]["download_url"]
+    assert outsider_response.status_code == 404

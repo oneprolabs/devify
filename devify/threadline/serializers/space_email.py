@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import serializers
 
 from threadline.models import EmailMessage
@@ -49,12 +50,23 @@ class SpaceEmailDetailSerializer(SpaceEmailSerializer):
         read_only_fields = fields
 
     def get_attachments(self, obj):
-        return [
-            {
+        space_id = self.context.get("space_id")
+        items = []
+        for attachment in obj.attachments.all():
+            item = {
                 "uuid": str(attachment.uuid),
                 "filename": attachment.filename,
                 "content_type": attachment.content_type,
                 "file_size": attachment.file_size,
             }
-            for attachment in obj.attachments.all()
-        ]
+            if space_id is not None:
+                item["download_url"] = reverse(
+                    "space-email-attachment-download",
+                    kwargs={
+                        "space_id": space_id,
+                        "email_uuid": obj.uuid,
+                        "attachment_uuid": attachment.uuid,
+                    },
+                )
+            items.append(item)
+        return items

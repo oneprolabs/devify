@@ -1085,7 +1085,9 @@ class EmailMailbox(models.Model):
     )
     user = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="mailboxes",
         verbose_name=_("User"),
     )
@@ -1180,7 +1182,10 @@ class EmailMailbox(models.Model):
         indexes = [models.Index(fields=["enabled"])]
 
     def __str__(self) -> str:
-        return f"{self.display_name} -> {self.user_id}"
+        owner = self.user_id or (
+            f"space:{self.space_id}" if self.space_id else "unowned"
+        )
+        return f"{self.display_name} -> {owner}"
 
     def save(self, *args, **kwargs):
         is_new = self._state.adding

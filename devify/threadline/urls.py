@@ -59,7 +59,11 @@ from .views.monitoring import (
     task_metrics,
     task_status_summary,
 )
-from .views.space_email import SpaceEmailDetailAPIView, SpaceEmailListAPIView
+from .views.space_email import (
+    SpaceEmailAttachmentDownloadAPIView,
+    SpaceEmailDetailAPIView,
+    SpaceEmailListAPIView,
+)
 
 # URL patterns for Threadline API endpoints
 urlpatterns = [
@@ -107,6 +111,12 @@ urlpatterns = [
         "spaces/<int:space_id>/emails/<uuid:email_uuid>",
         SpaceEmailDetailAPIView.as_view(),
         name="space-email-detail",
+    ),
+    path(
+        "spaces/<int:space_id>/emails/<uuid:email_uuid>/attachments/"
+        "<uuid:attachment_uuid>",
+        SpaceEmailAttachmentDownloadAPIView.as_view(),
+        name="space-email-attachment-download",
     ),
     # Settings endpoints
     path("settings", SettingsAPIView.as_view(), name="settings-list"),

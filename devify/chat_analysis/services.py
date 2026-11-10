@@ -234,6 +234,7 @@ def create_event(
     entity_key="",
 ):
     ensure_can_contribute(actor, space)
+    now = timezone.now()
     event, _ = Event.objects.get_or_create(
         space=space,
         event_key=canonical_event_key(event_key, title=title),
@@ -242,8 +243,11 @@ def create_event(
             "title": title,
             "content": content,
             "status": status,
-            "opened_at": opened_at,
-            "last_activity_at": last_activity_at,
+            # Manual events have no evidence window yet. Giving them the
+            # creation time keeps them visible in the event list and inside
+            # report periods instead of being filtered out by a NULL time.
+            "opened_at": opened_at or now,
+            "last_activity_at": last_activity_at or now,
             "entity_key": canonical_entity_key(entity_key),
         },
     )

@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 from chat_analysis.models import Event, EventNote, EventRelation, Note
 from chat_analysis.services import (
@@ -15,6 +16,23 @@ from chat_domain.models import Conversation, Message
 from spaces.models import Space, SpaceMembership
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
+
+
+def test_manual_event_gets_activity_times():
+    owner = User.objects.create_user(username="manual-event-owner")
+    space = make_space(owner, "manual-event-space")
+    before = timezone.now()
+    event = create_event(
+        actor=owner,
+        space=space,
+        event_key="manual-event",
+        title="Manual event",
+        content="Created without evidence timestamps.",
+    )
+    assert event.opened_at is not None
+    assert event.last_activity_at is not None
+    assert event.opened_at >= before
+    assert event.last_activity_at >= before
 
 
 def make_space(owner, slug="service-team"):

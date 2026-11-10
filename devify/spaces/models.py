@@ -220,7 +220,9 @@ class SpaceWorkflowConfig(models.Model):
     language = models.CharField(max_length=32, default="zh-CN")
     scene = models.CharField(max_length=80, default="chat")
     prompt_overrides = models.JSONField(default=dict, blank=True)
-    chat_analysis_preferences = models.JSONField(default=default_chat_analysis_preferences)
+    chat_analysis_preferences = models.JSONField(
+        default=default_chat_analysis_preferences
+    )
     attachment_policy = models.CharField(max_length=32, default="available")
     auto_process = models.BooleanField(default=True)
     processing_paused = models.BooleanField(default=False)

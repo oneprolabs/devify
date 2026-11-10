@@ -108,6 +108,7 @@ describe('SpaceSettings', () => {
     expect(wrapper.text()).toContain('简体中文')
     expect(wrapper.text()).toContain('v3')
     expect(wrapper.text()).toContain('个人聊天、群聊')
+    expect(wrapper.text()).toContain('未分类会话仅在两种聊天类型均选中时分析')
     expect(wrapper.text()).toContain('最近 30 天')
     expect(wrapper.text()).toContain('更粗')
     expect(wrapper.text()).toContain('简洁概述')

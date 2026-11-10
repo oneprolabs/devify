@@ -14,7 +14,10 @@ from chat_analysis.models import (
     NoteEvidence,
     ReportItemSource,
 )
-from spaces.models import SpaceWorkflowConfig, effective_chat_analysis_preferences
+from spaces.models import (
+    SpaceWorkflowConfig,
+    effective_chat_analysis_preferences,
+)
 from spaces.services import SpacePermissionService
 
 
@@ -97,6 +100,7 @@ def create_analysis_job(
     )
     cutoff_days = preferences.get("lookback_days", 0)
     snapshot = dict(specification or {})
+    snapshot["analysis_conversation_kind"] = conversation.kind
     snapshot["chat_analysis_preferences"] = preferences
     snapshot["analysis_cutoff"] = (
         (timezone.now() - timedelta(days=cutoff_days)).isoformat()

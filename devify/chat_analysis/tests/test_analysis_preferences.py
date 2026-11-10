@@ -75,6 +75,7 @@ def test_existing_events_are_shared_across_conversations(
     settings, monkeypatch
 ):
     import json
+
     from chat_analysis.models import Event, EventEvidence
 
     settings.CHAT_ANALYSIS_LLM_ENABLED = True
@@ -136,19 +137,22 @@ def test_existing_events_are_shared_across_conversations(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "selected,kind,expected",
+    "selected,kind,platform,expected",
     [
-        (["direct"], "direct", True),
-        (["direct"], "group", False),
-        (["group"], "direct", False),
-        (["group"], "group", True),
-        (["direct"], "mail", True),
-        (["group"], "mail_thread", True),
-        (["direct"], "unknown", True),
+        (["direct"], "direct", "wechat", True),
+        (["direct"], "group", "wechat", False),
+        (["group"], "direct", "wechat", False),
+        (["group"], "group", "wechat", True),
+        (["direct"], "mail", "email", True),
+        (["group"], "mail_thread", "email", True),
+        (["direct"], "unknown", "wechat", False),
+        (["group"], "unknown", "email", False),
+        (["direct", "group"], "unknown", "wechat", True),
+        (["direct", "group"], "unknown", "email", True),
     ],
 )
-def test_conversation_filter_only_applies_to_direct_and_group(
-    selected, kind, expected
+def test_conversation_filter_respects_selected_types(
+    selected, kind, platform, expected
 ):
     owner = User.objects.create_user(username="analysis-type-owner")
     space = SpaceBootstrapService.ensure_personal_space(owner)
@@ -158,7 +162,7 @@ def test_conversation_filter_only_applies_to_direct_and_group(
     )
     config.save()
     conversation = Conversation.objects.create(
-        space=space, identity_key="test:type", kind=kind
+        space=space, identity_key="test:type", kind=kind, platform=platform
     )
     message = Message.objects.create(
         conversation=conversation,
@@ -216,3 +220,66 @@ def test_explicit_request_key_stays_idempotent_across_preference_changes():
     assert second.specification == first.specification
     with pytest.raises(ChatAnalysisConflict):
         create_analysis_job(**dict(args, end_seq=2))
+
+
+@pytest.mark.django_db
+def test_legacy_job_without_preference_snapshot_keeps_unknown_behavior():
+    owner = User.objects.create_user(username="analysis-legacy-unknown-owner")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    config, _ = SpaceWorkflowConfig.objects.get_or_create(space=space)
+    config.chat_analysis_preferences = dict(
+        config.chat_analysis_preferences, conversation_types=["group"]
+    )
+    config.save()
+    conversation = Conversation.objects.create(
+        space=space, identity_key="test:legacy-unknown", kind="unknown"
+    )
+    message = Message.objects.create(
+        conversation=conversation, message_key="m1", ingest_seq=1
+    )
+    MessagePart.objects.create(
+        message=message, part_key="p", kind=MessagePart.Kind.TEXT,
+        ordinal=0, text="example",
+    )
+    job = create_analysis_job(
+        actor=owner, space=space, conversation=conversation,
+        request_key="legacy-unknown", end_seq=1, input_version="v1",
+    )
+    job.specification = {}
+    job.save(update_fields=("specification",))
+    execution.execute_analysis_job(job.pk, worker_id="legacy-unknown-test")
+    job.refresh_from_db()
+    assert job.state == AnalysisJob.State.READY
+    assert NoteEvidence.objects.filter(note__analysis_job=job).exists()
+
+
+@pytest.mark.django_db
+def test_job_fails_safely_if_conversation_kind_changes_before_execution():
+    owner = User.objects.create_user(username="analysis-kind-race-owner")
+    space = SpaceBootstrapService.ensure_personal_space(owner)
+    config, _ = SpaceWorkflowConfig.objects.get_or_create(space=space)
+    config.chat_analysis_preferences = dict(
+        config.chat_analysis_preferences, conversation_types=["group"]
+    )
+    config.save()
+    conversation = Conversation.objects.create(
+        space=space, identity_key="test:kind-race", kind="group"
+    )
+    message = Message.objects.create(
+        conversation=conversation, message_key="m1", ingest_seq=1
+    )
+    MessagePart.objects.create(
+        message=message, part_key="p", kind=MessagePart.Kind.TEXT,
+        ordinal=0, text="example",
+    )
+    job = create_analysis_job(
+        actor=owner, space=space, conversation=conversation,
+        request_key="kind-race", end_seq=1, input_version="v1",
+    )
+    assert job.specification["analysis_conversation_kind"] == "group"
+    conversation.kind = "direct"
+    conversation.save(update_fields=("kind",))
+    execution.execute_analysis_job(job.pk, worker_id="kind-race-test")
+    job.refresh_from_db()
+    assert job.state == AnalysisJob.State.FAILED
+    assert not NoteEvidence.objects.filter(note__analysis_job=job).exists()

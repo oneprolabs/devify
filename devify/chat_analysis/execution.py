@@ -448,7 +448,9 @@ def _summarize_note(note, payload, language, preferences=None):
 
 
 def _extract_events(job, note, messages, payload, language):
-    preferences = (job.specification or {}).get("chat_analysis_preferences", {})
+    preferences = (job.specification or {}).get(
+        "chat_analysis_preferences", {}
+    )
     granularity = preferences.get("event_granularity", "balanced")
     prompt = (
         "Extract ongoing matters (events) from one chunk of chat messages. "
@@ -461,19 +463,21 @@ def _extract_events(job, note, messages, payload, language):
         "messages; tags are at most five short labels such as customer, "
         f"product or incident id. Return at most {MAX_EVENTS_PER_CHUNK} "
         f"events. Write title and summary in {language}. Do not invent facts. "
-        "Do not create events for greetings, acknowledgements, jokes or isolated "
-        "comments without a substantive actionable matter. Routine personal "
-        "conversations about meals, going out, casual invitations, or short "
-        "replies are not events, even if they mention a plan, unless they "
-        "contain a consequential commitment that needs follow-up. Previous "
-        "events may include false positives: an existing matching title or key "
-        "does not justify creating or updating an event for trivial chat. "
-        "When nothing qualifies return an empty events list. A single important "
-        "decision or commitment can still be an event. Existing events may "
-        "originate in other conversations: reuse their key only when the "
-        "specific matter is clearly the same, not merely a similar topic. "
+        "Do not create events for greetings, acknowledgements, jokes or "
+        "isolated comments without a substantive actionable matter. "
+        "Routine personal conversations about meals, going out, casual "
+        "invitations, or short replies are not events, even if they mention a "
+        "plan, unless they contain a consequential commitment that needs "
+        "follow-up. Previous events may include false positives: an existing "
+        "matching title or key does not justify creating or updating an event "
+        "for trivial chat. When nothing qualifies return an empty events "
+        "list. A single important decision or commitment can still be an "
+        "event. Existing events may originate in other conversations: reuse "
+        "their key only when the specific matter is clearly the same, not "
+        "merely a similar topic. "
         f"Event granularity: {granularity}. For coarse granularity combine "
-        "related developments of the same matter rather than creating fragments. "
+        "related developments of the same matter rather than creating "
+        "fragments. "
         f"Summary style: {preferences.get('summary_style', 'concise')}; "
         f"detail: {preferences.get('summary_length', 'standard')}."
     )
@@ -558,7 +562,12 @@ def _enrich_note_with_llm(job, note, messages):
     language = _output_language(note.space)
     partial = False
     try:
-        if not _summarize_note(note, payload, language, (job.specification or {}).get("chat_analysis_preferences")):
+        if not _summarize_note(
+            note,
+            payload,
+            language,
+            (job.specification or {}).get("chat_analysis_preferences"),
+        ):
             partial = True
     except Exception:
         # An unavailable LLM is an infrastructure failure, not a data gap:
@@ -590,12 +599,29 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
 
     preferences = (job.specification or {}).get("chat_analysis_preferences")
     cutoff = (job.specification or {}).get("analysis_cutoff")
-    conversation_types = preferences.get("conversation_types", []) if preferences else []
+    conversation_types = (
+        preferences.get("conversation_types", []) if preferences else []
+    )
+    if not isinstance(conversation_types, list):
+        conversation_types = []
     kind = job.conversation.kind
+    snapshot_kind = (job.specification or {}).get("analysis_conversation_kind")
+    if snapshot_kind is not None and snapshot_kind != kind:
+        raise AnalysisJobRejected(
+            "Conversation kind changed after the analysis job was created."
+        )
+    unknown_chat_is_restricted = (
+        kind == "unknown"
+        and not all(
+            item in conversation_types for item in ("direct", "group")
+        )
+    )
     excluded = bool(
         preferences
-        and kind in ("direct", "group")
-        and kind not in conversation_types
+        and (
+            (kind in ("direct", "group") and kind not in conversation_types)
+            or unknown_chat_is_restricted
+        )
     )
     batches = job.upload_batches.all()
     while not excluded:

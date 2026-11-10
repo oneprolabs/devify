@@ -113,6 +113,7 @@ def test_conversation_type_normalization_is_safe_and_does_not_mutate(
     types, expected
 ):
     from copy import deepcopy
+
     from spaces.models import effective_chat_analysis_preferences
 
     preferences = {"conversation_types": types}

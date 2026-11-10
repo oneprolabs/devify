@@ -71,7 +71,9 @@ class SpaceWorkflowConfigSerializer(serializers.ModelSerializer):
     chat_analysis_preferences = serializers.SerializerMethodField()
 
     def get_chat_analysis_preferences(self, obj):
-        return effective_chat_analysis_preferences(obj.chat_analysis_preferences)
+        return effective_chat_analysis_preferences(
+            obj.chat_analysis_preferences
+        )
 
     class Meta:
         model = SpaceWorkflowConfig
@@ -101,9 +103,15 @@ class SpaceWorkflowConfigSerializer(serializers.ModelSerializer):
 
 
 class ChatAnalysisPreferencesSerializer(serializers.Serializer):
-    event_granularity = serializers.ChoiceField(choices=("fine", "balanced", "coarse"))
-    summary_length = serializers.ChoiceField(choices=("short", "standard", "detailed"))
-    summary_style = serializers.ChoiceField(choices=("concise", "narrative", "actions"))
+    event_granularity = serializers.ChoiceField(
+        choices=("fine", "balanced", "coarse")
+    )
+    summary_length = serializers.ChoiceField(
+        choices=("short", "standard", "detailed")
+    )
+    summary_style = serializers.ChoiceField(
+        choices=("concise", "narrative", "actions")
+    )
     conversation_types = serializers.ListField(
         child=serializers.ChoiceField(choices=("direct", "group")),
         allow_empty=False,
@@ -129,12 +137,16 @@ class SpaceWorkflowConfigUpdateSerializer(serializers.Serializer):
     language = serializers.CharField(max_length=32, required=False)
     scene = serializers.CharField(max_length=80, required=False)
     prompt_overrides = serializers.DictField(required=False)
-    chat_analysis_preferences = ChatAnalysisPreferencesSerializer(required=False)
+    chat_analysis_preferences = ChatAnalysisPreferencesSerializer(
+        required=False
+    )
 
     def validate_chat_analysis_preferences(self, value):
         required = set(ChatAnalysisPreferencesSerializer().fields)
         if set(value) != required:
-            raise serializers.ValidationError("All analysis preference fields are required.")
+            raise serializers.ValidationError(
+                "All analysis preference fields are required."
+            )
         return value
     attachment_policy = serializers.ChoiceField(
         choices=("available", "skip", "required"), required=False

@@ -44,7 +44,9 @@ def _enqueue_analysis_for_batch(batch):
     digests = batch.conversation_digests or {}
     preferences = get_analysis_preferences(batch.space)
     preference_digest = hashlib.sha256(
-        json.dumps(preferences, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        json.dumps(preferences, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
     ).hexdigest()
     conversations = Conversation.objects.filter(
         space=batch.space,
@@ -61,10 +63,9 @@ def _enqueue_analysis_for_batch(batch):
             continue
         digest = digests.get(str(conversation.pk))
         legacy_key = f"upload:{conversation.pk}:{digest}" if digest else None
+        content_key = legacy_key or f"upload:{batch.uuid}:{conversation.pk}"
         request_key = (
-            f"{legacy_key}:prefs:{preference_digest}"
-            if digest
-            else f"upload:{batch.uuid}:{conversation.pk}:prefs:{preference_digest}"
+            f"{content_key}:prefs:{preference_digest}:kind:{conversation.kind}"
         )
         try:
             existing = AnalysisJob.objects.filter(
@@ -78,12 +79,25 @@ def _enqueue_analysis_for_batch(batch):
                     snapshot = (legacy.specification or {}).get(
                         "chat_analysis_preferences"
                     )
-                    if (
+                    result = legacy.result_ref
+                    skipped = (
                         isinstance(snapshot, dict)
-                        and canonicalize_chat_analysis_preferences(snapshot) == preferences
-                    ) or (
-                        snapshot is None
-                        and preferences == default_chat_analysis_preferences()
+                        and isinstance(result, dict)
+                        and type(result.get("messages_processed")) is int
+                        and result["messages_processed"] == 0
+                    )
+                    if not skipped and (
+                        (
+                            isinstance(snapshot, dict)
+                            and canonicalize_chat_analysis_preferences(
+                                snapshot
+                            ) == preferences
+                        )
+                        or (
+                            snapshot is None
+                            and preferences
+                            == default_chat_analysis_preferences()
+                        )
                     ):
                         existing = legacy
             if existing is not None:

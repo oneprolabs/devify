@@ -187,7 +187,7 @@ const analysisRows = computed(() => {
               (type) => ({ direct: '个人聊天', group: '群聊' })[type] || type
             )
             .join('、'),
-          hint: '参与分析的聊天类型'
+          hint: '未分类会话仅在两种聊天类型均选中时分析'
         },
         {
           label: '时间范围',

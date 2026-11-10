@@ -16,6 +16,8 @@ export const spacesApi = {
     return api.get('/v1/spaces')
   },
 
+  // Team email sources are API-only in the first release. Keep these
+  // helpers for API clients, but do not wire them into a page.
   getEmailSources(spaceId) {
     return api.get(`/v1/spaces/${spaceId}/email-sources`)
   },

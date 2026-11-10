@@ -1019,7 +1019,7 @@ def test_space_email_source_connection_test_uses_space_manager_permission():
 
 
 @pytest.mark.django_db
-def test_space_email_source_sync_reports_not_started():
+def test_space_email_source_sync_uses_account_scheduler():
     owner = User.objects.create_user(username="email-sync-owner")
     space = SpaceBootstrapService.ensure_personal_space(owner)
     client = APIClient()
@@ -1038,4 +1038,4 @@ def test_space_email_source_sync_reports_not_started():
         f"/api/v1/spaces/{space.pk}/email-sources/{mailbox_uuid}/sync"
     )
     assert response.status_code == 200
-    assert response.data["data"]["status"] == "not_started"
+    assert response.data["data"]["status"] == "account_scheduler"

@@ -1,6 +1,6 @@
 """A mailbox is one globally unique source shared to one or more spaces."""
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -10,13 +10,18 @@ from rest_framework.test import APIClient
 
 from spaces.models import Space, SpaceMembership
 from threadline.models import (
+    EmailAttachment,
     EmailMailbox,
     EmailMailboxShare,
     EmailMessage,
     compute_mailbox_source_key,
 )
 from threadline.services.space_email import email_ai_allowed
-from threadline.tasks.email_fetch import _queue_merge_for_saved_email
+from threadline.tasks.email_fetch import (
+    _queue_merge_for_saved_email,
+    fetch_user_imap_emails,
+)
+from threadline.tasks.email_merge import process_email_merge
 from threadline.utils.email.service import EmailSaveService
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -350,3 +355,155 @@ def test_the_source_key_follows_the_imap_configuration():
     assert mailbox.source_key == compute_mailbox_source_key(
         "imap.example.com", 993, "key@example.com", "Archive", True
     )
+
+
+def test_team_ai_can_be_enabled_by_setting(settings):
+    owner = User.objects.create_user(username="sharing-ai-flag-owner")
+    team = make_team(owner, slug="sharing-ai-flag-team")
+    mailbox = make_mailbox(owner, team, username="ai-flag@example.com")
+    add_owner_share(mailbox)
+    message = EmailSaveService().save_email(
+        owner.id,
+        email_data("<ai-flag@example.com>"),
+        mailbox=mailbox,
+    )
+
+    settings.EMAIL_TEAM_AI_ENABLED = True
+
+    assert email_ai_allowed(message) is True
+
+
+def test_message_with_mailbox_but_no_space_uses_the_mailbox_space():
+    owner = User.objects.create_user(username="sharing-fallback-owner")
+    team = make_team(owner, slug="sharing-fallback-team")
+    mailbox = make_mailbox(owner, team, username="fallback@example.com")
+    add_owner_share(mailbox)
+
+    message = EmailMessage.objects.create(
+        user=owner,
+        mailbox=mailbox,
+        message_id="<fallback@example.com>",
+        subject="Fallback",
+        sender="a@example.com",
+        recipients="b@example.com",
+        received_at=timezone.now(),
+    )
+
+    assert message.space_id == team.pk
+
+
+def test_attachment_inherits_the_team_space():
+    owner = User.objects.create_user(username="sharing-attachment-owner")
+    team = make_team(owner, slug="sharing-attachment-team")
+    mailbox = make_mailbox(owner, team, username="attachment@example.com")
+    add_owner_share(mailbox)
+    message = EmailMessage.objects.create(
+        user=owner,
+        mailbox=mailbox,
+        space=team,
+        message_id="<attachment@example.com>",
+        subject="Attachment",
+        sender="a@example.com",
+        recipients="b@example.com",
+        received_at=timezone.now(),
+    )
+
+    attachment = EmailAttachment.objects.create(
+        user=owner,
+        email_message=message,
+        filename="quote.pdf",
+        safe_filename="quote.pdf",
+        content_type="application/pdf",
+        file_size=10,
+        file_path="/tmp/quote.pdf",
+    )
+
+    assert attachment.space_id == team.pk
+
+
+@patch(
+    "agentcore_task.adapters.django.services.lock.release_task_lock",
+    return_value=True,
+)
+@patch(
+    "agentcore_task.adapters.django.services.lock.acquire_task_lock",
+    return_value=True,
+)
+@patch(
+    "agentcore_task.adapters.django.services.lock.is_task_locked",
+    return_value=False,
+)
+@patch("threadline.tasks.email_merge.process_email_workflow.delay")
+def test_process_email_merge_skips_team_space(
+    mock_delay,
+    mock_is_locked,
+    mock_acquire_lock,
+    mock_release_lock,
+):
+    owner = User.objects.create_user(username="sharing-merge-owner")
+    team = make_team(owner, slug="sharing-merge-team")
+    mailbox = make_mailbox(owner, team, username="merge-team@example.com")
+    add_owner_share(mailbox)
+    message = EmailSaveService().save_email(
+        owner.id,
+        email_data("<merge-team@example.com>"),
+        mailbox=mailbox,
+    )
+
+    result = process_email_merge(str(message.id))
+
+    assert result == "team_ai_disabled"
+    mock_delay.assert_not_called()
+
+
+@patch(
+    "agentcore_task.adapters.django.services.lock.release_task_lock",
+    return_value=True,
+)
+@patch(
+    "agentcore_task.adapters.django.services.lock.acquire_task_lock",
+    return_value=True,
+)
+@patch(
+    "agentcore_task.adapters.django.services.lock.is_task_locked",
+    return_value=False,
+)
+@patch("threadline.tasks.email_fetch.EmailSaveService")
+@patch("threadline.tasks.email_fetch.EmailProcessor")
+def test_fetch_user_imap_emails_passes_the_mailbox_to_save(
+    mock_processor_class,
+    mock_save_service_class,
+    mock_is_locked,
+    mock_acquire_lock,
+    mock_release_lock,
+):
+    owner = User.objects.create_user(username="sharing-fetch-owner")
+    team = make_team(owner, slug="sharing-fetch-team")
+    mailbox = make_mailbox(owner, team, username="fetch-pass@example.com")
+    add_owner_share(mailbox)
+    email = email_data("<fetch-pass@example.com>")
+
+    processor = Mock()
+    processor.process_emails.return_value = [email]
+    mock_processor_class.return_value = processor
+    save_service = Mock()
+    save_service.save_email.return_value = None
+    mock_save_service_class.return_value = save_service
+
+    result = fetch_user_imap_emails(
+        owner.id,
+        {
+            "imap_config": {
+                "imap_host": "imap.example.com",
+                "imap_port": 993,
+                "username": "fetch-pass@example.com",
+                "folder": "INBOX",
+            }
+        },
+        mailbox=mailbox,
+    )
+
+    save_service.save_email.assert_called_once_with(
+        owner.id, email, mailbox=mailbox
+    )
+    assert result["status"] == "completed"

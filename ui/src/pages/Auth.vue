@@ -643,7 +643,7 @@ const validateEmail = () => {
 }
 
 const handleLogin = async () => {
-  if (!validateLogin()) {
+  if (loading.value || !validateLogin()) {
     return
   }
 
@@ -656,11 +656,10 @@ const handleLogin = async () => {
       password: formData.password
     })
 
-    router.push('/chats')
+    await router.push('/chats')
   } catch (error) {
     console.error('Login error:', error)
     errorMessage.value = t('auth.loginError')
-  } finally {
     loading.value = false
   }
 }

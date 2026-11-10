@@ -22,6 +22,7 @@ from threadline.tasks.email_fetch import (
     fetch_user_imap_emails,
 )
 from threadline.tasks.email_merge import process_email_merge
+from threadline.tasks.email_workflow import process_email_workflow
 from threadline.utils.email.service import EmailSaveService
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -454,6 +455,41 @@ def test_process_email_merge_skips_team_space(
 
     assert result == "team_ai_disabled"
     mock_delay.assert_not_called()
+
+
+@patch(
+    "agentcore_task.adapters.django.services.lock.release_task_lock",
+    return_value=True,
+)
+@patch(
+    "agentcore_task.adapters.django.services.lock.acquire_task_lock",
+    return_value=True,
+)
+@patch(
+    "agentcore_task.adapters.django.services.lock.is_task_locked",
+    return_value=False,
+)
+@patch("threadline.tasks.email_workflow.execute_email_processing_workflow")
+def test_process_email_workflow_skips_team_space(
+    mock_execute,
+    mock_is_locked,
+    mock_acquire_lock,
+    mock_release_lock,
+):
+    owner = User.objects.create_user(username="sharing-workflow-owner")
+    team = make_team(owner, slug="sharing-workflow-team")
+    mailbox = make_mailbox(owner, team, username="workflow@example.com")
+    add_owner_share(mailbox)
+    message = EmailSaveService().save_email(
+        owner.id,
+        email_data("<workflow@example.com>"),
+        mailbox=mailbox,
+    )
+
+    result = process_email_workflow(str(message.id))
+
+    assert result == str(message.id)
+    mock_execute.assert_not_called()
 
 
 @patch(

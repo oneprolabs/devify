@@ -6,6 +6,7 @@ from celery import shared_task
 
 from chat_analysis.execution import execute_analysis_job
 from chat_analysis.task_status import sweep_stale_tasks
+from chat_analysis.topic_scheduler import run_due_topic_reports
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,12 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
 def dispatch_analysis_job(job):
     """Queue the job without blocking the request."""
     return execute_analysis_job_task.delay(job.pk)
+
+
+@shared_task(bind=True, max_retries=0)
+def run_due_topic_reports_task(self):
+    """Create reports for topic subscriptions whose time has arrived."""
+    return run_due_topic_reports()
 
 
 @shared_task(bind=True, max_retries=0)

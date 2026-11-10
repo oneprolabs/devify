@@ -13,3 +13,8 @@ def register_periodic_tasks():
         task="chat_analysis.tasks.sweep_stale_async_tasks",
         schedule=crontab(minute="*/5"),
     )
+    TASK_REGISTRY.add(
+        name="chat-analysis-run-due-topic-reports",
+        task="chat_analysis.tasks.run_due_topic_reports_task",
+        schedule=crontab(minute="*"),
+    )

@@ -1,12 +1,15 @@
 """Topic and question-answer services over space-scoped analysis data."""
 
 import json
+import re
+from datetime import timedelta
 
 from django.conf import settings
 from django.db.models import Q
+from django.utils import timezone
 
 from chat_analysis.models import Event, Note
-from chat_domain.models import Message
+from chat_domain.models import Conversation, Message
 from core.tracking import LLMTracker
 from spaces.services import SpacePermissionService
 
@@ -14,9 +17,38 @@ QUESTION_PROMPT = """You answer questions about a user's imported
 conversation analysis.
 Use only the supplied records. If the records do not establish an answer, say
 so clearly; do not invent people, dates, decisions, or commitments.
+Records were preselected from conversations or time windows named in the
+question; records.scope describes that selection.
 Return JSON with exactly: answer (string), citations (array of objects with
 kind, id, title, and excerpt). Cite only supplied event, note, or message IDs.
 """
+
+# Shortest conversation title matched against question text; one-character
+# titles would match almost every question.
+MIN_TITLE_MATCH_CHARS = 2
+CHINESE_NUMBERS = {
+    "一": 1,
+    "两": 2,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+}
+RECENT_PREFIX = r"(?:近|最近|过去)"
+RECENT_DAYS = re.compile(
+    RECENT_PREFIX + r"\s*(\d+|[一两二三四五六七八九十])\s*(?:天|日)"
+)
+RECENT_WEEK = re.compile(RECENT_PREFIX + r"\s*(?:一|1)?\s*(?:个)?(?:周|星期)")
+RECENT_MONTH = re.compile(RECENT_PREFIX + r"\s*(?:一|1)?\s*个?月")
+THIS_WEEK = re.compile(r"本周|这周|这一周|这个星期|本星期")
+THIS_MONTH = re.compile(r"本月|这个月")
+TODAY = re.compile(r"今天|今日")
+YESTERDAY = re.compile(r"昨天|昨日")
 
 
 # Character budget for the records sent to the question model. Auto-generated
@@ -34,6 +66,54 @@ EVENT_BUDGET_SHARE = 0.30
 
 def _ids(value):
     return {int(item) for item in value or []}
+
+
+def _match_key(text):
+    """Keep letters and digits only so emoji and spacing do not block it."""
+    return "".join(char for char in (text or "").casefold() if char.isalnum())
+
+
+def conversations_named_in(space, question):
+    """Return ids of space conversations whose title appears in question."""
+    needle = _match_key(question)
+    if not needle:
+        return set()
+    titles = (
+        Conversation.objects.filter(space=space)
+        .exclude(title="")
+        .values_list("id", "title")
+    )
+    return {
+        pk
+        for pk, title in titles
+        if len(_match_key(title)) >= MIN_TITLE_MATCH_CHARS
+        and _match_key(title) in needle
+    }
+
+
+def question_since(question, now=None):
+    """Return the start of a time window named in the question, if any."""
+    text = question or ""
+    now = timezone.localtime(now or timezone.now())
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    days = RECENT_DAYS.search(text)
+    if days:
+        value = days.group(1)
+        count = int(value) if value.isdigit() else CHINESE_NUMBERS[value]
+        return now - timedelta(days=count)
+    if TODAY.search(text):
+        return today
+    if YESTERDAY.search(text):
+        return today - timedelta(days=1)
+    if THIS_WEEK.search(text):
+        return today - timedelta(days=today.weekday())
+    if RECENT_WEEK.search(text):
+        return now - timedelta(days=7)
+    if THIS_MONTH.search(text):
+        return today.replace(day=1)
+    if RECENT_MONTH.search(text):
+        return now - timedelta(days=30)
+    return None
 
 
 def _context_limits():
@@ -83,6 +163,7 @@ def question_context(
     conversation_ids=None,
     tag_keys=None,
     keywords=None,
+    since=None,
 ):
     event_ids = _ids(event_ids)
     note_ids = _ids(note_ids)
@@ -116,15 +197,23 @@ def question_context(
             )
         events = events.filter(event_query)
         notes = notes.filter(note_query)
-    if (
-        not event_ids
-        and not note_ids
-        and not conversation_ids
-        and not tag_keys
-        and not keywords
-    ):
-        events = events.order_by("-last_activity_at", "-id")
-        notes = notes.order_by("-start_at", "-id")
+    if since:
+        events = events.filter(
+            Q(last_activity_at__gte=since)
+            | Q(last_activity_at__isnull=True, created_at__gte=since)
+        )
+        notes = notes.filter(
+            Q(end_at__gte=since)
+            | Q(end_at__isnull=True, start_at__gte=since)
+            | Q(
+                end_at__isnull=True,
+                start_at__isnull=True,
+                created_at__gte=since,
+            )
+        )
+    # Order before slicing so filtered questions also keep the newest rows.
+    events = events.order_by("-last_activity_at", "-id")
+    notes = notes.order_by("-start_at", "-id")
     event_rows = list(events[:101])
     note_rows = list(notes[:101])
     rows_truncated = len(event_rows) > 100 or len(note_rows) > 100
@@ -165,6 +254,8 @@ def question_context(
         messages = messages.filter(
             chat_note_evidence__note_id__in=allowed_note_ids
         ).distinct()
+    if since:
+        messages = messages.filter(occurred_at__gte=since)
     message_rows = list(messages.order_by("-occurred_at", "-id")[:101])
     rows_truncated = rows_truncated or len(message_rows) > 100
     message_rows = message_rows[:100]
@@ -207,6 +298,7 @@ def question_context(
                 {message["conversation_id"] for message in selected_messages}
                 | conversation_ids
             ),
+            "since": since.isoformat() if since else None,
             "context_truncated": rows_truncated
             or notes_truncated
             or events_truncated
@@ -228,6 +320,8 @@ def answer_question(
 ):
     if not SpacePermissionService.can_read(actor, space):
         raise PermissionError("Space is not visible to this user.")
+    if not event_ids and not note_ids and not conversation_ids:
+        conversation_ids = conversations_named_in(space, question)
     context = question_context(
         space=space,
         event_ids=event_ids,
@@ -235,6 +329,7 @@ def answer_question(
         conversation_ids=conversation_ids,
         tag_keys=tag_keys,
         keywords=keywords,
+        since=question_since(question),
     )
     output, usage = LLMTracker.call_and_track(
         prompt=QUESTION_PROMPT,

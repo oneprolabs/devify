@@ -1,9 +1,24 @@
 """Asynchronous grounded question answering."""
 
+import logging
+
 from celery import shared_task
 
 from chat_analysis.models import QuestionAnswer
 from chat_analysis.topic_services import answer_question
+
+logger = logging.getLogger(__name__)
+
+MODEL_FAILURE_MESSAGE = (
+    "The answer model request failed. Please try again later."
+)
+
+
+def _failure_message(error):
+    """Hide provider error dumps from users; they stay in the worker log."""
+    if type(error).__module__.split(".")[0] in {"litellm", "openai"}:
+        return MODEL_FAILURE_MESSAGE
+    return str(error)[:2000]
 
 
 @shared_task(bind=True, max_retries=0)
@@ -21,8 +36,9 @@ def answer_question_task(self, question_id):
             **question.scope,
         )
     except Exception as error:
+        logger.exception("Question %s failed", question.pk)
         question.status = QuestionAnswer.Status.FAILED
-        question.error = str(error)[:2000]
+        question.error = _failure_message(error)
         question.save(update_fields=("status", "error", "updated_at"))
         return {"question_id": question.pk, "status": question.status}
     question.answer = result["answer"]

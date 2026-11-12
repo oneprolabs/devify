@@ -1,4 +1,5 @@
-from datetime import timedelta
+import json
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -14,6 +15,11 @@ from chat_analysis.models import (
     EventTagAssignment,
     Note,
     NoteEvidence,
+    QuestionAnswer,
+)
+from chat_analysis.question_tasks import (
+    MODEL_FAILURE_MESSAGE,
+    answer_question_task,
 )
 from chat_analysis.topic_services import answer_question, question_context
 from chat_domain.models import Conversation, Message, MessagePart
@@ -678,3 +684,184 @@ def test_question_context_skips_messages_withdrawn_by_their_uploader():
     message_ids = {item["id"] for item in context["messages"]}
     assert kept.pk in message_ids
     assert dropped.pk not in message_ids
+
+
+def make_conversation(space, key, title, **extra):
+    return Conversation.objects.create(
+        space=space,
+        platform=Conversation.Platform.WECHAT,
+        source_namespace="test",
+        source_conversation_id=key,
+        identity_key=f"wechat:test:{key}-{space.pk}",
+        title=title,
+        **extra,
+    )
+
+
+def make_message(conversation, key, text, occurred_at=None):
+    message = Message.objects.create(
+        conversation=conversation,
+        message_key=key,
+        ingest_seq=Message.objects.filter(conversation=conversation).count()
+        + 1,
+        sender_name="Alice",
+        occurred_at=occurred_at,
+    )
+    MessagePart.objects.create(
+        message=message,
+        part_key=f"{key}-part",
+        kind=MessagePart.Kind.TEXT,
+        text=text,
+    )
+    return message
+
+
+def test_conversations_named_in_matches_titles_in_question():
+    owner = User.objects.create_user(username="named-owner")
+    space = make_space(owner, "named-team")
+    other_space = make_space(owner, "named-other-team")
+    wang = make_conversation(space, "wang", "王欣")
+    team = make_conversation(space, "team", "🌟 BJ Dev Team 🌙")
+    make_conversation(space, "short", "张")
+    make_conversation(other_space, "other-wang", "王欣")
+
+    assert topic_services.conversations_named_in(
+        space, "我跟王欣的聊天记录总结一下"
+    ) == {wang.pk}
+    assert topic_services.conversations_named_in(
+        space, "bj dev team 最近在讨论什么？"
+    ) == {team.pk}
+    assert (
+        topic_services.conversations_named_in(space, "张三说了什么") == set()
+    )
+
+
+def test_answer_question_scopes_to_named_conversation():
+    owner = User.objects.create_user(username="named-answer-owner")
+    space = make_space(owner, "named-answer-team")
+    wang = make_conversation(space, "wang", "王欣")
+    other = make_conversation(space, "other", "项目群")
+    wang_message = make_message(wang, "wang-1", "周五前交付方案")
+    for index in range(120):
+        make_message(other, f"other-{index}", "无关讨论")
+
+    with patch(
+        "chat_analysis.topic_services.LLMTracker.call_and_track",
+        return_value=({"answer": "王欣要求周五前交付。"}, {}),
+    ) as call:
+        result = answer_question(
+            actor=owner, space=space, question="总结一下我和王欣的聊天"
+        )
+
+    records = json.loads(call.call_args.kwargs["content"])["records"]
+    assert [item["id"] for item in records["messages"]] == [wang_message.pk]
+    assert result["scope"]["conversation_ids"] == [wang.pk]
+
+
+def test_explicit_scope_is_not_replaced_by_named_conversation():
+    owner = User.objects.create_user(username="named-explicit-owner")
+    space = make_space(owner, "named-explicit-team")
+    make_conversation(space, "wang", "王欣")
+    other = make_conversation(space, "other", "项目群")
+    other_message = make_message(other, "other-1", "项目进度")
+
+    with patch(
+        "chat_analysis.topic_services.LLMTracker.call_and_track",
+        return_value=({"answer": "项目在推进。"}, {}),
+    ) as call:
+        result = answer_question(
+            actor=owner,
+            space=space,
+            question="王欣在项目群说了什么？",
+            conversation_ids=[other.pk],
+        )
+
+    records = json.loads(call.call_args.kwargs["content"])["records"]
+    assert [item["id"] for item in records["messages"]] == [other_message.pk]
+    assert result["scope"]["conversation_ids"] == [other.pk]
+
+
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        ("今天有什么新消息", datetime(2026, 11, 11, 0, 0)),
+        ("昨天聊了什么", datetime(2026, 11, 10, 0, 0)),
+        ("近3天的待办", datetime(2026, 11, 8, 15, 30)),
+        ("最近三天的待办", datetime(2026, 11, 8, 15, 30)),
+        ("最近一周有哪些风险", datetime(2026, 11, 4, 15, 30)),
+        ("本周进展", datetime(2026, 11, 9, 0, 0)),
+        ("这个月的报价", datetime(2026, 11, 1, 0, 0)),
+        ("近一个月的客户反馈", datetime(2026, 10, 12, 15, 30)),
+        ("最近有哪些事情需要我跟进？", None),
+    ],
+)
+def test_question_since_reads_time_words(question, expected):
+    zone = timezone.get_default_timezone()
+    now = timezone.make_aware(datetime(2026, 11, 11, 15, 30), zone)
+    since = topic_services.question_since(question, now=now)
+    if expected is None:
+        assert since is None
+    else:
+        assert since == timezone.make_aware(expected, zone)
+
+
+def test_question_context_filters_by_since():
+    owner = User.objects.create_user(username="since-owner")
+    space = make_space(owner, "since-team")
+    conversation = make_conversation(space, "since", "客户群")
+    now = timezone.now()
+    recent = make_message(conversation, "recent", "今天确认", occurred_at=now)
+    make_message(
+        conversation,
+        "old",
+        "上个月的内容",
+        occurred_at=now - timedelta(days=40),
+    )
+    recent_event = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="recent-event",
+        title="新事件",
+        content="今天",
+        status=Event.Status.OPEN,
+        last_activity_at=now,
+    )
+    Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="old-event",
+        title="旧事件",
+        content="上个月",
+        status=Event.Status.OPEN,
+        last_activity_at=now - timedelta(days=40),
+    )
+
+    context = question_context(space=space, since=now - timedelta(days=7))
+
+    assert [item["id"] for item in context["events"]] == [recent_event.pk]
+    assert [item["id"] for item in context["messages"]] == [recent.pk]
+    assert context["scope"]["since"] is not None
+
+
+def test_question_task_hides_provider_error_dump():
+    owner = User.objects.create_user(username="question-error-owner")
+    space = make_space(owner, "question-error-team")
+    question = QuestionAnswer.objects.create(
+        space=space,
+        created_by=owner,
+        question="最近有哪些事情需要我跟进？",
+        scope={},
+    )
+    error_type = type(
+        "BadRequestError", (Exception,), {"__module__": "litellm.exceptions"}
+    )
+
+    with patch(
+        "chat_analysis.question_tasks.answer_question",
+        side_effect=error_type("OpenAIException - Invalid request"),
+    ):
+        answer_question_task.run(question.pk)
+
+    question.refresh_from_db()
+    assert question.status == QuestionAnswer.Status.FAILED
+    assert question.error == MODEL_FAILURE_MESSAGE

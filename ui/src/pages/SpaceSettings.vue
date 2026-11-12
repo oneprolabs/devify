@@ -25,7 +25,15 @@
                   devices.length
                 }}</span>
               </h2>
-              <p>在客户端登录这个账号即自动绑定。</p>
+              <p>
+                在客户端登录这个账号即自动绑定。
+                <a
+                  href="https://github.com/oneprolabs/devify-desktop-releases/releases/tag/alpha"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >下载客户端（Mac M 系列芯片）</a
+                >
+              </p>
             </div>
             <div class="ws-listcard">
               <div v-if="loading && !devices.length" class="ws-state">

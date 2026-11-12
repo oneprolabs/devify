@@ -86,7 +86,8 @@ def test_existing_events_are_shared_across_conversations(
 
     def llm(*, prompt, content, json_mode, node_name, state):
         if node_name == "chat_event_extraction":
-            seen.append((prompt, json.loads(content)["existing_events"]))
+            payload = json.loads(content)
+            seen.append((prompt, payload["cross_candidates"]))
             return {
                 "events": [
                     {
@@ -131,8 +132,8 @@ def test_existing_events_are_shared_across_conversations(
     assert Event.objects.filter(space=space).count() == 1
     assert EventEvidence.objects.filter(event__space=space).count() == 2
     assert seen[1][1][0]["event_key"] == "project-a"
-    assert "other conversations" in seen[1][0]
-    assert "acknowledgements" in seen[1][0]
+    assert "cross_candidates" in seen[1][0]
+    assert "trackable matter" in seen[1][0]
 
 
 @pytest.mark.django_db

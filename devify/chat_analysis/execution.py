@@ -20,6 +20,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from chat_analysis.keys import canonical_event_key, slugify_key
 from chat_analysis.models import AnalysisJob, Event, EventSuggestion, Note
 from chat_analysis.services import (
     ChatAnalysisError,
@@ -45,6 +46,7 @@ ANALYSIS_CHUNK_SIZE = 200
 ENGINE_VERSION = "chat-analysis.v2"
 MAX_EVENTS_PER_CHUNK = 8
 EXISTING_EVENT_CONTEXT_LIMIT = 40
+CROSS_CANDIDATE_LIMIT = 12
 DEFAULT_OUTPUT_LANGUAGE = "zh-CN"
 MODULE_LOADED_AT = time.time()
 MODULE_PATH = os.path.abspath(__file__)
@@ -382,28 +384,233 @@ def _message_payload(messages):
                 else None
             ),
             "text": " / ".join(_message_texts(message)),
+            "reply_to_seq": (
+                message.reply_to.ingest_seq
+                if message.reply_to_id
+                else None
+            ),
         }
         for message in messages
     ]
 
 
-def _existing_event_context(space):
-    events = Event.objects.filter(space=space).order_by(
-        "-last_activity_at", "-id"
-    )[:EXISTING_EVENT_CONTEXT_LIMIT]
-    return [
-        {
-            "event_key": event.event_key,
-            "title": event.title,
-            "entity": event.entity_key,
-            "last_activity_at": (
-                event.last_activity_at.isoformat()
-                if event.last_activity_at
-                else None
-            ),
-        }
-        for event in events
-    ]
+def _message_people(messages):
+    people = set()
+    for message in messages:
+        for value in (message.sender_name, message.sender_key):
+            key = slugify_key(value)
+            if key:
+                people.add(key)
+    return people
+
+
+def _text_overlaps(left, right):
+    left_key = slugify_key(left)
+    right_key = slugify_key(right)
+    if len(left_key) < 2 or len(right_key) < 2:
+        return False
+    return left_key in right_key or right_key in left_key
+
+
+def _chunk_text(messages):
+    return " ".join(
+        " ".join(_message_texts(message)) for message in messages
+    )
+
+
+def _event_overlaps_chunk(event, messages):
+    """True when person, title or entity overlaps this chunk."""
+    chunk_text = _chunk_text(messages)
+    if event.entity_key and _text_overlaps(event.entity_key, chunk_text):
+        return True
+    if event.title and _text_overlaps(event.title, chunk_text):
+        return True
+    chunk_people = _message_people(messages)
+    evidence_people = set()
+    for link in event.evidence.all():
+        evidence_people |= _message_people([link.message])
+    return bool(chunk_people & evidence_people)
+
+
+def _event_prompt_item(event, conversation_title):
+    return {
+        "event_key": event.event_key,
+        "title": event.title,
+        "summary": event.content,
+        "status": event.status or Event.Status.OPEN,
+        "entity": event.entity_key,
+        "conversation_title": conversation_title,
+    }
+
+
+def _unfinished_event_qs(space):
+    return (
+        Event.objects.filter(space=space)
+        .exclude(status=Event.Status.DONE)
+        .prefetch_related("evidence__message__conversation")
+        .order_by("-last_activity_at", "-id")
+    )
+
+
+def _open_events_same_conversation(space, conversation):
+    title = conversation.title or conversation.identity_key
+    events = (
+        _unfinished_event_qs(space)
+        .filter(evidence__message__conversation_id=conversation.pk)
+        .distinct()[:EXISTING_EVENT_CONTEXT_LIMIT]
+    )
+    return [_event_prompt_item(event, title) for event in events]
+
+
+def _other_conversation_title(event, conversation_id):
+    for link in event.evidence.all():
+        other = link.message.conversation
+        if other.pk != conversation_id:
+            return other.title or other.identity_key
+    return ""
+
+
+def _cross_candidates(space, conversation, messages):
+    events = (
+        _unfinished_event_qs(space)
+        .exclude(evidence__message__conversation_id=conversation.pk)
+        .distinct()[:EXISTING_EVENT_CONTEXT_LIMIT]
+    )
+    selected = []
+    for event in events:
+        if not _event_overlaps_chunk(event, messages):
+            continue
+        selected.append(
+            _event_prompt_item(
+                event,
+                _other_conversation_title(event, conversation.pk),
+            )
+        )
+        if len(selected) >= CROSS_CANDIDATE_LIMIT:
+            break
+    return selected
+
+
+def _cited_messages(event, by_seq):
+    """Resolve cited seqs from sources or legacy source_seqs."""
+    source_messages = []
+    roles = []
+    sources = event.get("sources")
+    if isinstance(sources, list) and sources:
+        for item in sources:
+            if not isinstance(item, dict):
+                continue
+            try:
+                seq = int(item.get("seq"))
+            except (TypeError, ValueError):
+                continue
+            message = by_seq.get(seq)
+            if message is None:
+                continue
+            source_messages.append(message)
+            role = str(item.get("role") or "matter").strip().lower()
+            roles.append(role or "matter")
+        return source_messages, roles
+    for value in event.get("source_seqs") or []:
+        try:
+            seq = int(value)
+        except (TypeError, ValueError):
+            continue
+        message = by_seq.get(seq)
+        if message is None:
+            continue
+        source_messages.append(message)
+        roles.append("matter")
+    return source_messages, roles
+
+
+def _reject_pending_false_positive(*, actor, space, event_key):
+    """Reject pending suggestions that never became Events."""
+    canonical_key = canonical_event_key(event_key)
+    if not canonical_key:
+        return
+    pending = EventSuggestion.objects.filter(
+        space=space,
+        event_key=canonical_key,
+        status=EventSuggestion.Status.PENDING,
+        event__isnull=True,
+    )
+    for suggestion in pending:
+        review_event_suggestion(
+            actor=actor,
+            suggestion=suggestion,
+            decision=EventSuggestion.Status.REJECTED,
+        )
+
+
+def _event_extraction_prompt(language, preferences):
+    """Ask the model to judge create, attach or drop for one chat chunk."""
+    granularity = preferences.get("event_granularity", "balanced")
+    style = preferences.get("summary_style", "concise")
+    length = preferences.get("summary_length", "standard")
+    return (
+        "Judge trackable matters in one conversation chunk, fold them into "
+        "existing events when they are the same matter, and name the source "
+        "chat for every message you use. Return JSON: "
+        '{"events":[{"action":"create"|"attach"|"drop","event_key":"",'
+        '"title":"","summary":"","status":"open"|"in_progress"|"done",'
+        '"entity":"","tags":[],"sources":[{"seq":0,"conversation_title":"",'
+        '"role":"matter"|"confirmation"}],"cross_decision":"same"|"related"'
+        '|"separate"|null,"reason":""}]}. '
+        "Input fields: conversation_title; messages with seq, sender, time, "
+        "text, reply_to_seq; open_events_same_conversation; "
+        "cross_candidates. reply_to_seq is the quoted message when WeChat "
+        "has one, otherwise null. open_events_same_conversation are "
+        "unfinished events from this same chat. cross_candidates are "
+        "unfinished events from other chats that already share a person or "
+        "a concrete subject with this chunk. Do not treat that list as the "
+        "whole space. If a candidate is not in the list, do not merge with "
+        "it. "
+        "A trackable matter is an assignment, a reminder that expects "
+        "action, a decision, a commitment, a deadline, or a follow-up "
+        "someone still owes. Greetings, jokes, small talk, meals, casual "
+        "invitations, and short replies that confirm nothing are not "
+        'events. If this chunk has no trackable matter, return {"events":'
+        "[]}. If an existing event is only trivial chat and these messages "
+        "do not continue a real matter, emit action drop with that "
+        "event_key so a rerun can remove it. "
+        'A message whose text is only "1", "收到", "好的", "ok", "嗯" or '
+        '"知道了" is a confirmation, never a new event. If reply_to_seq is '
+        "set, the confirmation belongs to the matter of that quoted "
+        "message. If reply_to_seq is null, attach it to the latest "
+        "unfinished matter in this conversation that was directed at the "
+        "sender. Later messages from other people do not break the link. "
+        "If several unfinished matters fit and none is clearly the target, "
+        "or none fits, ignore the reply. "
+        "Same conversation: action attach when the candidate continues an "
+        "event in open_events_same_conversation, or a confirmation "
+        "resolves one. Set event_key to that event. Rewrite summary so it "
+        "includes who confirmed and what remains. Set status to "
+        "in_progress if work remains, or done if this message closes it. "
+        "action create only when no open event in this conversation is the "
+        "same matter. Leave event_key empty. A similar topic is not the "
+        "same matter. "
+        "Cross conversation, only for action create, and only against "
+        "cross_candidates: cross_decision same only when both sides are "
+        "the same specific assignment, decision or commitment. Set "
+        "event_key to that candidate and change action to attach. related "
+        "when the topic is similar but it is not the same instance. Words "
+        'such as "报价" or "周末" are not enough. Leave event_key empty '
+        "and keep action create. separate when they are different "
+        "matters. If several candidates could be same and one is not "
+        "clearly right, return related. For action attach or drop, set "
+        "cross_decision to null. "
+        "sources lists every message that supports the event, including "
+        "the confirmation. conversation_title is the group or chat name, "
+        "not a numeric id. role is matter or confirmation. status is "
+        "open, in_progress or done. tags are at most five short labels. "
+        f"Return at most {MAX_EVENTS_PER_CHUNK} events. Do not invent "
+        f"facts. Write title, summary and reason in {language}. "
+        f"Event granularity: {granularity}. For coarse granularity combine "
+        "related developments of the same matter rather than creating "
+        "fragments. "
+        f"Summary style: {style}; detail: {length}."
+    )
 
 
 def _call_json(*, prompt, content, node_name):
@@ -451,40 +658,26 @@ def _extract_events(job, note, messages, payload, language):
     preferences = (job.specification or {}).get(
         "chat_analysis_preferences", {}
     )
-    granularity = preferences.get("event_granularity", "balanced")
-    prompt = (
-        "Extract ongoing matters (events) from one chunk of chat messages. "
-        'Return JSON: {"events": [...]}. Each event must have event_key, '
-        "entity, title, summary, status, source_seqs and tags. "
-        "Rules: one event per ongoing matter; merge messages about the same "
-        "matter into a single event; reuse the event_key of an existing "
-        "event when the matter continues it; status is one of open, "
-        "in_progress, done; source_seqs must be seq numbers from the given "
-        "messages; tags are at most five short labels such as customer, "
-        f"product or incident id. Return at most {MAX_EVENTS_PER_CHUNK} "
-        f"events. Write title and summary in {language}. Do not invent facts. "
-        "Do not create events for greetings, acknowledgements, jokes or "
-        "isolated comments without a substantive actionable matter. "
-        "Routine personal conversations about meals, going out, casual "
-        "invitations, or short replies are not events, even if they mention a "
-        "plan, unless they contain a consequential commitment that needs "
-        "follow-up. Previous events may include false positives: an existing "
-        "matching title or key does not justify creating or updating an event "
-        "for trivial chat. When nothing qualifies return an empty events "
-        "list. A single important decision or commitment can still be an "
-        "event. Existing events may originate in other conversations: reuse "
-        "their key only when the specific matter is clearly the same, not "
-        "merely a similar topic. "
-        f"Event granularity: {granularity}. For coarse granularity combine "
-        "related developments of the same matter rather than creating "
-        "fragments. "
-        f"Summary style: {preferences.get('summary_style', 'concise')}; "
-        f"detail: {preferences.get('summary_length', 'standard')}."
+    conversation = job.conversation
+    conversation_title = (
+        conversation.title or conversation.identity_key
     )
+    prompt = _event_extraction_prompt(language, preferences)
     content = json.dumps(
         {
+            "conversation_title": conversation_title,
             "messages": payload,
-            "existing_events": _existing_event_context(note.space),
+            "open_events_same_conversation": (
+                _open_events_same_conversation(
+                    note.space,
+                    conversation,
+                )
+            ),
+            "cross_candidates": _cross_candidates(
+                note.space,
+                conversation,
+                messages,
+            ),
         },
         ensure_ascii=False,
     )
@@ -502,6 +695,18 @@ def _extract_events(job, note, messages, payload, language):
     for index, event in enumerate(events[:MAX_EVENTS_PER_CHUNK]):
         if not isinstance(event, dict):
             continue
+        action = str(event.get("action") or "create").strip().lower()
+        if action not in ("create", "attach", "drop"):
+            action = "create"
+        if action == "drop":
+            key = str(event.get("event_key") or "").strip()
+            if key:
+                _reject_pending_false_positive(
+                    actor=job.created_by,
+                    space=note.space,
+                    event_key=key,
+                )
+            continue
         title = str(event.get("title") or "").strip()
         summary = str(event.get("summary") or "").strip()
         if not title or not summary:
@@ -509,19 +714,17 @@ def _extract_events(job, note, messages, payload, language):
         status = str(event.get("status") or "").strip().lower()
         if status not in Event.Status.values:
             status = Event.Status.OPEN
+        source_messages, roles = _cited_messages(event, by_seq)
+        confirmation_only = bool(roles) and all(
+            role == "confirmation" for role in roles
+        )
+        if status == Event.Status.DONE and confirmation_only:
+            status = Event.Status.IN_PROGRESS
         tags = [
             str(tag).strip()
             for tag in (event.get("tags") or [])
             if str(tag).strip()
         ][:5]
-        source_messages = []
-        for value in event.get("source_seqs") or []:
-            try:
-                seq = int(value)
-            except (TypeError, ValueError):
-                continue
-            if seq in by_seq:
-                source_messages.append(by_seq[seq])
         event_key = str(
             event.get("event_key")
             or f"{job.uuid}:event:{messages[0].ingest_seq}:{index}"
@@ -536,7 +739,9 @@ def _extract_events(job, note, messages, payload, language):
             summary=summary,
             status=status,
             tags=tags,
-            source_seqs=[message.ingest_seq for message in source_messages],
+            source_seqs=[
+                message.ingest_seq for message in source_messages
+            ],
         )
         if getattr(settings, "CHAT_ANALYSIS_AUTO_CREATE_EVENTS", False):
             suggestion = review_event_suggestion(
@@ -638,9 +843,9 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
                 origins__upload_item__batch__in=batches
             ).distinct()
         messages = list(
-            query.prefetch_related("parts").order_by("ingest_seq")[
-                :ANALYSIS_CHUNK_SIZE
-            ]
+            query.select_related("reply_to")
+            .prefetch_related("parts")
+            .order_by("ingest_seq")[:ANALYSIS_CHUNK_SIZE]
         )
         if not messages:
             break

@@ -233,6 +233,29 @@ describe('SpaceChats', () => {
     expect(image.exists()).toBe(true)
   })
 
+  it('shows playable voice directly and preserves transcript text', async () => {
+    spacesApi.getMessages.mockResolvedValue({
+      data: {
+        data: {
+          list: [
+            {
+              ...message,
+              preview: '[语音] 明天下午开会',
+              media: [
+                { id: 12, kind: 'audio', media_url: '/v1/spaces/3/media/12' }
+              ]
+            }
+          ],
+          pagination: { page: 1 }
+        }
+      }
+    })
+    const wrapper = await mountPage()
+    expect(wrapper.find('[aria-label="播放语音"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('明天下午开会')
+    expect(spacesApi.getMessage).not.toHaveBeenCalled()
+  })
+
   it('renders an uploaded image inline instead of the placeholder', async () => {
     spacesApi.getMessages.mockResolvedValue({
       data: {
@@ -261,6 +284,12 @@ describe('SpaceChats', () => {
     expect(image.exists()).toBe(true)
     expect(image.attributes('src')).toBe('blob:media')
     expect(wrapper.find('.bub').exists()).toBe(false)
+    await image.trigger('click')
+    expect(wrapper.find('[role="dialog"] img').attributes('src')).toBe(
+      'blob:media'
+    )
+    await wrapper.find('[aria-label="关闭图片预览"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
 
   it('keeps an honest empty state for the chat summary', async () => {

@@ -9,9 +9,7 @@ from chat_analysis.topic_services import answer_question
 
 logger = logging.getLogger(__name__)
 
-MODEL_FAILURE_MESSAGE = (
-    "The answer model request failed. Please try again later."
-)
+MODEL_FAILURE_MESSAGE = "回答生成失败，请稍后重试。"
 
 
 def _failure_message(error):

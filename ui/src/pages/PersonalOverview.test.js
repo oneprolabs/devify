@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import PersonalOverview from './PersonalOverview.vue'
 import { spacesApi } from '@/api/spaces'
+import { authApi } from '@/api/auth'
+
+vi.mock('@/api/auth', () => ({ authApi: { getDesktopDevices: vi.fn() } }))
 
 vi.mock('@/components/layout/AppLayout.vue', () => ({
   default: { template: '<div><slot /></div>' }
@@ -107,6 +110,10 @@ function mountPage() {
 describe('PersonalOverview', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    localStorage.clear()
+    authApi.getDesktopDevices.mockResolvedValue({
+      data: { data: [{ device_id: 'device-1', status: 'active' }] }
+    })
     spacesApi.getSpaces.mockResolvedValue({ data: { data: [space] } })
     spacesApi.getEvents.mockImplementation((id, { status }) =>
       Promise.resolve(
@@ -118,6 +125,41 @@ describe('PersonalOverview', () => {
     spacesApi.getConversations.mockResolvedValue(paginated(conversations))
     spacesApi.getTopics.mockResolvedValue({ data: { data: topics } })
     spacesApi.takeoverSpace.mockResolvedValue({ data: {} })
+  })
+
+  it('shows and remembers dismissal of the download prompt for an unbound account', async () => {
+    authApi.getDesktopDevices.mockResolvedValue({ data: { data: [] } })
+    const wrapper = mountPage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('连接客户端，开始同步聊天')
+    expect(wrapper.text()).toContain('适用于 Mac M 系列芯片')
+    await wrapper.get('[aria-label="关闭下载提示"]').trigger('click')
+    expect(wrapper.text()).not.toContain('连接客户端，开始同步聊天')
+    wrapper.unmount()
+    const again = mountPage()
+    await flushPromises()
+    expect(again.text()).not.toContain('连接客户端，开始同步聊天')
+  })
+
+  it('hides the prompt after a device is bound and the overview is refreshed', async () => {
+    authApi.getDesktopDevices
+      .mockResolvedValueOnce({ data: { data: [] } })
+      .mockResolvedValue({
+        data: { data: [{ device_id: 'mac-1', status: 'active' }] }
+      })
+    const wrapper = mountPage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('连接客户端，开始同步聊天')
+    await button(wrapper, '刷新').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('连接客户端，开始同步聊天')
+  })
+
+  it('does not show the prompt when the device lookup fails', async () => {
+    authApi.getDesktopDevices.mockRejectedValue(new Error('offline'))
+    const wrapper = mountPage()
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('连接客户端，开始同步聊天')
   })
 
   it('loads the API data and shows four correctly named metrics', async () => {

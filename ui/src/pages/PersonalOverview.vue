@@ -68,7 +68,40 @@
           </section>
         </template>
         <template v-else-if="showOverview && !needsTakeover">
-          <section class="device-card" aria-label="个人工作台状态">
+          <section
+            v-if="showDesktopPrompt"
+            class="desktop-prompt"
+            aria-label="客户端下载提示"
+          >
+            <img
+              class="desktop-prompt-icon"
+              src="/aimychats-desktop.png"
+              alt="AIMyChats 客户端图标"
+            />
+            <div class="desktop-prompt-copy">
+              <strong>连接客户端，开始同步聊天</strong>
+              <p>安装 AIMyChats 客户端并登录，即可选择需要同步的聊天记录。</p>
+            </div>
+            <div class="desktop-prompt-actions">
+              <a
+                data-testid="desktop-download"
+                href="https://github.com/oneprolabs/devify-desktop-releases/releases/tag/alpha"
+                target="_blank"
+                rel="noopener noreferrer"
+                >下载 Mac 客户端</a
+              ><span>适用于 Mac M 系列芯片</span>
+            </div>
+            <button
+              type="button"
+              class="desktop-prompt-close"
+              aria-label="关闭下载提示"
+              @click="dismissDesktopPrompt"
+            >
+              ×
+            </button>
+          </section>
+
+          <section v-else class="device-card" aria-label="个人工作台状态">
             <span class="device-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 24 24"
@@ -206,6 +239,7 @@ import {
   validCount
 } from '@/components/overview/formatters'
 import { spacesApi } from '@/api/spaces'
+import { authApi } from '@/api/auth'
 
 const props = defineProps({
   spaceId: { type: [String, Number], required: true }
@@ -224,6 +258,40 @@ const uploads = ref(null)
 const conversations = ref(null)
 const topics = ref(null)
 let requestVersion = 0
+const devicesLoaded = ref(false)
+const hasDesktopDevice = ref(false)
+let promptWasDismissed = false
+try {
+  promptWasDismissed =
+    localStorage.getItem('aimychats-desktop-prompt-dismissed') === '1'
+} catch {
+  /* Storage may be unavailable. */
+}
+const dismissed = ref(promptWasDismissed)
+const showDesktopPrompt = computed(
+  () => devicesLoaded.value && !hasDesktopDevice.value && !dismissed.value
+)
+function dismissDesktopPrompt() {
+  dismissed.value = true
+  try {
+    localStorage.setItem('aimychats-desktop-prompt-dismissed', '1')
+  } catch {
+    /* Keep it closed for this visit. */
+  }
+}
+async function loadDesktopDevices(version) {
+  devicesLoaded.value = false
+  try {
+    const data = unwrap(await authApi.getDesktopDevices())
+    const list = Array.isArray(data) ? data : data?.list
+    if (!Array.isArray(list)) throw new Error('Invalid device list')
+    if (version !== requestVersion) return
+    hasDesktopDevice.value = list.some((device) => device.status !== 'revoked')
+    devicesLoaded.value = true
+  } catch {
+    /* Do not infer device state when the request fails. */
+  }
+}
 
 // Each status is ordered by the server. Merging its first page of up to 100
 // items is sufficient for the first 100 across both known unfinished statuses.
@@ -320,6 +388,7 @@ const list = (response) => {
 
 async function load() {
   const version = ++requestVersion
+  void loadDesktopDevices(version)
   const spaceId = props.spaceId
   loading.value = true
   error.value = ''
@@ -468,6 +537,83 @@ watch(
 </script>
 
 <style scoped>
+.desktop-prompt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 22px 48px 22px 24px;
+  margin-bottom: 22px;
+  border-radius: 12px;
+  background: #eef4ff;
+}
+.desktop-prompt-icon {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 3px 12px #344b7a1c;
+}
+.desktop-prompt-copy {
+  flex: 1;
+  min-width: 0;
+}
+.desktop-prompt-copy strong {
+  color: #16223b;
+  font-size: 17px;
+}
+.desktop-prompt-copy p {
+  margin: 7px 0 0;
+  color: #68758c;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.desktop-prompt-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.desktop-prompt-actions a {
+  border-radius: 8px;
+  background: #465fdf;
+  padding: 10px 15px;
+  color: white;
+  text-decoration: none;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.desktop-prompt-actions span {
+  color: #77849a;
+  font-size: 11px;
+}
+.desktop-prompt-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: #8190a6;
+  cursor: pointer;
+  font-size: 20px;
+}
+@media (max-width: 760px) {
+  .desktop-prompt {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .desktop-prompt-copy {
+    flex: 1 1 200px;
+  }
+  .desktop-prompt-actions {
+    margin-left: 76px;
+    align-items: flex-start;
+  }
+}
+
 .overview-page {
   min-height: 100%;
   overflow: auto;

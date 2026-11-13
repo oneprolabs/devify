@@ -12,6 +12,8 @@ import os
 from celery import current_task
 from django.utils.log import DEFAULT_LOGGING
 
+from core.request_logging import current_request_id
+
 # Disable Django's logging setup
 LOGGING_CONFIG = None
 
@@ -32,6 +34,8 @@ def _current_task_id() -> str:
 
 class TaskIdFormatter(logging.Formatter):
     def format(self, record):
+        if not hasattr(record, "request_id"):
+            record.request_id = current_request_id()
         if not hasattr(record, "task_id"):
             record.task_id = _current_task_id()
         return super().format(record)
@@ -39,6 +43,8 @@ class TaskIdFormatter(logging.Formatter):
 
 def _task_id_log_record_factory(*args, **kwargs):
     record = _ORIGINAL_LOG_RECORD_FACTORY(*args, **kwargs)
+    if not hasattr(record, "request_id"):
+        record.request_id = current_request_id()
     if not hasattr(record, "task_id"):
         record.task_id = _current_task_id()
     return record
@@ -60,7 +66,8 @@ def configure_logging(log_level="INFO"):
                 "()": TaskIdFormatter,
                 "format": (
                     "[%(asctime)s][%(levelname)s]"
-                    "[task_id=%(task_id)s] %(message)s"
+                    "[task_id=%(task_id)s]"
+                    "[request_id=%(request_id)s] %(message)s"
                 ),
             },
             "django.server": DEFAULT_LOGGING["formatters"]["django.server"],

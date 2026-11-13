@@ -165,6 +165,7 @@ INSTALLED_APPS += [
 SITE_ID = 1
 
 MIDDLEWARE = [
+    "core.request_logging.RequestIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # Place CORS middleware early in the stack.
     "corsheaders.middleware.CorsMiddleware",

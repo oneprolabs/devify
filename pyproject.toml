@@ -107,6 +107,7 @@ testpaths = [
     "devify/expense/tests",
     "devify/billing/tests",
     "devify/feedback/tests",
+    "devify/core/tests/test_request_logging.py",
 ]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

@@ -44,6 +44,28 @@ def test_diagnostic_dates_are_serializable_after_validation():
     assert json.loads(encoded)["context"]["related_batch_ids"] == [42]
 
 
+def test_request_correlation_survives_diagnostic_serialization():
+    data = payload()
+    data["diagnostics"]["events"][0].update(
+        request_id="desktop-123",
+        server_request_id="server-456",
+        http_status=503,
+    )
+    serializer = CreateFeedbackSerializer(data=data)
+    assert serializer.is_valid(), serializer.errors
+    event = json.loads(json.dumps(serializer.data))["diagnostics"]["events"][0]
+    assert event["request_id"] == "desktop-123"
+    assert event["server_request_id"] == "server-456"
+    assert event["http_status"] == 503
+
+
+@pytest.mark.parametrize("field", ["request_id", "server_request_id"])
+def test_request_correlation_rejects_invalid_ids(field):
+    data = payload()
+    data["diagnostics"]["events"][0][field] = "id\nprivate"
+    assert not CreateFeedbackSerializer(data=data).is_valid()
+
+
 @pytest.mark.parametrize(
     "key", ["chat_body", "access_token", "database", "settings"]
 )

@@ -45,8 +45,14 @@ class EventSerializer(StrictSerializer):
         max_length=80, required=False, allow_blank=True
     )
     batch_id = serializers.IntegerField(required=False, min_value=1)
-    request_id = serializers.CharField(
-        max_length=80, required=False, allow_blank=True
+    request_id = serializers.RegexField(
+        r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,79}\Z", required=False
+    )
+    server_request_id = serializers.RegexField(
+        r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,79}\Z", required=False
+    )
+    http_status = serializers.IntegerField(
+        min_value=100, max_value=599, required=False
     )
     duration_ms = serializers.IntegerField(required=False, min_value=0)
 

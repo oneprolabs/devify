@@ -4,6 +4,8 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
+import spaces.models
+
 
 def create_personal_spaces(apps, schema_editor):
     """Give every existing account its personal space and owner membership."""
@@ -91,6 +93,7 @@ class Migration(migrations.Migration):
                 ('language', models.CharField(default='zh-CN', max_length=32)),
                 ('scene', models.CharField(default='chat', max_length=80)),
                 ('prompt_overrides', models.JSONField(blank=True, default=dict)),
+                ('chat_analysis_preferences', models.JSONField(default=spaces.models.default_chat_analysis_preferences)),
                 ('attachment_policy', models.CharField(default='available', max_length=32)),
                 ('auto_process', models.BooleanField(default=True)),
                 ('processing_paused', models.BooleanField(default=False)),

@@ -97,6 +97,11 @@ describe('SpaceSettings', () => {
     expect(wrapper.text()).toContain('macOS')
     expect(wrapper.text()).toContain('在线')
     expect(wrapper.text()).toContain('已绑定设备')
+    expect(
+      wrapper.get('a[href*="devify-desktop-releases"]').attributes('href')
+    ).toBe(
+      'https://github.com/oneprolabs/devify-desktop-releases/releases/latest'
+    )
   })
 
   it('renders the stored processing defaults read-only', async () => {

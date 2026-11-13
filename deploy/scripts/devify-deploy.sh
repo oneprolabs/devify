@@ -276,6 +276,9 @@ prepare_directories() {
         "${DEPLOY_ROOT}/data/certs/haraka" \
         "${DEPLOY_ROOT}/data/certs/nginx" \
         "${DEPLOY_ROOT}/data/django/staticfiles" \
+        "${DEPLOY_ROOT}/data/chat_upload_archives" \
+        "${DEPLOY_ROOT}/data/chat_media" \
+        "${DEPLOY_ROOT}/data/chat_avatars" \
         "${DEPLOY_ROOT}/data/email_attachments" \
         "${DEPLOY_ROOT}/data/haraka/debug" \
         "${DEPLOY_ROOT}/data/haraka/email_attachments" \

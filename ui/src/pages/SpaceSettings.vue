@@ -28,7 +28,7 @@
               <p>
                 在客户端登录这个账号即自动绑定。
                 <a
-                  href="https://github.com/oneprolabs/devify-desktop-releases/releases/tag/alpha"
+                  href="https://github.com/oneprolabs/devify-desktop-releases/releases/latest"
                   target="_blank"
                   rel="noopener noreferrer"
                   >下载客户端（Mac M 系列芯片）</a

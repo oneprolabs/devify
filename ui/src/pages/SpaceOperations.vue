@@ -289,7 +289,7 @@ const modeText = (upload) =>
 
 const contentText = (upload) => {
   if (['created', 'uploading'].includes(upload.status)) return '等待上传'
-  if (upload.status === 'processing') return '解析统计中'
+  if (upload.status === 'processing') return upload.worker_started_at ? '解析统计中' : '等待解析'
   if (upload.status === 'failed') return '未完成'
   const conversations = Number(upload.conversation_count || 0)
   const messages = Number(upload.message_count || 0)
@@ -316,9 +316,9 @@ const statusInfo = (upload) => {
       Number.isFinite(lastUpdate) &&
       Date.now() - lastUpdate > 15 * 60 * 1000
     ) {
-      return { text: '解析耗时较长', cls: 'warn' }
+      return { text: upload.worker_started_at ? '解析耗时较长' : '等待解析较长', cls: 'warn' }
     }
-    return { text: '解析中', cls: 'ac' }
+    return { text: upload.worker_started_at ? '解析中' : '等待解析', cls: 'ac' }
   }
   if (status === 'failed') return { text: '失败', cls: 'bad' }
   if (status === 'cancelled') return { text: '已取消', cls: '' }
@@ -411,7 +411,7 @@ const stagesFor = (upload) => {
         ? `会话 → 消息，归 ${messages} 条${duplicates ? ` · ${duplicates} 条重复` : ''}`
         : failed
           ? '解析未完成'
-          : '等待解析结果',
+          : upload.worker_started_at ? '正在解析聊天记录' : '等待后台任务开始',
       time: formatDuration(
         durationBetween(upload.parse_started_at, upload.completed_at)
       )

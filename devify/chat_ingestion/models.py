@@ -84,6 +84,7 @@ class UploadBatch(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     archive_received_at = models.DateTimeField(null=True, blank=True)
     parse_started_at = models.DateTimeField(null=True, blank=True)
+    worker_started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

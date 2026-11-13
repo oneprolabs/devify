@@ -8,6 +8,17 @@ from celery.signals import worker_ready
 logger = logging.getLogger(__name__)
 
 
+@worker_ready.connect(dispatch_uid="chat_ingestion.startup_recovery")
+def recover_chat_uploads_on_worker_ready(sender=None, **kwargs):
+    """Recover stale uploads after a worker restart."""
+    try:
+        from chat_ingestion.recovery import recover_stale_uploads
+
+        logger.info("Chat upload recovery: %s", recover_stale_uploads())
+    except Exception:
+        logger.exception("Chat upload startup recovery failed")
+
+
 @worker_ready.connect(dispatch_uid="chat_analysis.engine_freshness")
 def warn_when_analysis_code_is_stale(sender=None, **kwargs):
     """Warn when analysis code was edited after this worker imported it.

@@ -78,6 +78,8 @@ def test_parser_task_retries_transient_parser_errors():
             parse_chat_upload_task.run(batch.pk)
 
     retry.assert_called_once()
+    batch.refresh_from_db()
+    assert batch.worker_started_at is not None
 
 
 def test_parser_task_marks_timeout_failed():

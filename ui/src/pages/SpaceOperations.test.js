@@ -165,8 +165,8 @@ describe('SpaceOperations', () => {
     const wrapper = mountPage()
     await flushPromises()
     expect(wrapper.text()).toContain('上传状态待确认')
-    expect(wrapper.text()).toContain('解析统计中')
-    expect(wrapper.text()).toContain('解析耗时较长')
+    expect(wrapper.text()).toContain('等待解析')
+    expect(wrapper.text()).toContain('等待解析较长')
     expect(wrapper.text()).not.toContain('0 条新消息')
     await wrapper.findAll('.sync-row:not(.sync-head)')[1].trigger('click')
     expect(wrapper.find('.stages').text()).toContain('归档已接收，数量待解析')
@@ -177,7 +177,7 @@ describe('SpaceOperations', () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     let wrapper
     try {
-      const waiting = { ...uploads[0], status: 'processing', message_count: 0 }
+      const waiting = { ...uploads[0], status: 'processing', message_count: 0, worker_started_at: new Date().toISOString() }
       spacesApi.getUploads.mockResolvedValue({
         data: { data: { list: [waiting], pagination: { next: null } } }
       })

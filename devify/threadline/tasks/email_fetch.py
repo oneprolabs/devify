@@ -7,29 +7,82 @@ File: devify/threadline/tasks/email_fetch.py
 """
 
 import logging
-from typing import Dict
-
-from celery import shared_task
-from django.utils import timezone
-from django.conf import settings
 
 from agentcore_task.adapters.django import prevent_duplicate_task
-from threadline.models import EmailMailbox, EmailMessage, Settings
+from celery import shared_task
+from django.conf import settings
+from django.db.models import Q
+from django.utils import timezone
+
+from threadline.models import EmailMailbox, EmailMessage
 from threadline.services.processing_control import is_processing_paused
+from threadline.services.space_email import email_ai_allowed
+from threadline.tasks.email_merge import process_email_merge
 from threadline.utils.email import (
     EmailProcessor,
     EmailSaveService,
 )
 from threadline.utils.task_tracer import TaskTracer
-from threadline.tasks.email_merge import process_email_merge
 
 logger = logging.getLogger(__name__)
+
+
+def fetchable_mailboxes():
+    """Mailboxes the scheduler may poll.
+
+    Personal sources still need an active credential holder. Team sources
+    belong to the space, so they keep being fetched even when the creator was
+    deactivated or removed.
+    """
+    return (
+        EmailMailbox.objects.filter(enabled=True)
+        .filter(Q(user__is_active=True) | Q(space__kind="team"))
+        .select_related("user", "space", "created_by")
+        .order_by("user_id", "id")
+    )
+
+
+def resolve_mailbox_owner(mailbox):
+    """Return the user that owns messages received from this source."""
+    if mailbox.user_id:
+        return mailbox.user
+    if mailbox.created_by_id:
+        return mailbox.created_by
+    space = mailbox.space
+    if space is None:
+        return None
+    if space.owner_id:
+        return space.owner
+    if space.personal_owner_id:
+        return space.personal_owner
+    if space.created_by_id:
+        return space.created_by
+    membership = (
+        space.memberships.filter(
+            status="active", role__in=("owner", "maintainer")
+        )
+        .select_related("user")
+        .first()
+    )
+    return membership.user if membership else None
 
 
 def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
     """
     Queue merge coordination only for real EmailMessage instances.
     """
+    if not isinstance(email_msg, EmailMessage):
+        logger.debug(
+            "Skipping merge queue for non-model email record: %r", email_msg
+        )
+        return
+
+    if not email_ai_allowed(email_msg):
+        logger.info(
+            "Skipping merge/AI for team-space email %s", email_msg.id
+        )
+        return
+
     if is_processing_paused(email_msg.user_id):
         # The mail is kept; only the workflow waits. It resumes from
         # FETCHED once the user lifts the pause.
@@ -40,14 +93,7 @@ def _queue_merge_for_saved_email(email_msg: EmailMessage) -> None:
         )
         return
 
-    if not isinstance(email_msg, EmailMessage):
-        logger.debug(
-            "Skipping merge queue for non-model email record: %r", email_msg
-        )
-        return
-
     process_email_merge.delay(str(email_msg.id))
-
 
 
 def _record_mailbox_success(mailbox) -> None:
@@ -121,17 +167,21 @@ def imap_email_fetch():
         # Every enabled mailbox is polled, whatever else the user has
         # configured. Mailboxes and the virtual address are parallel
         # channels now, not alternatives.
-        mailboxes = (
-            EmailMailbox.objects.filter(enabled=True, user__is_active=True)
-            .select_related("user")
-            .order_by("user_id", "id")
-        )
+        mailboxes = fetchable_mailboxes()
 
         for mailbox in mailboxes:
-            user = mailbox.user
+            owner = resolve_mailbox_owner(mailbox)
+            if owner is None:
+                logger.warning(
+                    "Skipping mailbox %s: no user or space manager to own "
+                    "the messages",
+                    mailbox.pk,
+                )
+                error_count += 1
+                continue
+            user = owner
             user_display = (
-                f"{user.username} (ID: {user.id}) "
-                f"[{mailbox.display_name}]"
+                f"{user.username} (ID: {user.id}) " f"[{mailbox.display_name}]"
             )
             try:
                 logger.info(f"{context} Processing mailbox {user_display}")
@@ -143,6 +193,7 @@ def imap_email_fetch():
                     user.id,
                     mailbox.to_email_config(),
                     user_display=user_display,
+                    mailbox=mailbox,
                 )
                 processed_count += 1
                 emails_processed += result.get("emails_processed", 0)
@@ -343,7 +394,7 @@ def haraka_email_fetch():
     timeout=settings.TASK_TIMEOUT_MINUTES * 60,
 )
 def fetch_user_imap_emails(
-    user_id: int, email_config: dict, user_display: str = None
+    user_id: int, email_config: dict, user_display: str = None, mailbox=None
 ):
     """
     Fetch IMAP emails for specific user
@@ -353,6 +404,8 @@ def fetch_user_imap_emails(
         email_config: Pre-fetched email configuration for optimization.
         user_display: User display string for logging (optional, e.g.
                       "admin (ID: 1)")
+        mailbox: The EmailMailbox row being fetched. Its space becomes the
+            message's primary space and its id is the dedup key.
     """
     if not user_display:
         user_display = f"User ID: {user_id}"
@@ -367,7 +420,8 @@ def fetch_user_imap_emails(
         imap_host = imap_config.get("imap_host", "unknown")
         use_ssl = imap_config.get("use_ssl", True)
         imap_port = imap_config.get(
-            "imap_ssl_port", imap_config.get("imap_port", 993 if use_ssl else 143)
+            "imap_ssl_port",
+            imap_config.get("imap_port", 993 if use_ssl else 143),
         )
         folder = imap_config.get("folder", "INBOX")
 
@@ -390,7 +444,9 @@ def fetch_user_imap_emails(
 
         for email_data in processor.process_emails():
             try:
-                email_msg = save_service.save_email(user_id, email_data)
+                email_msg = save_service.save_email(
+                    user_id, email_data, mailbox=mailbox
+                )
 
                 if email_msg is None:
                     logger.info(

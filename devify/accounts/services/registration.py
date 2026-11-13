@@ -45,9 +45,8 @@ class RegistrationService:
         Returns:
             datetime: Token expiration datetime
         """
-        return (
-            timezone.now() +
-            timedelta(hours=settings.REGISTRATION_TOKEN_EXPIRY_HOURS)
+        return timezone.now() + timedelta(
+            hours=settings.REGISTRATION_TOKEN_EXPIRY_HOURS
         )
 
     @staticmethod
@@ -88,36 +87,30 @@ class RegistrationService:
                 - (False, error_message) if invalid
         """
         if not alias:
-            return False, 'Alias cannot be empty'
+            return False, "Alias cannot be empty"
 
         if len(alias) < 3 or len(alias) > 64:
-            return (
-                False,
-                'Alias must be between 3 and 64 characters'
-            )
+            return (False, "Alias must be between 3 and 64 characters")
 
-        if alias.startswith('.') or alias.endswith('.'):
-            return (
-                False,
-                'Username cannot start or end with a dot'
-            )
+        if alias.startswith(".") or alias.endswith("."):
+            return (False, "Username cannot start or end with a dot")
 
-        pattern = r'^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$'
+        pattern = r"^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$"
         if len(alias) == 3:
-            pattern = r'^[a-zA-Z0-9.]{3}$'
+            pattern = r"^[a-zA-Z0-9.]{3}$"
 
         if not re.match(pattern, alias):
             return (
                 False,
-                'Alias must start and end with letter or number, '
-                'and can only contain letters, numbers, dots, '
-                'underscores, and hyphens'
+                "Alias must start and end with letter or number, "
+                "and can only contain letters, numbers, dots, "
+                "underscores, and hyphens",
             )
 
         if not EmailAlias.is_unique(alias):
-            return False, 'This virtual email is already taken'
+            return False, "This virtual email is already taken"
 
-        return True, ''
+        return True, ""
 
     @staticmethod
     def _initialize_free_plan(user):
@@ -128,20 +121,20 @@ class RegistrationService:
         This runs automatically during registration and delegates
         to the billing subscription service for idempotency.
 
+        Billing bootstrap is best effort: a deployment without a ``free``
+        plan, or a transient billing failure, must not block signup. The
+        failure is logged and the user can be granted a plan later from the
+        billing admin.
+
         Args:
             user: Django User instance
-
-        Raises:
-            Exception: If billing initialization fails
         """
         # Local import to avoid circular dependency and conditional loading.
         # Note: Imports billing models locally to avoid circular dependency.
         from billing.services.subscription_service import SubscriptionService
 
         try:
-            subscription = SubscriptionService.assign_free_plan_to_user(
-                user
-            )
+            subscription = SubscriptionService.assign_free_plan_to_user(user)
 
             logger.info(
                 f"Initialized Free Plan for user {user.username}: "
@@ -158,15 +151,14 @@ class RegistrationService:
                 f"Error: {error_type}: {error_message}",
                 exc_info=True,
                 extra={
-                    'user_id': user.id,
-                    'username': user.username,
-                    'exception_type': error_type,
-                    'exception_message': error_message,
-                    'service': 'RegistrationService',
-                    'method': '_initialize_free_plan',
-                }
+                    "user_id": user.id,
+                    "username": user.username,
+                    "exception_type": error_type,
+                    "exception_message": error_message,
+                    "service": "RegistrationService",
+                    "method": "_initialize_free_plan",
+                },
             )
-            raise
 
     @staticmethod
     @transaction.atomic
@@ -176,7 +168,7 @@ class RegistrationService:
         username: str,
         scene: str,
         language: str,
-        timezone_str: str
+        timezone_str: str,
     ) -> User:
         """
         Create user with complete configuration in atomic transaction.
@@ -203,22 +195,18 @@ class RegistrationService:
             ValueError: If validation fails or configuration error
             Exception: If any step in the creation process fails
         """
-        is_valid, error_msg = (
-            RegistrationService.validate_virtual_email_alias(
-                username
-            )
+        is_valid, error_msg = RegistrationService.validate_virtual_email_alias(
+            username
         )
         if not is_valid:
-            raise ValueError(f'Invalid virtual email username: {error_msg}')
+            raise ValueError(f"Invalid virtual email username: {error_msg}")
 
         if User.objects.filter(email=email).exists():
-            raise ValueError('Email already exists')
+            raise ValueError("Email already exists")
 
         try:
             user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=password
+                username=username, email=email, password=password
             )
             logger.info(f"Created user: {username}")
             UserBootstrapService.bootstrap_user(
@@ -229,8 +217,8 @@ class RegistrationService:
                 email_config=(
                     UserBootstrapService.build_auto_assign_email_config()
                 ),
-                prompt_description='User prompt configuration',
-                email_description='User email configuration',
+                prompt_description="User prompt configuration",
+                email_description="User email configuration",
                 email_alias=username,
             )
 
@@ -248,23 +236,22 @@ class RegistrationService:
                 f"Error: {error_type}: {error_message}",
                 exc_info=True,
                 extra={
-                    'email': email,
-                    'username': username,
-                    'scene': scene,
-                    'language': language,
-                    'timezone': timezone_str,
-                    'exception_type': error_type,
-                    'exception_message': error_message,
-                    'service': 'RegistrationService',
-                    'method': 'create_user_with_config',
-                }
+                    "email": email,
+                    "username": username,
+                    "scene": scene,
+                    "language": language,
+                    "timezone": timezone_str,
+                    "exception_type": error_type,
+                    "exception_message": error_message,
+                    "service": "RegistrationService",
+                    "method": "create_user_with_config",
+                },
             )
             raise
 
     @staticmethod
     def create_registration_token(
-        email: str,
-        language: str
+        email: str, language: str
     ) -> tuple[str, Profile]:
         """
         Create or update a registration token for email registration.
@@ -284,11 +271,8 @@ class RegistrationService:
             ValueError: If user exists and registration is completed
         """
         token = RegistrationService.generate_registration_token()
-        expires_at = (
-            timezone.now() +
-            timedelta(
-                hours=settings.REGISTRATION_TOKEN_EXPIRY_HOURS
-            )
+        expires_at = timezone.now() + timedelta(
+            hours=settings.REGISTRATION_TOKEN_EXPIRY_HOURS
         )
 
         # Get or create user
@@ -297,7 +281,7 @@ class RegistrationService:
         if not user:
             # Generate unique username if user doesn't exist
             # Try email prefix first, then add counter if needed
-            username = email.split('@')[0]
+            username = email.split("@")[0]
             base_username = username
             counter = 1
             while User.objects.filter(username=username).exists():
@@ -306,9 +290,7 @@ class RegistrationService:
 
             # Create new user
             user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=None
+                username=username, email=email, password=None
             )
             user.set_unusable_password()
             user.save()
@@ -319,11 +301,11 @@ class RegistrationService:
         profile, profile_created = Profile.objects.get_or_create(
             user=user,
             defaults={
-                'registration_completed': False,
-                'registration_token': token,
-                'registration_token_expires': expires_at,
-                'language': language
-            }
+                "registration_completed": False,
+                "registration_token": token,
+                "registration_token_expires": expires_at,
+                "language": language,
+            },
         )
 
         # If profile already exists, update token and language
@@ -336,7 +318,7 @@ class RegistrationService:
         # Check if registration is already completed
         if profile.registration_completed:
             raise ValueError(
-                'User already exists and registration is completed'
+                "User already exists and registration is completed"
             )
 
         # Log appropriate message based on what was created
@@ -368,13 +350,12 @@ class RegistrationService:
         """
         try:
             profile = Profile.objects.get(
-                registration_token=token,
-                registration_completed=False
+                registration_token=token, registration_completed=False
             )
 
             if (
-                profile.registration_token_expires and
-                profile.registration_token_expires < timezone.now()
+                profile.registration_token_expires
+                and profile.registration_token_expires < timezone.now()
             ):
                 logger.warning(
                     f"Registration token expired for user: "

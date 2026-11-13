@@ -16,13 +16,15 @@ File: devify/threadline/tasks/email_workflow.py
 
 import logging
 import time
+
+from agentcore_task.adapters.django import prevent_duplicate_task
 from celery import shared_task
 from django.conf import settings
 
-from agentcore_task.adapters.django import prevent_duplicate_task
+from threadline.agents.workflow import execute_email_processing_workflow
 from threadline.models import EmailMessage
 from threadline.services.processing_control import is_processing_paused
-from threadline.agents.workflow import execute_email_processing_workflow
+from threadline.services.space_email import email_ai_allowed
 from threadline.utils.task_tracer import TaskTracer
 
 logger = logging.getLogger(__name__)
@@ -85,9 +87,16 @@ def process_email_workflow(
     """
     try:
         started_at = time.monotonic()
-        email = EmailMessage.objects.select_related("user", "merged_into").get(
-            id=email_id
-        )
+        email = EmailMessage.objects.select_related(
+            "user", "merged_into", "space"
+        ).get(id=email_id)
+
+        if not email_ai_allowed(email):
+            logger.info(
+                "[Workflow] Team-space email %s skips AI workflow in v1",
+                email_id,
+            )
+            return str(email_id)
 
         # The brake has to hold here, not only where work is scheduled.
         # A queued task outlives the moment it was queued: Redis redelivers

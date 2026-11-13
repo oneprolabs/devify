@@ -9,7 +9,7 @@ Tests cover key service methods without complex Stripe mocking:
 
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -40,8 +40,8 @@ class TestGetActiveSubscription:
 
         assert subscription is not None
         assert subscription.user == test_user_with_free_subscription
-        assert subscription.status == 'active'
-        assert subscription.provider.name == 'platform'
+        assert subscription.status == "active"
+        assert subscription.provider.name == "platform"
 
     def test_get_active_subscription_none_exists(self, test_user):
         """
@@ -63,7 +63,7 @@ class TestGetActiveSubscription:
             user=test_user,
             plan=free_plan,
             provider=platform_payment_provider,
-            status='canceled',
+            status="canceled",
             auto_renew=False,
             current_period_start=timezone.now(),
             current_period_end=timezone.now() + timedelta(days=30),
@@ -88,11 +88,11 @@ class TestGetActiveSubscription:
         """
         import time
 
-        sub1 = Subscription.objects.create(
+        Subscription.objects.create(
             user=test_user,
             plan=free_plan,
             provider=platform_payment_provider,
-            status='active',
+            status="active",
             auto_renew=True,
             current_period_start=timezone.now(),
             current_period_end=timezone.now() + timedelta(days=30),
@@ -104,7 +104,7 @@ class TestGetActiveSubscription:
             user=test_user,
             plan=starter_plan,
             provider=payment_provider,
-            status='active',
+            status="active",
             auto_renew=True,
             current_period_start=timezone.now(),
             current_period_end=timezone.now() + timedelta(days=30),
@@ -140,8 +140,8 @@ class TestSubscriptionCancellation:
 
         subscription.refresh_from_db()
         assert subscription.auto_renew is False
-        assert subscription.status == 'active'
-        assert subscription.provider.name == 'platform'
+        assert subscription.status == "active"
+        assert subscription.provider.name == "platform"
 
     def test_cancel_nonexistent_subscription(self):
         """
@@ -167,22 +167,22 @@ class TestHandleCancellation:
             user=test_user,
             plan=starter_plan,
             provider=payment_provider,
-            status='active',
+            status="active",
             auto_renew=True,
             current_period_start=timezone.now(),
             current_period_end=timezone.now() + timedelta(days=30),
         )
 
-        SubscriptionService.handle_cancellation('sub_fake_id_for_test')
+        SubscriptionService.handle_cancellation("sub_fake_id_for_test")
 
         subscription.refresh_from_db()
-        assert subscription.status == 'active'
+        assert subscription.status == "active"
 
     def test_handle_cancellation_not_found_no_error(self):
         """
         Handle cancellation for non-existent subscription doesn't raise
         """
-        SubscriptionService.handle_cancellation('sub_nonexistent')
+        SubscriptionService.handle_cancellation("sub_nonexistent")
 
 
 @pytest.mark.django_db
@@ -199,7 +199,7 @@ class TestHandlePaymentSuccess:
         payment_provider,
     ):
         customer = Customer.objects.create(
-            id='cus_test',
+            id="cus_test",
             subscriber=test_user,
             email=test_user.email,
             metadata={},
@@ -208,7 +208,7 @@ class TestHandlePaymentSuccess:
             user=test_user,
             plan=starter_plan,
             provider=payment_provider,
-            status='active',
+            status="active",
             auto_renew=True,
             current_period_start=timezone.now() - timedelta(days=10),
             current_period_end=timezone.now() + timedelta(days=20),
@@ -225,7 +225,8 @@ class TestHandlePaymentSuccess:
         )
 
         reset_period_credits = mocker.patch(
-            'billing.services.subscription_service.CreditsService.reset_period_credits'
+            "billing.services.subscription_service.CreditsService."
+            "reset_period_credits"
         )
 
         SubscriptionService.handle_payment_success(customer.id)
@@ -255,14 +256,12 @@ class TestCreateSubscriptionValidation:
         )
 
         subscription = SubscriptionService.create_subscription(
-            user_id=test_user.id,
-            plan_id=starter_plan.id,
-            provider='stripe'
+            user_id=test_user.id, plan_id=starter_plan.id, provider="stripe"
         )
 
         assert subscription.user == test_user
         assert subscription.plan == starter_plan
-        assert subscription.status == 'active'
+        assert subscription.status == "active"
 
         credits = UserCredits.objects.get(user=test_user, is_active=True)
         assert credits.subscription == subscription
@@ -280,7 +279,7 @@ class TestCreateSubscriptionValidation:
             user=test_user,
             plan=free_plan,
             provider=platform_payment_provider,
-            status='active',
+            status="active",
             auto_renew=True,
             current_period_start=timezone.now() - timedelta(days=5),
             current_period_end=timezone.now() + timedelta(days=25),
@@ -289,26 +288,24 @@ class TestCreateSubscriptionValidation:
             user=test_user,
             plan=starter_plan,
             provider=payment_provider,
-            status='past_due',
+            status="past_due",
             auto_renew=True,
             current_period_start=timezone.now() - timedelta(days=5),
             current_period_end=timezone.now() + timedelta(days=25),
         )
 
         subscription = SubscriptionService.create_subscription(
-            user_id=test_user.id,
-            plan_id=starter_plan.id,
-            provider='stripe'
+            user_id=test_user.id, plan_id=starter_plan.id, provider="stripe"
         )
 
         old_active.refresh_from_db()
-        assert old_active.status == 'canceled'
+        assert old_active.status == "canceled"
         assert old_active.auto_renew is False
-        assert subscription.status == 'active'
+        assert subscription.status == "active"
         assert (
             Subscription.objects.filter(
                 user=test_user,
-                status='active',
+                status="active",
             ).count()
             == 1
         )
@@ -328,7 +325,7 @@ def test_switch_plan_for_user_cancels_non_terminal_existing_subscriptions(
         user=test_user,
         plan=starter_plan,
         provider=payment_provider,
-        status='active',
+        status="active",
         auto_renew=True,
         current_period_start=timezone.now(),
         current_period_end=timezone.now() + timedelta(days=30),
@@ -337,7 +334,7 @@ def test_switch_plan_for_user_cancels_non_terminal_existing_subscriptions(
         user=test_user,
         plan=starter_plan,
         provider=payment_provider,
-        status='past_due',
+        status="past_due",
         auto_renew=True,
         current_period_start=timezone.now(),
         current_period_end=timezone.now() + timedelta(days=30),
@@ -346,7 +343,7 @@ def test_switch_plan_for_user_cancels_non_terminal_existing_subscriptions(
         user=test_user,
         plan=starter_plan,
         provider=payment_provider,
-        status='trialing',
+        status="trialing",
         auto_renew=True,
         current_period_start=timezone.now(),
         current_period_end=timezone.now() + timedelta(days=30),
@@ -355,7 +352,7 @@ def test_switch_plan_for_user_cancels_non_terminal_existing_subscriptions(
         user=test_user,
         plan=free_plan,
         provider=platform_payment_provider,
-        status='canceled',
+        status="canceled",
         auto_renew=False,
         current_period_start=timezone.now(),
         current_period_end=timezone.now() + timedelta(days=30),
@@ -371,10 +368,10 @@ def test_switch_plan_for_user_cancels_non_terminal_existing_subscriptions(
     trialing_subscription.refresh_from_db()
     target_subscription.refresh_from_db()
 
-    assert active_subscription.status == 'canceled'
-    assert past_due_subscription.status == 'canceled'
-    assert trialing_subscription.status == 'canceled'
-    assert target_subscription.status == 'active'
+    assert active_subscription.status == "canceled"
+    assert past_due_subscription.status == "canceled"
+    assert trialing_subscription.status == "canceled"
+    assert target_subscription.status == "active"
     assert target_subscription.plan == free_plan
     assert target_subscription.auto_renew is True
 
@@ -389,7 +386,7 @@ def test_switch_plan_for_user_replaces_same_plan_with_different_provider(
         user=test_user,
         plan=starter_plan,
         provider=payment_provider,
-        status='past_due',
+        status="past_due",
         auto_renew=True,
         current_period_start=timezone.now(),
         current_period_end=timezone.now() + timedelta(days=30),
@@ -403,12 +400,12 @@ def test_switch_plan_for_user_replaces_same_plan_with_different_provider(
     stripe_subscription.refresh_from_db()
     target_subscription.refresh_from_db()
 
-    assert stripe_subscription.status == 'canceled'
+    assert stripe_subscription.status == "canceled"
     assert stripe_subscription.auto_renew is False
     assert target_subscription.id != stripe_subscription.id
-    assert target_subscription.status == 'active'
+    assert target_subscription.status == "active"
     assert target_subscription.plan == starter_plan
-    assert target_subscription.provider.name == 'platform'
+    assert target_subscription.provider.name == "platform"
 
 
 @pytest.mark.django_db
@@ -423,9 +420,7 @@ class TestCreateSubscription:
         """
         with pytest.raises(Plan.DoesNotExist):
             SubscriptionService.create_subscription(
-                user_id=test_user.id,
-                plan_id=99999,
-                provider='stripe'
+                user_id=test_user.id, plan_id=99999, provider="stripe"
             )
 
     def test_create_subscription_invalid_provider(
@@ -438,24 +433,23 @@ class TestCreateSubscription:
             SubscriptionService.create_subscription(
                 user_id=test_user.id,
                 plan_id=starter_plan.id,
-                provider='invalid_provider'
+                provider="invalid_provider",
             )
 
     def test_create_subscription_creates_user_credits(
         self, test_user, starter_plan, payment_provider
     ):
         """
-        Create subscription when UserCredits doesn't exist creates it automatically
+        Create subscription when UserCredits doesn't exist creates it
+        automatically
         """
         subscription = SubscriptionService.create_subscription(
-            user_id=test_user.id,
-            plan_id=starter_plan.id,
-            provider='stripe'
+            user_id=test_user.id, plan_id=starter_plan.id, provider="stripe"
         )
 
         assert subscription.user == test_user
         assert subscription.plan == starter_plan
-        assert subscription.status == 'active'
+        assert subscription.status == "active"
 
         credits = UserCredits.objects.get(user=test_user, is_active=True)
         assert credits.subscription == subscription
@@ -468,80 +462,83 @@ class TestSyncUserSubscriptionFromStripe:
     Test recovering a local subscription from Stripe
     """
 
-    def test_sync_user_subscription_from_stripe_picks_latest_active_subscription(
+    def test_sync_picks_latest_active_subscription(
         self,
         mocker,
         test_user,
     ):
         customer = SimpleNamespace(
-            id='cus_123',
+            id="cus_123",
             subscriber=test_user,
             email=test_user.email,
             subscriber_id=test_user.id,
             save=Mock(),
         )
         active_subscription = SimpleNamespace(
-            id='sub_active',
-            status='active',
+            id="sub_active",
+            status="active",
             created=200,
         )
         active_subscription.to_dict = lambda: {
-            'id': 'sub_active',
-            'status': 'active',
-            'customer': 'cus_123',
-            'created': 200,
-            'items': {
-                'data': [
+            "id": "sub_active",
+            "status": "active",
+            "customer": "cus_123",
+            "created": 200,
+            "items": {
+                "data": [
                     {
-                        'price': {'id': 'price_test'},
-                        'current_period_start': 1710000000,
-                        'current_period_end': 1712592000,
+                        "price": {"id": "price_test"},
+                        "current_period_start": 1710000000,
+                        "current_period_end": 1712592000,
                     }
                 ]
             },
         }
         canceled_subscription = SimpleNamespace(
-            id='sub_canceled',
-            status='canceled',
+            id="sub_canceled",
+            status="canceled",
             created=100,
         )
         canceled_subscription.to_dict = lambda: {
-            'id': 'sub_canceled',
-            'status': 'canceled',
-            'customer': 'cus_123',
-            'created': 100,
+            "id": "sub_canceled",
+            "status": "canceled",
+            "customer": "cus_123",
+            "created": 100,
         }
         djstripe_subscription = SimpleNamespace(
-            id='sub_active',
+            id="sub_active",
             customer=customer,
-            plan=SimpleNamespace(id='price_test'),
+            plan=SimpleNamespace(id="price_test"),
         )
         synced_subscription = SimpleNamespace(id=999)
 
         mocker.patch(
-            'billing.services.subscription_service.get_stripe_secret_key',
-            return_value='sk_test_123',
+            "billing.services.subscription_service.get_stripe_secret_key",
+            return_value="sk_test_123",
         )
         mocker.patch(
-            'billing.services.subscription_service.ensure_djstripe_owner_account',
-            return_value=SimpleNamespace(id='acct_test_123'),
+            "billing.services.subscription_service."
+            "ensure_djstripe_owner_account",
+            return_value=SimpleNamespace(id="acct_test_123"),
         )
         mocker.patch(
-            'billing.services.subscription_service.Customer.objects.filter',
-            return_value=SimpleNamespace(first=lambda: customer),
+            "billing.services.subscription_service.resolve_customer_for_user",
+            return_value=customer,
         )
         mocker.patch(
-            'billing.services.subscription_service.stripe.Subscription.list',
+            "billing.services.subscription_service.stripe.Subscription.list",
             return_value=SimpleNamespace(
                 data=[canceled_subscription, active_subscription]
             ),
         )
         mocker.patch(
-            'billing.services.subscription_service.DjstripeSubscription.sync_from_stripe_data',
+            "billing.services.subscription_service.DjstripeSubscription."
+            "sync_from_stripe_data",
             return_value=djstripe_subscription,
         )
         sync_from_djstripe = mocker.patch(
-            'billing.services.subscription_service.SubscriptionService.sync_from_djstripe',
+            "billing.services.subscription_service.SubscriptionService."
+            "sync_from_djstripe",
             return_value=synced_subscription,
         )
 
@@ -552,72 +549,75 @@ class TestSyncUserSubscriptionFromStripe:
         assert result == synced_subscription
         sync_from_djstripe.assert_called_once_with(djstripe_subscription)
 
-    def test_sync_user_subscription_from_stripe_passes_runtime_api_key_to_djstripe(
+    def test_sync_passes_runtime_api_key_to_djstripe(
         self,
         mocker,
         test_user,
     ):
         customer = SimpleNamespace(
-            id='cus_123',
+            id="cus_123",
             subscriber=test_user,
             email=test_user.email,
             subscriber_id=test_user.id,
             save=Mock(),
         )
         active_subscription = SimpleNamespace(
-            id='sub_active',
-            status='active',
+            id="sub_active",
+            status="active",
             created=200,
         )
         active_subscription.to_dict = lambda: {
-            'id': 'sub_active',
-            'status': 'active',
-            'customer': 'cus_123',
-            'created': 200,
-            'items': {
-                'data': [
+            "id": "sub_active",
+            "status": "active",
+            "customer": "cus_123",
+            "created": 200,
+            "items": {
+                "data": [
                     {
-                        'price': {'id': 'price_test'},
-                        'current_period_start': 1710000000,
-                        'current_period_end': 1712592000,
+                        "price": {"id": "price_test"},
+                        "current_period_start": 1710000000,
+                        "current_period_end": 1712592000,
                     }
                 ]
             },
         }
         djstripe_subscription = SimpleNamespace(
-            id='sub_active',
+            id="sub_active",
             customer=customer,
-            plan=SimpleNamespace(id='price_test'),
+            plan=SimpleNamespace(id="price_test"),
         )
         synced_subscription = SimpleNamespace(id=999)
 
         mocker.patch(
-            'billing.services.subscription_service.get_stripe_secret_key',
-            return_value='sk_test_runtime_123',
+            "billing.services.subscription_service.get_stripe_secret_key",
+            return_value="sk_test_runtime_123",
         )
         mocker.patch(
-            'billing.services.subscription_service.ensure_djstripe_owner_account',
-            return_value=SimpleNamespace(id='acct_test_123'),
+            "billing.services.subscription_service."
+            "ensure_djstripe_owner_account",
+            return_value=SimpleNamespace(id="acct_test_123"),
         )
         mocker.patch(
-            'billing.services.subscription_service.Customer.objects.filter',
-            return_value=SimpleNamespace(first=lambda: customer),
+            "billing.services.subscription_service.resolve_customer_for_user",
+            return_value=customer,
         )
         mocker.patch(
-            'billing.services.subscription_service.stripe.Subscription.list',
+            "billing.services.subscription_service.stripe.Subscription.list",
             return_value=SimpleNamespace(data=[active_subscription]),
         )
         sync_from_stripe_data = mocker.patch(
-            'billing.services.subscription_service.DjstripeSubscription.sync_from_stripe_data',
+            "billing.services.subscription_service.DjstripeSubscription."
+            "sync_from_stripe_data",
             return_value=djstripe_subscription,
         )
         sync_from_djstripe = mocker.patch(
-            'billing.services.subscription_service.SubscriptionService.sync_from_djstripe',
+            "billing.services.subscription_service.SubscriptionService."
+            "sync_from_djstripe",
             return_value=synced_subscription,
         )
         mocker.patch(
-            'billing.services.subscription_service.stripe.api_key',
-            'sk_test_runtime_123',
+            "billing.services.subscription_service.stripe.api_key",
+            "sk_test_runtime_123",
         )
 
         result = SubscriptionService.sync_user_subscription_from_stripe(
@@ -626,7 +626,10 @@ class TestSyncUserSubscriptionFromStripe:
 
         assert result == synced_subscription
         sync_from_stripe_data.assert_called_once()
-        assert sync_from_stripe_data.call_args.kwargs['api_key'] == 'sk_test_runtime_123'
+        assert (
+            sync_from_stripe_data.call_args.kwargs["api_key"]
+            == "sk_test_runtime_123"
+        )
         sync_from_djstripe.assert_called_once_with(djstripe_subscription)
 
     def test_sync_from_djstripe_handles_stripe_objects(
@@ -635,16 +638,16 @@ class TestSyncUserSubscriptionFromStripe:
         test_user,
     ):
         customer = SimpleNamespace(
-            id='cus_123',
+            id="cus_123",
             subscriber=test_user,
             email=test_user.email,
             subscriber_id=test_user.id,
         )
         djstripe_subscription = SimpleNamespace(
-            id='sub_active',
+            id="sub_active",
             customer=customer,
-            plan=SimpleNamespace(id='price_test'),
-            status='active',
+            plan=SimpleNamespace(id="price_test"),
+            status="active",
             cancel_at_period_end=False,
             cancel_at=None,
         )
@@ -652,7 +655,7 @@ class TestSyncUserSubscriptionFromStripe:
             items=SimpleNamespace(
                 data=[
                     SimpleNamespace(
-                        price=SimpleNamespace(id='price_test'),
+                        price=SimpleNamespace(id="price_test"),
                         current_period_start=1710000000,
                         current_period_end=1712592000,
                     )
@@ -660,15 +663,15 @@ class TestSyncUserSubscriptionFromStripe:
             ),
             billing_cycle_anchor=1710000000,
         )
-        stripe_provider = SimpleNamespace(name='stripe')
+        stripe_provider = SimpleNamespace(name="stripe")
         plan_price = SimpleNamespace(
-            plan=SimpleNamespace(slug='starter'),
+            plan=SimpleNamespace(slug="starter"),
             provider=stripe_provider,
         )
         synced_subscription = SimpleNamespace(
             id=999,
-            status='active',
-            plan=SimpleNamespace(slug='starter'),
+            status="active",
+            plan=SimpleNamespace(slug="starter"),
             provider=stripe_provider,
             auto_renew=True,
             djstripe_subscription=djstripe_subscription,
@@ -676,27 +679,31 @@ class TestSyncUserSubscriptionFromStripe:
         user_credits = SimpleNamespace(save=Mock())
 
         mocker.patch(
-            'billing.services.subscription_service.stripe.api_key',
-            'sk_test_runtime_123',
+            "billing.services.subscription_service.stripe.api_key",
+            "sk_test_runtime_123",
         )
         mocker.patch(
-            'billing.services.subscription_service.stripe.Subscription.retrieve',
+            "billing.services.subscription_service.stripe.Subscription."
+            "retrieve",
             return_value=stripe_subscription,
         )
         mocker.patch(
-            'billing.services.subscription_service.PlanPrice.objects.filter',
+            "billing.services.subscription_service.PlanPrice.objects.filter",
             return_value=SimpleNamespace(first=lambda: plan_price),
         )
         mocker.patch(
-            'billing.services.subscription_service.Subscription.objects.update_or_create',
+            "billing.services.subscription_service.Subscription.objects."
+            "update_or_create",
             return_value=(synced_subscription, False),
         )
         mocker.patch(
-            'billing.services.subscription_service.CreditsService.get_user_credits',
+            "billing.services.subscription_service.CreditsService."
+            "get_user_credits",
             return_value=user_credits,
         )
         reset_period_credits = mocker.patch(
-            'billing.services.subscription_service.CreditsService.reset_period_credits'
+            "billing.services.subscription_service.CreditsService."
+            "reset_period_credits"
         )
         result = SubscriptionService.sync_from_djstripe(djstripe_subscription)
 

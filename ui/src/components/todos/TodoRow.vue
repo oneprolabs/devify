@@ -50,8 +50,8 @@
       </div>
 
     <router-link
-      v-if="sourceTitle"
-      :to="`/chats/${todo.email_message.uuid || todo.email_message.id}`"
+      v-if="sourceTitle && todo.email_message?.uuid"
+      :to="`/chats/${todo.email_message.uuid}`"
       class="truncate text-[calc(11px*var(--fs))] text-accent hover:underline md:w-[210px] md:flex-none md:text-[calc(11.5px*var(--fs))]"
       :title="sourceTitle"
     >

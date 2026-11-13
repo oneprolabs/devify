@@ -531,34 +531,22 @@ const calendarDays = computed(() => {
 const selectedDateTodos = computed(() => {
   let dateTodos = []
 
-  if (selectedDate.value) {
+  if (viewMode.value === 'list') {
+    // The API already applies the selected range, including undated TODOs.
+    dateTodos = todos.value.slice()
+  } else if (selectedDate.value) {
     // Show todos for selected date
     dateTodos = getTodosForDate(selectedDate.value)
   } else {
-    // Show todos based on calendar view mode and current month/week
-    if (viewMode.value === 'calendar') {
-      if (calendarViewMode.value === 'week') {
-        // Week view: show todos for current week
-        const weekRange = getWeekRangeForDate(currentMonth.value)
-        dateTodos = todos.value.filter((todo) => {
-          if (!todo.deadline) return false
-          const todoDate = new Date(todo.deadline)
-          return todoDate >= weekRange.start && todoDate <= weekRange.end
-        })
-      } else {
-        // Month view: show todos for current month
-        dateTodos = todos.value.filter((todo) => {
-          if (!todo.deadline) return false
-          const todoDate = new Date(todo.deadline)
-          const year = todoDate.getFullYear()
-          const month = todoDate.getMonth()
-          const currentYear = currentMonth.value.getFullYear()
-          const currentMonthIndex = currentMonth.value.getMonth()
-          return year === currentYear && month === currentMonthIndex
-        })
-      }
+    // Calendar views only show TODOs with a date in the displayed period.
+    if (calendarViewMode.value === 'week') {
+      const weekRange = getWeekRangeForDate(currentMonth.value)
+      dateTodos = todos.value.filter((todo) => {
+        if (!todo.deadline) return false
+        const todoDate = new Date(todo.deadline)
+        return todoDate >= weekRange.start && todoDate <= weekRange.end
+      })
     } else {
-      // List view: show all todos for current month (default view)
       dateTodos = todos.value.filter((todo) => {
         if (!todo.deadline) return false
         const todoDate = new Date(todo.deadline)
@@ -969,6 +957,10 @@ const loadTodos = async () => {
       ordering: '-created_at',
       deadline_after: range.start,
       deadline_before: range.end
+    }
+
+    if (viewMode.value === 'list') {
+      params.include_no_deadline = true
     }
 
     if (filters.value.is_completed !== null) {

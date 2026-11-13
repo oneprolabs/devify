@@ -53,18 +53,24 @@ def _format_crontab(schedule: CrontabSchedule | None) -> str | None:
     )
 
 
-def _get_existing_crontab(expr: str) -> CrontabSchedule | None:
+def _crontab_spec(expr: str) -> dict:
     parts = str(expr).strip().split()
-    timezone = getattr(settings, "TIME_ZONE", "UTC")
-    spec = {
+    return {
         "minute": parts[0],
         "hour": parts[1],
         "day_of_month": parts[2],
         "month_of_year": parts[3],
         "day_of_week": parts[4],
-        "timezone": timezone,
+        "timezone": getattr(settings, "TIME_ZONE", "UTC"),
     }
-    return CrontabSchedule.objects.filter(**spec).order_by("id").first()
+
+
+def _get_existing_crontab(expr: str) -> CrontabSchedule | None:
+    return (
+        CrontabSchedule.objects.filter(**_crontab_spec(expr))
+        .order_by("id")
+        .first()
+    )
 
 
 def _task_definitions() -> list[dict]:
@@ -89,7 +95,9 @@ def _task_definitions() -> list[dict]:
             ),
             "module": "threadline",
             "label": "Stuck email reset",
-            "description": "Requeue emails that were left in processing state.",
+            "description": (
+                "Requeue emails that were left in processing state."
+            ),
             "default_enabled": True,
             "default_crontab": "*/10 * * * *",
             "args": (),
@@ -110,9 +118,7 @@ def _task_definitions() -> list[dict]:
         },
         {
             "name": "threadline-email-task-cleanup",
-            "task": (
-                "threadline.tasks.scheduler.schedule_email_task_cleanup"
-            ),
+            "task": ("threadline.tasks.scheduler.schedule_email_task_cleanup"),
             "module": "threadline",
             "label": "EmailTask cleanup",
             "description": "Delete old EmailTask records from the database.",
@@ -124,9 +130,7 @@ def _task_definitions() -> list[dict]:
         },
         {
             "name": "threadline-share-link-cleanup",
-            "task": (
-                "threadline.tasks.scheduler.schedule_share_link_cleanup"
-            ),
+            "task": ("threadline.tasks.scheduler.schedule_share_link_cleanup"),
             "module": "threadline",
             "label": "Share link cleanup",
             "description": "Delete expired share links.",
@@ -175,16 +179,6 @@ def _serialise_tasks() -> list[dict]:
 
 
 def _update_task(definition: dict, enabled: bool, crontab_value: str) -> None:
-    schedule = _get_existing_crontab(crontab_value)
-    if schedule is None:
-        raise serializers.ValidationError(
-            {
-                "crontab": (
-                    f"Crontab schedule does not exist: {crontab_value}"
-                )
-            }
-        )
-
     task = (
         PeriodicTask.objects.select_for_update()
         .filter(name=definition["name"])
@@ -192,11 +186,15 @@ def _update_task(definition: dict, enabled: bool, crontab_value: str) -> None:
     )
     if task is None:
         raise serializers.ValidationError(
-            {
-                "name": (
-                    f"Periodic task does not exist: {definition['name']}"
-                )
-            }
+            {"name": (f"Periodic task does not exist: {definition['name']}")}
+        )
+
+    schedule = _get_existing_crontab(crontab_value)
+    if schedule is None:
+        # Only schedules created by ``register_periodic_tasks`` may be used:
+        # creating one here would let the admin page drift from the registry.
+        raise serializers.ValidationError(
+            {"crontab": (f"Crontab schedule does not exist: {crontab_value}")}
         )
 
     task.task = definition["task"]
@@ -291,5 +289,6 @@ class AdminPeriodicTaskSettingsAPIView(APIView):
 
         PeriodicTasks.update_changed()
         return Response(
-            {"tasks": _serialise_tasks()}, status=status.HTTP_200_OK,
+            {"tasks": _serialise_tasks()},
+            status=status.HTTP_200_OK,
         )

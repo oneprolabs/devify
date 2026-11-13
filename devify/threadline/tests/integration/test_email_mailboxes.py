@@ -67,15 +67,25 @@ class TestMailboxModel:
             with transaction.atomic():
                 make_mailbox(user)
 
-    def test_two_users_may_connect_the_same_address(self, django_user_model):
+    def test_a_mailbox_source_is_globally_unique(self, django_user_model):
+        from django.db import IntegrityError, transaction
+
         first = django_user_model.objects.create_user("m4", password="x")
         second = django_user_model.objects.create_user("m5", password="x")
 
-        make_mailbox(first)
-        make_mailbox(second)
+        make_mailbox(first, username="shared@example.com")
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                make_mailbox(second, username="shared@example.com")
 
-        assert EmailMailbox.objects.filter(user=first).count() == 1
-        assert EmailMailbox.objects.filter(user=second).count() == 1
+        assert (
+            EmailMailbox.objects.filter(
+                username="shared@example.com"
+            ).count()
+            == 1
+        )
+        # The second user is expected to receive the source through a share
+        # instead of configuring the same account again.
 
 
 class TestMailboxAPI:
@@ -87,8 +97,8 @@ class TestMailboxAPI:
     ):
         mine = django_user_model.objects.create_user("m6", password="x")
         theirs = django_user_model.objects.create_user("m7", password="x")
-        make_mailbox(mine)
-        make_mailbox(theirs)
+        make_mailbox(mine, username="mine@example.com")
+        make_mailbox(theirs, username="theirs@example.com")
         api_client.force_authenticate(user=mine)
 
         response = api_client.get(LIST_URL)
@@ -116,7 +126,9 @@ class TestMailboxAPI:
     def test_connecting_an_invoice_mailbox_enables_expense(
         self, api_client, django_user_model
     ):
-        user = django_user_model.objects.create_user("invoice-new", password="x")
+        user = django_user_model.objects.create_user(
+            "invoice-new", password="x"
+        )
         api_client.force_authenticate(user=user)
 
         response = api_client.post(
@@ -179,7 +191,9 @@ class TestMailboxAPI:
     def test_setting_an_existing_mailbox_to_invoices_enables_expense(
         self, api_client, django_user_model
     ):
-        user = django_user_model.objects.create_user("invoice-edit", password="x")
+        user = django_user_model.objects.create_user(
+            "invoice-edit", password="x"
+        )
         mailbox = make_mailbox(user)
         api_client.force_authenticate(user=user)
 

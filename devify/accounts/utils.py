@@ -4,6 +4,28 @@ Utility functions for working with user accounts and social authentication.
 
 from allauth.socialaccount.models import SocialAccount
 
+PLATFORM_LABELS = {
+    "macos": "macOS",
+    "mac": "macOS",
+    "darwin": "macOS",
+    "windows": "Windows",
+    "win": "Windows",
+    "win32": "Windows",
+    "linux": "Linux",
+    "ios": "iOS",
+    "android": "Android",
+}
+
+
+def platform_display_name(platform):
+    value = str(platform or "").strip()
+    return PLATFORM_LABELS.get(value.lower(), value)
+
+
+def default_device_label(platform=""):
+    display = platform_display_name(platform)
+    return f"桌面客户端 · {display}" if display else "桌面客户端"
+
 
 class SocialAccountHelper:
     """
@@ -33,10 +55,7 @@ class SocialAccountHelper:
                 picture = google.extra_data.get('picture')
         """
         try:
-            return SocialAccount.objects.get(
-                user=user,
-                provider='google'
-            )
+            return SocialAccount.objects.get(user=user, provider="google")
         except SocialAccount.DoesNotExist:
             return None
 
@@ -59,10 +78,7 @@ class SocialAccountHelper:
                 nickname = wechat.extra_data.get('nickname')
         """
         try:
-            return SocialAccount.objects.get(
-                user=user,
-                provider='weixin'
-            )
+            return SocialAccount.objects.get(user=user, provider="weixin")
         except SocialAccount.DoesNotExist:
             return None
 
@@ -85,10 +101,7 @@ class SocialAccountHelper:
                 avatar = github.extra_data.get('avatar_url')
         """
         try:
-            return SocialAccount.objects.get(
-                user=user,
-                provider='github'
-            )
+            return SocialAccount.objects.get(user=user, provider="github")
         except SocialAccount.DoesNotExist:
             return None
 
@@ -129,8 +142,7 @@ class SocialAccountHelper:
                 print("User has Google account")
         """
         return SocialAccount.objects.filter(
-            user=user,
-            provider=provider
+            user=user, provider=provider
         ).exists()
 
     @staticmethod
@@ -157,8 +169,7 @@ class SocialAccountHelper:
                 print(f"Google ID: {google_id}")
         """
         account = SocialAccount.objects.filter(
-            user=user,
-            provider=provider
+            user=user, provider=provider
         ).first()
         return account.uid if account else None
 

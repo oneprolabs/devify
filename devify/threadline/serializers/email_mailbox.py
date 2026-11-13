@@ -1,10 +1,11 @@
 """Serializers for user-connected mailboxes."""
 
 from django.conf import settings as django_settings
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from threadline.models import EmailMailbox
+from threadline.models import EmailMailbox, compute_mailbox_source_key
 
 
 def _clean_lines(value, field_label):
@@ -101,19 +102,41 @@ class EmailMailboxSerializer(serializers.ModelSerializer):
         username = attrs.get("username") or getattr(
             self.instance, "username", ""
         )
-        duplicate = EmailMailbox.objects.filter(
-            user=user, imap_host=host, username=username
+        imap_port = attrs.get("imap_port") or getattr(
+            self.instance, "imap_port", 993
         )
+        folder = attrs.get("folder") or getattr(
+            self.instance, "folder", "INBOX"
+        )
+        use_ssl = attrs.get("use_ssl", getattr(self.instance, "use_ssl", True))
+        source_key = compute_mailbox_source_key(
+            host, imap_port, username, folder, use_ssl
+        )
+        duplicate = EmailMailbox.objects.filter(source_key=source_key)
         if self.instance is not None:
             duplicate = duplicate.exclude(pk=self.instance.pk)
         if duplicate.exists():
             raise serializers.ValidationError(
-                _("That mailbox is already connected.")
+                _(
+                    "That mailbox is already connected. "
+                    "Ask its owner to share it with this space."
+                )
             )
 
         if self.instance is None:
             limit = getattr(django_settings, "MAX_USER_MAILBOXES", 5)
-            if EmailMailbox.objects.filter(user=user).count() >= limit:
+            personal_count = (
+                EmailMailbox.objects.filter(user=user)
+                .filter(
+                    Q(space__isnull=True)
+                    | Q(
+                        space__kind="personal",
+                        space__personal_owner=user,
+                    )
+                )
+                .count()
+            )
+            if personal_count >= limit:
                 raise serializers.ValidationError(
                     _("You can connect at most %(limit)d mailboxes.")
                     % {"limit": limit}
@@ -122,7 +145,9 @@ class EmailMailboxSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        validated_data["user"] = self.context["request"].user
+        user = self.context["request"].user
+        validated_data["user"] = user
+        validated_data["created_by"] = user
         return super().create(validated_data)
 
     def update(self, instance, validated_data):

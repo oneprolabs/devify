@@ -9,6 +9,7 @@ This module configures:
 """
 
 import os
+from pathlib import Path
 
 # ============================
 # Email Auto-Assignment Configuration
@@ -41,17 +42,26 @@ DEFAULT_LANGUAGE = os.getenv('DEFAULT_LANGUAGE', 'en-US')
 # - Note: Affects LLM prompt templates and processing behavior
 DEFAULT_SCENE = os.getenv('DEFAULT_SCENE', 'chat')
 
+# EMAIL_TEAM_AI_ENABLED: run merge/workflow/LLM for team-space email.
+# First release keeps team mail receive-and-read only; the pipeline is
+# skipped until space billing/quotas are decided.
+EMAIL_TEAM_AI_ENABLED = os.getenv(
+    'EMAIL_TEAM_AI_ENABLED', 'false'
+).strip().lower() in {'1', 'true', 'yes', 'on'}
+
 # ============================
 # Threadline Configuration
 # ============================
 
 # THREADLINE_CONFIG_PATH: Path to Threadline configuration files
 # - Use Case: Store user-specific email processing configurations
-# - Default: '/opt/devify/conf/threadline'
+# - Default: '<repository>/conf/threadline' (same path as /opt/devify/conf
+#   inside the container, but also valid in CI and local checkouts)
 # - Security: Ensure proper file permissions (readable by Django)
 # - Note: Used for storing scene templates and processing rules
 THREADLINE_CONFIG_PATH = os.getenv(
-    'THREADLINE_CONFIG_PATH', '/opt/devify/conf/threadline'
+    'THREADLINE_CONFIG_PATH',
+    str(Path(__file__).resolve().parents[2] / 'conf' / 'threadline'),
 )
 
 # ============================

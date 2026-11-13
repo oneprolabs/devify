@@ -57,6 +57,7 @@ urlpatterns = [
     path("api/v1/", include("chat_analysis.suggestion_urls")),
     path("api/v1/", include("relay.urls")),
     path("api/v1/", include("expense.urls")),
+    path("api/v1/", include("feedback.urls")),
     # Agentcore task execution API
     path("api/v1/tasks/", include("agentcore_task.adapters.django.urls")),
     # Management APIs for auth users/groups

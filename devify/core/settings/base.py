@@ -154,6 +154,7 @@ INSTALLED_APPS += [
     "threadline",
     "relay",
     "expense",
+    "feedback",
     "agentcore_metering.adapters.django",
     "agentcore_task.adapters.django",
     "agentcore_notifier.adapters.django",

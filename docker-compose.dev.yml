@@ -34,6 +34,7 @@ services:
       - ./data.dev/haraka/emails:/opt/haraka/emails
       - ./data.dev/haraka/email_attachments:/opt/haraka/email_attachments
       - ./data.dev/email_attachments:/opt/email_attachments
+      - ./data.dev/feedback:/opt/feedback
       - ./docker/nginx/certs:/opt/devify/docker/nginx/certs
     networks:
       - devify_network
@@ -63,6 +64,7 @@ services:
       - ./data.dev/haraka/emails:/opt/haraka/emails
       - ./data.dev/haraka/email_attachments:/opt/haraka/email_attachments
       - ./data.dev/email_attachments:/opt/email_attachments
+      - ./data.dev/feedback:/opt/feedback
     networks:
       - devify_network
     depends_on:
@@ -89,6 +91,7 @@ services:
       - ./data.dev/haraka/emails:/opt/haraka/emails
       - ./data.dev/haraka/email_attachments:/opt/haraka/email_attachments
       - ./data.dev/email_attachments:/opt/email_attachments
+      - ./data.dev/feedback:/opt/feedback
     networks:
       - devify_network
     depends_on:

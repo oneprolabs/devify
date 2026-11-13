@@ -85,7 +85,7 @@
             <div class="desktop-prompt-actions">
               <a
                 data-testid="desktop-download"
-                href="https://github.com/oneprolabs/devify-desktop-releases/releases/tag/alpha"
+                href="https://github.com/oneprolabs/devify-desktop-releases/releases/latest"
                 target="_blank"
                 rel="noopener noreferrer"
                 >下载 Mac 客户端</a

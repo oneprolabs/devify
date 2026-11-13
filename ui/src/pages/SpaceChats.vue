@@ -405,9 +405,26 @@
                               alt="图片"
                               class="bub-image"
                               loading="lazy"
-                              @click="toggleMessage(message)"
+                              role="button"
+                              tabindex="0"
+                              aria-label="放大图片"
+                              @click="
+                                previewImage = resolveMedia(part.media_url)
+                              "
+                              @keydown.enter.prevent="
+                                previewImage = resolveMedia(part.media_url)
+                              "
+                              @keydown.space.prevent="
+                                previewImage = resolveMedia(part.media_url)
+                              "
                             />
                           </div>
+                          <VoiceBubble
+                            v-for="part in audioParts(message)"
+                            :key="part.id"
+                            :url="part.media_url"
+                            :outgoing="message.direction === 'outgoing'"
+                          />
                           <button
                             v-if="bubbleText(message)"
                             type="button"
@@ -454,6 +471,18 @@
                                   :alt="partLabel(part.kind)"
                                   class="part-image"
                                   loading="lazy"
+                                  role="button"
+                                  tabindex="0"
+                                  aria-label="放大图片"
+                                  @click="
+                                    previewImage = resolveMedia(part.media_url)
+                                  "
+                                  @keydown.enter.prevent="
+                                    previewImage = resolveMedia(part.media_url)
+                                  "
+                                  @keydown.space.prevent="
+                                    previewImage = resolveMedia(part.media_url)
+                                  "
                                 />
                                 <video
                                   v-else-if="
@@ -513,16 +542,36 @@
         </main>
       </div>
     </div>
+    <div
+      v-if="previewImage"
+      class="image-preview"
+      role="dialog"
+      aria-modal="true"
+      aria-label="图片预览"
+      @click.self="previewImage = ''"
+      @keydown.esc="previewImage = ''"
+    >
+      <button
+        type="button"
+        class="image-preview-close"
+        aria-label="关闭图片预览"
+        @click="previewImage = ''"
+      >
+        ×
+      </button>
+      <img :src="previewImage" alt="图片预览" />
+    </div>
   </AppLayout>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { spacesApi } from '@/api/spaces'
 import { useAvatars } from '@/composables/useAvatars'
 import { useChatMedia } from '@/composables/useChatMedia'
+import VoiceBubble from '@/components/spaces/VoiceBubble.vue'
 
 const props = defineProps({
   spaceId: { type: [String, Number], required: true }
@@ -530,16 +579,22 @@ const props = defineProps({
 const route = useRoute()
 const { resolve: resolveAvatar } = useAvatars()
 const { resolve: resolveMedia } = useChatMedia()
+const previewImage = ref('')
 
 const MEDIA_PLACEHOLDERS = /\[(图片|视频|语音|文件)\]/g
 const imageParts = (message) =>
   (message.media || []).filter(
     (part) => part.kind === 'image' && part.media_url
   )
+const audioParts = (message) =>
+  (message.media || []).filter(
+    (part) => part.kind === 'audio' && part.media_url
+  )
 // Show the picture instead of the "[图片]" placeholder; keep any real text.
 const bubbleText = (message) => {
   const text = message.preview || ''
-  if (!imageParts(message).length) return text || '（无正文）'
+  if (!imageParts(message).length && !audioParts(message).length)
+    return text || '（无正文）'
   return text.replace(MEDIA_PLACEHOLDERS, '').trim()
 }
 
@@ -1018,7 +1073,14 @@ watch(
   }
 )
 
-onMounted(loadConversations)
+const closePreviewOnEscape = (event) => {
+  if (event.key === 'Escape') previewImage.value = ''
+}
+onMounted(() => {
+  loadConversations()
+  window.addEventListener('keydown', closePreviewOnEscape)
+})
+onUnmounted(() => window.removeEventListener('keydown', closePreviewOnEscape))
 </script>
 
 <style scoped>
@@ -1600,6 +1662,30 @@ onMounted(loadConversations)
   border-radius: 8px;
   object-fit: contain;
   background: rgb(var(--c-chip));
+  cursor: zoom-in;
+}
+.image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  background: rgba(0, 0, 0, 0.82);
+}
+.image-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.image-preview-close {
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  color: white;
+  font-size: 32px;
+  cursor: pointer;
 }
 .part-video {
   display: block;

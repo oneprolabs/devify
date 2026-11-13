@@ -278,3 +278,10 @@ def parse_chat_upload_task(self, batch_id):
 
 def dispatch_parse_chat_upload(batch):
     return parse_chat_upload_task.delay(batch.pk)
+
+
+@shared_task
+def recover_stale_uploads_task():
+    from chat_ingestion.recovery import recover_stale_uploads
+
+    return recover_stale_uploads()

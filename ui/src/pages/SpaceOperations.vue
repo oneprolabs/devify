@@ -119,7 +119,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { authApi } from '@/api/auth'
 import { spacesApi } from '@/api/spaces'
@@ -136,6 +136,9 @@ const activeDevice = ref('all')
 const expanded = ref(null)
 const loading = ref(false)
 const error = ref('')
+let refreshTimer
+let refreshing = false
+let disposed = false
 
 const unwrap = (response) => response.data.data || response.data
 
@@ -222,6 +225,30 @@ async function loadDevices() {
   }
 }
 
+async function refreshUploads() {
+  if (loading.value || refreshing) return
+  refreshing = true
+  const spaceId = props.spaceId
+  const pages = page.value
+  try {
+    const results = await Promise.all(
+      Array.from({ length: pages }, (_, index) =>
+        spacesApi.getUploads(spaceId, { page_size: 100, page: index + 1 })
+      )
+    )
+    if (disposed || props.spaceId !== spaceId || page.value !== pages) return
+    const data = results.map(unwrap)
+    uploads.value = data.flatMap((result) =>
+      Array.isArray(result) ? result : result.list || []
+    )
+    pagination.value = data[data.length - 1]?.pagination || null
+  } catch {
+    // Keep the last successful result visible and retry on the next tick.
+  } finally {
+    refreshing = false
+  }
+}
+
 function toggle(upload) {
   expanded.value = expanded.value === upload.id ? null : upload.id
 }
@@ -261,6 +288,9 @@ const modeText = (upload) =>
   (upload.device_id ? '客户端' : '网页')
 
 const contentText = (upload) => {
+  if (['created', 'uploading'].includes(upload.status)) return '等待上传'
+  if (upload.status === 'processing') return '解析统计中'
+  if (upload.status === 'failed') return '未完成'
   const conversations = Number(upload.conversation_count || 0)
   const messages = Number(upload.message_count || 0)
   if (!messages) return '0 条新消息'
@@ -270,8 +300,26 @@ const contentText = (upload) => {
 const statusInfo = (upload) => {
   const status = upload.status
   if (status === 'created') return { text: '待上传', cls: '' }
-  if (status === 'uploading') return { text: '上传中', cls: 'ac' }
-  if (status === 'processing') return { text: '解析中', cls: 'ac' }
+  if (status === 'uploading') {
+    const lastUpdate = Date.parse(upload.updated_at || upload.created_at)
+    if (
+      Number.isFinite(lastUpdate) &&
+      Date.now() - lastUpdate > 15 * 60 * 1000
+    ) {
+      return { text: '上传状态待确认', cls: 'warn' }
+    }
+    return { text: '上传中', cls: 'ac' }
+  }
+  if (status === 'processing') {
+    const lastUpdate = Date.parse(upload.updated_at || upload.created_at)
+    if (
+      Number.isFinite(lastUpdate) &&
+      Date.now() - lastUpdate > 15 * 60 * 1000
+    ) {
+      return { text: '解析耗时较长', cls: 'warn' }
+    }
+    return { text: '解析中', cls: 'ac' }
+  }
   if (status === 'failed') return { text: '失败', cls: 'bad' }
   if (status === 'cancelled') return { text: '已取消', cls: '' }
   const analysis = upload.analysis_summary
@@ -318,7 +366,7 @@ const stagesFor = (upload) => {
   const cancelled = status === 'cancelled'
   const hasArchive =
     Boolean(upload.archive_received_at) ||
-    ['processing', 'completed', 'failed'].includes(status)
+    ['processing', 'completed'].includes(status)
   const clientUpload =
     Boolean(upload.device_id) || upload.source_provider === 'tauri_upload'
   const messages = Number(upload.message_count || 0)
@@ -336,7 +384,11 @@ const stagesFor = (upload) => {
       tone: hasArchive ? 'ok' : clientUpload ? 'ac' : 'muted',
       label: '打包',
       detail: clientUpload
-        ? `${messages} 条消息 · ${conversations} 个会话 · ${images} 张图片（本机完成）`
+        ? !hasArchive
+          ? '等待客户端上传归档'
+          : !completed
+            ? '归档已接收，数量待解析'
+            : `${messages} 条消息 · ${conversations} 个会话 · ${images} 张图片（本机完成）`
         : `网页导入 · ${messages} 条消息 · ${conversations} 个会话`,
       time: ''
     },
@@ -355,9 +407,11 @@ const stagesFor = (upload) => {
       icon: completed ? '✓' : failed ? '!' : '…',
       tone: completed ? 'ok' : failed ? 'bad' : 'ac',
       label: '解析整理',
-      detail: `会话 → 消息，归 ${messages} 条${
-        duplicates ? ` · ${duplicates} 条重复` : ''
-      }`,
+      detail: completed
+        ? `会话 → 消息，归 ${messages} 条${duplicates ? ` · ${duplicates} 条重复` : ''}`
+        : failed
+          ? '解析未完成'
+          : '等待解析结果',
       time: formatDuration(
         durationBetween(upload.parse_started_at, upload.completed_at)
       )
@@ -366,7 +420,11 @@ const stagesFor = (upload) => {
       icon: images ? (completed ? '✓' : '…') : '—',
       tone: images ? (completed ? 'ok' : 'ac') : 'muted',
       label: '图片处理',
-      detail: images ? `${images} 张图片随消息保存` : '本次没有图片',
+      detail: !completed
+        ? '等待解析结果'
+        : images
+          ? `${images} 张图片随消息保存`
+          : '本次没有图片',
       time: ''
     },
     {
@@ -448,6 +506,11 @@ watch(
 
 onMounted(async () => {
   await Promise.all([load(), loadDevices()])
+  if (!disposed) refreshTimer = window.setInterval(refreshUploads, 15000)
+})
+onUnmounted(() => {
+  disposed = true
+  window.clearInterval(refreshTimer)
 })
 </script>
 

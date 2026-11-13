@@ -32,6 +32,9 @@ services:
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/haraka/emails:/opt/haraka/emails
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/haraka/email_attachments:/opt/haraka/email_attachments
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/email_attachments:/opt/email_attachments
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_upload_archives:/opt/devify/chat_upload_archives
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_media:/opt/devify/chat_media
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_avatars:/opt/devify/chat_avatars
       - ${DEVIFY_NGINX_CERTS_DIR:-./docker/nginx/certs}:/opt/devify/docker/nginx/certs
     networks:
       - devify_network
@@ -60,6 +63,9 @@ services:
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/haraka/emails:/opt/haraka/emails
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/haraka/email_attachments:/opt/haraka/email_attachments
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/email_attachments:/opt/email_attachments
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_upload_archives:/opt/devify/chat_upload_archives
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_media:/opt/devify/chat_media
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_avatars:/opt/devify/chat_avatars
     networks:
       - devify_network
     depends_on:

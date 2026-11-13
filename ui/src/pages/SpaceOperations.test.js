@@ -137,6 +137,67 @@ describe('SpaceOperations', () => {
     expect(stages.findAll('.stage')).toHaveLength(6)
   })
 
+  it('does not present unknown upload and parsing counts as zero', async () => {
+    const old = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+    spacesApi.getUploads.mockResolvedValue({
+      data: {
+        data: {
+          list: [
+            {
+              id: 1,
+              status: 'uploading',
+              created_at: old,
+              updated_at: old,
+              device_id: 'mac-1'
+            },
+            {
+              id: 2,
+              status: 'processing',
+              created_at: old,
+              archive_received_at: old,
+              device_id: 'mac-1'
+            }
+          ],
+          pagination: { next: null }
+        }
+      }
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('上传状态待确认')
+    expect(wrapper.text()).toContain('解析统计中')
+    expect(wrapper.text()).toContain('解析耗时较长')
+    expect(wrapper.text()).not.toContain('0 条新消息')
+    await wrapper.findAll('.sync-row:not(.sync-head)')[1].trigger('click')
+    expect(wrapper.find('.stages').text()).toContain('归档已接收，数量待解析')
+    expect(wrapper.find('.stages').text()).not.toContain('本次没有图片')
+  })
+
+  it('refreshes task state while keeping the expanded record open', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    let wrapper
+    try {
+      const waiting = { ...uploads[0], status: 'processing', message_count: 0 }
+      spacesApi.getUploads.mockResolvedValue({
+        data: { data: { list: [waiting], pagination: { next: null } } }
+      })
+      wrapper = mountPage()
+      await flushPromises()
+      await wrapper.find('.sync-row:not(.sync-head)').trigger('click')
+      expect(wrapper.text()).toContain('解析统计中')
+      spacesApi.getUploads.mockResolvedValue({
+        data: { data: { list: [uploads[0]], pagination: { next: null } } }
+      })
+      await vi.advanceTimersByTimeAsync(15000)
+      await flushPromises()
+      expect(wrapper.text()).toContain('9 会话 · 412 条')
+      expect(wrapper.find('.stages').exists()).toBe(true)
+    } finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('filters records by device', async () => {
     const wrapper = mountPage()
     await flushPromises()

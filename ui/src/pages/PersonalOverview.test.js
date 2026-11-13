@@ -133,6 +133,11 @@ describe('PersonalOverview', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('连接客户端，开始同步聊天')
     expect(wrapper.text()).toContain('适用于 Mac M 系列芯片')
+    expect(
+      wrapper.get('[data-testid="desktop-download"]').attributes('href')
+    ).toBe(
+      'https://github.com/oneprolabs/devify-desktop-releases/releases/latest'
+    )
     await wrapper.get('[aria-label="关闭下载提示"]').trigger('click')
     expect(wrapper.text()).not.toContain('连接客户端，开始同步聊天')
     wrapper.unmount()

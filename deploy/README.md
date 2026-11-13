@@ -57,6 +57,18 @@ The script will:
 
 ## Upgrade
 
+Chat upload archives, media, and avatars are stored under
+`data/chat_upload_archives`, `data/chat_media`, and `data/chat_avatars` in the
+deploy root. The API containers and worker share these persistent directories;
+include them in backups alongside the database.
+
+Before the first upgrade from a release without these mounts, inspect the
+existing API and worker containers for chat files. Copy any needed files into
+the corresponding runtime directories and verify them before replacing the
+containers: mounting an empty directory hides files in the old container and
+does not migrate them automatically. In particular, preserve incomplete upload
+archives before attempting to resume their batches.
+
 ```bash
 cd devify-deploy
 git pull

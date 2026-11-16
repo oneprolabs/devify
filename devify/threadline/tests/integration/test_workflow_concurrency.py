@@ -36,6 +36,10 @@ def committed_email(django_db_setup, django_db_blocker):
             )
             yield email
         finally:
+            EmailMessage.objects.filter(user=user).delete()
+            personal_space = getattr(user, "personal_space", None)
+            if personal_space is not None:
+                personal_space.delete()
             user.delete()
 
 

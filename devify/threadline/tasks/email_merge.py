@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import logging
 
-from agentcore_task.adapters.django import prevent_duplicate_task
+from agentcore_task.adapters.django import TaskStatus, prevent_duplicate_task
+from agentcore_task.adapters.django.models import TaskExecution
 from celery import shared_task
 from django.conf import settings
 
 from threadline.models import EmailMessage
 from threadline.services.email_merge import EmailMergeService
 from threadline.services.space_email import email_ai_allowed
+from threadline.services.workflow_recovery import child_workflow_id
 from threadline.state_machine import (
     EMAIL_STATE_MACHINE,
     EmailStatus,
@@ -74,6 +76,10 @@ def process_email_merge(
     """
     tracer = TaskTracer("EMAIL_MERGE")
     task_id = getattr(process_email_merge.request, "id", "") or ""
+    if task_id and TaskExecution.objects.filter(
+        task_id=task_id, status=TaskStatus.SUCCESS,
+    ).exists():
+        return str(email_id)
     tracer.set_task_id(task_id)
     merge_failure_logged = False
     email = None
@@ -90,6 +96,9 @@ def process_email_merge(
         has_merged_children = email.merged_children.exists()
         merge_result = {
             "email_id": str(email.id),
+            "workflow_task_id": (
+                child_workflow_id(task_id) if task_id else None
+            ),
             "anchor_email_id": str(email.id),
             "should_merge": False,
             "merge_reason": "manual_merge_skip" if has_merged_children else "",
@@ -180,13 +189,17 @@ def process_email_merge(
             }
 
         try:
-            process_email_workflow.delay(
-                str(email.id),
-                force=force,
-                language=language,
-                scene=scene,
-                trigger_source=trigger_source,
-            )
+            options = {
+                "force": force, "language": language, "scene": scene,
+                "trigger_source": trigger_source,
+            }
+            if task_id:
+                process_email_workflow.apply_async(
+                    args=[str(email.id)], kwargs=options,
+                    task_id=child_workflow_id(task_id),
+                )
+            else:
+                process_email_workflow.delay(str(email.id), **options)
         except Exception as exc:
             merge_failure_logged = True
             logger.error(

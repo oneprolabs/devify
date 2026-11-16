@@ -10,11 +10,17 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
+from agentcore_task.adapters.django import acquire_task_lock, release_task_lock
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
-from agentcore_task.adapters.django import acquire_task_lock, release_task_lock
 from threadline.models import EmailMessage
+from threadline.services.processing_control import paused_user_ids
+from threadline.services.workflow_recovery import (
+    expire_workflow_reservation,
+    workflows_in_flight,
+)
 from threadline.state_machine import EmailStatus
 from threadline.tasks.email_merge import process_email_merge
 
@@ -61,20 +67,40 @@ def recover_stuck_processing_emails(
         now = timezone.now()
         timeout_threshold = now - timedelta(minutes=timeout_minutes)
 
-        candidates = list(
-            EmailMessage.objects.filter(
-                status=EmailStatus.PROCESSING.value,
-                updated_at__lt=timeout_threshold,
+        candidates = EmailMessage.objects.filter(
+            status=EmailStatus.PROCESSING.value,
+            updated_at__lt=timeout_threshold,
+        ).exclude(user_id__in=paused_user_ids())
+        floor_hours = getattr(settings, "STUCK_EMAIL_MAX_AGE_HOURS", 48)
+        if floor_hours:
+            candidates = candidates.filter(
+                updated_at__gte=now - timedelta(hours=floor_hours)
             )
-            .select_related("user")
-            .order_by("updated_at", "id")
-        )
+        candidates = list(candidates.order_by("updated_at", "id"))
+        in_flight = workflows_in_flight() if candidates else set()
+        if in_flight is None:
+            return {
+                "status": "skipped", "reason": "inspection_unavailable",
+                "timeout_minutes": timeout_minutes,
+                "candidate_count": len(candidates), "requeued_count": 0,
+            }
 
         requeued_count = 0
         dispatch_errors = []
 
         for email in candidates:
+            if str(email.pk) in in_flight:
+                continue
             try:
+                # Re-open only the row inspected above. A queued/running
+                # request or concurrent completion must never be overwritten.
+                with transaction.atomic():
+                    if not EmailMessage.objects.filter(
+                        pk=email.pk, status=EmailStatus.PROCESSING.value,
+                        updated_at=email.updated_at,
+                    ).update(status=EmailStatus.FAILED.value, updated_at=now):
+                        continue
+                    expire_workflow_reservation(email.pk)
                 process_email_merge.delay(
                     str(email.id),
                     force=False,

@@ -18,14 +18,13 @@ def recover_processing_emails_on_worker_ready(sender=None, **kwargs):
         return
     try:
         logger.info("Threadline worker_ready signal received")
-        from threadline.services.startup_recovery import (
-            recover_stuck_processing_emails,
+        from threadline.tasks.scheduler import (
+            recover_email_workflows_after_startup,
         )
 
-        result = recover_stuck_processing_emails()
+        task = recover_email_workflows_after_startup.apply_async(countdown=10)
         logger.info(
-            "Threadline startup recovery completed: %s",
-            result,
+            "Queued Threadline startup recovery: %s", task.id,
         )
     except Exception as exc:
         logger.exception(

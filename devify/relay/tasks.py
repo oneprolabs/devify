@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 
+from agentcore_task.adapters.django import TaskStatus, prevent_duplicate_task
+from agentcore_task.adapters.django.models import TaskExecution
 from celery import shared_task
 from django.conf import settings
 
-from agentcore_task.adapters.django import prevent_duplicate_task
 from relay.models import RelayDelivery, RelayEvent
 from relay.services.dispatcher import RelayDispatcher
 from threadline.utils.task_tracer import TaskTracer
@@ -74,6 +75,11 @@ def process_relay_event(event_id: str) -> dict:
     timeout=getattr(settings, "TASK_TIMEOUT_MINUTES", 60) * 60,
 )
 def process_relay_delivery(delivery_id: str) -> dict:
+    task_id = getattr(process_relay_delivery.request, "id", "") or ""
+    if task_id and TaskExecution.objects.filter(
+        task_id=task_id, status=TaskStatus.SUCCESS,
+    ).exists():
+        return {"created": 0, "success": 0, "failed": 0, "skipped": 1}
     delivery = RelayDelivery.objects.select_related(
         "event",
         "event__user",
@@ -81,7 +87,6 @@ def process_relay_delivery(delivery_id: str) -> dict:
         "subscription",
     ).get(id=delivery_id)
     tracer = TaskTracer("RELAY_DELIVERY", module="relay")
-    task_id = getattr(process_relay_delivery.request, "id", "") or ""
     tracer.set_task_id(task_id)
     tracer.create_task(
         {

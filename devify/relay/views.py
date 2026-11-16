@@ -31,11 +31,12 @@ from relay.serializers import (
     RelaySubscriptionSerializer,
 )
 from relay.services.adapters import RelayAdapterRegistry
+from relay.services.dispatcher import RelayDispatcher
 from relay.services.test_attachments import (
     BUILTIN_TEST_ATTACHMENT,
     build_test_attachments,
 )
-from relay.tasks import process_relay_delivery, process_relay_event
+from relay.tasks import process_relay_event
 
 logger = logging.getLogger(__name__)
 
@@ -499,28 +500,11 @@ class RelayDeliveryRetryAPIView(APIView):
     def post(self, request, pk):
         delivery = self._get_object(request, pk)
         task_rebuilt = self._task_rebuilt_needed(delivery)
-        delivery.status = RelayDelivery.Status.PROCESSING
-        delivery.error_message = ""
-        delivery.metadata = {
-            **(delivery.metadata or {}),
-            "relay_retry_requested": True,
-        }
-        delivery.save(
-            update_fields=[
-                "status",
-                "error_message",
-                "metadata",
-                "updated_at",
-            ]
-        )
-        if delivery.event.status != RelayEvent.Status.PROCESSING:
-            delivery.event.status = RelayEvent.Status.PROCESSING
-            delivery.event.save(update_fields=["status"])
-        task = process_relay_delivery.delay(str(delivery.id))
+        task_id = RelayDispatcher.enqueue_retry(delivery)
         return _response(
             {
                 "delivery_id": delivery.id,
-                "task_id": task.id,
+                "task_id": task_id,
                 "task_rebuilt": task_rebuilt,
             },
             message=_("queued"),

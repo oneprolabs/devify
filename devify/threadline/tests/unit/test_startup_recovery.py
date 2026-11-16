@@ -18,6 +18,12 @@ from threadline.tests.fixtures.factories import (
 class ThreadlineStartupRecoveryTest(TestCase):
     def setUp(self):
         self.user = UserFactory(username="recovery-test-user")
+        inspection = patch(
+            "threadline.services.startup_recovery.workflows_in_flight",
+            return_value=set(),
+        )
+        inspection.start()
+        self.addCleanup(inspection.stop)
 
     @patch("threadline.services.startup_recovery.release_task_lock")
     @patch("threadline.services.startup_recovery.acquire_task_lock")

@@ -271,13 +271,17 @@ class TestBillingRule:
         assert second["credits_consumed"] == 0
         assert EmailCreditsTransaction.objects.filter(user=user).count() == 1
 
-    def test_forced_rerun_charges_again(self, user):
+    @pytest.mark.parametrize("disposition", ["to_claim", "filed"])
+    def test_forced_rerun_charges_again(self, user, disposition):
         give_credits(user, 10)
         email = make_email(user)
         attach(user, email)
 
         with stub_decode(), patch(EXTRACT_PATH, return_value=invoice_fields()):
             recognize_email(email)
+            Invoice.objects.filter(email_message=email).update(
+                disposition=disposition
+            )
             forced = recognize_email(email, force=True)
 
         assert forced["credits_consumed"] == 1

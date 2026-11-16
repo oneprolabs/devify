@@ -776,14 +776,13 @@ def recognize_email(email, force: bool = False, bill: bool = True) -> dict:
     stats["duplicates"] = results.filter(
         status=Invoice.Status.DUPLICATE
     ).count()
-    claimable = results.filter(
+    billable = results.filter(
         status=Invoice.Status.EXTRACTED,
-        disposition=Invoice.Disposition.TO_CLAIM,
-    ).exists()
+    ).exclude(disposition=Invoice.Disposition.SUPPORTING).exists()
 
     # One charge for the email, and only when it actually produced something
     # new. Duplicates and non-invoices stay free.
-    if bill and claimable and (force or charge is None):
+    if bill and billable and (force or charge is None):
         try:
             transaction_record = CreditsService.consume_credits(
                 user_id=email.user_id,

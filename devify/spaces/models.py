@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -12,6 +14,7 @@ class Space(models.Model):
         SUSPENDED = "suspended", "Suspended"
         ARCHIVED = "archived", "Archived"
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=120)
     slug = models.SlugField(max_length=140, unique=True)
     kind = models.CharField(max_length=20, choices=Kind.choices)

@@ -1,6 +1,7 @@
 """API for the mailboxes a user has connected."""
 
 import logging
+import uuid
 
 from django.conf import settings as django_settings
 from django.contrib.auth.models import User
@@ -471,7 +472,7 @@ class SpaceEmailSourceShareAPIView(APIView):
             resource_type="email_mailbox",
             resource_id=mailbox.pk,
             metadata={
-                "target_space_id": target.pk,
+                "target_space_id": str(target.pk),
                 "permission": permission,
             },
         )
@@ -502,14 +503,22 @@ class SpaceEmailSourceShareAPIView(APIView):
                 code=400,
                 status_code=400,
             )
-        if int(target_id) == mailbox.space_id:
+        try:
+            target_uuid = uuid.UUID(target_id)
+        except (AttributeError, TypeError, ValueError):
+            return _response(
+                {"detail": "Invalid space."},
+                code=400,
+                status_code=400,
+            )
+        if target_uuid == mailbox.space_id:
             return _response(
                 {"detail": "The owner space share cannot be removed."},
                 code=409,
                 status_code=409,
             )
         EmailMailboxShare.objects.filter(
-            mailbox=mailbox, space_id=target_id
+            mailbox=mailbox, space_id=target_uuid
         ).delete()
         audit_space_action(
             actor=request.user,
@@ -517,7 +526,7 @@ class SpaceEmailSourceShareAPIView(APIView):
             action="email.source_unshared",
             resource_type="email_mailbox",
             resource_id=mailbox.pk,
-            metadata={"target_space_id": int(target_id)},
+            metadata={"target_space_id": str(target_uuid)},
         )
         return _response(None, message="unshared")
 
@@ -615,7 +624,7 @@ class SpaceEmailSourceTransferAPIView(APIView):
                 action="email.source_transferred",
                 resource_type="email_mailbox",
                 resource_id=mailbox.pk,
-                metadata={"target_space_id": target.pk},
+                metadata={"target_space_id": str(target.pk)},
             )
         return _response(
             {"mailbox_uuid": str(mailbox.uuid), "space_id": target.pk},

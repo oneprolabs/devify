@@ -7,7 +7,7 @@ from chat_analysis.suggestion_views import (
 
 urlpatterns = [
     path(
-        "spaces/<int:space_id>/event-suggestions",
+        "spaces/<uuid:space_id>/event-suggestions",
         EventSuggestionListAPIView.as_view(),
         name="chat-event-suggestion-list",
     ),

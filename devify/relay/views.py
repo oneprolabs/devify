@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from copy import deepcopy
 from types import SimpleNamespace
 
@@ -91,19 +92,16 @@ class AppsAPIView(APIView):
         space_id = request.query_params.get("space_id")
         if space_id is None:
             return _response(APP_REGISTRY.list_apps(request.user))
-        if (
-            not space_id.isascii()
-            or not space_id.isdecimal()
-            or len(space_id) > 19
-            or not 0 < int(space_id) <= 9223372036854775807
-        ):
+        try:
+            space_uuid = uuid.UUID(space_id)
+        except (AttributeError, TypeError, ValueError):
             return _response(
                 {"detail": "Invalid space."}, code=400, status_code=400
             )
         from spaces.models import Space
         from spaces.services import SpacePermissionService
 
-        space = get_object_or_404(Space, pk=int(space_id))
+        space = get_object_or_404(Space, pk=space_uuid)
         if not SpacePermissionService.can_read(request.user, space) or (
             space.kind == Space.Kind.PERSONAL
             and space.personal_owner_id != request.user.id

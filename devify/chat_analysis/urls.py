@@ -9,7 +9,7 @@ from chat_analysis.views import (
 
 urlpatterns = [
     path(
-        "spaces/<int:space_id>/analysis-jobs",
+        "spaces/<uuid:space_id>/analysis-jobs",
         SpaceAnalysisJobListCreateAPIView.as_view(),
         name="chat-analysis-job-list-create",
     ),

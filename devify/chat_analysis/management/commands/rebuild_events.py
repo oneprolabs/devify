@@ -13,6 +13,7 @@ Dry-run by default; pass ``--apply`` to persist.
 """
 
 import logging
+import uuid
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -41,7 +42,7 @@ class Command(BaseCommand):
     help = "Rebuild automatic chat events from existing notes for one space."
 
     def add_arguments(self, parser):
-        parser.add_argument("--space", type=int, required=True)
+        parser.add_argument("--space", type=uuid.UUID, required=True)
         parser.add_argument(
             "--apply",
             action="store_true",

@@ -15,6 +15,8 @@ Run it inside the API container::
     python manage.py merge_chat_messages --space 46 --apply
 """
 
+import uuid
+
 from django.core.management.base import BaseCommand
 
 from chat_domain.models import Conversation, Message
@@ -30,8 +32,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--space",
-            type=int,
-            default=0,
+            type=uuid.UUID,
+            default=None,
             help="Only process one space. Defaults to every space.",
         )
         parser.add_argument(

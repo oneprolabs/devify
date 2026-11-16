@@ -410,7 +410,7 @@ def test_manifest_cannot_choose_space_or_uploader():
     manifest = default_manifest(
         1,
         2,
-        space_id=other_space.pk,
+        space_id=str(other_space.pk),
         uploaded_by_id=other.pk,
     )
     batch = start_upload(

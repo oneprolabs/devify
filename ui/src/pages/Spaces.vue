@@ -334,7 +334,7 @@ const userStore = useUserStore()
 const spaces = ref([])
 const sources = ref([])
 const selectedId = ref(
-  Number(localStorage.getItem('devify.activeSpaceId')) || null
+  localStorage.getItem('devify.activeSpaceId') || null
 )
 const loading = ref(false)
 const sourcesLoading = ref(false)

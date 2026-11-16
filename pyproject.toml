@@ -106,6 +106,8 @@ testpaths = [
     "devify/relay/tests",
     "devify/expense/tests",
     "devify/billing/tests",
+    "devify/feedback/tests",
+    "devify/core/tests/test_request_logging.py",
 ]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -171,7 +173,7 @@ profile = "black"
 line_length = 79
 known_first_party = [
     "accounts", "billing", "chat_analysis", "chat_domain", "chat_ingestion",
-    "core", "expense", "relay", "spaces", "threadline",
+    "core", "expense", "feedback", "relay", "spaces", "threadline",
 ]
 
 [tool.black]

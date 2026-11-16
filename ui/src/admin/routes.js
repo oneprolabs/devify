@@ -3,6 +3,12 @@
  */
 export const adminRoutes = [
   {
+    path: '/management/feedback',
+    name: 'FeedbackManagement',
+    component: () => import('@/admin/pages/Feedback/Index.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
     path: '/management',
     redirect: '/management/users'
   },

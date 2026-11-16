@@ -12,7 +12,7 @@ from chat_ingestion.views import (
 
 urlpatterns = [
     path(
-        "spaces/<int:space_id>/chat/uploads",
+        "spaces/<uuid:space_id>/chat/uploads",
         UploadBatchCreateAPIView.as_view(),
         name="chat-upload-create",
     ),

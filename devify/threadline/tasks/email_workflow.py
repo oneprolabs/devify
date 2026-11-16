@@ -26,7 +26,10 @@ from threadline.agents.workflow import execute_email_processing_workflow
 from threadline.models import EmailMessage
 from threadline.services.processing_control import is_processing_paused
 from threadline.services.space_email import email_ai_allowed
-from threadline.services.workflow_recovery import claim_workflow
+from threadline.services.workflow_recovery import (
+    child_workflow_id,
+    claim_workflow,
+)
 from threadline.state_machine import EmailStatus
 from threadline.utils.task_tracer import TaskTracer
 
@@ -123,7 +126,7 @@ def process_email_workflow(
             logger.info("Skipping completed workflow invocation %s", task_id)
             return str(email_id)
 
-        claimed = claim_workflow(email_id, force=force)
+        claimed = claim_workflow(email_id, force=force, task_id=task_id)
         if not claimed:
             logger.info(
                 "Skipping settled or running email %s (force=%s)",
@@ -251,9 +254,13 @@ def retry_failed_email_workflow(email_id: str) -> str:
         str: The email_id
     """
     logger.info(f"[Workflow] Retrying failed workflow for email {email_id}")
-    process_email_workflow.delay(
-        email_id,
-        force=True,
-        trigger_source="retry_task",
-    )
+    task_id = getattr(retry_failed_email_workflow.request, "id", "")
+    options = {"force": True, "trigger_source": "retry_task"}
+    if task_id:
+        process_email_workflow.apply_async(
+            args=[email_id], kwargs=options,
+            task_id=child_workflow_id(task_id),
+        )
+    else:
+        process_email_workflow.delay(email_id, **options)
     return email_id

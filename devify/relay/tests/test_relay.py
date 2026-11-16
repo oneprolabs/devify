@@ -4,11 +4,11 @@ import os
 from types import SimpleNamespace
 
 import pytest
+from agentcore_task.adapters.django.models import TaskExecution
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from agentcore_task.adapters.django.models import TaskExecution
 from relay.models import RelayDelivery, RelayEvent, RelaySubscription
 from relay.services.dispatcher import RelayDispatcher
 from relay.services.publisher import RelayEventPublisher
@@ -18,9 +18,7 @@ from relay.services.test_attachments import (
 )
 from relay.tasks import process_relay_delivery
 from threadline.agents.nodes.workflow_finalize import WorkflowFinalizeNode
-from threadline.models import EmailMessage
 from threadline.tests.fixtures.factories import EmailMessageFactory
-
 
 User = get_user_model()
 
@@ -38,7 +36,9 @@ class _TestAdapter:
         )
 
 
-def _create_successful_delivery(*, event, subscription, external_id, external_url):
+def _create_successful_delivery(
+    *, event, subscription, external_id, external_url
+):
     return RelayDelivery.objects.create(
         event=event,
         subscription=subscription,
@@ -74,7 +74,8 @@ def test_workflow_finalize_publishes_relay_event(monkeypatch):
         return SimpleNamespace(id=123)
 
     monkeypatch.setattr(
-        "relay.services.publisher.RelayEventPublisher.publish_workflow_completed",
+        "relay.services.publisher.RelayEventPublisher."
+        "publish_workflow_completed",
         fake_publish,
     )
     monkeypatch.setattr(
@@ -142,7 +143,9 @@ def test_relay_test_attachments_fall_back_to_builtin_sample():
 
 
 @pytest.mark.django_db
-def test_relay_test_endpoint_uses_subscription_configuration(api_client, monkeypatch):
+def test_relay_test_endpoint_uses_subscription_configuration(
+    api_client, monkeypatch
+):
     user = User.objects.create_user(
         username="relay-user-test-endpoint",
         email="relay-test-endpoint@example.com",
@@ -205,15 +208,22 @@ def test_relay_test_endpoint_uses_subscription_configuration(api_client, monkeyp
 
     assert response.status_code == 200
     assert response.data["data"]["external_id"] == "record-1"
-    assert captured["subscription_config"]["feishu_bitable"]["app_id"] == "cli_xxx"
+    assert (
+        captured["subscription_config"]["feishu_bitable"]["app_id"]
+        == "cli_xxx"
+    )
     assert captured["event_subject"] == "devify test summary"
-    assert captured["delivery_metadata"]["relay_delivery_plan"]["action"] == "new"
+    assert (
+        captured["delivery_metadata"]["relay_delivery_plan"]["action"] == "new"
+    )
     assert captured["attachments"][0]["filename"] == "builtin-test-image.png"
     assert captured["attachments"][0]["content_type"] == "image/png"
 
 
 @pytest.mark.django_db
-def test_relay_test_endpoint_returns_400_when_delivery_fails(api_client, monkeypatch):
+def test_relay_test_endpoint_returns_400_when_delivery_fails(
+    api_client, monkeypatch
+):
     user = User.objects.create_user(
         username="relay-user-test-endpoint-fail",
         email="relay-test-endpoint-fail@example.com",
@@ -270,7 +280,9 @@ def test_relay_test_endpoint_returns_400_when_delivery_fails(api_client, monkeyp
 
 
 @pytest.mark.django_db
-def test_relay_test_endpoint_accepts_draft_subscription_config(api_client, monkeypatch):
+def test_relay_test_endpoint_accepts_draft_subscription_config(
+    api_client, monkeypatch
+):
     user = User.objects.create_user(
         username="relay-user-draft-config",
         email="relay-draft-config@example.com",
@@ -282,7 +294,9 @@ def test_relay_test_endpoint_accepts_draft_subscription_config(api_client, monke
         def deliver(self, *, event, subscription, delivery):
             captured["subscription_config"] = subscription.config
             captured["subscription_target_type"] = subscription.target_type
-            captured["delivery_plan"] = delivery.metadata.get("relay_delivery_plan")
+            captured["delivery_plan"] = delivery.metadata.get(
+                "relay_delivery_plan"
+            )
             return SimpleNamespace(
                 external_id="record-draft-1",
                 external_url="https://example.com/record-draft-1",
@@ -335,8 +349,14 @@ def test_relay_test_endpoint_accepts_draft_subscription_config(api_client, monke
     assert response.status_code == 200
     assert response.data["data"]["external_id"] == "record-draft-1"
     assert captured["subscription_target_type"] == "feishu_bitable"
-    assert captured["subscription_config"]["feishu_bitable"]["app_token_type"] == "wiki"
-    assert captured["subscription_config"]["feishu_bitable"]["app_token"] == "wiki-node-token"
+    assert (
+        captured["subscription_config"]["feishu_bitable"]["app_token_type"]
+        == "wiki"
+    )
+    assert (
+        captured["subscription_config"]["feishu_bitable"]["app_token"]
+        == "wiki-node-token"
+    )
     assert captured["delivery_plan"]["action"] == "new"
 
 
@@ -421,8 +441,14 @@ def test_relay_test_endpoint_merges_draft_over_existing_subscription(
     assert response.status_code == 200
     assert response.data["data"]["external_id"] == "record-merge-1"
     assert captured["subscription_target_type"] == "feishu_bitable"
-    assert captured["subscription_config"]["feishu_bitable"]["app_token_type"] == "wiki"
-    assert captured["subscription_config"]["feishu_bitable"]["app_token"] == "wiki-node-token"
+    assert (
+        captured["subscription_config"]["feishu_bitable"]["app_token_type"]
+        == "wiki"
+    )
+    assert (
+        captured["subscription_config"]["feishu_bitable"]["app_token"]
+        == "wiki-node-token"
+    )
 
 
 @pytest.mark.django_db
@@ -513,7 +539,10 @@ def test_relay_dispatcher_creates_only_enabled_deliveries(monkeypatch):
     assert delivery.external_id == f"ext-{enabled.id}"
     assert delivery.agentcore_task_id == "task-123"
     assert test_adapter.calls == 1
-    assert RelayEvent.objects.get(id=event.id).status == RelayEvent.Status.COMPLETED
+    assert (
+        RelayEvent.objects.get(id=event.id).status
+        == RelayEvent.Status.COMPLETED
+    )
 
 
 @pytest.mark.django_db
@@ -568,7 +597,10 @@ def test_relay_dispatcher_retries_single_delivery(monkeypatch):
     assert refreshed.status == RelayDelivery.Status.SUCCESS
     assert refreshed.agentcore_task_id == "task-456"
     assert refreshed.external_id == f"ext-{subscription.id}"
-    assert RelayEvent.objects.get(id=event.id).status == RelayEvent.Status.COMPLETED
+    assert (
+        RelayEvent.objects.get(id=event.id).status
+        == RelayEvent.Status.COMPLETED
+    )
 
 
 @pytest.mark.django_db
@@ -623,7 +655,9 @@ def test_relay_dispatcher_updates_existing_issue_when_auto_merge_wants_update(
     )
     monkeypatch.setattr(
         "relay.services.drivers.jira_handler.JiraIssueHandler.create_issue",
-        lambda self, **kwargs: pytest.fail("create_issue should not be called"),
+        lambda self, **kwargs: pytest.fail(
+            "create_issue should not be called"
+        ),
     )
     monkeypatch.setattr(
         "relay.services.drivers.jira_handler.JiraIssueHandler.get_issue_url",
@@ -632,7 +666,9 @@ def test_relay_dispatcher_updates_existing_issue_when_auto_merge_wants_update(
 
     summary = RelayDispatcher.dispatch_event(event, task_id="task-auto-update")
 
-    refreshed = RelayDelivery.objects.get(event=event, subscription=subscription)
+    refreshed = RelayDelivery.objects.get(
+        event=event, subscription=subscription
+    )
     assert summary["success"] == 1
     assert refreshed.external_id == "REQ-123"
     assert refreshed.metadata["relay_strategy"] == "update"
@@ -713,7 +749,8 @@ def test_relay_retry_uploads_jira_attachments(monkeypatch):
         fake_update,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.jira_handler.JiraIssueHandler.upload_attachments",
+        "relay.services.drivers.jira_handler.JiraIssueHandler."
+        "upload_attachments",
         fake_upload,
     )
     monkeypatch.setattr(
@@ -721,11 +758,14 @@ def test_relay_retry_uploads_jira_attachments(monkeypatch):
         lambda self, issue_key: f"https://jira.example.com/browse/{issue_key}",
     )
     monkeypatch.setattr(
-        "relay.services.drivers.jira_handler.JiraIssueHandler.get_issue_attachment_fingerprints",
+        "relay.services.drivers.jira_handler.JiraIssueHandler."
+        "get_issue_attachment_fingerprints",
         lambda self, issue_key: [],
     )
 
-    summary = RelayDispatcher.retry_delivery(delivery, task_id="task-attachments")
+    summary = RelayDispatcher.retry_delivery(
+        delivery, task_id="task-attachments"
+    )
 
     refreshed = RelayDelivery.objects.get(id=delivery.id)
     assert summary["success"] == 1
@@ -803,7 +843,8 @@ def test_relay_retry_preserves_existing_uploaded_attachment_keys(monkeypatch):
         fake_update,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.jira_handler.JiraIssueHandler.upload_attachments",
+        "relay.services.drivers.jira_handler.JiraIssueHandler."
+        "upload_attachments",
         lambda self, issue_key, attachments: pytest.fail(
             "upload_attachments should not be called on Jira update"
         ),
@@ -818,7 +859,9 @@ def test_relay_retry_preserves_existing_uploaded_attachment_keys(monkeypatch):
     }
     delivery.save(update_fields=["metadata"])
 
-    summary = RelayDispatcher.retry_delivery(delivery, task_id="task-attachments-skip")
+    summary = RelayDispatcher.retry_delivery(
+        delivery, task_id="task-attachments-skip"
+    )
 
     refreshed = RelayDelivery.objects.get(id=delivery.id)
     assert summary["success"] == 1
@@ -826,7 +869,10 @@ def test_relay_retry_preserves_existing_uploaded_attachment_keys(monkeypatch):
         "jira_id:att-1",
         "name:demo.png:12",
     ]
-    assert refreshed.metadata["upload_result"]["reason"] == "all_attachments_already_uploaded"
+    assert (
+        refreshed.metadata["upload_result"]["reason"]
+        == "all_attachments_already_uploaded"
+    )
     assert refreshed.metadata["upload_result"]["skipped_count"] == 1
 
 
@@ -904,7 +950,9 @@ def test_relay_retry_recreates_jira_issue_when_target_is_missing(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_relay_retry_recreates_feishu_record_when_target_is_missing(monkeypatch):
+def test_relay_retry_recreates_feishu_record_when_target_is_missing(
+    monkeypatch,
+):
     user = User.objects.create_user(
         username="relay-user-feishu-missing",
         email="relay-feishu-missing@example.com",
@@ -954,19 +1002,29 @@ def test_relay_retry_recreates_feishu_record_when_target_is_missing(monkeypatch)
         return "record-405"
 
     monkeypatch.setattr(
-        "relay.services.drivers.feishu_bitable_handler.FeishuBitableIssueHandler.update_issue",
+        "relay.services.drivers.feishu_bitable_handler."
+        "FeishuBitableIssueHandler."
+        "update_issue",
         fake_update,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.feishu_bitable_handler.FeishuBitableIssueHandler.create_issue",
+        "relay.services.drivers.feishu_bitable_handler."
+        "FeishuBitableIssueHandler."
+        "create_issue",
         fake_create,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.feishu_bitable_handler.FeishuBitableIssueHandler.get_issue_url",
-        lambda self, record_id: f"https://feishu.example.com/record/{record_id}",
+        "relay.services.drivers.feishu_bitable_handler."
+        "FeishuBitableIssueHandler."
+        "get_issue_url",
+        lambda self, record_id: (
+            f"https://feishu.example.com/record/{record_id}"
+        ),
     )
 
-    summary = RelayDispatcher.retry_delivery(delivery, task_id="task-feishu-missing")
+    summary = RelayDispatcher.retry_delivery(
+        delivery, task_id="task-feishu-missing"
+    )
 
     refreshed = RelayDelivery.objects.get(id=delivery.id)
     assert summary["success"] == 1
@@ -1051,7 +1109,8 @@ def test_relay_dispatcher_creates_and_links_related_issues_for_jira(
         fake_create,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.jira_handler.JiraIssueHandler.link_related_issues",
+        "relay.services.drivers.jira_handler.JiraIssueHandler."
+        "link_related_issues",
         fake_link,
     )
     monkeypatch.setattr(
@@ -1061,7 +1120,9 @@ def test_relay_dispatcher_creates_and_links_related_issues_for_jira(
 
     summary = RelayDispatcher.dispatch_event(event, task_id="task-link")
 
-    refreshed = RelayDelivery.objects.get(event=event, subscription=subscription)
+    refreshed = RelayDelivery.objects.get(
+        event=event, subscription=subscription
+    )
     assert summary["success"] == 1
     assert refreshed.external_id == "REQ-222"
     assert refreshed.metadata["relay_strategy"] == "new_and_link"
@@ -1140,21 +1201,31 @@ def test_relay_dispatcher_creates_and_partially_links_for_feishu(
         return {"linked_count": 0, "skipped_count": len(related_issue_keys)}
 
     monkeypatch.setattr(
-        "relay.services.drivers.feishu_bitable_handler.FeishuBitableIssueHandler.create_issue",
+        "relay.services.drivers.feishu_bitable_handler."
+        "FeishuBitableIssueHandler."
+        "create_issue",
         fake_create,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.feishu_bitable_handler.FeishuBitableIssueHandler.link_related_issues",
+        "relay.services.drivers.feishu_bitable_handler."
+        "FeishuBitableIssueHandler."
+        "link_related_issues",
         fake_link,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.feishu_bitable_handler.FeishuBitableIssueHandler.get_issue_url",
-        lambda self, record_id: f"https://feishu.example.com/record/{record_id}",
+        "relay.services.drivers.feishu_bitable_handler."
+        "FeishuBitableIssueHandler."
+        "get_issue_url",
+        lambda self, record_id: (
+            f"https://feishu.example.com/record/{record_id}"
+        ),
     )
 
     summary = RelayDispatcher.dispatch_event(event, task_id="task-feishu-link")
 
-    refreshed = RelayDelivery.objects.get(event=event, subscription=subscription)
+    refreshed = RelayDelivery.objects.get(
+        event=event, subscription=subscription
+    )
     assert summary["success"] == 1
     assert refreshed.external_id == "record-222"
     assert refreshed.metadata["relay_strategy"] == "new_and_link"
@@ -1208,25 +1279,44 @@ def test_relay_dispatcher_applies_feishu_title_prefix(monkeypatch):
         return "record-333"
 
     monkeypatch.setattr(
-        "relay.services.drivers.feishu_bitable_handler.FeishuBitableIssueHandler.create_issue",
+        "relay.services.drivers.feishu_bitable_handler."
+        "FeishuBitableIssueHandler."
+        "create_issue",
         fake_create,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.feishu_bitable_handler.FeishuBitableIssueHandler.get_issue_url",
-        lambda self, record_id: f"https://feishu.example.com/record/{record_id}",
+        "relay.services.drivers.feishu_bitable_handler."
+        "FeishuBitableIssueHandler."
+        "get_issue_url",
+        lambda self, record_id: (
+            f"https://feishu.example.com/record/{record_id}"
+        ),
     )
 
-    summary = RelayDispatcher.dispatch_event(event, task_id="task-feishu-prefix")
+    summary = RelayDispatcher.dispatch_event(
+        event, task_id="task-feishu-prefix"
+    )
 
-    refreshed = RelayDelivery.objects.get(event=event, subscription=subscription)
+    refreshed = RelayDelivery.objects.get(
+        event=event, subscription=subscription
+    )
     assert summary["success"] == 1
     assert refreshed.external_id == "record-333"
-    assert calls["create"]["issue_data"]["title"] == "[DEVIFY TEST] Child title"
-    assert calls["create"]["email_data"]["summary_title"] == "[DEVIFY TEST] Child title"
+    assert (
+        calls["create"]["issue_data"]["title"] == "[DEVIFY TEST] Child title"
+    )
+    assert (
+        calls["create"]["email_data"]["summary_title"]
+        == "[DEVIFY TEST] Child title"
+    )
 
 
 @pytest.mark.django_db
-def test_relay_delivery_retry_api_triggers_task(monkeypatch, api_client):
+def test_relay_delivery_retry_api_triggers_task(
+    monkeypatch,
+    api_client,
+    django_capture_on_commit_callbacks,
+):
     user = User.objects.create_user(
         username="relay-user-4",
         email="relay4@example.com",
@@ -1237,7 +1327,10 @@ def test_relay_delivery_retry_api_triggers_task(monkeypatch, api_client):
         user=user,
         email_message=email,
         event_type=RelayEvent.EventType.WORKFLOW_COMPLETED,
-        artifact_snapshot={"summary_title": "API retry", "summary_content": "API retry"},
+        artifact_snapshot={
+            "summary_title": "API retry",
+            "summary_content": "API retry",
+        },
     )
     subscription = RelaySubscription.objects.create(
         user=user,
@@ -1259,20 +1352,21 @@ def test_relay_delivery_retry_api_triggers_task(monkeypatch, api_client):
     )
     api_client.force_authenticate(user=user)
 
-    queued = SimpleNamespace(id="task-999")
+    queued = []
     monkeypatch.setattr(
         process_relay_delivery,
-        "delay",
-        lambda delivery_id: queued,
+        "apply_async",
+        lambda **kwargs: queued.append(kwargs),
     )
 
-    response = api_client.post(
-        reverse("relay-delivery-retry", kwargs={"pk": delivery.id})
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        response = api_client.post(
+            reverse("relay-delivery-retry", kwargs={"pk": delivery.id})
+        )
 
     assert response.status_code == 202
     assert response.data["data"]["delivery_id"] == delivery.id
-    assert response.data["data"]["task_id"] == "task-999"
+    assert response.data["data"]["task_id"] == queued[0]["task_id"]
     assert response.data["data"]["task_rebuilt"] is False
 
 
@@ -1280,6 +1374,7 @@ def test_relay_delivery_retry_api_triggers_task(monkeypatch, api_client):
 def test_relay_delivery_retry_api_marks_rebuilt_task_when_task_record_missing(
     monkeypatch,
     api_client,
+    django_capture_on_commit_callbacks,
 ):
     user = User.objects.create_user(
         username="relay-user-4b",
@@ -1291,7 +1386,10 @@ def test_relay_delivery_retry_api_marks_rebuilt_task_when_task_record_missing(
         user=user,
         email_message=email,
         event_type=RelayEvent.EventType.WORKFLOW_COMPLETED,
-        artifact_snapshot={"summary_title": "API retry", "summary_content": "API retry"},
+        artifact_snapshot={
+            "summary_title": "API retry",
+            "summary_content": "API retry",
+        },
     )
     subscription = RelaySubscription.objects.create(
         user=user,
@@ -1314,21 +1412,24 @@ def test_relay_delivery_retry_api_marks_rebuilt_task_when_task_record_missing(
     )
     api_client.force_authenticate(user=user)
 
-    queued = SimpleNamespace(id="task-1000")
+    queued = []
     monkeypatch.setattr(
         process_relay_delivery,
-        "delay",
-        lambda delivery_id: queued,
+        "apply_async",
+        lambda **kwargs: queued.append(kwargs),
     )
 
-    response = api_client.post(
-        reverse("relay-delivery-retry", kwargs={"pk": delivery.id})
-    )
+    with django_capture_on_commit_callbacks(execute=True):
+        response = api_client.post(
+            reverse("relay-delivery-retry", kwargs={"pk": delivery.id})
+        )
 
     assert response.status_code == 202
-    assert response.data["data"]["task_id"] == "task-1000"
+    assert response.data["data"]["task_id"] == queued[0]["task_id"]
     assert response.data["data"]["task_rebuilt"] is True
-    assert not TaskExecution.objects.filter(task_id="deleted-task-123").exists()
+    assert not TaskExecution.objects.filter(
+        task_id="deleted-task-123"
+    ).exists()
 
 
 @pytest.mark.django_db
@@ -1381,11 +1482,17 @@ def test_relay_event_list_includes_legacy_and_unpublished_events(api_client):
     response = api_client.get(reverse("relay-events"))
 
     assert response.status_code == 200
-    assert response.data["data"]["items"][0]["event_artifact_snapshot"][
-        "summary_title"
-    ] == "Message title wins 2"
+    assert (
+        response.data["data"]["items"][0]["event_artifact_snapshot"][
+            "summary_title"
+        ]
+        == "Message title wins 2"
+    )
     assert len(response.data["data"]["items"][0]["deliveries"]) == 1
-    assert response.data["data"]["items"][1]["event_artifact_snapshot"]["title"] == "Legacy title"
+    assert (
+        response.data["data"]["items"][1]["event_artifact_snapshot"]["title"]
+        == "Legacy title"
+    )
     assert len(response.data["data"]["items"][1]["deliveries"]) == 1
     assert response.data["data"]["pagination"]["total"] == 2
     assert response.data["data"]["pagination"]["totalPages"] == 1
@@ -1425,11 +1532,16 @@ def test_relay_event_detail_returns_event_business_state(api_client):
     )
     api_client.force_authenticate(user=user)
 
-    response = api_client.get(reverse("relay-event-detail", kwargs={"pk": event.id}))
+    response = api_client.get(
+        reverse("relay-event-detail", kwargs={"pk": event.id})
+    )
 
     assert response.status_code == 200
     assert response.data["data"]["status"] == RelayEvent.Status.PROCESSING
-    assert response.data["data"]["deliveries"][0]["status"] == RelayDelivery.Status.PROCESSING
+    assert (
+        response.data["data"]["deliveries"][0]["status"]
+        == RelayDelivery.Status.PROCESSING
+    )
 
 
 @pytest.mark.django_db

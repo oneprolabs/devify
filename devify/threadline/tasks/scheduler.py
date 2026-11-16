@@ -4,11 +4,15 @@ from datetime import timedelta
 from agentcore_task.adapters.django import prevent_duplicate_task
 from celery import shared_task
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 from threadline.models import EmailMessage, EmailTask
 from threadline.services.processing_control import paused_user_ids
-from threadline.services.workflow_recovery import workflows_in_flight
+from threadline.services.workflow_recovery import (
+    expire_workflow_reservation,
+    workflows_in_flight,
+)
 from threadline.state_machine import EmailStatus
 from threadline.tasks.cleanup import (
     EmailCleanupManager,
@@ -21,6 +25,25 @@ from threadline.utils.task_cleanup import cleanup_stale_tasks
 from threadline.utils.task_tracer import TaskTracer, use_task_tracer
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def recover_email_workflows_after_startup():
+    """Inspect from a task after the worker's control loop is responsive."""
+    from threadline.services.startup_recovery import (
+        recover_stuck_processing_emails,
+    )
+
+    tracer = TaskTracer("STUCK_EMAIL_STARTUP_RECOVERY", module="threadline")
+    tracer.create_task()
+    try:
+        result = recover_stuck_processing_emails()
+        tracer.complete_task(result)
+        return result
+    except Exception as exc:
+        tracer.fail_task({"error": str(exc)}, str(exc))
+        raise
+
 
 # Celery beat keeps publishing while a worker is blocked. Redis holds every
 # copy, and when the worker frees up the whole backlog runs back to back:
@@ -350,11 +373,13 @@ def schedule_reset_stuck_processing_emails(
                     f"Processing stuck for over {timeout_minutes} minutes. "
                     "Requires manual intervention."
                 )
-                if unchanged.update(
-                    status=email.status, error_message=email.error_message,
-                    updated_at=now,
-                ):
-                    processing_failed_count += 1
+                with transaction.atomic():
+                    if unchanged.update(
+                        status=email.status, error_message=email.error_message,
+                        updated_at=now,
+                    ):
+                        expire_workflow_reservation(email.pk)
+                        processing_failed_count += 1
 
         total_handled = (
             fetched_retry_count

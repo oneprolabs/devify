@@ -4,8 +4,12 @@ import ast
 import base64
 import json
 import logging
+from uuid import NAMESPACE_URL, uuid5
 
+from agentcore_task.adapters.django import TaskStatus
+from agentcore_task.adapters.django.models import TaskExecution
 from celery import current_app
+from django.db import transaction
 from django.utils import timezone
 
 from threadline.models import EmailMessage
@@ -13,9 +17,40 @@ from threadline.state_machine import EmailStatus
 
 logger = logging.getLogger(__name__)
 WORKFLOW_TASK = "threadline.tasks.email_workflow.process_email_workflow"
+MERGE_TASK = "threadline.tasks.email_merge.process_email_merge"
+RETRY_TASK = "threadline.tasks.email_workflow.retry_failed_email_workflow"
+EMAIL_TASKS = {WORKFLOW_TASK, MERGE_TASK, RETRY_TASK}
 
 
-def claim_workflow(email_id, *, force=False):
+def child_workflow_id(parent_id):
+    """A redelivered parent must publish the same child invocation."""
+    return str(uuid5(NAMESPACE_URL, f"devify:email-workflow:{parent_id}"))
+
+
+def claim_workflow(email_id, *, force=False, task_id=None):
+    if task_id:
+        with transaction.atomic():
+            email = EmailMessage.objects.select_for_update().get(pk=email_id)
+            reserved = TaskExecution.objects.filter(
+                task_id=task_id, task_name="EMAIL_WORKFLOW",
+                metadata__dispatch_reserved=True,
+                metadata__email_id=str(email_id),
+            )
+            if reserved.exists():
+                owner = (email.metadata or {}).get("processing_progress", {})
+                if (
+                    email.status != EmailStatus.PROCESSING.value
+                    or owner.get("task_id") != task_id
+                ):
+                    return False
+                claimed = reserved.filter(status=TaskStatus.PENDING).update(
+                    status=TaskStatus.STARTED, started_at=timezone.now(),
+                )
+                if claimed:
+                    EmailMessage.objects.filter(pk=email.pk).update(
+                        updated_at=timezone.now(),
+                    )
+                return bool(claimed)
     candidates = EmailMessage.objects.filter(pk=email_id)
     if force:
         candidates = candidates.exclude(status=EmailStatus.PROCESSING.value)
@@ -28,8 +63,19 @@ def claim_workflow(email_id, *, force=False):
     ))
 
 
+def expire_workflow_reservation(email_id):
+    """Retire an abandoned queued request before recovery creates a new one."""
+    TaskExecution.objects.filter(
+        task_name="EMAIL_WORKFLOW", status=TaskStatus.PENDING,
+        metadata__email_id=str(email_id), metadata__dispatch_reserved=True,
+    ).update(
+        status=TaskStatus.FAILURE, finished_at=timezone.now(),
+        error="Queued workflow abandoned; replaced by recovery",
+    )
+
+
 def _email_id(request):
-    if request.get("name", request.get("task")) != WORKFLOW_TASK:
+    if request.get("name", request.get("task")) not in EMAIL_TASKS:
         return None
     args = request.get("args") or []
     kwargs = request.get("kwargs") or {}
@@ -44,13 +90,14 @@ def _email_id(request):
 
 
 def _broker_email_id(message):
-    if message.get("headers", {}).get("task") != WORKFLOW_TASK:
+    task = message.get("headers", {}).get("task")
+    if task not in EMAIL_TASKS:
         return None
     body = message["body"]
     if message.get("properties", {}).get("body_encoding") == "base64":
         body = base64.b64decode(body)
     args, kwargs, _ = json.loads(body)
-    return _email_id({"name": WORKFLOW_TASK, "args": args, "kwargs": kwargs})
+    return _email_id({"name": task, "args": args, "kwargs": kwargs})
 
 
 def workflows_in_flight():
@@ -79,10 +126,19 @@ def workflows_in_flight():
                 if email_id is not None:
                     found.add(email_id)
         inspector = current_app.control.inspect(timeout=3)
+        queues = inspector.active_queues()
+        route = current_app.amqp.router.route({}, WORKFLOW_TASK)
+        queue_name = route["queue"].name
+        email_workers = {
+            worker for worker, consumed in (queues or {}).items()
+            if any(queue["name"] == queue_name for queue in consumed)
+        }
+        if not email_workers:
+            raise ValueError("No email workers answered recovery inspection")
         for method in ("active", "reserved", "scheduled"):
             workers = getattr(inspector, method)()
-            if not workers:
-                raise ValueError("No workers answered recovery inspection")
+            if not workers or not email_workers.issubset(workers):
+                raise ValueError("Incomplete email worker recovery inspection")
             for requests in workers.values():
                 for request in requests:
                     email_id = _email_id(request.get("request", request))

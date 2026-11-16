@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict
+from uuid import uuid4
 
+from agentcore_task.adapters.django import TaskStatus
+from agentcore_task.adapters.django.models import TaskExecution
 from django.db import transaction
 from django.utils import timezone
 
@@ -78,7 +81,7 @@ class RelayDispatcher:
                 # Claim failed retries inside the same lock as creation.
                 delivery.status = RelayDelivery.Status.PENDING
                 delivery.error_message = ""
-                if task_id and not delivery.agentcore_task_id:
+                if task_id:
                     delivery.agentcore_task_id = task_id
                 delivery.save(update_fields=[
                     "status", "error_message", "agentcore_task_id",
@@ -161,39 +164,173 @@ class RelayDispatcher:
         return summary
 
     @classmethod
+    def enqueue_retry(cls, delivery):
+        """Reserve one explicit retry before making it visible to a worker."""
+        from relay.tasks import process_relay_delivery
+
+        with transaction.atomic():
+            EmailMessage.objects.select_for_update().get(
+                pk=delivery.event.email_message_id
+            )
+            delivery.refresh_from_db()
+            if (
+                delivery.status
+                in {
+                    RelayDelivery.Status.PENDING,
+                    RelayDelivery.Status.PROCESSING,
+                }
+                and delivery.agentcore_task_id
+            ):
+                active = TaskExecution.objects.filter(
+                    task_id=delivery.agentcore_task_id,
+                    status__in=[TaskStatus.PENDING, TaskStatus.STARTED],
+                ).exists()
+                if active:
+                    return delivery.agentcore_task_id
+            request_id = str(uuid4())
+            TaskExecution.objects.create(
+                task_id=request_id,
+                task_name="RELAY_DELIVERY",
+                module="relay",
+                status=TaskStatus.PENDING,
+                created_by_id=delivery.event.user_id,
+                metadata={
+                    "dispatch_reserved": True,
+                    "delivery_id": str(delivery.pk),
+                    "event_id": str(delivery.event_id),
+                },
+            )
+            delivery.status = RelayDelivery.Status.PENDING
+            delivery.error_message = ""
+            delivery.agentcore_task_id = request_id
+            delivery.metadata = {
+                **(delivery.metadata or {}),
+                "relay_retry_requested": True,
+            }
+            delivery.save(
+                update_fields=[
+                    "status",
+                    "error_message",
+                    "agentcore_task_id",
+                    "metadata",
+                    "updated_at",
+                ]
+            )
+            RelayEvent.objects.filter(pk=delivery.event_id).update(
+                status=RelayEvent.Status.PROCESSING,
+            )
+
+        def dispatch():
+            try:
+                process_relay_delivery.apply_async(
+                    args=[str(delivery.pk)],
+                    task_id=request_id,
+                )
+            except Exception as exc:
+                with transaction.atomic():
+                    EmailMessage.objects.select_for_update().get(
+                        pk=delivery.event.email_message_id
+                    )
+                    pending = TaskExecution.objects.filter(
+                        task_id=request_id,
+                        status=TaskStatus.PENDING,
+                    ).update(
+                        status=TaskStatus.FAILURE,
+                        error=str(exc),
+                        finished_at=timezone.now(),
+                    )
+                    if pending:
+                        RelayDelivery.objects.filter(
+                            pk=delivery.pk,
+                            agentcore_task_id=request_id,
+                        ).update(
+                            status=RelayDelivery.Status.FAILED,
+                            error_message=str(exc),
+                            updated_at=timezone.now(),
+                        )
+                        RelayEvent.objects.filter(pk=delivery.event_id).update(
+                            status=RelayEvent.Status.FAILED,
+                        )
+                raise
+
+        transaction.on_commit(dispatch)
+        return request_id
+
+    @classmethod
     def retry_delivery(
         cls,
         delivery: RelayDelivery,
         *,
         task_id: str | None = None,
     ) -> Dict[str, Any]:
-        delivery = (
-            RelayDelivery.objects.select_related(
+        with transaction.atomic():
+            EmailMessage.objects.select_for_update().get(
+                pk=delivery.event.email_message_id
+            )
+            delivery = RelayDelivery.objects.select_related(
                 "event",
                 "event__user",
                 "event__email_message",
                 "subscription",
+            ).get(id=delivery.id)
+            previous_id = delivery.agentcore_task_id
+            previous_task = (
+                TaskExecution.objects.filter(
+                    task_id=previous_id,
+                ).first()
+                if previous_id
+                else None
             )
-            .get(id=delivery.id)
-        )
-
-        delivery.status = RelayDelivery.Status.PENDING
-        delivery.error_message = ""
-        delivery.metadata = {
-            **(delivery.metadata or {}),
-            "relay_retry_requested": True,
-        }
-        if task_id:
-            delivery.agentcore_task_id = task_id
-        delivery.save(
-            update_fields=[
-                "status",
-                "error_message",
-                "metadata",
-                "agentcore_task_id",
-                "updated_at",
-            ]
-        )
+            request = TaskExecution.objects.filter(task_id=task_id).first()
+            if (
+                request and request.metadata.get("dispatch_reserved")
+                and previous_id != task_id
+            ):
+                return {"created": 0, "success": 0, "failed": 0, "skipped": 1}
+            repeated = task_id and (
+                delivery.metadata.get("relay_retry_task_id") == task_id
+                or (
+                    previous_id == task_id
+                    and delivery.status == RelayDelivery.Status.SUCCESS
+                )
+            )
+            busy = (
+                delivery.status
+                in {
+                    RelayDelivery.Status.PENDING,
+                    RelayDelivery.Status.PROCESSING,
+                }
+                and previous_task
+                and previous_task.status
+                in {
+                    TaskStatus.PENDING,
+                    TaskStatus.STARTED,
+                }
+                and previous_id != task_id
+            )
+            if repeated or busy:
+                return {"created": 0, "success": 0, "failed": 0, "skipped": 1}
+            delivery.status = RelayDelivery.Status.PROCESSING
+            delivery.error_message = ""
+            delivery.metadata = {
+                **(delivery.metadata or {}),
+                "relay_retry_requested": True,
+                "relay_retry_task_id": task_id,
+            }
+            if task_id:
+                delivery.agentcore_task_id = task_id
+                TaskExecution.objects.filter(
+                    task_id=task_id, status=TaskStatus.PENDING,
+                ).update(status=TaskStatus.STARTED, started_at=timezone.now())
+            delivery.save(
+                update_fields=[
+                    "status",
+                    "error_message",
+                    "metadata",
+                    "agentcore_task_id",
+                    "updated_at",
+                ]
+            )
 
         _dispatch_failed = False
         try:
@@ -215,7 +352,8 @@ class RelayDispatcher:
                     status=RelayDelivery.Status.FAILED,
                 ).count()
                 delivery.event.status = (
-                    RelayEvent.Status.FAILED if failed_count
+                    RelayEvent.Status.FAILED
+                    if failed_count
                     else RelayEvent.Status.COMPLETED
                 )
             delivery.event.processed_at = timezone.now()

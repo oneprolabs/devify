@@ -9,6 +9,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from threadline.models import EmailMessage
+
 from ..fixtures.factories import EmailMessageFactory, UserFactory
 
 
@@ -47,14 +48,12 @@ class MergeThreadlinesCommandTest(TestCase):
     def test_apply_persists_merge(self):
         message1 = self._create_message(subject="Source one")
         message2 = self._create_message(subject="Source two")
-        message1_id = message1.id
-        message2_id = message2.id
         out = StringIO()
         note = "合并前已确认内容重复"
 
         with patch(
-            "threadline.tasks.email_merge.process_email_merge.delay"
-        ) as enqueue_delay:
+            "threadline.tasks.email_merge.process_email_merge.apply_async"
+        ) as enqueue_task, self.captureOnCommitCallbacks(execute=True):
             call_command(
                 "merge_threadlines",
                 source_uuids=[str(message1.uuid), str(message2.uuid)],
@@ -75,7 +74,7 @@ class MergeThreadlinesCommandTest(TestCase):
         # Verify the note was added to canonical's text content
         self.assertIn("[Manual merge note]", canonical.text_content)
         self.assertIn(note, canonical.text_content)
-        enqueue_delay.assert_called_once()
+        enqueue_task.assert_called_once()
 
         self.assertIn("Merge applied successfully", out.getvalue())
         self.assertIn("Workflow enqueue triggered", out.getvalue())

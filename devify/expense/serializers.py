@@ -17,6 +17,7 @@ from expense.models import (
     InvoiceSourceFile,
     TripSuggestion,
 )
+from expense.services.invoices import unique_documents
 from expense.services.taxi_route import merge_route, normalize_route
 
 
@@ -380,7 +381,7 @@ class InvoiceDetailSerializer(InvoiceListSerializer):
                     getattr(self._source(copy), "file_path", "")
                 ),
             }
-            for copy in copies
+            for copy in unique_documents(copies, obj)
         ]
 
     class Meta(InvoiceListSerializer.Meta):

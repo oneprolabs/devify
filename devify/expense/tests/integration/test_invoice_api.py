@@ -119,6 +119,37 @@ class TestInvoiceList:
 
 
 class TestInvoiceDetail:
+    def test_repeated_forward_does_not_repeat_related_files(
+        self, api_client, user
+    ):
+        invoice = make_invoice(user)
+        for index, (status, fingerprint) in enumerate([
+            (Invoice.Status.EXTRACTED, "a"),
+            (Invoice.Status.DUPLICATE, "b"),
+            (Invoice.Status.DUPLICATE, "a"),
+            (Invoice.Status.DUPLICATE, "b"),
+        ]):
+            copy = invoice if index == 0 else make_invoice(
+                user, status=status, duplicate_of=invoice
+            )
+            copy.email_attachment = EmailAttachment.objects.create(
+                user=user,
+                email_message=copy.email_message,
+                filename=f"invoice-{index}.pdf",
+                safe_filename=f"invoice-{index}.pdf",
+                content_type="application/pdf",
+                file_size=100,
+                file_path=f"/tmp/invoice-{index}.pdf",
+                content_md5=fingerprint * 32,
+            )
+            copy.save(update_fields=["email_attachment"])
+        api_client.force_authenticate(user=user)
+
+        data = api_client.get(f"{LIST_URL}/{invoice.uuid}").data["data"]
+
+        assert len(data["related_documents"]) == 1
+        assert data["related_documents"][0]["filename"] == "invoice-1.pdf"
+
     def test_detail_includes_provenance(self, api_client, user):
         email = make_email(user)
         attachment = EmailAttachment.objects.create(

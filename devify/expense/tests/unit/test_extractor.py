@@ -167,6 +167,27 @@ def test_pdf_party_columns_override_reversed_model_reading(monkeypatch):
     assert result["buyer_tax_id"] == "91110105MA01UYHY0T"
 
 
+def test_declared_itinerary_kind_overrides_model_invoice_kind(monkeypatch):
+    from expense.services import extractor
+    from expense.services.decoder import DecodedSource, DecodeMode
+
+    decoded = DecodedSource(
+        mode=DecodeMode.TEXT,
+        text="打车行程单",
+        fields={"document_kind": "ride_itinerary"},
+    )
+    monkeypatch.setattr(
+        extractor, "call_model",
+        lambda *args: raw_invoice(document_kind="invoice"),
+    )
+    email = SimpleNamespace(subject="发票", sender="", received_at=None)
+
+    result = extractor.extract(decoded, email, "ride.pdf", "model", "test")
+
+    assert result["document_kind"] == "ride_itinerary"
+    assert result["raw_extraction"]["document_kind"] == "ride_itinerary"
+
+
 def test_railway_record_overrides_zero_tax_breakdown(monkeypatch):
     from expense.services import extractor
     from expense.services.decoder import DecodedSource, DecodeMode

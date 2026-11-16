@@ -29,6 +29,27 @@ SETTLED_GROUP_STATES = (ExpenseGroup.Status.REIMBURSED,)
 FILED_REASONS = ("personal", "rejected", "expired", "other")
 
 
+def unique_documents(documents, primary=None) -> list:
+    """Keep one copy of each file, including across forwarded emails."""
+
+    def identity(document):
+        source = document.email_attachment or document.source_file
+        md5 = getattr(source, "content_md5", "")
+        if md5:
+            return ("md5", md5)
+        path = getattr(source, "file_path", "")
+        return ("path", path) if path else ("invoice", document.pk)
+
+    seen = {identity(primary)} if primary is not None else set()
+    result = []
+    for document in documents:
+        key = identity(document)
+        if key not in seen:
+            seen.add(key)
+            result.append(document)
+    return result
+
+
 def claimed_subquery(states):
     return ExpenseGroupItem.objects.filter(
         invoice=OuterRef("pk"), group__status__in=states

@@ -150,6 +150,42 @@ def build_png(path):
 
 
 class TestDecodePdf:
+    def test_ride_itinerary_declares_its_document_kind(
+        self, monkeypatch, tmp_path
+    ):
+        from expense.services import decoder
+
+        text = "高德地图—打车——行程单\nAMAP ITINERARY\n共计3单行程，合计63.55元\n起点 终点 金额"
+        monkeypatch.setattr(decoder, "_read_pdf_text", lambda doc, pages: text)
+        target = tmp_path / "itinerary.pdf"
+        target.write_bytes(build_pdf(None))
+
+        decoded = decode_pdf(str(target))
+
+        assert decoded.mode == DecodeMode.TEXT
+        assert decoded.fields["document_kind"] == "ride_itinerary"
+
+    def test_corrupt_font_mapping_uses_rendered_page(
+        self, monkeypatch, tmp_path
+    ):
+        from expense.services import decoder
+
+        text = (
+            "电子发票（普通发票） 发票号码：\n名称：\n"
+            + "\x04\x05\x06\x07\x08" * 15
+            + "\n91310110350849784X\n价税合计 ¥417.00"
+        )
+        monkeypatch.setattr(decoder, "_read_pdf_text", lambda doc, pages: text)
+        target = tmp_path / "invoice.pdf"
+        target.write_bytes(build_pdf(None))
+
+        decoded = decode_pdf(str(target))
+
+        assert decoded.mode == DecodeMode.IMAGE
+        assert decoded.decoder == "pdf_render"
+        assert decoded.images
+        assert decoded.fields == {}
+
     def test_text_layer_is_preferred(self, tmp_path):
         target = tmp_path / "invoice.pdf"
         target.write_bytes(

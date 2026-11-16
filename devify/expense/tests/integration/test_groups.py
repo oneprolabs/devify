@@ -84,8 +84,7 @@ class TestMembership:
 
     def test_the_period_covers_the_invoice_dates(self, user):
         group = make_group(user)
-        make_invoice(user, issue_date=date(2026, 8, 1))
-        early = Invoice.objects.first()
+        early = make_invoice(user, issue_date=date(2026, 8, 1))
         late = make_invoice(user, issue_date=date(2026, 8, 20))
 
         group_service.add_invoices(group, [str(early.uuid), str(late.uuid)])
@@ -159,14 +158,13 @@ class TestMembership:
 
         assert group.invoice_count == 0
         assert group.total_amount == Decimal("0")
-        assert not ExpenseGroupItem.objects.exists()
+        assert not ExpenseGroupItem.objects.filter(group=group).exists()
 
 
 class TestSummary:
     def test_summary_carries_the_capitalized_total(self, user):
         group = make_group(user)
-        make_invoice(user, total_amount=Decimal("128.50"))
-        invoice = Invoice.objects.first()
+        invoice = make_invoice(user, total_amount=Decimal("128.50"))
         group_service.add_invoices(group, [str(invoice.uuid)])
 
         summary = group_service.build_summary(group)
@@ -212,6 +210,25 @@ class TestSummary:
 
 
 class TestExport:
+    def test_repeated_forward_does_not_repeat_exported_files(
+        self, user, tmp_path
+    ):
+        group = make_group(user)
+        invoice = make_invoice(user)
+        primary = attach_file(user, invoice, tmp_path)
+        copy = make_invoice(
+            user, status=Invoice.Status.DUPLICATE, duplicate_of=invoice
+        )
+        attachment = attach_file(user, copy, tmp_path, "forward.pdf")
+        attachment.content_md5 = primary.content_md5
+        attachment.save(update_fields=["content_md5"])
+        group_service.add_invoices(group, [str(invoice.uuid)])
+
+        plan = export_service.plan_export(group)
+
+        assert len(plan["entries"]) == 1
+        assert plan["missing_files"] == 0
+
     def test_archive_includes_itinerary_without_counting_it_twice(
         self, user, tmp_path
     ):

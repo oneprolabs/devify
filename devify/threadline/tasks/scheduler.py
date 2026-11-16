@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from threadline.models import EmailMessage, EmailTask
 from threadline.services.processing_control import paused_user_ids
+from threadline.services.workflow_recovery import workflows_in_flight
 from threadline.state_machine import EmailStatus
 from threadline.tasks.cleanup import (
     EmailCleanupManager,
@@ -306,8 +307,17 @@ def schedule_reset_stuck_processing_emails(
         fetched_retry_count = 0
         fetched_failed_count = 0
         processing_failed_count = 0
+        in_flight = workflows_in_flight() if stuck_emails.exists() else set()
+        if in_flight is None:
+            tracer.complete_task({"status": "inspection_unavailable"})
+            return {"status": "skipped", "reason": "inspection_unavailable"}
 
         for email in stuck_emails:
+            if str(email.pk) in in_flight:
+                continue
+            unchanged = EmailMessage.objects.filter(
+                pk=email.pk, status=email.status, updated_at=email.updated_at
+            )
             if email.status == EmailStatus.FETCHED.value:
                 if email.fetch_retry_count == 0:
                     email.fetch_retry_count = 1
@@ -315,9 +325,12 @@ def schedule_reset_stuck_processing_emails(
                         "Email stuck in FETCHED status, retrying "
                         "workflow trigger"
                     )
-                    email.save(
-                        update_fields=["fetch_retry_count", "error_message"]
-                    )
+                    if not unchanged.filter(fetch_retry_count=0).update(
+                        fetch_retry_count=1,
+                        error_message=email.error_message,
+                        updated_at=now,
+                    ):
+                        continue
                     process_email_workflow.delay(str(email.id))
                     fetched_retry_count += 1
                 else:
@@ -326,16 +339,22 @@ def schedule_reset_stuck_processing_emails(
                         "Email stuck in FETCHED status after retry. "
                         "Possible Celery worker issue - check worker logs"
                     )
-                    email.save(update_fields=["status", "error_message"])
-                    fetched_failed_count += 1
+                    if unchanged.update(
+                        status=email.status, error_message=email.error_message,
+                        updated_at=now,
+                    ):
+                        fetched_failed_count += 1
             elif email.status == EmailStatus.PROCESSING.value:
                 email.status = EmailStatus.FAILED.value
                 email.error_message = (
                     f"Processing stuck for over {timeout_minutes} minutes. "
                     "Requires manual intervention."
                 )
-                email.save(update_fields=["status", "error_message"])
-                processing_failed_count += 1
+                if unchanged.update(
+                    status=email.status, error_message=email.error_message,
+                    updated_at=now,
+                ):
+                    processing_failed_count += 1
 
         total_handled = (
             fetched_retry_count

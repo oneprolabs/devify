@@ -17,7 +17,8 @@ File: devify/threadline/tasks/email_workflow.py
 import logging
 import time
 
-from agentcore_task.adapters.django import prevent_duplicate_task
+from agentcore_task.adapters.django import TaskStatus, prevent_duplicate_task
+from agentcore_task.adapters.django.models import TaskExecution
 from celery import shared_task
 from django.conf import settings
 
@@ -25,6 +26,8 @@ from threadline.agents.workflow import execute_email_processing_workflow
 from threadline.models import EmailMessage
 from threadline.services.processing_control import is_processing_paused
 from threadline.services.space_email import email_ai_allowed
+from threadline.services.workflow_recovery import claim_workflow
+from threadline.state_machine import EmailStatus
 from threadline.utils.task_tracer import TaskTracer
 
 logger = logging.getLogger(__name__)
@@ -85,6 +88,7 @@ def process_email_workflow(
         ValueError: If email not found
         Exception: For workflow execution errors
     """
+    claimed = False
     try:
         started_at = time.monotonic()
         email = EmailMessage.objects.select_related(
@@ -112,8 +116,23 @@ def process_email_workflow(
             )
             return str(email_id)
 
-        tracer = TaskTracer("EMAIL_WORKFLOW")
         task_id = getattr(process_email_workflow.request, "id", "") or ""
+        if task_id and TaskExecution.objects.filter(
+            task_id=task_id, status=TaskStatus.SUCCESS
+        ).exists():
+            logger.info("Skipping completed workflow invocation %s", task_id)
+            return str(email_id)
+
+        claimed = claim_workflow(email_id, force=force)
+        if not claimed:
+            logger.info(
+                "Skipping settled or running email %s (force=%s)",
+                email_id, force,
+            )
+            return str(email_id)
+        email.status = EmailStatus.PROCESSING.value
+
+        tracer = TaskTracer("EMAIL_WORKFLOW")
         tracer.set_task_id(task_id)
         workflow_context = tracer.context_summary(
             {
@@ -207,6 +226,10 @@ def process_email_workflow(
         logger.error(f"[Workflow] EmailMessage {email_id} not found")
         raise ValueError(f"Email with id {email_id} not found")
     except Exception as exc:
+        if claimed:
+            EmailMessage.objects.filter(
+                pk=email_id, status=EmailStatus.PROCESSING.value
+            ).update(status=EmailStatus.FAILED.value)
         logger.error(
             f"[Workflow] Failed to execute for email {email_id}: {exc}"
         )

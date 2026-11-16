@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict
+
+from django.db import transaction
 from django.utils import timezone
 
 from relay.models import RelayDelivery, RelayEvent, RelaySubscription
 from relay.services.adapters import RelayAdapterRegistry
 from relay.services.delivery_strategy import resolve_delivery_plan
+from relay.services.publisher import workflow_result_key
+from threadline.models import EmailMessage
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,63 @@ class RelayDispatcher:
         }
 
     @classmethod
+    def _claim_delivery(cls, event, subscription, task_id):
+        key = workflow_result_key(event.artifact_snapshot)
+        idempotency_key = (
+            f"workflow:{event.email_message_id}:{key}:{subscription.id}"
+        )
+        with transaction.atomic():
+            EmailMessage.objects.select_for_update().get(
+                pk=event.email_message_id
+            )
+            # Recognize historical deliveries that still use event IDs.
+            previous = RelayDelivery.objects.filter(
+                subscription=subscription,
+                event__email_message_id=event.email_message_id,
+                event__event_type=event.event_type,
+            ).select_related("event").order_by("created_at")
+            matching = [
+                item for item in previous
+                if workflow_result_key(item.event.artifact_snapshot) == key
+            ]
+            delivery = next((
+                item for item in matching
+                if item.status in {
+                    RelayDelivery.Status.SUCCESS,
+                    RelayDelivery.Status.PROCESSING,
+                    RelayDelivery.Status.PENDING,
+                    RelayDelivery.Status.SKIPPED,
+                }
+            ), matching[0] if matching else None)
+            created = delivery is None
+            if created:
+                delivery = RelayDelivery.objects.create(
+                    idempotency_key=idempotency_key,
+                    event=event, subscription=subscription,
+                    target_type=subscription.target_type,
+                    status=RelayDelivery.Status.PENDING,
+                    agentcore_task_id=task_id,
+                )
+            elif delivery.status in {
+                RelayDelivery.Status.SUCCESS,
+                RelayDelivery.Status.PROCESSING,
+                RelayDelivery.Status.PENDING,
+                RelayDelivery.Status.SKIPPED,
+            }:
+                return delivery, False, False
+            else:
+                # Claim failed retries inside the same lock as creation.
+                delivery.status = RelayDelivery.Status.PENDING
+                delivery.error_message = ""
+                if task_id and not delivery.agentcore_task_id:
+                    delivery.agentcore_task_id = task_id
+                delivery.save(update_fields=[
+                    "status", "error_message", "agentcore_task_id",
+                    "updated_at",
+                ])
+            return delivery, created, True
+
+    @classmethod
     def dispatch_event(
         cls,
         event: RelayEvent,
@@ -37,51 +98,18 @@ class RelayDispatcher:
             .order_by("created_at")
         )
         summary = {"created": 0, "success": 0, "failed": 0, "skipped": 0}
-        has_subscriptions = False
+        delivery_ids = set()
 
         for subscription in subscriptions:
-            has_subscriptions = True
-            idempotency_key = f"{event.id}:{subscription.id}"
-            delivery, created = RelayDelivery.objects.get_or_create(
-                idempotency_key=idempotency_key,
-                defaults={
-                    "event": event,
-                    "subscription": subscription,
-                    "target_type": subscription.target_type,
-                    "status": RelayDelivery.Status.PENDING,
-                    "agentcore_task_id": task_id,
-                },
+            delivery, created, claimed = cls._claim_delivery(
+                event, subscription, task_id
             )
-
+            delivery_ids.add(delivery.pk)
             if created:
                 summary["created"] += 1
-            elif delivery.status == RelayDelivery.Status.SUCCESS:
+            if not claimed:
                 summary["skipped"] += 1
                 continue
-            elif delivery.status in {
-                RelayDelivery.Status.PROCESSING,
-                RelayDelivery.Status.PENDING,
-            }:
-                summary["skipped"] += 1
-                continue
-
-            if not created:
-                delivery.subscription = subscription
-                delivery.target_type = subscription.target_type
-                delivery.status = RelayDelivery.Status.PENDING
-                delivery.error_message = ""
-                if task_id and not delivery.agentcore_task_id:
-                    delivery.agentcore_task_id = task_id
-                delivery.save(
-                    update_fields=[
-                        "subscription",
-                        "target_type",
-                        "status",
-                        "error_message",
-                        "agentcore_task_id",
-                        "updated_at",
-                    ]
-                )
 
             try:
                 cls._dispatch_one(
@@ -113,14 +141,23 @@ class RelayDispatcher:
                     ]
                 )
 
-        if summary["failed"]:
-            event.status = RelayEvent.Status.FAILED
-        elif has_subscriptions and not summary["success"]:
-            event.status = RelayEvent.Status.FAILED
-        else:
-            event.status = RelayEvent.Status.COMPLETED
-        event.processed_at = timezone.now()
-        event.save(update_fields=["status", "processed_at"])
+        with transaction.atomic():
+            EmailMessage.objects.select_for_update().get(
+                pk=event.email_message_id
+            )
+            statuses = set(RelayDelivery.objects.filter(
+                pk__in=delivery_ids
+            ).values_list("status", flat=True))
+            if RelayDelivery.Status.FAILED in statuses:
+                event.status = RelayEvent.Status.FAILED
+            elif statuses & {
+                RelayDelivery.Status.PENDING, RelayDelivery.Status.PROCESSING
+            }:
+                event.status = RelayEvent.Status.PROCESSING
+            else:
+                event.status = RelayEvent.Status.COMPLETED
+            event.processed_at = timezone.now()
+            event.save(update_fields=["status", "processed_at"])
         return summary
 
     @classmethod

@@ -21,7 +21,6 @@ from threadline.services.processing_control import (
 )
 from threadline.state_machine import EmailStatus
 
-
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
 
@@ -38,6 +37,13 @@ def make_email(user, counter=[0], **overrides):
     }
     payload.update(overrides)
     return EmailMessage.objects.create(**payload)
+
+
+@pytest.fixture(autouse=True)
+def no_in_flight_workflows(monkeypatch):
+    monkeypatch.setattr(
+        "threadline.tasks.scheduler.workflows_in_flight", lambda: set()
+    )
 
 
 class TestPauseFlag:
@@ -240,7 +246,6 @@ class TestSweepWindow:
 
         queued = {call.args[0] for call in workflow.delay.call_args_list}
         assert str(email.id) in queued
-
 
 
 class TestPauseHoldsInsideTheTask:

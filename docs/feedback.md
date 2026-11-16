@@ -36,11 +36,12 @@ API 与 worker 必须能访问同一目录，禁止配置到任何公开静态�
   "client_id": "77d31076-8e6c-4afe-80ce-7fe010cb6296",
   "category": "upload",
   "description": "点击上传后显示服务不可用",
-  "contact": "",
   "context": {
     "app_version": "0.1.0",
     "platform": "macos",
     "arch": "aarch64",
+    "os_version": "macOS 14.5 (23F79)",
+    "wechat_version": "4.1.15",
     "page": "chat",
     "related_batch_ids": [42]
   },
@@ -54,9 +55,14 @@ API 与 worker 必须能访问同一目录，禁止配置到任何公开静态�
 
 - 分类：`wechat/backup/upload/login/interface/other`。
 - 状态：`received/processing/needs_info/resolved`。
+- 提交人由登录身份确定，反馈记录与管理员界面使用用户名（`submitted_by`）标识。
+  客户端不再填写 `contact`；字段保留给旧客户端，最长 200 字。
+- `context.os_version` / `context.wechat_version` 由客户端自动采集
+  （操作系统版本、微信安装版本），均为可选、最长 64 字；
+  旧客户端不发送时按空字符串保存。
 - `client_id` 在用户范围内唯一；同内容重放返回原反馈（200），
   同编号不同内容返回 409，新建返回 201。服务端自行计算内容摘要。
-- 描述最长 5000 字、联系方式最长 200 字；诊断 JSON 最多 512 KiB、
+- 描述最长 5000 字；诊断 JSON 最多 512 KiB、
   1000 条事件；最多 3 张 PNG/JPEG，每张输入不超过 3 MiB，
   总请求不超过 10 MiB。截图实际解码、去元数据并重新编码。
 - 截图 30 天后拒绝下载，每日清理字节并保留过期标记和反馈处理结果。

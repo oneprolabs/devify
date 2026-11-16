@@ -76,6 +76,33 @@ def test_unknown_diagnostic_fields_are_rejected(key):
     assert not serializer.is_valid()
 
 
+def test_host_environment_is_optional_and_bounded():
+    data = payload()
+    data["context"].update(
+        os_version="macOS 14.5 (23F79)", wechat_version="4.1.15"
+    )
+    serializer = CreateFeedbackSerializer(data=data)
+    assert serializer.is_valid(), serializer.errors
+    assert json.loads(json.dumps(serializer.data))["context"][
+        "wechat_version"
+    ] == "4.1.15"
+
+    # Older clients omit both fields; they must keep validating.
+    serializer = CreateFeedbackSerializer(data=payload())
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["context"]["os_version"] == ""
+
+    data = payload()
+    data["context"]["os_version"] = "x" * 65
+    assert not CreateFeedbackSerializer(data=data).is_valid()
+
+
+def test_unknown_context_fields_are_rejected():
+    data = payload()
+    data["context"]["chat_body"] = "private"
+    assert not CreateFeedbackSerializer(data=data).is_valid()
+
+
 def test_image_content_is_reencoded_and_appended_data_removed():
     output = io.BytesIO()
     Image.new("RGB", (12, 8)).save(output, format="PNG")

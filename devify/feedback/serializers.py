@@ -14,6 +14,12 @@ class ContextSerializer(StrictSerializer):
     app_version = serializers.CharField(max_length=32)
     platform = serializers.ChoiceField(choices=["macos", "windows", "linux"])
     arch = serializers.CharField(max_length=32, required=False)
+    os_version = serializers.CharField(
+        max_length=64, required=False, allow_blank=True, default=""
+    )
+    wechat_version = serializers.CharField(
+        max_length=64, required=False, allow_blank=True, default=""
+    )
     page = serializers.CharField(max_length=32, required=False)
     related_batch_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),

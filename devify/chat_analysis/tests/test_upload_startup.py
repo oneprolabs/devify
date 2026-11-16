@@ -25,7 +25,8 @@ def test_dedicated_chat_workers_skip_unrelated_startup_recovery(monkeypatch):
 
     monkeypatch.setenv("CHAT_DEDICATED_WORKER", "true")
     with patch(
-        "threadline.services.startup_recovery.recover_stuck_processing_emails"
+        "threadline.tasks.scheduler."
+        "recover_email_workflows_after_startup.apply_async"
     ) as email, patch(
         "relay.services.legacy_sync.sync_all_legacy_issue_configs"
     ) as relay:
@@ -35,7 +36,7 @@ def test_dedicated_chat_workers_skip_unrelated_startup_recovery(monkeypatch):
     relay.assert_not_called()
 
 
-def test_default_worker_keeps_existing_startup_recovery(monkeypatch):
+def test_default_worker_queues_email_recovery_after_startup(monkeypatch):
     from relay.celery_bootstrap import sync_legacy_issue_config_on_worker_ready
     from threadline.celery_bootstrap import (
         recover_processing_emails_on_worker_ready,
@@ -43,11 +44,12 @@ def test_default_worker_keeps_existing_startup_recovery(monkeypatch):
 
     monkeypatch.delenv("CHAT_DEDICATED_WORKER", raising=False)
     with patch(
-        "threadline.services.startup_recovery.recover_stuck_processing_emails"
+        "threadline.tasks.scheduler."
+        "recover_email_workflows_after_startup.apply_async"
     ) as email, patch(
         "relay.services.legacy_sync.sync_all_legacy_issue_configs"
     ) as relay:
         recover_processing_emails_on_worker_ready()
         sync_legacy_issue_config_on_worker_ready()
-    email.assert_called_once_with()
+    email.assert_called_once_with(countdown=10)
     relay.assert_called_once_with()

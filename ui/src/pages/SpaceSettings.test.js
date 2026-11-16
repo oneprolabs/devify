@@ -104,6 +104,24 @@ describe('SpaceSettings', () => {
     )
   })
 
+  it('refreshes device presence while the settings page remains open', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    let wrapper
+    try {
+      authApi.getDesktopDevices.mockResolvedValueOnce({ data: { data: [{ ...device, last_seen_at: new Date(Date.now() - 20 * 60 * 1000).toISOString() }] } })
+      wrapper = mountPage()
+      await flushPromises()
+      expect(wrapper.text()).toContain('离线')
+      vi.advanceTimersByTime(60 * 1000)
+      await flushPromises()
+      expect(authApi.getDesktopDevices).toHaveBeenCalledTimes(2)
+      expect(wrapper.text()).toContain('在线')
+    } finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('renders the stored processing defaults read-only', async () => {
     const wrapper = mountPage()
     await flushPromises()

@@ -162,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { authApi } from '@/api/auth'
 import { spacesApi } from '@/api/spaces'
@@ -368,11 +368,12 @@ const platformText = (platform) => {
     }[key] || platform
   )
 }
+const currentTime = ref(Date.now())
 const minutesSince = (value) => {
   if (!value) return null
   const time = new Date(value).getTime()
   if (Number.isNaN(time)) return null
-  return Math.max(0, Math.round((Date.now() - time) / 60000))
+  return Math.max(0, Math.round((currentTime.value - time) / 60000))
 }
 const stateClass = (device) => {
   const minutes = minutesSince(device.last_seen_at)
@@ -448,7 +449,25 @@ const languageText = (language) =>
 const sceneText = (scene) =>
   ({ chat: '聊天分析', email: '邮件分析' })[scene] || scene || '—'
 
-onMounted(load)
+let deviceRefreshTimer
+async function refreshDevices() {
+  try {
+    const data = unwrap(await authApi.getDesktopDevices())
+    devices.value = (Array.isArray(data) ? data : data.list || []).filter(
+      (device) => device.status !== 'revoked'
+    )
+  } catch {
+    // Retain the last confirmed device state until the next refresh.
+  }
+}
+onMounted(() => {
+  load()
+  deviceRefreshTimer = window.setInterval(() => {
+    currentTime.value = Date.now()
+    void refreshDevices()
+  }, 60 * 1000)
+})
+onUnmounted(() => window.clearInterval(deviceRefreshTimer))
 </script>
 
 <style scoped>

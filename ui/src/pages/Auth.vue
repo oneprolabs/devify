@@ -602,7 +602,10 @@ const loading = ref(false)
 const errorMessage = ref('')
 const emailSent = ref(false)
 
-const showForgotPassword = ref(false)
+const showForgotPassword = ref(route.query.forgot === '1')
+watch(() => route.query.forgot, (value) => {
+  if (value === '1') showForgotPassword.value = true
+})
 const resetEmail = ref('')
 const resetLoading = ref(false)
 const resetErrorMessage = ref('')

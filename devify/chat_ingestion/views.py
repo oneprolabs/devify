@@ -1,3 +1,6 @@
+import logging
+import time
+
 from chat_sources.models import SourceImport
 from chat_sources.services import get_or_create_upload_source
 from django.conf import settings
@@ -44,6 +47,8 @@ from spaces.services import (
     check_storage_quota,
     get_space_quota,
 )
+
+logger = logging.getLogger(__name__)
 
 CONFLICT_FIELDS = (
     "source_type",
@@ -518,6 +523,8 @@ class UploadBatchArchiveAPIView(APIView):
 
     @transaction.atomic
     def put(self, request, batch_id):
+        started = time.monotonic()
+        logger.info("Chat archive request started: batch=%s", batch_id)
         batch = _visible_batch(request.user, batch_id, lock=True)
         if batch is None:
             return Response({"detail": "Upload not found."}, status=404)
@@ -543,9 +550,17 @@ class UploadBatchArchiveAPIView(APIView):
         try:
             store_archive(batch, uploaded)
         except ArchiveTooLarge as error:
+            logger.warning("Chat archive too large: batch=%s", batch_id)
             return Response({"detail": str(error)}, status=413)
         except ArchiveMismatch as error:
+            logger.warning(
+                "Chat archive validation failed: batch=%s", batch_id
+            )
             return Response({"detail": str(error)}, status=409)
+        logger.info(
+            "Chat archive stored: batch=%s bytes=%s elapsed_seconds=%.3f",
+            batch_id, batch.archive_size, time.monotonic() - started,
+        )
         takeover = _active_takeover(request.user, batch.space)
         audit_space_action(
             actor=request.user,

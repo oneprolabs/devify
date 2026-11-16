@@ -69,6 +69,15 @@ containers: mounting an empty directory hides files in the old container and
 does not migrate them automatically. In particular, preserve incomplete upload
 archives before attempting to resume their batches.
 
+Chat archive parsing uses `devify-chat-worker` (two concurrent tasks), and AI
+event analysis uses `devify-analysis-worker` (one task). The normal worker
+continues consuming the default queue, including previously queued work. The
+analysis worker enables AI and automatic event creation and requires a working
+administrator-configured model. The blue/green deploy checks both workers before
+switching traffic. Monitor all queues during deploys and rollbacks; do not delete
+queued messages. The chat worker must share archive, media, and avatar storage
+with the API. Previously completed or partial uploads are not reanalysed automatically.
+
 ```bash
 cd devify-deploy
 git pull

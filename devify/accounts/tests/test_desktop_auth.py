@@ -1,10 +1,12 @@
 import base64
 import hashlib
 import secrets
+from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
@@ -137,6 +139,8 @@ def test_existing_login_can_register_and_refresh_its_device():
         user=user, device_id=device_id, platform="macos"
     ).exists()
 
+    old_seen = timezone.now() - timedelta(minutes=20)
+    DesktopDevice.objects.filter(user=user, device_id=device_id).update(last_seen_at=old_seen)
     second = client.post(
         "/api/v1/auth/desktop/devices",
         {
@@ -149,7 +153,9 @@ def test_existing_login_can_register_and_refresh_its_device():
     assert second.status_code == 201
     assert second.data["data"]["device_id"] == device_id
     assert DesktopDevice.objects.filter(user=user).count() == 1
-    assert DesktopDevice.objects.get(user=user).label == "MacBook Pro · 工作"
+    device = DesktopDevice.objects.get(user=user)
+    assert device.label == "MacBook Pro · 工作"
+    assert device.last_seen_at > old_seen
 
 
 def test_missing_device_row_does_not_block_the_token():

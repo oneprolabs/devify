@@ -115,6 +115,7 @@ class UploadBatchSerializer(serializers.ModelSerializer):
             "updated_at",
             "archive_received_at",
             "parse_started_at",
+            "worker_started_at",
             "completed_at",
         )
         read_only_fields = fields

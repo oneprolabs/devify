@@ -296,7 +296,8 @@ def test_upload_status_is_visible_to_members_and_admin_only_after_takeover():
     ).exists()
 
 
-def test_archive_upload_records_server_checksum_and_size():
+def test_archive_upload_records_server_checksum_and_size(caplog):
+    caplog.set_level("INFO", logger="chat_ingestion.views")
     owner = User.objects.create_user(username="upload-archive-owner")
     space = make_team(owner, slug="upload-archive-team")
     client = auth_client(owner)
@@ -315,6 +316,8 @@ def test_archive_upload_records_server_checksum_and_size():
     )
 
     assert uploaded.status_code == 200
+    assert "Chat archive request started" in caplog.text
+    assert "Chat archive stored" in caplog.text
     batch.refresh_from_db()
     assert batch.archive_sha256 == hashlib.sha256(content).hexdigest()
     assert batch.archive_size == len(content)

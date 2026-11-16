@@ -58,6 +58,7 @@ class ChatStorageComposeTest(unittest.TestCase):
                     ).lower(),
                     "true",
                 )
+                self.assertEqual(config["services"]["devify-worker"]["command"], ["celery"])
                 self.assertIn(
                     "--queues=chat_ingestion",
                     config["services"]["devify-chat-worker"]["command"],

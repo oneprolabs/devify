@@ -12,6 +12,8 @@ Run it inside the API container::
     python manage.py backfill_chat_media --space 46 --apply
 """
 
+import uuid
+
 from django.core.management.base import BaseCommand
 
 from chat_domain.media import media_exists, store_media
@@ -26,8 +28,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--space",
-            type=int,
-            default=0,
+            type=uuid.UUID,
+            default=None,
             help="Only backfill one space. Defaults to every space.",
         )
         parser.add_argument(

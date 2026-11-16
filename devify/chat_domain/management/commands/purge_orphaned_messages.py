@@ -12,6 +12,7 @@ Run it inside the API container::
     python manage.py purge_orphaned_messages --days 30 --apply
 """
 
+import uuid
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
@@ -32,8 +33,8 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--space",
-            type=int,
-            default=0,
+            type=uuid.UUID,
+            default=None,
             help="Only purge one space. Defaults to every space.",
         )
         parser.add_argument(

@@ -10,6 +10,7 @@ Run it inside the API container::
     python manage.py audit_chat_union
 """
 
+import uuid
 from collections import defaultdict
 
 from django.core.management.base import BaseCommand
@@ -31,8 +32,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--space",
-            type=int,
-            default=0,
+            type=uuid.UUID,
+            default=None,
             help="Only inspect one space. Defaults to every space.",
         )
         parser.add_argument(

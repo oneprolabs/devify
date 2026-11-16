@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import patch
 
 import pytest
@@ -113,7 +114,7 @@ def test_space_list_only_returns_active_memberships():
 
     assert response.status_code == 200
     assert [item["id"] for item in response.data["data"]] == [
-        personal.id,
+        str(personal.id),
     ]
 
 
@@ -200,12 +201,13 @@ def test_inactive_space_disallows_upload_and_delete_without_queries():
 
 def test_personal_space_default_applies_only_to_new_unassigned_records():
     email = EmailMessage(user_id=10)
+    space_id = uuid.uuid4()
     with patch(
-        "threadline.models._ensure_personal_space_id", return_value=42
+        "threadline.models._ensure_personal_space_id", return_value=space_id
     ) as ensure:
         _assign_personal_space(email)
         _assign_personal_space(email)
-        assert email.space_id == 42
+        assert email.space_id == space_id
         ensure.assert_called_once_with(10)
 
     email.space_id = None
@@ -216,11 +218,12 @@ def test_personal_space_default_applies_only_to_new_unassigned_records():
 
 
 def test_new_attachment_inherits_its_parent_email_space():
-    email = EmailMessage(pk=1, user_id=10, space_id=42)
+    space_id = uuid.uuid4()
+    email = EmailMessage(pk=1, user_id=10, space_id=space_id)
     attachment = EmailAttachment(user_id=11, email_message=email)
     with patch("django.db.models.Model.save"):
         attachment.save()
-    assert attachment.space_id == 42
+    assert attachment.space_id == space_id
 
 
 @pytest.mark.django_db
@@ -356,7 +359,7 @@ def test_only_global_admin_can_list_ownerless_team_spaces():
     client.force_authenticate(user=admin)
     response = client.get("/api/v1/admin/spaces/ownerless")
     assert response.status_code == 200
-    assert [item["id"] for item in response.data["data"]] == [orphan.id]
+    assert [item["id"] for item in response.data["data"]] == [str(orphan.id)]
 
 
 @pytest.mark.django_db

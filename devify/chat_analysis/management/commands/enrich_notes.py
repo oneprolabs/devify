@@ -1,5 +1,7 @@
 """Structure existing automatic Notes and create their event suggestions."""
 
+import uuid
+
 from django.core.management.base import BaseCommand
 
 from chat_analysis.execution import _enrich_note_with_llm
@@ -14,7 +16,7 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
-        parser.add_argument("--space", type=int, required=True)
+        parser.add_argument("--space", type=uuid.UUID, required=True)
         parser.add_argument(
             "--force",
             action="store_true",

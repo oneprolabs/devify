@@ -7,7 +7,7 @@ from chat_analysis.report_views import (
 
 urlpatterns = [
     path(
-        "spaces/<int:space_id>/reports",
+        "spaces/<uuid:space_id>/reports",
         SpaceReportListCreateAPIView.as_view(),
         name="chat-report-list-create",
     ),

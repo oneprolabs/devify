@@ -1,5 +1,6 @@
 """Space context is checked before app metadata or account stats are read."""
 
+import uuid
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -8,6 +9,8 @@ import pytest
 from relay.views import AppsAPIView
 
 pytestmark = pytest.mark.unit
+
+SPACE_ID = str(uuid.uuid4())
 
 
 def request(user_id=1, **query):
@@ -49,7 +52,7 @@ def test_team_space_is_authorized_before_filtering():
             "relay.views.APP_REGISTRY.list_apps", return_value=[]
         ) as listing,
     ):
-        response = AppsAPIView().get(request(space_id="12"))
+        response = AppsAPIView().get(request(space_id=SPACE_ID))
     assert response.status_code == 200
     assert listing.call_args.kwargs["space_kind"] == "team"
 
@@ -69,6 +72,6 @@ def test_denied_or_someone_elses_personal_space_never_lists_apps(
         ),
         patch("relay.views.APP_REGISTRY.list_apps") as listing,
     ):
-        response = AppsAPIView().get(request(space_id="12"))
+        response = AppsAPIView().get(request(space_id=SPACE_ID))
     assert response.status_code == 404
     listing.assert_not_called()

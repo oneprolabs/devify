@@ -64,7 +64,7 @@ class UploadItemSerializer(serializers.ModelSerializer):
 
 class UploadBatchSerializer(serializers.ModelSerializer):
     items = UploadItemSerializer(many=True, read_only=True)
-    space_id = serializers.IntegerField(read_only=True)
+    space_id = serializers.UUIDField(read_only=True)
     source_id = serializers.IntegerField(read_only=True)
     uploaded_by_id = serializers.IntegerField(read_only=True)
     conversation_count = serializers.SerializerMethodField()

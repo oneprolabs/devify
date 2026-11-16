@@ -9,6 +9,7 @@ note evidence.
 Dry-run by default; pass ``--apply`` to persist.
 """
 
+import uuid
 from collections import defaultdict
 
 from django.core.management.base import BaseCommand, CommandError
@@ -24,7 +25,7 @@ class Command(BaseCommand):
     help = "Canonicalise, merge and backfill chat events for one space."
 
     def add_arguments(self, parser):
-        parser.add_argument("--space", type=int, required=True)
+        parser.add_argument("--space", type=uuid.UUID, required=True)
         parser.add_argument(
             "--apply",
             action="store_true",

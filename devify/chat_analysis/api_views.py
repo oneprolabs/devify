@@ -1301,7 +1301,7 @@ class SpaceResourceCopyAPIView(APIView):
             action="space.resource_copied",
             resource_type=resource_type,
             metadata={
-                "source_space_id": source.pk,
+                "source_space_id": str(source.pk),
                 "copied": copied,
                 "warnings": warnings,
             },

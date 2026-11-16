@@ -22,7 +22,7 @@ from chat_analysis.api_views import (
 
 urlpatterns = [
     path(
-        "spaces/<int:space_id>/topics",
+        "spaces/<uuid:space_id>/topics",
         SpaceTopicSubscriptionListCreateAPIView.as_view(),
         name="chat-topic-list-create",
     ),
@@ -42,22 +42,22 @@ urlpatterns = [
         name="chat-topic-reports",
     ),
     path(
-        "spaces/<int:space_id>/resource-copies",
+        "spaces/<uuid:space_id>/resource-copies",
         SpaceResourceCopyAPIView.as_view(),
         name="chat-resource-copy",
     ),
     path(
-        "spaces/<int:space_id>/questions",
+        "spaces/<uuid:space_id>/questions",
         SpaceQuestionAPIView.as_view(),
         name="chat-question",
     ),
     path(
-        "spaces/<int:space_id>/questions/<int:question_id>",
+        "spaces/<uuid:space_id>/questions/<int:question_id>",
         QuestionAnswerDetailAPIView.as_view(),
         name="chat-question-detail",
     ),
     path(
-        "spaces/<int:space_id>/tags",
+        "spaces/<uuid:space_id>/tags",
         SpaceEventTagListCreateAPIView.as_view(),
         name="chat-event-tag-list-create",
     ),
@@ -82,7 +82,7 @@ urlpatterns = [
         name="chat-event-relation-detail",
     ),
     path(
-        "spaces/<int:space_id>/notes",
+        "spaces/<uuid:space_id>/notes",
         SpaceNoteListCreateAPIView.as_view(),
         name="chat-note-list-create",
     ),
@@ -97,7 +97,7 @@ urlpatterns = [
         name="chat-note-evidence",
     ),
     path(
-        "spaces/<int:space_id>/events",
+        "spaces/<uuid:space_id>/events",
         SpaceEventListCreateAPIView.as_view(),
         name="chat-event-list-create",
     ),
@@ -117,7 +117,7 @@ urlpatterns = [
         name="chat-event-note-detail",
     ),
     path(
-        "spaces/<int:space_id>/event-relations",
+        "spaces/<uuid:space_id>/event-relations",
         SpaceEventRelationListCreateAPIView.as_view(),
         name="chat-event-relation-list-create",
     ),

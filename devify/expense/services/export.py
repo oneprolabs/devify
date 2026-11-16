@@ -24,6 +24,7 @@ from expense.constants import (
 )
 from expense.models import ExpenseGroupItem, Invoice
 from expense.services import naming
+from expense.services.invoices import unique_documents
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,9 @@ def plan_export(group, template: str = "", by_category: bool = True):
             }
         )
 
-        for copy in copies_by_invoice.get(invoice.id, []):
+        for copy in unique_documents(
+            copies_by_invoice.get(invoice.id, []), invoice
+        ):
             source = copy.email_attachment or copy.source_file
             original = getattr(source, "filename", "") or "附件"
             stem = naming.sanitize(os.path.splitext(original)[0]) or "附件"

@@ -203,13 +203,31 @@ def decode_pdf(path: str, max_pages: int = 3) -> DecodedSource:
         page_count = len(document)
         text = _read_pdf_text(document, max_pages)
 
-        if len(text.strip()) >= MIN_TEXT_LAYER_CHARS:
+        # Broken font mappings can leave readable labels and tax IDs around
+        # control characters where names and invoice numbers should be.
+        # A long text layer is not necessarily a usable one.
+        corrupt_chars = sum(
+            (ord(char) < 32 and char not in "\r\n\t")
+            or char in "\ufffd\ufffe"
+            or "\ue000" <= char <= "\uf8ff"
+            for char in text
+        )
+        if (
+            len(text.strip()) >= MIN_TEXT_LAYER_CHARS
+            and corrupt_chars / len(text.strip()) < 0.02
+        ):
+            fields = _pdf_declared_parties(text)
+            if (
+                re.search(r"(?:打车|网约车|用车|出行).*行程单", text[:200])
+                and "发票号码" not in text
+            ):
+                fields["document_kind"] = "ride_itinerary"
             return DecodedSource(
                 mode=DecodeMode.TEXT,
                 text=text,
                 page_count=page_count,
                 decoder="pdf_text_layer",
-                fields=_pdf_declared_parties(text),
+                fields=fields,
                 route_details=parse_amap_pdf_route(document, text),
             )
 

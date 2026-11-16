@@ -212,6 +212,25 @@ class TestSummary:
 
 
 class TestExport:
+    def test_repeated_forward_does_not_repeat_exported_files(
+        self, user, tmp_path
+    ):
+        group = make_group(user)
+        invoice = make_invoice(user)
+        primary = attach_file(user, invoice, tmp_path)
+        copy = make_invoice(
+            user, status=Invoice.Status.DUPLICATE, duplicate_of=invoice
+        )
+        attachment = attach_file(user, copy, tmp_path, "forward.pdf")
+        attachment.content_md5 = primary.content_md5
+        attachment.save(update_fields=["content_md5"])
+        group_service.add_invoices(group, [str(invoice.uuid)])
+
+        plan = export_service.plan_export(group)
+
+        assert len(plan["entries"]) == 1
+        assert plan["missing_files"] == 0
+
     def test_archive_includes_itinerary_without_counting_it_twice(
         self, user, tmp_path
     ):

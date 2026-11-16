@@ -281,6 +281,7 @@ def normalize(raw: dict) -> dict:
 
     return {
         "is_invoice": True,
+        "document_kind": _clean_text(raw.get("document_kind"), 32),
         "invoice_type": invoice_type,
         "invoice_no": invoice_no,
         "invoice_code": _clean_text(raw.get("invoice_code"), 64),

@@ -135,20 +135,38 @@ def find_sibling(email, fields, lookup) -> Invoice | None:
     if fields.get("invoice_no") or amount in (None, ""):
         return None
 
-    return (
+    candidates = (
         Invoice.objects.filter(
             user=email.user,
             email_message=email,
             total_amount=amount,
-            status=Invoice.Status.EXTRACTED,
+            status__in=[Invoice.Status.EXTRACTED, Invoice.Status.DUPLICATE],
         )
         .exclude(**lookup)
+        .select_related("duplicate_of")
         .order_by("id")
-        .first()
     )
+    current_id = Invoice.objects.filter(**lookup).values_list(
+        "pk", flat=True
+    ).first()
+    for candidate in candidates:
+        original = (
+            candidate.duplicate_of
+            if candidate.status == Invoice.Status.DUPLICATE
+            else candidate
+        )
+        if (
+            original is not None
+            and original.pk != current_id
+            and original.user_id == email.user_id
+            and original.status == Invoice.Status.EXTRACTED
+            and original.total_amount == amount
+        ):
+            return original
+    return None
 
 
-def absorb_unnumbered_copies(invoice: Invoice) -> int:
+def absorb_unnumbered_copies(invoice: Invoice, email_id=None) -> int:
     """
     Take over copies of this invoice that were read before it.
 
@@ -164,7 +182,9 @@ def absorb_unnumbered_copies(invoice: Invoice) -> int:
     copies = list(
         Invoice.objects.filter(
             user_id=invoice.user_id,
-            email_message_id=invoice.email_message_id,
+            email_message_id=(
+                email_id if email_id is not None else invoice.email_message_id
+            ),
             total_amount=invoice.total_amount,
             invoice_no="",
             status=Invoice.Status.EXTRACTED,
@@ -387,6 +407,7 @@ def _persist(
     payload = {
         **defaults,
         "status": Invoice.Status.EXTRACTED,
+        "duplicate_of": None,
         "dedup_key": dedup_key,
         "invoice_type": fields["invoice_type"],
         "invoice_no": fields["invoice_no"],
@@ -419,7 +440,10 @@ def _persist(
     # demoted, and if the reader corrects it and reads it again the row
     # must come back rather than stay quietly out of every total. Filing
     # is the user's own decision and is left alone.
-    if is_hotel_folio(fields):
+    if (
+        is_hotel_folio(fields)
+        or fields.get("document_kind") == "ride_itinerary"
+    ):
         payload["disposition"] = Invoice.Disposition.SUPPORTING
     else:
         current = Invoice.objects.filter(**lookup).values_list(
@@ -452,6 +476,10 @@ def _persist(
 
     if invoice.status == Invoice.Status.EXTRACTED:
         absorb_unnumbered_copies(invoice)
+    elif existing is not None:
+        # A forwarded invoice points to the original in another email.
+        # Collect an itinerary read earlier in this forward as well.
+        absorb_unnumbered_copies(existing, email_id=email.id)
 
     # Reading a document again can demote it, and it may already be sitting
     # in a claim somebody is preparing. Adding one there is refused, so
@@ -674,6 +702,7 @@ def recognize_email(email, force: bool = False, bill: bool = True) -> dict:
     allowed_domains = resolve_allowed_domains(app_config, user_config)
     links_done = 0
     wanted_links = _links_worth_following(email, verdict, app_config)
+    processed = []
 
     for source in verdict.sources:
         if source.kind == SourceKind.BODY_LINK:
@@ -688,6 +717,12 @@ def recognize_email(email, force: bool = False, bill: bool = True) -> dict:
             )
             if outcome is not None:
                 _tally(stats, outcome)
+                processed.extend(
+                    Invoice.objects.filter(
+                        source_file__email_message=email,
+                        source_file__source_url=source.url[:1000],
+                    ).values_list("pk", flat=True)
+                )
             continue
 
         attachment = by_id.get(source.attachment_id)
@@ -726,14 +761,29 @@ def recognize_email(email, force: bool = False, bill: bool = True) -> dict:
             stats["failed"] += 1
             continue
 
-        _, result = _persist(
+        invoice, result = _persist(
             email, fields, source.kind, attachment=attachment
         )
+        processed.append(invoice.pk)
         _tally(stats, result)
+
+    # A later numbered document may have absorbed an earlier itinerary.
+    # Bill from the final rows, rather than the intermediate outcomes.
+    results = Invoice.objects.filter(pk__in=processed)
+    stats["extracted"] = results.filter(
+        status=Invoice.Status.EXTRACTED
+    ).count()
+    stats["duplicates"] = results.filter(
+        status=Invoice.Status.DUPLICATE
+    ).count()
+    claimable = results.filter(
+        status=Invoice.Status.EXTRACTED,
+        disposition=Invoice.Disposition.TO_CLAIM,
+    ).exists()
 
     # One charge for the email, and only when it actually produced something
     # new. Duplicates and non-invoices stay free.
-    if bill and stats["extracted"] > 0 and (force or charge is None):
+    if bill and claimable and (force or charge is None):
         try:
             transaction_record = CreditsService.consume_credits(
                 user_id=email.user_id,

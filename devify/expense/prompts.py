@@ -7,6 +7,7 @@ Return a single JSON object and nothing else. Use this shape exactly:
 
 {
   "is_invoice": true,
+  "document_kind": "invoice|ride_itinerary|hotel_folio",
   "invoice_type": "vat_special|vat_normal|vat_electronic|train|
                    flight_itinerary|coach|taxi|hotel|quota|other",
   "invoice_no": "",
@@ -31,6 +32,11 @@ Return a single JSON object and nothing else. Use this shape exactly:
 Rules:
 - Decide "is_invoice" first. If the document is not an invoice, a receipt or
   a travel itinerary, return {"is_invoice": false} and stop. Do not guess.
+- A taxi/ride 行程单 is a supporting document: set "document_kind" to
+  "ride_itinerary" and still extract its routes, dates and amounts. It is
+  not the tax invoice for the ride and must not be claimed separately.
+  Use "hotel_folio" for a hotel folio and "invoice" for actual invoices
+  and claimable tickets, including airline electronic itineraries.
 - A hotel 结账单 / 水单 / 预授权单 is read like any other document: type it
   "hotel" and leave "invoice_no" and "invoice_code" empty, because a folio
   has neither. Do not copy a number off the 增值税发票 printed beside it.

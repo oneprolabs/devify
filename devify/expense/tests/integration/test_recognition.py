@@ -7,6 +7,7 @@ deduplication behaviour, not the quality of the model's reading.
 
 from datetime import date, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -137,7 +138,7 @@ class TestBillingRule:
 
         assert stats["extracted"] == 5
         assert stats["credits_consumed"] == 1
-        assert EmailCreditsTransaction.objects.count() == 1
+        assert EmailCreditsTransaction.objects.filter(user=user).count() == 1
 
     def test_email_without_an_invoice_is_free(self, user):
         give_credits(user, 10)
@@ -151,7 +152,45 @@ class TestBillingRule:
 
         assert stats["not_invoice"] == 1
         assert stats["credits_consumed"] == 0
-        assert EmailCreditsTransaction.objects.count() == 0
+        assert EmailCreditsTransaction.objects.filter(user=user).count() == 0
+
+    @pytest.mark.parametrize(
+        ("kind", "expected_cost"), [("invoice", 1), ("ride_itinerary", 0)]
+    )
+    def test_linked_documents_bill_only_claimable_invoices(
+        self, user, kind, expected_cost
+    ):
+        give_credits(user, 10)
+        email = make_email(user)
+        url = "https://fapiao.example.com/invoice.pdf"
+        email.html_content = f'<a href="{url}">下载发票</a>'
+        email.save(update_fields=["html_content"])
+        config = get_app_config()
+        config.link_domain_allowlist = []
+        config.save(update_fields=["link_domain_allowlist"])
+        fetched = SimpleNamespace(
+            ok=True, status="ok", error="", final_url=url,
+            content_type="application/pdf", file_size=100,
+            file_path="/tmp/linked.pdf", content_md5="f" * 32,
+        )
+        prefix = "expense.services.recognition."
+        with (
+            patch(prefix + "_links_worth_following", return_value={url}),
+            patch(prefix + "fetch_link", return_value=fetched),
+            patch(
+                prefix + "_extract_file",
+                return_value=invoice_fields(
+                    document_kind=kind,
+                    invoice_no="" if kind == "ride_itinerary" else "LINK-1",
+                ),
+            ),
+        ):
+            stats = recognize_email(email)
+
+        assert stats["extracted"] == 1
+        assert stats["duplicates"] == 0
+        assert stats["credits_consumed"] == expected_cost
+        assert Invoice.objects.get(email_message=email).source_file_id
 
     def test_a_hotel_folio_is_kept_as_supporting(self, user):
         """
@@ -178,7 +217,7 @@ class TestBillingRule:
 
         # Kept and readable — it is what the attachment said — but never
         # counted: it cannot go in a claim and no figure includes it.
-        invoice = Invoice.objects.get()
+        invoice = Invoice.objects.get(email_message=email)
         assert invoice.status == "extracted"
         assert invoice.disposition == "supporting"
 
@@ -198,7 +237,7 @@ class TestBillingRule:
         with stub_decode(), patch(EXTRACT_PATH, return_value=real):
             recognize_email(email)
 
-        invoice = Invoice.objects.get()
+        invoice = Invoice.objects.get(email_message=email)
         assert invoice.status == "extracted"
         assert invoice.disposition == "to_claim"
 
@@ -214,7 +253,7 @@ class TestBillingRule:
 
         assert stats["failed"] == 1
         assert stats["credits_consumed"] == 0
-        assert EmailCreditsTransaction.objects.count() == 0
+        assert EmailCreditsTransaction.objects.filter(user=user).count() == 0
         assert (
             Invoice.objects.get(email_message=email).status
             == Invoice.Status.FAILED
@@ -230,7 +269,7 @@ class TestBillingRule:
             second = recognize_email(email)
 
         assert second["credits_consumed"] == 0
-        assert EmailCreditsTransaction.objects.count() == 1
+        assert EmailCreditsTransaction.objects.filter(user=user).count() == 1
 
     def test_forced_rerun_charges_again(self, user):
         give_credits(user, 10)
@@ -242,7 +281,7 @@ class TestBillingRule:
             forced = recognize_email(email, force=True)
 
         assert forced["credits_consumed"] == 1
-        assert EmailCreditsTransaction.objects.count() == 2
+        assert EmailCreditsTransaction.objects.filter(user=user).count() == 2
 
     def test_empty_balance_skips_before_calling_the_model(self, user):
         give_credits(user, 0)
@@ -317,7 +356,7 @@ class TestDeduplication:
             recognize_email(first)
             recognize_email(second)
 
-        assert EmailCreditsTransaction.objects.count() == 1
+        assert EmailCreditsTransaction.objects.filter(user=user).count() == 1
 
     def test_duplicate_points_back_at_the_original(self, user):
         give_credits(user, 10)
@@ -367,7 +406,7 @@ class TestDeduplication:
 
         assert stats["extracted"] == 2
         assert Invoice.objects.filter(
-            status=Invoice.Status.EXTRACTED
+            user=user, status=Invoice.Status.EXTRACTED
         ).count() == 2
 
     def test_the_same_number_for_a_different_user_is_not_a_duplicate(
@@ -465,8 +504,82 @@ class TestSameEmailCopies:
         with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
             recognize_email(email)
 
-        assert Invoice.objects.filter(status="extracted").count() == 1
-        assert Invoice.objects.filter(status="duplicate").count() == 1
+        assert (
+            Invoice.objects.filter(user=user, status="extracted").count() == 1
+        )
+        assert (
+            Invoice.objects.filter(user=user, status="duplicate").count() == 1
+        )
+
+    @pytest.mark.parametrize("itinerary_first", [False, True])
+    def test_forwarded_itinerary_joins_the_original_invoice(
+        self, user, itinerary_first
+    ):
+        give_credits(user, 10)
+        original = make_email(user)
+        attach(user, original, filename="original.pdf")
+        with stub_decode(), patch(EXTRACT_PATH, return_value=invoice_fields()):
+            recognize_email(original)
+        canonical = Invoice.objects.get(email_message=original)
+
+        forwarded = make_email(user)
+        names = ["invoice.pdf", "itinerary.pdf"]
+        fields = [
+            invoice_fields(),
+            invoice_fields(invoice_no="", document_kind="ride_itinerary"),
+        ]
+        if itinerary_first:
+            names.reverse()
+            fields.reverse()
+        for name in names:
+            attach(user, forwarded, filename=name)
+        with stub_decode(), patch(EXTRACT_PATH, side_effect=fields):
+            stats = recognize_email(forwarded)
+
+        assert (
+            Invoice.objects.filter(user=user, status="extracted").count() == 1
+        )
+        assert (
+            canonical.duplicates.filter(email_message=forwarded).count() == 2
+        )
+        assert stats["extracted"] == 0
+        assert stats["duplicates"] == 2
+        assert stats["credits_consumed"] == 0
+
+    def test_rereading_unnumbered_copies_keeps_a_canonical_invoice(self, user):
+        email = make_email(user)
+        attach(user, email, filename="first.pdf")
+        attach(user, email, filename="second.pdf")
+        fields = invoice_fields(invoice_no="", document_kind="ride_itinerary")
+        with stub_decode(), patch(EXTRACT_PATH, return_value=fields):
+            recognize_email(email, bill=False)
+            canonical = Invoice.objects.get(
+                email_message=email, status=Invoice.Status.EXTRACTED
+            )
+            stats = recognize_email(email, force=True, bill=False)
+
+        canonical.refresh_from_db()
+        assert canonical.status == Invoice.Status.EXTRACTED
+        assert canonical.duplicate_of_id is None
+        assert canonical.duplicates.filter(email_message=email).count() == 1
+        assert stats["extracted"] == 1
+        assert stats["duplicates"] == 1
+
+    def test_unmatched_ride_itinerary_is_supporting(self, user):
+        give_credits(user, 10)
+        email = make_email(user)
+        attach(user, email, filename="itinerary.pdf")
+        with stub_decode(), patch(
+            EXTRACT_PATH,
+            return_value=invoice_fields(
+                invoice_no="", document_kind="ride_itinerary"
+            ),
+        ):
+            stats = recognize_email(email)
+
+        invoice = Invoice.objects.get(email_message=email)
+        assert invoice.disposition == "supporting"
+        assert stats["credits_consumed"] == 0
 
     def test_it_collapses_whichever_order_they_arrive_in(self, user):
         # Which file the sender put first must not decide the outcome.
@@ -482,9 +595,11 @@ class TestSameEmailCopies:
         with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
             recognize_email(email)
 
-        kept = Invoice.objects.get(status="extracted")
+        kept = Invoice.objects.get(user=user, status="extracted")
         assert kept.invoice_no == "26117000001180197970"
-        assert Invoice.objects.filter(status="duplicate").count() == 1
+        assert (
+            Invoice.objects.filter(user=user, status="duplicate").count() == 1
+        )
 
     def test_the_numbered_invoice_is_the_one_kept(self, user):
         give_credits(user, 10)
@@ -499,7 +614,8 @@ class TestSameEmailCopies:
         with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
             recognize_email(email)
 
-        assert Invoice.objects.get(status="extracted").seller_name == "首约科技"
+        kept = Invoice.objects.get(user=user, status="extracted")
+        assert kept.seller_name == "首约科技"
 
     def test_a_different_amount_is_a_different_expense(self, user):
         give_credits(user, 10)
@@ -514,7 +630,9 @@ class TestSameEmailCopies:
         with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
             recognize_email(email)
 
-        assert Invoice.objects.filter(status="extracted").count() == 2
+        assert (
+            Invoice.objects.filter(user=user, status="extracted").count() == 2
+        )
 
     def test_the_same_amount_in_another_email_is_left_alone(self, user):
         # Two lunches at the same price in different weeks are two lunches.
@@ -534,7 +652,9 @@ class TestSameEmailCopies:
             recognize_email(first)
             recognize_email(second)
 
-        assert Invoice.objects.filter(status="extracted").count() == 2
+        assert (
+            Invoice.objects.filter(user=user, status="extracted").count() == 2
+        )
 
 
 class TestTravelDate:
@@ -573,10 +693,9 @@ class TestTravelDate:
         with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
             recognize_email(email)
 
-        assert Invoice.objects.get(status="extracted").expense_date == (
-            travelled_on
-        )
-        assert Invoice.objects.get(status="extracted").ticket_details == {
+        kept = Invoice.objects.get(user=user, status="extracted")
+        assert kept.expense_date == travelled_on
+        assert kept.ticket_details == {
             "from_address": "上海虹桥站",
             "to_address": "酒店",
         }
@@ -608,12 +727,9 @@ class TestTravelDate:
         with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
             recognize_email(email)
 
-        assert Invoice.objects.get(status="extracted").expense_date == (
-            travelled_on
-        )
-        assert Invoice.objects.get(status="extracted").ticket_details[
-            "from_address"
-        ] == "机场"
+        invoice = Invoice.objects.get(email_message=email, status="extracted")
+        assert invoice.expense_date == travelled_on
+        assert invoice.ticket_details["from_address"] == "机场"
 
     def test_a_date_the_invoice_already_knows_is_not_overwritten(self, user):
         give_credits(user, 10)
@@ -637,7 +753,8 @@ class TestTravelDate:
         with stub_decode(), patch(EXTRACT_PATH, side_effect=side_effect):
             recognize_email(email)
 
-        assert Invoice.objects.get(status="extracted").expense_date == known
+        kept = Invoice.objects.get(user=user, status="extracted")
+        assert kept.expense_date == known
 
 
 class TestDuplicatesAreNotWork:
@@ -708,7 +825,9 @@ class TestUnreadableDocuments:
         with stub_decode(), patch(EXTRACT_PATH, return_value=empty):
             recognize_email(email)
 
-        assert Invoice.objects.filter(status="extracted").count() == 0
+        assert (
+            Invoice.objects.filter(user=user, status="extracted").count() == 0
+        )
 
     def test_it_is_recorded_as_failed_so_it_can_be_retried(self, user):
         give_credits(user, 10)
@@ -721,7 +840,7 @@ class TestUnreadableDocuments:
         with stub_decode(), patch(EXTRACT_PATH, return_value=empty):
             recognize_email(email)
 
-        invoice = Invoice.objects.get()
+        invoice = Invoice.objects.get(email_message=email)
         assert invoice.status == "failed"
         assert "no amount" in invoice.error_message
 
@@ -751,7 +870,9 @@ class TestUnreadableDocuments:
         with stub_decode(), patch(EXTRACT_PATH, return_value=free):
             recognize_email(email)
 
-        assert Invoice.objects.filter(status="extracted").count() == 1
+        assert (
+            Invoice.objects.filter(user=user, status="extracted").count() == 1
+        )
 
     def test_a_real_non_invoice_is_still_just_that(self, user):
         give_credits(user, 10)
@@ -763,7 +884,7 @@ class TestUnreadableDocuments:
         ):
             recognize_email(email)
 
-        assert Invoice.objects.get().status == "not_invoice"
+        assert Invoice.objects.get(email_message=email).status == "not_invoice"
 
 
 class TestMergedEmailsAreInScope:

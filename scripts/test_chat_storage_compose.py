@@ -58,7 +58,9 @@ class ChatStorageComposeTest(unittest.TestCase):
                     ).lower(),
                     "true",
                 )
-                self.assertEqual(config["services"]["devify-worker"]["command"], ["celery"])
+                self.assertEqual(
+                    config["services"]["devify-worker"]["command"], ["celery"]
+                )
                 self.assertIn(
                     "--queues=chat_ingestion",
                     config["services"]["devify-chat-worker"]["command"],
@@ -66,9 +68,12 @@ class ChatStorageComposeTest(unittest.TestCase):
                 analysis = config["services"]["devify-analysis-worker"]
                 self.assertIn("--queues=chat_analysis", analysis["command"])
                 self.assertIn("--concurrency=1", analysis["command"])
-                self.assertEqual(analysis["environment"]["CHAT_ANALYSIS_LLM_ENABLED"], "true")
-                self.assertEqual(analysis["environment"]["CHAT_ANALYSIS_AUTO_CREATE_EVENTS"], "true")
-                self.assertEqual(analysis["environment"]["CHAT_UPLOAD_DEDICATED_QUEUE"], "true")
+                for name in (
+                    "CHAT_ANALYSIS_LLM_ENABLED",
+                    "CHAT_ANALYSIS_AUTO_CREATE_EVENTS",
+                    "CHAT_UPLOAD_DEDICATED_QUEUE",
+                ):
+                    self.assertEqual(analysis["environment"][name], "true")
                 api_services = (
                     name for name in services if name.startswith("devify-api")
                 )

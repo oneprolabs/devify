@@ -140,7 +140,9 @@ def test_existing_login_can_register_and_refresh_its_device():
     ).exists()
 
     old_seen = timezone.now() - timedelta(minutes=20)
-    DesktopDevice.objects.filter(user=user, device_id=device_id).update(last_seen_at=old_seen)
+    DesktopDevice.objects.filter(user=user, device_id=device_id).update(
+        last_seen_at=old_seen
+    )
     second = client.post(
         "/api/v1/auth/desktop/devices",
         {

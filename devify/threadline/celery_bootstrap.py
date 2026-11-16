@@ -1,4 +1,5 @@
 import logging
+import os
 
 from celery.signals import worker_ready
 
@@ -13,6 +14,8 @@ def recover_processing_emails_on_worker_ready(sender=None, **kwargs):
     This module is intentionally named as a Celery bootstrap hook so other
     apps can follow the same pattern for their own worker startup logic.
     """
+    if os.getenv("CHAT_DEDICATED_WORKER", "").lower() in {"1", "true", "yes"}:
+        return
     try:
         logger.info("Threadline worker_ready signal received")
         from threadline.services.startup_recovery import (

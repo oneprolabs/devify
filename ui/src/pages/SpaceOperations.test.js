@@ -137,6 +137,17 @@ describe('SpaceOperations', () => {
     expect(stages.findAll('.stage')).toHaveLength(6)
   })
 
+  it('counts parsing time from worker start instead of time spent waiting', async () => {
+    spacesApi.getUploads.mockResolvedValue({
+      data: { data: { list: [{ ...uploads[0], worker_started_at: '2026-11-04T11:41:04Z' }], pagination: { next: null } } }
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.find('.sync-row:not(.sync-head)').trigger('click')
+    expect(wrapper.findAll('.stage')[2].text()).toContain('1.0s')
+    expect(wrapper.findAll('.stage')[2].text()).toContain('等待 2.0s')
+  })
+
   it('does not present unknown upload and parsing counts as zero', async () => {
     const old = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     spacesApi.getUploads.mockResolvedValue({
@@ -165,11 +176,12 @@ describe('SpaceOperations', () => {
     const wrapper = mountPage()
     await flushPromises()
     expect(wrapper.text()).toContain('上传状态待确认')
-    expect(wrapper.text()).toContain('解析统计中')
-    expect(wrapper.text()).toContain('解析耗时较长')
+    expect(wrapper.text()).toContain('等待解析')
+    expect(wrapper.text()).toContain('等待解析较长')
     expect(wrapper.text()).not.toContain('0 条新消息')
     await wrapper.findAll('.sync-row:not(.sync-head)')[1].trigger('click')
     expect(wrapper.find('.stages').text()).toContain('归档已接收，数量待解析')
+    expect(wrapper.find('.stages').text()).toContain('已上传，等待后台处理')
     expect(wrapper.find('.stages').text()).not.toContain('本次没有图片')
   })
 
@@ -177,7 +189,7 @@ describe('SpaceOperations', () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     let wrapper
     try {
-      const waiting = { ...uploads[0], status: 'processing', message_count: 0 }
+      const waiting = { ...uploads[0], status: 'processing', message_count: 0, worker_started_at: new Date().toISOString() }
       spacesApi.getUploads.mockResolvedValue({
         data: { data: { list: [waiting], pagination: { next: null } } }
       })

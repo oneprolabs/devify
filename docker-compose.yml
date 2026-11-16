@@ -25,6 +25,8 @@ services:
         PIP_TRUSTED_HOST: pypi.org
     env_file:
       - ${DEVIFY_ENV_FILE:-./.env}
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/django/staticfiles:/opt/devify/core/staticfiles
       - ${DEVIFY_RUNTIME_ROOT:-.}/cache:/opt/cache
@@ -41,6 +43,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      devify-chat-worker:
+        condition: service_started
     command: gunicorn
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
@@ -57,6 +61,8 @@ services:
     logging: *default-logging
     env_file:
       - ${DEVIFY_ENV_FILE:-./.env}
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ${DEVIFY_RUNTIME_ROOT:-.}/cache:/opt/cache
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/logs/worker:/var/log/celery
@@ -76,6 +82,61 @@ services:
       redis:
         condition: service_healthy
     command: celery
+
+  devify-chat-worker:
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:latest
+    container_name: devify-chat-worker
+    restart: unless-stopped
+    stop_grace_period: 60s
+    logging: *default-logging
+    env_file:
+      - ${DEVIFY_ENV_FILE:-./.env}
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
+      CHAT_DEDICATED_WORKER: "true"
+      CELERY_WORKER_PREFETCH_MULTIPLIER: "1"
+    volumes:
+      - ${DEVIFY_RUNTIME_ROOT:-.}/cache:/opt/cache
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_upload_archives:/opt/devify/chat_upload_archives
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_media:/opt/devify/chat_media
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_avatars:/opt/devify/chat_avatars
+    networks:
+      - devify_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["celery"]
+    command: ["-A", "core", "worker", "--loglevel=INFO", "--concurrency=2", "--hostname=chat-upload@%h", "--queues=chat_ingestion"]
+
+  devify-analysis-worker:
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:latest
+    container_name: devify-analysis-worker
+    restart: unless-stopped
+    stop_grace_period: 60s
+    logging: *default-logging
+    env_file:
+      - ${DEVIFY_ENV_FILE:-./.env}
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
+      CHAT_DEDICATED_WORKER: "true"
+      CHAT_ANALYSIS_LLM_ENABLED: "true"
+      CHAT_ANALYSIS_AUTO_CREATE_EVENTS: "true"
+      CELERY_WORKER_PREFETCH_MULTIPLIER: "1"
+    volumes:
+      - ${DEVIFY_RUNTIME_ROOT:-.}/cache:/opt/cache
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_media:/opt/devify/chat_media
+      - ${DEVIFY_RUNTIME_ROOT:-.}/data/chat_avatars:/opt/devify/chat_avatars
+    networks:
+      - devify_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["celery"]
+    command: ["-A", "core", "worker", "--loglevel=INFO", "--concurrency=1", "--hostname=chat-analysis@%h", "--queues=chat_analysis"]
 
   devify-scheduler:
     image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:latest

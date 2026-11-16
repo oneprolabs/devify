@@ -83,6 +83,12 @@ services:
       redis:
         condition: service_healthy
 
+  devify-chat-worker:
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:${DEVIFY_IMAGE_TAG:-latest}
+
+  devify-analysis-worker:
+    image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:${DEVIFY_IMAGE_TAG:-latest}
+
   devify-scheduler:
     image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:${DEVIFY_IMAGE_TAG:-latest}
     depends_on: !override

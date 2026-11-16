@@ -253,7 +253,7 @@ router.beforeEach(async (to, from, next) => {
       }
     }
     next()
-  } else if (to.meta.requiresGuest && userStore.isAuthenticated) {
+  } else if (to.meta.requiresGuest && userStore.isAuthenticated && !(to.path === '/login' && to.query.forgot === '1')) {
     next('/workspace')
   } else {
     next()

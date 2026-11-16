@@ -76,7 +76,8 @@ def recover_stale_uploads(*, now=None, stale_seconds=STALE_SECONDS):
                 result["missing_or_invalid"] += 1
                 continue
             # Refresh the timestamp to throttle repeat sweeps.
-            batch.save(update_fields=("updated_at",))
+            batch.worker_started_at = None
+            batch.save(update_fields=("worker_started_at", "updated_at"))
 
             def dispatch(batch=batch):
                 try:

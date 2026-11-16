@@ -428,6 +428,35 @@ bluegreen_deploy() {
     compose run --rm --no-deps "devify-api-${next}" \
         python manage.py migrate --noinput
 
+    log "Starting chat parser before routing uploads to its queue..."
+    compose up -d devify-chat-worker devify-analysis-worker
+    local analysis_hostname
+    analysis_hostname="$(docker inspect -f '{{.Config.Hostname}}' devify-analysis-worker)"
+    local analysis_ready=0 analysis_attempt
+    for analysis_attempt in 1 2 3 4 5 6; do
+        if docker exec devify-analysis-worker celery -A core inspect ping -d "chat-analysis@${analysis_hostname}" --timeout=5; then
+            analysis_ready=1
+            break
+        fi
+        sleep 2
+    done
+    if [ "${analysis_ready}" != "1" ]; then
+        die "Chat analysis worker did not respond; deploy aborted before traffic switch."
+    fi
+    local chat_hostname chat_ready=0 attempt
+    chat_hostname="$(docker inspect -f '{{.Config.Hostname}}' devify-chat-worker)"
+    for attempt in 1 2 3 4 5 6; do
+        if docker exec devify-chat-worker celery -A core inspect ping \
+            -d "chat-upload@${chat_hostname}" --timeout=5; then
+            chat_ready=1
+            break
+        fi
+        sleep 2
+    done
+    if [ "${chat_ready}" != "1" ]; then
+        die "Chat parser did not respond; deploy aborted before traffic switch."
+    fi
+
     log "Starting devify-api-${next} / devify-ui-${next}..."
     compose --profile "${next}" up -d \
         "devify-api-${next}" "devify-ui-${next}"
@@ -469,7 +498,7 @@ bluegreen_deploy() {
 
     # Non-colored app services: ordinary rolling restart. Celery graceful-drain
     # settings mean in-flight tasks finish before the old process exits.
-    compose up -d devify-worker devify-scheduler
+    compose up -d devify-worker devify-chat-worker devify-analysis-worker devify-scheduler
     compose ps
 }
 
@@ -566,7 +595,7 @@ rollback_stack() {
     # rolled away from, against the same database. DEVIFY_IMAGE_TAG is
     # already exported above, so this recreates them at ${rbtag} too.
     log "Rolling devify-worker / devify-scheduler back to ${rbtag}..."
-    compose up -d devify-worker devify-scheduler
+    compose up -d devify-worker devify-chat-worker devify-analysis-worker devify-scheduler
 
     log "Rolled back: active color is now ${target}. ${active} left running for inspection."
 }
@@ -578,7 +607,7 @@ status_stack() {
     local color; color="$(current_color)"
     log "Active color: ${color}"
     compose ps "devify-api-${color}" "devify-ui-${color}" \
-        devify-worker devify-scheduler devify-home nginx 2>/dev/null || true
+        devify-worker devify-chat-worker devify-analysis-worker devify-scheduler devify-home nginx 2>/dev/null || true
     if docker exec "devify-api-${color}" \
         curl -fs http://127.0.0.1:8000/health >/dev/null 2>&1; then
         log "devify-api-${color} (active): healthy"

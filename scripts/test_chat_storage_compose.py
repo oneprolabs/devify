@@ -22,12 +22,14 @@ class ChatStorageComposeTest(unittest.TestCase):
             variants = (
                 (
                     ["-f", "docker-compose.yml"],
-                    ["devify-api", "devify-worker"],
+                    ["devify-api", "devify-worker", "devify-chat-worker"],
                 ),
                 (
                     [
                         "-f",
                         "docker-compose.yml",
+                        "-f",
+                        "deploy/docker-compose.yml",
                         "-f",
                         "docker-compose.bluegreen.yml",
                         "--profile",
@@ -35,7 +37,10 @@ class ChatStorageComposeTest(unittest.TestCase):
                         "--profile",
                         "green",
                     ],
-                    ["devify-api-blue", "devify-api-green", "devify-worker"],
+                    [
+                        "devify-api-blue", "devify-api-green", "devify-worker",
+                        "devify-chat-worker",
+                    ],
                 ),
             )
             for args, services in variants:
@@ -47,6 +52,44 @@ class ChatStorageComposeTest(unittest.TestCase):
                     stderr=subprocess.PIPE,
                 )
                 config = json.loads(output)
+                self.assertNotEqual(
+                    config["services"]["devify-worker"]["environment"].get(
+                        "CHAT_DEDICATED_WORKER", "false"
+                    ).lower(),
+                    "true",
+                )
+                self.assertEqual(
+                    config["services"]["devify-worker"]["command"], ["celery"]
+                )
+                self.assertIn(
+                    "--queues=chat_ingestion",
+                    config["services"]["devify-chat-worker"]["command"],
+                )
+                analysis = config["services"]["devify-analysis-worker"]
+                self.assertIn("--queues=chat_analysis", analysis["command"])
+                self.assertIn("--concurrency=1", analysis["command"])
+                for name in (
+                    "CHAT_ANALYSIS_LLM_ENABLED",
+                    "CHAT_ANALYSIS_AUTO_CREATE_EVENTS",
+                    "CHAT_UPLOAD_DEDICATED_QUEUE",
+                ):
+                    self.assertEqual(analysis["environment"][name], "true")
+                api_services = (
+                    name for name in services if name.startswith("devify-api")
+                )
+                for service in api_services:
+                    self.assertEqual(
+                        config["services"][service]["depends_on"]
+                        ["devify-chat-worker"]["condition"],
+                        "service_started",
+                    )
+                for service in services:
+                    self.assertEqual(
+                        config["services"][service]["environment"].get(
+                            "CHAT_UPLOAD_DEDICATED_QUEUE"
+                        ),
+                        "true",
+                    )
                 for service in services:
                     mounts = {
                         mount["target"]: mount["source"]

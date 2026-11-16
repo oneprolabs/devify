@@ -50,6 +50,9 @@ def write_archive(batch, content=b"valid archive"):
 def test_recovery_requeues_verified_batch_only_once():
     batch = make_batch("good")
     write_archive(batch)
+    UploadBatch.objects.filter(pk=batch.pk).update(
+        worker_started_at=timezone.now()
+    )
     with patch("chat_ingestion.tasks.dispatch_parse_chat_upload") as dispatch:
         assert recover_stale_uploads() == {
             "requeued": 1,
@@ -63,6 +66,7 @@ def test_recovery_requeues_verified_batch_only_once():
     assert dispatch.call_args.args[0].pk == batch.pk
     batch.refresh_from_db()
     assert batch.status == UploadBatch.Status.PROCESSING
+    assert batch.worker_started_at is None
 
 
 @pytest.mark.parametrize("corrupt", [False, True])

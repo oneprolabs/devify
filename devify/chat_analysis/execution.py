@@ -319,12 +319,14 @@ def _write_chunk_note(job, messages):
     lines = []
     occurred_at = []
     missing_content = False
+    missing_count = 0
     for message in messages:
         if message.occurred_at:
             occurred_at.append(message.occurred_at)
         texts = _message_texts(message)
         if not texts:
             missing_content = True
+            missing_count += 1
             continue
         if message.occurred_at:
             stamp = timezone.localtime(message.occurred_at).strftime(
@@ -334,6 +336,11 @@ def _write_chunk_note(job, messages):
             stamp = "unknown-time"
         sender = message.sender_name or message.sender_key or "unknown"
         lines.append(f"[{stamp}] {sender}: {' / '.join(texts)}")
+    if missing_count:
+        logger.info(
+            "Chat analysis job %s: %s messages have no text",
+            job.pk, missing_count,
+        )
     if not lines:
         return False, True
     first_seq = messages[0].ingest_seq
@@ -774,6 +781,9 @@ def _enrich_note_with_llm(job, note, messages):
             (job.specification or {}).get("chat_analysis_preferences"),
         ):
             partial = True
+            logger.warning(
+                "Chat analysis job %s: summary result incomplete", job.pk
+            )
     except Exception:
         # An unavailable LLM is an infrastructure failure, not a data gap:
         # keep the job's state and let the caller retry.
@@ -782,6 +792,9 @@ def _enrich_note_with_llm(job, note, messages):
     try:
         if not _extract_events(job, note, messages, payload, language):
             partial = True
+            logger.warning(
+                "Chat analysis job %s: event result incomplete", job.pk
+            )
     except Exception:
         logger.exception("LLM event extraction failed for job %s", job.pk)
         raise RuntimeError("LLM event extraction failed") from None

@@ -161,6 +161,9 @@ def parse_chat_upload_task(self, batch_id):
         return {"batch_id": batch.pk, "status": batch.status}
     if batch.status != UploadBatch.Status.PROCESSING:
         return {"batch_id": batch.pk, "status": batch.status}
+    UploadBatch.objects.filter(
+        pk=batch.pk, status=UploadBatch.Status.PROCESSING
+    ).update(worker_started_at=timezone.now())
     source_import = getattr(batch, "source_import", None)
     if source_import:
         source_import.status = SourceImport.Status.RUNNING

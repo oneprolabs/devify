@@ -8,7 +8,8 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from spaces.models import Space, SpaceMembership
+from spaces.models import Space, SpaceAuditLog, SpaceMembership
+from spaces.services import takeover_space
 from threadline.models import (
     EmailAttachment,
     EmailMailbox,
@@ -655,3 +656,59 @@ def test_team_attachment_downloads_through_the_space_endpoint(
     assert detail.status_code == 200
     assert detail.data["data"]["attachments"][0]["download_url"]
     assert outsider_response.status_code == 404
+
+
+def test_staff_member_reads_space_mail_without_takeover():
+    """Staff read member spaces directly; takeover stays the fallback."""
+    staff = User.objects.create_user(username="sharing-staff", is_staff=True)
+    team = make_team(staff, slug="sharing-staff-team")
+    mailbox = make_mailbox(staff, team, username="staff@example.com")
+    add_owner_share(mailbox)
+    EmailSaveService().save_email(
+        staff.id,
+        email_data("<sharing-staff-1@example.com>"),
+        mailbox=mailbox,
+    )
+
+    url = reverse("space-email-list", kwargs={"space_id": team.pk})
+    member_response = client_for(staff).get(url)
+    assert member_response.status_code == 200
+    assert len(member_response.data["data"]["list"]) == 1
+
+    other_staff = User.objects.create_user(
+        username="sharing-other-staff", is_staff=True
+    )
+    assert client_for(other_staff).get(url).status_code == 404
+
+
+def test_takeover_attribution_survives_staff_membership():
+    """A staff member acting under takeover keeps the takeover audit id."""
+    owner = User.objects.create_user(username="sharing-audit-owner")
+    staff = User.objects.create_user(
+        username="sharing-audit-staff", is_staff=True
+    )
+    team = make_team(owner, slug="sharing-audit-team")
+    SpaceMembership.objects.create(
+        space=team, user=staff, role=SpaceMembership.Role.USER
+    )
+    mailbox = make_mailbox(owner, team, username="audit@example.com")
+    add_owner_share(mailbox)
+    message = EmailSaveService().save_email(
+        owner.id,
+        email_data("<sharing-audit-1@example.com>"),
+        mailbox=mailbox,
+    )
+    takeover = takeover_space(admin=staff, space=team, reason="audit check")
+
+    url = reverse(
+        "space-email-detail",
+        kwargs={"space_id": team.pk, "email_uuid": message.uuid},
+    )
+    response = client_for(staff).delete(url)
+
+    assert response.status_code == 204
+    audit = SpaceAuditLog.objects.filter(
+        space=team, action="email.deleted"
+    ).latest("id")
+    assert audit.actor == staff
+    assert audit.metadata["takeover_id"] == takeover.pk

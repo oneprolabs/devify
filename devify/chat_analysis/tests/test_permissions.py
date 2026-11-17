@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth.models import User
 
+from chat_analysis.api_views import _editable
 from chat_analysis.models import Event, Note
 from chat_analysis.services import (
     ChatAnalysisPermissionError,
@@ -217,3 +218,25 @@ def test_event_assignment_requires_write_permission():
 
     with pytest.raises(ChatAnalysisPermissionError):
         assign_note_events(actor=guest, note=note, events=[event], manual=True)
+
+
+def test_staff_owner_can_edit_own_note():
+    """Staff edit through their membership instead of takeover only."""
+    staff = User.objects.create_user(
+        username="staff-note-owner", is_staff=True
+    )
+    space = make_team(staff, slug="staff-note-team")
+    note = Note.objects.create(
+        space=space,
+        created_by=staff,
+        note_key="staff-note-1",
+        title="阶段总结",
+        content="内容",
+    )
+
+    assert _editable(staff, note) is True
+
+    other_staff = User.objects.create_user(
+        username="other-note-staff", is_staff=True
+    )
+    assert _editable(other_staff, note) is False

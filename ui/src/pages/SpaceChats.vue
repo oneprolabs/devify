@@ -4,7 +4,7 @@
       <div v-if="error" class="page-alert" role="alert">{{ error }}</div>
 
       <section
-        v-if="!loading && !conversations.length"
+        v-if="!loading && !error && !conversations.length"
         class="onboarding"
         aria-labelledby="onboarding-title"
       >
@@ -111,7 +111,9 @@
               {{
                 conversations.length
                   ? '没有符合条件的会话。'
-                  : '还没有上传的会话。'
+                  : error
+                    ? '会话暂时无法加载。'
+                    : '还没有上传的会话。'
               }}
             </div>
             <template v-else>
@@ -608,6 +610,7 @@ const search = ref('')
 const conversationFilter = ref('all')
 const pendingConversations = ref(0)
 const selectedConversation = ref(null)
+const lastSelectedConversationId = ref(null)
 const mobileMessage = ref(false)
 
 const messages = ref([])
@@ -798,6 +801,16 @@ const isNewDay = (message, index) =>
 
 const unwrap = (response) => response.data.data || response.data
 
+const conversationLoadMessage = (requestError) => {
+  const status = requestError?.response?.status
+  if (status === 404) return '空间不存在或你无权访问。'
+  if (status === 403) return '你没有访问这个空间的权限。'
+  const body = requestError?.response?.data
+  const detail = body?.data?.detail || body?.detail
+  if (typeof detail === 'string' && detail.trim()) return detail.trim()
+  return '会话加载失败，请稍后重试。'
+}
+
 const loadConversations = async () => {
   loading.value = true
   error.value = ''
@@ -821,20 +834,31 @@ const loadConversations = async () => {
       (item) => String(item.id) === String(route.query.conversation_id)
     )
     const current = conversations.value.find(
-      (item) => item.id === selectedConversation.value?.id
+      (item) =>
+        item.id ===
+        (selectedConversation.value?.id ?? lastSelectedConversationId.value)
     )
     const target = requested || current || conversations.value[0]
     const view = 'raw'
     if (current && target.id === current.id) {
       selectedConversation.value = target
+      lastSelectedConversationId.value = target.id
       await loadConversationView(target)
     } else {
       if (requested) mobileMessage.value = true
       await selectConversation(target, view)
     }
   } catch (requestError) {
-    error.value =
-      requestError.response?.data?.detail || '会话加载失败，请稍后重试。'
+    conversations.value = []
+    conversationsTotal.value = 0
+    pendingConversations.value = 0
+    conversationsNext.value = false
+    selectedConversation.value = null
+    messages.value = []
+    conversationEvents.value = []
+    eventsTotal.value = null
+    eventsNext.value = false
+    error.value = conversationLoadMessage(requestError)
   } finally {
     loading.value = false
   }
@@ -870,6 +894,7 @@ const openConversation = async (conversation) => {
 const selectConversation = async (conversation, view = 'raw') => {
   if (!conversation) return
   selectedConversation.value = conversation
+  lastSelectedConversationId.value = conversation.id
   conversationView.value = view
   conversationEvents.value = []
   eventsTotal.value = null

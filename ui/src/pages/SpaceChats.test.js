@@ -301,6 +301,78 @@ describe('SpaceChats', () => {
     expect(wrapper.text()).toContain('云端还没有为这个会话生成聊天总结')
   })
 
+  it('shows the onboarding empty state when there are no conversations', async () => {
+    spacesApi.getConversations.mockResolvedValue({
+      data: {
+        data: {
+          list: [],
+          counts: { total: 0, pending: 0 },
+          pagination: { total: 0, next: null }
+        }
+      }
+    })
+
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('.onboarding').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('会话加载失败')
+    expect(spacesApi.getMessages).not.toHaveBeenCalled()
+  })
+
+  it('explains an unreadable space instead of blaming the network', async () => {
+    spacesApi.getConversations.mockRejectedValue({
+      response: {
+        status: 404,
+        data: { code: 404, message: 'failed', data: {} }
+      }
+    })
+
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('[role="alert"]').text()).toContain(
+      '空间不存在或你无权访问'
+    )
+    expect(wrapper.find('.onboarding').exists()).toBe(false)
+    expect(wrapper.text()).toContain('会话暂时无法加载')
+  })
+
+  it('restores the open conversation after a failed refresh', async () => {
+    const second = { ...conversation, id: 5, title: '另一个群' }
+    spacesApi.getConversations.mockResolvedValue({
+      data: {
+        data: {
+          list: [conversation, second],
+          counts: { total: 2, pending: 0 },
+          pagination: { total: 2 }
+        }
+      }
+    })
+
+    const wrapper = await mountPage()
+    await wrapper.findAll('.conv-row')[1].trigger('click')
+    await flushPromises()
+    expect(spacesApi.getMessages).toHaveBeenLastCalledWith('3', 5, {
+      page_size: 100,
+      page: 'last'
+    })
+
+    spacesApi.getConversations.mockRejectedValueOnce({
+      response: { status: 500, data: {} }
+    })
+    const refresh = wrapper.get('[aria-label="刷新会话"]')
+    await refresh.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('会话加载失败')
+
+    await refresh.trigger('click')
+    await flushPromises()
+    expect(spacesApi.getMessages).toHaveBeenLastCalledWith('3', 5, {
+      page_size: 100,
+      page: 'last'
+    })
+  })
+
   it('filters the rail by search text', async () => {
     const wrapper = await mountPage()
 

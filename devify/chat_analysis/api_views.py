@@ -59,7 +59,7 @@ from chat_analysis.services import (
     upsert_event_relation,
 )
 from chat_domain.models import Message, MessagePart
-from spaces.models import Space, SpaceMembership, SpaceTakeover
+from spaces.models import Space, SpaceTakeover
 from spaces.services import (
     SpacePermissionService,
     audit_space_action,
@@ -101,18 +101,15 @@ def _pagination_data(paginator):
 
 
 def _editable(actor, instance):
-    if getattr(actor, "is_staff", False):
-        return SpacePermissionService.has_active_takeover(
-            actor, instance.space
-        )
     membership = SpacePermissionService.membership(actor, instance.space)
+    if membership and (
+        SpacePermissionService.can_manage(membership)
+        or instance.created_by_id == actor.pk
+    ):
+        return True
     return bool(
-        membership
-        and membership.status == SpaceMembership.Status.ACTIVE
-        and (
-            SpacePermissionService.can_manage(membership)
-            or instance.created_by_id == actor.pk
-        )
+        getattr(actor, "is_staff", False)
+        and SpacePermissionService.has_active_takeover(actor, instance.space)
     )
 
 

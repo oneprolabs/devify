@@ -153,6 +153,26 @@ def test_inactive_membership_has_no_permissions(status):
 
 @pytest.mark.django_db
 @pytest.mark.integration
+@pytest.mark.parametrize(
+    "status",
+    [SpaceMembership.Status.INVITED, SpaceMembership.Status.REMOVED],
+)
+def test_inactive_membership_cannot_read_space(status):
+    user = User.objects.create_user(username=f"inactive-{status}")
+    space = Space.objects.create(
+        name="Inactive Team",
+        slug=f"inactive-team-{status}",
+        kind=Space.Kind.TEAM,
+        owner=user,
+    )
+    SpaceMembership.objects.create(space=space, user=user, status=status)
+
+    assert not SpacePermissionService.can_read(user, space)
+    assert space.id not in SpacePermissionService.readable_space_ids(user)
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
 def test_resource_permission_matrix_requires_takeover_for_global_admin():
     owner = User.objects.create_user(username="resource-owner")
     member = User.objects.create_user(username="resource-member")
@@ -188,6 +208,35 @@ def test_resource_permission_matrix_requires_takeover_for_global_admin():
     assert SpacePermissionService.can_read(admin, space)
     assert SpacePermissionService.can_upload(admin, space)
     assert SpacePermissionService.can_delete_resource(admin, space, member.pk)
+
+
+@pytest.mark.django_db
+@pytest.mark.integration
+def test_staff_member_reads_own_space_without_takeover():
+    """Staff accounts keep normal access to the spaces they belong to."""
+    admin = User.objects.create_user(
+        username="member-admin", is_staff=True
+    )
+    space = Space.objects.create(
+        name="Admin Personal",
+        slug="admin-personal",
+        kind=Space.Kind.PERSONAL,
+        owner=admin,
+    )
+    SpaceMembership.objects.create(
+        space=space,
+        user=admin,
+        role=SpaceMembership.Role.OWNER,
+    )
+
+    assert SpacePermissionService.can_read(admin, space)
+    assert SpacePermissionService.can_upload(admin, space)
+    assert space.id in SpacePermissionService.readable_space_ids(admin)
+
+    stranger = User.objects.create_user(
+        username="other-admin", is_staff=True
+    )
+    assert not SpacePermissionService.can_read(stranger, space)
 
 
 def test_inactive_space_disallows_upload_and_delete_without_queries():

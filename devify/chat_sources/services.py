@@ -37,7 +37,11 @@ def get_or_create_upload_source(*, space, actor, channel_type, account_key):
 
 
 def can_manage_source(user, source):
-    if getattr(user, "is_staff", False):
-        return SpacePermissionService.has_active_takeover(user, source.space)
-    membership = SpacePermissionService.membership(user, source.space)
-    return SpacePermissionService.can_manage(membership)
+    if SpacePermissionService.can_manage(
+        SpacePermissionService.membership(user, source.space)
+    ):
+        return True
+    return bool(
+        getattr(user, "is_staff", False)
+        and SpacePermissionService.has_active_takeover(user, source.space)
+    )

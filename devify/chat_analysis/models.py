@@ -103,6 +103,31 @@ class AnalysisJob(models.Model):
         return f"{self.request_key} ({self.state})"
 
 
+class ScheduledAnalysisRun(models.Model):
+    """A durable cutoff for one configured analysis time slot."""
+
+    slot = models.CharField(max_length=40, unique=True)
+    boundary = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AnalysisJobMessage(models.Model):
+    """Exact message assignment for a scheduled analysis job."""
+
+    job = models.ForeignKey(AnalysisJob, on_delete=models.CASCADE, related_name="scheduled_messages")
+    message = models.OneToOneField("chat_domain.Message", on_delete=models.CASCADE, related_name="scheduled_analysis")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    error = models.TextField(blank=True)
+
+    def clean(self):
+        if self.job_id and self.message_id and self.job.conversation_id != self.message.conversation_id:
+            raise ValidationError({"message": "Message must belong to the job conversation."})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+
 class Note(models.Model):
     """A stage summary backed by uploaded messages, not an event."""
 

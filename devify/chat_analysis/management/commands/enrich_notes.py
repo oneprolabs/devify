@@ -4,7 +4,7 @@ import uuid
 
 from django.core.management.base import BaseCommand
 
-from chat_analysis.execution import _enrich_note_with_llm
+from chat_analysis.execution import _enrich_note_with_llm, _messages_from_note
 from chat_analysis.models import Note
 
 
@@ -54,12 +54,7 @@ class Command(BaseCommand):
             ):
                 skipped += 1
                 continue
-            messages = [
-                evidence.message
-                for evidence in note.evidence.select_related(
-                    "message"
-                ).order_by("message__ingest_seq")
-            ]
+            messages = _messages_from_note(note)
             if not messages:
                 skipped += 1
                 continue

@@ -96,7 +96,7 @@ def test_parser_task_marks_timeout_failed():
     assert "time limit" in batch.error_message
 
 
-def test_completed_batch_recovers_missing_analysis_once():
+def test_completed_batch_does_not_start_analysis():
     from chat_analysis.models import AnalysisJob
     from chat_domain.models import Conversation, Message, MessageOrigin
     from chat_ingestion.models import UploadItem
@@ -121,15 +121,8 @@ def test_completed_batch_recovers_missing_analysis_once():
         message=message, upload_item=item, locator_key="1", parser_version="1"
     )
 
-    with patch(
-        "chat_ingestion.tasks.create_analysis_job",
-        side_effect=RuntimeError("temporarily unavailable"),
-    ):
-        parse_chat_upload_task.run(batch.pk)
+    parse_chat_upload_task.run(batch.pk)
+    parse_chat_upload_task.run(batch.pk)
+
     assert not batch.analysis_jobs.exists()
-    with patch("chat_ingestion.tasks.execute_analysis_job") as execute:
-        parse_chat_upload_task.run(batch.pk)
-        parse_chat_upload_task.run(batch.pk)
-    assert batch.analysis_jobs.count() == 1
-    assert AnalysisJob.objects.filter(upload_batches=batch).count() == 1
-    execute.assert_called_once()
+    assert AnalysisJob.objects.filter(upload_batches=batch).count() == 0

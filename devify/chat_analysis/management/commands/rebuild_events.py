@@ -21,7 +21,9 @@ from django.db import transaction
 from chat_analysis.execution import (
     _extract_events,
     _message_payload,
+    _messages_from_note,
     _output_language,
+    _store_events,
 )
 from chat_analysis.models import (
     Event,
@@ -92,28 +94,25 @@ class Command(BaseCommand):
                 break
             if note.analysis_job_id is None:
                 continue
-            messages = [
-                evidence.message
-                for evidence in note.evidence.select_related(
-                    "message"
-                ).order_by("message__ingest_seq")
-            ]
-            if not messages:
-                empty += 1
-                continue
             try:
-                ok = _extract_events(
+                messages = _messages_from_note(note)
+                if not messages:
+                    empty += 1
+                    continue
+                events = _extract_events(
                     note.analysis_job,
-                    note,
                     messages,
                     _message_payload(messages),
                     language,
                 )
+                if events is not None:
+                    with transaction.atomic():
+                        _store_events(note.analysis_job, note, messages, events)
             except Exception:
                 logger.exception("Event rebuild failed for note %s", note.pk)
                 failed += 1
                 continue
-            if not ok:
+            if events is None:
                 failed += 1
             processed += 1
             self.stdout.write(

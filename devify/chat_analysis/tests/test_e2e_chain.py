@@ -118,6 +118,21 @@ def client_for(user):
     return client
 
 
+def run_scheduled_analysis(conversation):
+    """The upload no longer starts analysis; the slot does."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from chat_analysis.execution import execute_analysis_job
+    from chat_analysis.scheduled_dispatch import schedule_conversation
+
+    boundary = timezone.now() + timedelta(seconds=1)
+    job = schedule_conversation(conversation.pk, boundary)
+    assert job is not None
+    return execute_analysis_job(job.pk, worker_id="e2e")
+
+
 def upload_and_complete(client, space, key="e2e-chain"):
     created = client.post(
         f"/api/v1/spaces/{space.pk}/chat/uploads",
@@ -167,7 +182,8 @@ def test_upload_parse_note_event_report_and_question(monkeypatch, llm):
     assert messages.status_code == 200
     assert len(messages.data["data"]["list"]) == 2
 
-    # 2. Rule-based analysis wrote a Note backed by message evidence.
+    # 2. The scheduled slot wrote a Note backed by message evidence.
+    run_scheduled_analysis(conversation)
     job = AnalysisJob.objects.get(conversation=conversation)
     assert job.state in (AnalysisJob.State.READY, AnalysisJob.State.PARTIAL)
     note = job.notes.get()
@@ -285,6 +301,7 @@ def test_import_succeeds_even_when_analysis_fails_and_can_be_retried(
     )
     assert listing.status_code == 200
 
+    run_scheduled_analysis(conversation)
     job = AnalysisJob.objects.get(conversation=conversation)
     assert job.state == AnalysisJob.State.FAILED
     assert "removed" in job.error

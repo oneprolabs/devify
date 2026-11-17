@@ -26,7 +26,7 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
 
 
 def dispatch_analysis_job(job):
-    """Queue the job without blocking the request."""
+    """Queue the job on the existing chat_analysis worker."""
     return execute_analysis_job_task.delay(job.pk)
 
 
@@ -34,6 +34,19 @@ def dispatch_analysis_job(job):
 def run_due_topic_reports_task(self):
     """Create reports for topic subscriptions whose time has arrived."""
     return run_due_topic_reports()
+
+
+@shared_task(bind=True, max_retries=0)
+def run_due_scheduled_analysis_task(self):
+    """Enqueue due conversations onto the existing analysis worker.
+
+    Beat only decides the Beijing slot. Each job is
+    ``execute_analysis_job_task``, which production routes to the
+    ``chat_analysis`` queue consumed by ``devify-analysis-worker``.
+    """
+    from chat_analysis.scheduled_dispatch import dispatch_due_analysis
+
+    return dispatch_due_analysis()
 
 
 @shared_task(bind=True, max_retries=0)

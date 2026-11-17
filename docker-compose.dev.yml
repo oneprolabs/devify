@@ -57,6 +57,8 @@ services:
     logging: *default-logging
     env_file:
       - ./.env.dev
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ./cache.dev:/opt/cache
       - ./data.dev/logs/worker:/var/log/celery
@@ -84,6 +86,9 @@ services:
     logging: *default-logging
     env_file:
       - ./.env.dev
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
+      CHAT_DEDICATED_WORKER: "true"
     volumes:
       - ./cache.dev:/opt/cache
       - ./data.dev/logs/upload-worker:/var/log/celery
@@ -104,6 +109,40 @@ services:
     entrypoint: ["celery"]
     command: ["-A", "core", "worker", "--loglevel=INFO", "--concurrency=1", "--hostname=chat-upload@%h", "--queues=chat_ingestion"]
 
+  devify-analysis-worker:
+    image: devify:latest
+    container_name: devify-analysis-worker-dev
+    restart: unless-stopped
+    stop_grace_period: 60s
+    logging: *default-logging
+    env_file:
+      - ./.env.dev
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
+      CHAT_DEDICATED_WORKER: "true"
+      CHAT_ANALYSIS_LLM_ENABLED: "true"
+      CHAT_ANALYSIS_AUTO_CREATE_EVENTS: "true"
+      CELERY_WORKER_PREFETCH_MULTIPLIER: "1"
+    volumes:
+      - ./cache.dev:/opt/cache
+      - ./data.dev/logs/analysis-worker:/var/log/celery
+      - ./devify:/opt/devify
+      - ./data.dev/haraka/emails:/opt/haraka/emails
+      - ./data.dev/haraka/email_attachments:/opt/haraka/email_attachments
+      - ./data.dev/email_attachments:/opt/email_attachments
+      - ./data.dev/feedback:/opt/feedback
+    networks:
+      - devify_network
+    depends_on:
+      devify-api:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["celery"]
+    command: ["-A", "core", "worker", "--loglevel=INFO", "--concurrency=1", "--hostname=chat-analysis@%h", "--queues=chat_analysis"]
+
   devify-scheduler:
     image: devify:latest
     container_name: devify-scheduler-dev
@@ -112,6 +151,8 @@ services:
     logging: *default-logging
     env_file:
       - ./.env.dev
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ./data.dev/logs/scheduler:/var/log/celery
       - ./devify:/opt/devify

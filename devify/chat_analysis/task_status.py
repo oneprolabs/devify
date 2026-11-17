@@ -185,30 +185,23 @@ def recover_expired_analysis_jobs(
     requeued = 0
     failed = 0
     requeued_ids = []
-    for job in stale:
-        job.lease_owner = ""
-        job.lease_until = None
-        if job.attempts < max_attempts:
-            job.state = AnalysisJob.State.QUEUED
-            job.error = "lease_expired: requeued after worker timeout."
-            requeued += 1
-            requeued_ids.append(job.pk)
-        else:
-            job.state = AnalysisJob.State.FAILED
-            job.error = (
-                "lease_expired: max attempts reached "
-                f"({job.attempts}/{max_attempts})."
-            )
-            failed += 1
-        job.save(
-            update_fields=(
-                "state",
-                "error",
-                "lease_owner",
-                "lease_until",
-                "updated_at",
-            )
+    for job in stale.iterator():
+        retry = job.attempts < max_attempts
+        state = AnalysisJob.State.QUEUED if retry else AnalysisJob.State.FAILED
+        error = (
+            "lease_expired: requeued after worker timeout."
+            if retry else "lease_expired: max attempts reached "
+            f"({job.attempts}/{max_attempts})."
         )
+        updated = stale.filter(pk=job.pk, fencing_token=job.fencing_token).update(
+            state=state, error=error, lease_owner="", lease_until=None, updated_at=now
+        )
+        if updated:
+            if retry:
+                requeued += 1
+                requeued_ids.append(job.pk)
+            else:
+                failed += 1
     return {
         "requeued": requeued,
         "failed": failed,

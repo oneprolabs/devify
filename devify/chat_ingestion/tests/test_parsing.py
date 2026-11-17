@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
-from chat_analysis.models import AnalysisJob, Note
+from chat_analysis.models import AnalysisJob
 from chat_domain.models import (
     Conversation,
     ConversationAvatar,
@@ -227,9 +227,7 @@ def test_complete_parses_archive_into_conversations_messages_and_parts():
     origins = MessageOrigin.objects.filter(message__conversation=conversation)
     assert origins.count() == 2
     assert {origin.parser_version for origin in origins} == {"wechat.v1"}
-    job = AnalysisJob.objects.get(conversation=conversation)
-    assert job.state in (AnalysisJob.State.READY, AnalysisJob.State.PARTIAL)
-    assert Note.objects.filter(analysis_job=job).count() == 1
+    assert not AnalysisJob.objects.filter(conversation=conversation).exists()
 
 
 def test_reimport_dedupes_messages_and_records_new_origins():

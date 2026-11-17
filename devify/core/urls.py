@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.urls import include, path
 
 from accounts.views import OAuthCallbackRedirectView
+from billing.views import EntitlementsAPIView
 
 from .swagger import redoc_view, schema_view, swagger_view
 
@@ -58,6 +59,12 @@ urlpatterns = [
     path("api/v1/", include("relay.urls")),
     path("api/v1/", include("expense.urls")),
     path("api/v1/", include("feedback.urls")),
+    # Subscription entitlements of the signed-in account (desktop client)
+    path(
+        "api/v1/me/entitlements",
+        EntitlementsAPIView.as_view(),
+        name="me-entitlements",
+    ),
     # Agentcore task execution API
     path("api/v1/tasks/", include("agentcore_task.adapters.django.urls")),
     # Management APIs for auth users/groups

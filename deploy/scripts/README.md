@@ -10,8 +10,14 @@ Use `devify-deploy.sh` for install, upgrade, and daily operations:
 ./deploy/scripts/devify-deploy.sh status
 ./deploy/scripts/devify-deploy.sh logs
 ./deploy/scripts/devify-deploy.sh restart
+./deploy/scripts/devify-deploy.sh recreate
 ./deploy/scripts/devify-deploy.sh config
 ```
+
+`restart` only restarts existing containers. `recreate` applies the current
+Compose configuration with `--force-recreate` and preserves data volumes; it
+does not pull new images. Pass service names to limit either operation, for
+example `recreate devify-api devify-worker`.
 
 Environment overrides:
 

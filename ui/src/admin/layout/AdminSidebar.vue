@@ -59,32 +59,8 @@
       </button>
     </div>
 
-    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto flex flex-col">
-      <div class="flex-1 space-y-1">
-        <router-link
-          to="/management/feedback"
-          class="admin-nav-item"
-          :class="
-            isActive('/management/feedback') ? 'admin-nav-item-active' : ''
-          "
-          @click="isMobile && $emit('close')"
-        >
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 5h16v11H9l-5 4V5z"
-            />
-          </svg>
-          <span>问题反馈</span>
-        </router-link>
+    <nav class="flex-1 min-h-0 px-3 py-4 space-y-1 flex flex-col">
+      <div class="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
         <div class="menu-group">
           <button
             @click="toggleThreadlineMenu"
@@ -963,7 +939,32 @@
         </div>
       </div>
 
-      <div class="mt-auto pt-4 border-t border-slate-700">
+      <div class="mt-auto pt-4 border-t border-slate-700 space-y-1">
+        <router-link
+          to="/management/feedback"
+          class="admin-nav-item"
+          :class="
+            isActive('/management/feedback') ? 'admin-nav-item-active' : ''
+          "
+          @click="isMobile && $emit('close')"
+          @mouseenter="preloadRoute('/management/feedback')"
+        >
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 5h16v11H9l-5 4V5z"
+            />
+          </svg>
+          <span>问题反馈</span>
+        </router-link>
         <router-link
           to="/dashboard"
           class="admin-nav-item"

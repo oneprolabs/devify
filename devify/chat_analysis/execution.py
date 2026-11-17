@@ -763,6 +763,10 @@ def _call_json(*, prompt, content, node_name):
         json_mode=True,
         node_name=node_name,
         state={},
+        **(
+            {"model_uuid": settings.CHAT_ANALYSIS_MODEL_UUID}
+            if settings.CHAT_ANALYSIS_MODEL_UUID else {}
+        ),
     )
     return output if isinstance(output, dict) else None
 

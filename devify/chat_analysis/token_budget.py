@@ -2,7 +2,8 @@
 
 
 def request_budget(configured_limit):
-    """Use the same default model and output allowance as the LLM tracker."""
+    """Use the same model and output allowance as the LLM tracker."""
+    from django.conf import settings
     import litellm
     import tiktoken
     from agentcore_metering.adapters.django.services.runtime_config import (
@@ -10,7 +11,7 @@ def request_budget(configured_limit):
     )
 
     try:
-        params = get_litellm_params()
+        params = get_litellm_params(model_uuid=settings.CHAT_ANALYSIS_MODEL_UUID)
     except ValueError:
         params = {}
     model = params.get("model", "")

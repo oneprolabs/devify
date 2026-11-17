@@ -39,7 +39,7 @@ def test_budget_reserves_output_and_counts_complete_model_request(monkeypatch):
         "max_tokens": 2048,
         "api_base": "https://api.openai.com/v1",
     }
-    monkeypatch.setattr(runtime_config, "get_litellm_params", lambda: params)
+    monkeypatch.setattr(runtime_config, "get_litellm_params", lambda **kwargs: params)
     monkeypatch.setattr(
         litellm,
         "get_model_info",

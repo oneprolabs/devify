@@ -23,8 +23,7 @@ def register_periodic_tasks():
         task="chat_analysis.tasks.run_due_topic_reports_task",
         schedule=crontab(minute="*"),
     )
-    # Re-check often enough that a late beat still opens 11:00 or 18:00.
-    # The slot cutoff itself stays on the Beijing clock, not this interval.
+    # Poll for missed cutoffs and retry unfinished work within each slot.
     TASK_REGISTRY.add(
         name="chat-analysis-run-due-scheduled-analysis",
         task="chat_analysis.tasks.run_due_scheduled_analysis_task",

@@ -40,7 +40,7 @@ def run_due_topic_reports_task(self):
 def run_due_scheduled_analysis_task(self):
     """Enqueue due conversations onto the existing analysis worker.
 
-    Beat only decides the Beijing slot. Each job is
+    Beat checks the Beijing schedule. Each job is
     ``execute_analysis_job_task``, which production routes to the
     ``chat_analysis`` queue consumed by ``devify-analysis-worker``.
     """

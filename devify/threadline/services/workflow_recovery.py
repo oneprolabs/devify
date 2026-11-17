@@ -32,9 +32,13 @@ def claim_workflow(email_id, *, force=False, task_id=None):
         with transaction.atomic():
             email = EmailMessage.objects.select_for_update().get(pk=email_id)
             reserved = TaskExecution.objects.filter(
-                task_id=task_id, task_name="EMAIL_WORKFLOW",
-                # Compare JSON values as JSON on MariaDB, including the string ID.
-                metadata__contains={"email_id": str(email_id), "dispatch_reserved": True},
+                task_id=task_id,
+                task_name="EMAIL_WORKFLOW",
+                # Compare the string ID as JSON on MariaDB.
+                metadata__contains={
+                    "email_id": str(email_id),
+                    "dispatch_reserved": True,
+                },
             )
             if reserved.exists():
                 owner = (email.metadata or {}).get("processing_progress", {})
@@ -66,10 +70,15 @@ def claim_workflow(email_id, *, force=False, task_id=None):
 def expire_workflow_reservation(email_id):
     """Retire an abandoned queued request before recovery creates a new one."""
     TaskExecution.objects.filter(
-        task_name="EMAIL_WORKFLOW", status=TaskStatus.PENDING,
-        metadata__contains={"email_id": str(email_id), "dispatch_reserved": True},
+        task_name="EMAIL_WORKFLOW",
+        status=TaskStatus.PENDING,
+        metadata__contains={
+            "email_id": str(email_id),
+            "dispatch_reserved": True,
+        },
     ).update(
-        status=TaskStatus.FAILURE, finished_at=timezone.now(),
+        status=TaskStatus.FAILURE,
+        finished_at=timezone.now(),
         error="Queued workflow abandoned; replaced by recovery",
     )
 

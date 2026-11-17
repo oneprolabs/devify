@@ -20,7 +20,11 @@ def request_budget(configured_limit):
         model_info = {}
     input_limit = model_info.get("max_input_tokens")
     if input_limit:
-        output = params.get("max_tokens") or model_info.get("max_output_tokens") or 0
+        output = (
+            params.get("max_tokens")
+            or model_info.get("max_output_tokens")
+            or 0
+        )
         configured_limit = min(configured_limit, input_limit - output)
 
     # Only opt into a tokenizer we can identify. Proxies and unknown models
@@ -66,7 +70,9 @@ def take_message_window(messages, count_request, input_budget):
         candidate = window + [message]
         if count_request(candidate) > input_budget:
             if not window:
-                raise MessageExceedsBudget("One message exceeds the model input budget.")
+                raise MessageExceedsBudget(
+                    "One message exceeds the model input budget."
+                )
             break
         window = candidate
     return window

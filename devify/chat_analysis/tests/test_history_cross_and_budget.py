@@ -2,10 +2,10 @@
 
 import json
 from datetime import timedelta
+from runpy import run_path
 from unittest.mock import patch
 
 import pytest
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 
@@ -34,7 +34,7 @@ from chat_analysis.token_budget import MessageExceedsBudget
 from chat_domain.models import Conversation, Message, MessageOrigin
 from chat_ingestion.models import UploadBatch
 from chat_ingestion.views import _analysis_summaries
-
+from core.settings import celery as celery_settings
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -99,9 +99,9 @@ def test_large_history_is_capped_and_does_not_block_other_conversations(
 
     assert [
         item.message.ingest_seq
-        for item in first.scheduled_messages.select_related("message").order_by(
-            "message__ingest_seq"
-        )
+        for item in first.scheduled_messages.select_related(
+            "message"
+        ).order_by("message__ingest_seq")
     ] == [1, 2]
     assert list(
         parallel.scheduled_messages.values_list("message_id", flat=True)
@@ -110,9 +110,9 @@ def test_large_history_is_capped_and_does_not_block_other_conversations(
     assert second.pk != first.pk
     assert [
         item.message.ingest_seq
-        for item in second.scheduled_messages.select_related("message").order_by(
-            "message__ingest_seq"
-        )
+        for item in second.scheduled_messages.select_related(
+            "message"
+        ).order_by("message__ingest_seq")
     ] == [3, 4]
 
 
@@ -228,7 +228,9 @@ def test_model_failure_keeps_the_assigned_message_unfinished(
     def fail(_job, _messages, *_results):
         raise RuntimeError("model timeout")
 
-    monkeypatch.setattr("chat_analysis.execution._prepare_chunk", lambda *_args: (None, None))
+    monkeypatch.setattr(
+        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+    )
     monkeypatch.setattr("chat_analysis.execution._write_chunk_note", fail)
     result = execution.execute_analysis_job(job.pk, worker_id="history-fail")
     assignment = AnalysisJobMessage.objects.get(job=job, message=message)
@@ -256,15 +258,22 @@ def test_oversize_message_resumes_with_original_evidence(
     AnalysisJobMessage.objects.create(job=job, message=first)
     AnalysisJobMessage.objects.create(job=job, message=second)
     if legacy_skip:
-        job.scheduled_messages.filter(message=first).update(error=LEGACY_OVERSIZE_ERROR)
-        job.scheduled_messages.filter(message=second).update(completed_at=timezone.now())
+        job.scheduled_messages.filter(message=first).update(
+            error=LEGACY_OVERSIZE_ERROR
+        )
+        job.scheduled_messages.filter(message=second).update(
+            completed_at=timezone.now()
+        )
         job.state = AnalysisJob.State.PARTIAL
         job.checkpoint = {
             "last_ingest_seq": 2, "messages_processed": 1, "partial": True,
         }
         job.save(update_fields=("state", "checkpoint"))
         with patch("chat_analysis.tasks.dispatch_analysis_job") as dispatch:
-            assert schedule_conversation(conversation.pk, timezone.now()).pk == job.pk
+            assert (
+                schedule_conversation(conversation.pk, timezone.now()).pk
+                == job.pk
+            )
             dispatch.assert_called_once()
     seen = []
     interrupted = False
@@ -272,7 +281,12 @@ def test_oversize_message_resumes_with_original_evidence(
     def llm(*, prompt, content, node_name, **kwargs):
         nonlocal interrupted
         if node_name != "chat_event_extraction":
-            return {"facts": [], "actions": [], "risks": [], "decisions": []}, {}
+            return {
+                "facts": [],
+                "actions": [],
+                "risks": [],
+                "decisions": [],
+            }, {}
         payload = json.loads(content)
         message, = payload["messages"]
         if len(seen) == 1 and not interrupted:
@@ -282,13 +296,19 @@ def test_oversize_message_resumes_with_original_evidence(
         events = []
         if message["seq"] == 1:
             prior = payload["open_events_same_conversation"]
-            events.append({
-                "action": "attach" if prior else "create",
-                "event_key": prior[0]["event_key"] if prior else "",
-                "title": "跟进故障",
-                "summary": "需要跟进，已收到结尾" if message["text"].endswith("结尾") else "需要跟进",
-                "source_seqs": [1],
-            })
+            events.append(
+                {
+                    "action": "attach" if prior else "create",
+                    "event_key": prior[0]["event_key"] if prior else "",
+                    "title": "跟进故障",
+                    "summary": (
+                        "需要跟进，已收到结尾"
+                        if message["text"].endswith("结尾")
+                        else "需要跟进"
+                    ),
+                    "source_seqs": [1],
+                }
+            )
         return {"events": events}, {}
 
     monkeypatch.setattr(execution.LLMTracker, "call_and_track", llm)
@@ -301,24 +321,35 @@ def test_oversize_message_resumes_with_original_evidence(
     result = execution.execute_analysis_job(job.pk, worker_id="retry")
     assert result.job.state == AnalysisJob.State.READY
     assert "".join(text for seq, text in seen if seq == 1) == body
-    assert [text for seq, text in seen if seq == 2] == ([] if legacy_skip else ["后续"])
-    assert job.scheduled_messages.filter(completed_at__isnull=False).count() == 2
+    assert [text for seq, text in seen if seq == 2] == (
+        [] if legacy_skip else ["后续"]
+    )
+    assert (
+        job.scheduled_messages.filter(completed_at__isnull=False).count() == 2
+    )
     assert NoteEvidence.objects.filter(message=first).count() == sum(
         seq == 1 for seq, _ in seen
     )
     fragments = Note.objects.filter(
         analysis_job=job, evidence__message=first
     ).order_by("id")
-    assert "".join(
-        execution._message_payload(execution._messages_from_note(note))[0]["text"]
-        for note in fragments
-    ) == body
+    assert (
+        "".join(
+            execution._message_payload(execution._messages_from_note(note))[0][
+                "text"
+            ]
+            for note in fragments
+        )
+        == body
+    )
     event = Event.objects.get(space=space)
     assert event.content == "需要跟进，已收到结尾"
-    assert list(event.evidence.values_list("message_id", flat=True)) == [first.pk]
+    assert list(event.evidence.values_list("message_id", flat=True)) == [
+        first.pk
+    ]
 
 
-def test_same_matter_across_conversations_attaches_and_other_matters_stay_separate(
+def test_across_chats_same_matter_attaches_and_other_matters_stay_separate(
     monkeypatch, settings
 ):
     settings.CHAT_ANALYSIS_LLM_ENABLED = True
@@ -440,15 +471,18 @@ def test_token_budget_splits_long_text_and_keeps_a_reply_with_its_parent(
     third.reply_to = second
     third.save(update_fields=("reply_to",))
     settings.CHAT_ANALYSIS_MODEL_INPUT_TOKENS = high
-    assert [item.pk for item in execution._messages_for_model(job, messages)] == [
-        first.pk
-    ]
+    assert [
+        item.pk for item in execution._messages_for_model(job, messages)
+    ] == [first.pk]
 
     seen = []
-    monkeypatch.setattr("chat_analysis.execution._prepare_chunk", lambda *_args: (None, None))
+    monkeypatch.setattr(
+        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+    )
     monkeypatch.setattr(
         "chat_analysis.execution._write_chunk_note",
-        lambda _job, chunk, *_results: seen.append([item.pk for item in chunk]) or (True, False),
+        lambda _job, chunk, *_results: seen.append([item.pk for item in chunk])
+        or (True, False),
     )
     result = execution.execute_analysis_job(job.pk, worker_id="budget")
     assert seen == [[first.pk], [second.pk, third.pk]]
@@ -491,7 +525,9 @@ def test_queued_and_running_are_distinct_sync_states():
         status=UploadBatch.Status.COMPLETED,
         completed_at=stored,
     )
-    queued = make_job(space, owner, conversation, end_seq=1, key="sync-queued-job")
+    queued = make_job(
+        space, owner, conversation, end_seq=1, key="sync-queued-job"
+    )
     running = make_job(
         space, owner, conversation, end_seq=2, key="sync-running-job"
     )
@@ -513,8 +549,9 @@ def test_queued_and_running_are_distinct_sync_states():
     assert summaries[plain.pk]["job_count"] == 0
 
 
-def test_analysis_tasks_use_the_dedicated_queue():
-    routes = settings.CELERY_TASK_ROUTES
+def test_analysis_tasks_use_the_dedicated_queue(monkeypatch):
+    monkeypatch.setenv("CHAT_UPLOAD_DEDICATED_QUEUE", "true")
+    routes = run_path(celery_settings.__file__)["CELERY_TASK_ROUTES"]
     assert (
         routes["chat_analysis.tasks.execute_analysis_job_task"]["queue"]
         == "chat_analysis"

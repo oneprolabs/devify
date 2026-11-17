@@ -1,11 +1,17 @@
 import pytest
 
-from chat_analysis.token_budget import MessageExceedsBudget, take_message_window
+from chat_analysis.token_budget import (
+    MessageExceedsBudget,
+    take_message_window,
+)
 
 
 def test_window_obeys_full_request_budget_and_preserves_order():
     messages = ["abcd", "efgh", "ij"]
-    count_request = lambda chunk: 5 + sum(len(x) for x in chunk)
+
+    def count_request(chunk):
+        return 5 + sum(len(x) for x in chunk)
+
     assert take_message_window(messages, count_request, 13) == messages[:2]
     assert take_message_window(messages[2:], count_request, 13) == messages[2:]
 

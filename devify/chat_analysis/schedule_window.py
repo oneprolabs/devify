@@ -4,9 +4,10 @@ import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-
 BEIJING = ZoneInfo("Asia/Shanghai")
-DEFAULT_SCHEDULE = "11:00,18:00"
+DEFAULT_SCHEDULE = ",".join(
+    f"{hour:02d}:{minute:02d}" for hour in range(24) for minute in (0, 30)
+)
 
 
 def parse_schedule(value=DEFAULT_SCHEDULE):
@@ -34,7 +35,9 @@ def due_slot(now, schedule=DEFAULT_SCHEDULE):
     the cutoff.
     """
     if now.tzinfo is None or now.utcoffset() is None:
-        raise ValueError("Analysis schedule requires a timezone-aware datetime.")
+        raise ValueError(
+            "Analysis schedule requires a timezone-aware datetime."
+        )
     local = now.astimezone(BEIJING)
     times = parse_schedule(schedule)
     started = []

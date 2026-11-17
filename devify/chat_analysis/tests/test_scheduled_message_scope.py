@@ -4,10 +4,14 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from chat_analysis.models import AnalysisJob, AnalysisJobMessage
 from chat_analysis.execution import execute_analysis_job
-from chat_analysis.tests.test_execution import add_message, make_conversation, make_job, make_space
-
+from chat_analysis.models import AnalysisJob, AnalysisJobMessage
+from chat_analysis.tests.test_execution import (
+    add_message,
+    make_conversation,
+    make_job,
+    make_space,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -31,7 +35,9 @@ def test_scope_rejects_message_from_other_conversation():
     second = make_conversation(space, "second")
     job = make_job(space, owner, first)
     with pytest.raises(ValidationError):
-        AnalysisJobMessage.objects.create(job=job, message=add_message(second, 1))
+        AnalysisJobMessage.objects.create(
+            job=job, message=add_message(second, 1)
+        )
 
 
 def test_scheduled_job_only_analyzes_assigned_messages(monkeypatch, settings):
@@ -45,14 +51,28 @@ def test_scheduled_job_only_analyzes_assigned_messages(monkeypatch, settings):
     job = make_job(space, owner, conversation, end_seq=3)
     job.specification["scheduled_message_scope"] = True
     job.save(update_fields=("specification",))
-    assignments = [AnalysisJobMessage.objects.create(job=job, message=m) for m in (first, third)]
+    assignments = [
+        AnalysisJobMessage.objects.create(job=job, message=m)
+        for m in (first, third)
+    ]
     seen = []
-    monkeypatch.setattr("chat_analysis.execution._prepare_chunk", lambda *_args: (None, None))
-    monkeypatch.setattr("chat_analysis.execution._write_chunk_note", lambda job, messages, *_results: (seen.extend(m.pk for m in messages) or True, False))
+    monkeypatch.setattr(
+        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+    )
+    monkeypatch.setattr(
+        "chat_analysis.execution._write_chunk_note",
+        lambda job, messages, *_results: (
+            seen.extend(m.pk for m in messages) or True,
+            False,
+        ),
+    )
     result = execute_analysis_job(job.pk, worker_id="test")
     assert result.job.state == AnalysisJob.State.READY
     assert seen == [first.pk, third.pk]
-    assert all(AnalysisJobMessage.objects.get(pk=a.pk).completed_at for a in assignments)
+    assert all(
+        AnalysisJobMessage.objects.get(pk=a.pk).completed_at
+        for a in assignments
+    )
 
 
 def test_partial_chunk_is_not_marked_completed(monkeypatch, settings):
@@ -65,8 +85,13 @@ def test_partial_chunk_is_not_marked_completed(monkeypatch, settings):
     job.specification["scheduled_message_scope"] = True
     job.save(update_fields=("specification",))
     assignment = AnalysisJobMessage.objects.create(job=job, message=message)
-    monkeypatch.setattr("chat_analysis.execution._prepare_chunk", lambda *_args: (None, None))
-    monkeypatch.setattr("chat_analysis.execution._write_chunk_note", lambda job, messages, *_results: (True, True))
+    monkeypatch.setattr(
+        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+    )
+    monkeypatch.setattr(
+        "chat_analysis.execution._write_chunk_note",
+        lambda job, messages, *_results: (True, True),
+    )
     result = execute_analysis_job(job.pk, worker_id="test")
     assignment.refresh_from_db()
     assert result.job.state == AnalysisJob.State.PARTIAL
@@ -94,7 +119,9 @@ def test_model_window_keeps_the_rest_for_the_next_pass(monkeypatch, settings):
     owner = User.objects.create_user(username="scope-window-owner")
     space = make_space(owner, "scope-window-space")
     conversation = make_conversation(space)
-    messages = [add_message(conversation, index, text="x" * 40) for index in (1, 2)]
+    messages = [
+        add_message(conversation, index, text="x" * 40) for index in (1, 2)
+    ]
     job = make_job(space, owner, conversation, end_seq=2)
     job.specification["scheduled_message_scope"] = True
     job.save(update_fields=("specification",))
@@ -106,10 +133,15 @@ def test_model_window_keeps_the_rest_for_the_next_pass(monkeypatch, settings):
         return chunk[:1]
 
     monkeypatch.setattr("chat_analysis.execution._messages_for_model", prefix)
-    monkeypatch.setattr("chat_analysis.execution._prepare_chunk", lambda *_args: (None, None))
+    monkeypatch.setattr(
+        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+    )
     monkeypatch.setattr(
         "chat_analysis.execution._write_chunk_note",
-        lambda job, chunk, *_results: (seen.append([item.pk for item in chunk]) or True, False),
+        lambda job, chunk, *_results: (
+            seen.append([item.pk for item in chunk]) or True,
+            False,
+        ),
     )
     result = execute_analysis_job(job.pk, worker_id="test")
     assert seen == [[messages[0].pk], [messages[1].pk]]

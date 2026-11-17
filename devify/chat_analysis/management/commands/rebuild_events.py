@@ -107,7 +107,9 @@ class Command(BaseCommand):
                 )
                 if events is not None:
                     with transaction.atomic():
-                        _store_events(note.analysis_job, note, messages, events)
+                        _store_events(
+                            note.analysis_job, note, messages, events
+                        )
             except Exception:
                 logger.exception("Event rebuild failed for note %s", note.pk)
                 failed += 1

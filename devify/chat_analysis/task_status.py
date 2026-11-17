@@ -193,8 +193,14 @@ def recover_expired_analysis_jobs(
             if retry else "lease_expired: max attempts reached "
             f"({job.attempts}/{max_attempts})."
         )
-        updated = stale.filter(pk=job.pk, fencing_token=job.fencing_token).update(
-            state=state, error=error, lease_owner="", lease_until=None, updated_at=now
+        updated = stale.filter(
+            pk=job.pk, fencing_token=job.fencing_token
+        ).update(
+            state=state,
+            error=error,
+            lease_owner="",
+            lease_until=None,
+            updated_at=now,
         )
         if updated:
             if retry:

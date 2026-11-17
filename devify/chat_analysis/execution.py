@@ -30,11 +30,6 @@ from chat_analysis.models import (
     EventSuggestion,
     Note,
 )
-from chat_analysis.token_budget import (
-    MessageExceedsBudget,
-    request_budget,
-    take_message_window,
-)
 from chat_analysis.services import (
     ChatAnalysisError,
     ChatAnalysisPermissionError,
@@ -45,6 +40,11 @@ from chat_analysis.services import (
 from chat_analysis.suggestions import (
     create_event_suggestion,
     review_event_suggestion,
+)
+from chat_analysis.token_budget import (
+    MessageExceedsBudget,
+    request_budget,
+    take_message_window,
 )
 from chat_domain.models import Message, MessagePart
 from core.tracking import LLMTracker
@@ -330,7 +330,9 @@ def _message_texts(message):
 
 
 def _chunk_note_key(job, messages):
-    note_key = f"job:{job.uuid}:{messages[0].ingest_seq}-{messages[-1].ingest_seq}"
+    note_key = (
+        f"job:{job.uuid}:{messages[0].ingest_seq}-{messages[-1].ingest_seq}"
+    )
     first = messages[0]
     if hasattr(first, "analysis_fragment_offset"):
         start = first.analysis_fragment_offset
@@ -394,7 +396,9 @@ def _write_chunk_note(job, messages, summary, events):
             message=message,
         )
     _persist_enrichment(job, note, messages, summary, events)
-    partial = settings.CHAT_ANALYSIS_LLM_ENABLED and (summary is None or events is None)
+    partial = settings.CHAT_ANALYSIS_LLM_ENABLED and (
+        summary is None or events is None
+    )
     return True, missing_content or partial
 
 
@@ -402,7 +406,13 @@ def _persist_enrichment(job, note, messages, summary, events):
     if summary is not None:
         note.structured_data = summary
         note.generation_version = "chat-note-llm.v1"
-        note.save(update_fields=("structured_data", "generation_version", "updated_at"))
+        note.save(
+            update_fields=(
+                "structured_data",
+                "generation_version",
+                "updated_at",
+            )
+        )
     if events is not None:
         _store_events(job, note, messages, events)
 
@@ -427,7 +437,9 @@ def _model_input_budget():
 
 
 def _request_sizer(job):
-    preferences = (job.specification or {}).get("chat_analysis_preferences") or {}
+    preferences = (job.specification or {}).get(
+        "chat_analysis_preferences"
+    ) or {}
     language = _output_language(job.space)
     prompt = _event_extraction_prompt(language, preferences)
     summary_prompt = _note_summary_prompt(language, preferences)
@@ -440,7 +452,9 @@ def _request_sizer(job):
     def count_request(window):
         payload = _message_payload(window)
         event_size = count(prompt, _event_content(title, payload, [], []))
-        summary_size = count(summary_prompt, json.dumps(payload, ensure_ascii=False))
+        summary_size = count(
+            summary_prompt, json.dumps(payload, ensure_ascii=False)
+        )
         return max(event_size + budget - event_limit, summary_size)
 
     return budget, count_request
@@ -460,7 +474,9 @@ def _messages_for_model(job, messages):
 
 def _message_fragment(job, message, offset, text):
     if offset >= len(text):
-        raise ValueError("No message text remains at the saved fragment offset.")
+        raise ValueError(
+            "No message text remains at the saved fragment offset."
+        )
     budget, count = _request_sizer(job)
     fragment = copy(message)
     fragment.analysis_fragment_offset = offset
@@ -677,7 +693,8 @@ def _event_extraction_prompt(language, preferences):
         '"role":"matter"|"confirmation"}],"cross_decision":"same"|"related"'
         '|"separate"|null,"reason":""}]}. '
         "Input fields: conversation_title; messages with seq, sender, time, "
-        "text, reply_to_seq and optional fragment_offset; open_events_same_conversation; "
+        "text, reply_to_seq and optional fragment_offset; "
+        "open_events_same_conversation; "
         "A message with fragment_offset is a slice of the original message. "
         "Use existing events to fold later slices into the same matter. "
         "cross_candidates. reply_to_seq is the quoted message when WeChat "
@@ -737,7 +754,9 @@ def _event_extraction_prompt(language, preferences):
 def _call_json(*, prompt, content, node_name):
     budget, count = request_budget(_model_input_budget())
     if count(prompt, content) > budget:
-        raise MessageExceedsBudget("The model request exceeds the input budget.")
+        raise MessageExceedsBudget(
+            "The model request exceeds the input budget."
+        )
     output, _usage = LLMTracker.call_and_track(
         prompt=prompt,
         content=content,
@@ -796,7 +815,9 @@ def _extract_events(job, messages, payload, language):
     content = _event_content(conversation_title, payload, open_events, cross)
     while count(prompt, content) > budget and (cross or open_events):
         (cross or open_events).pop()
-        content = _event_content(conversation_title, payload, open_events, cross)
+        content = _event_content(
+            conversation_title, payload, open_events, cross
+        )
     output = _call_json(
         prompt=prompt,
         content=content,
@@ -871,8 +892,10 @@ def _store_events(job, note, messages, events):
             if suggestion.event_id and not source_messages:
                 refresh_event_window(suggestion.event, messages=messages)
             if (
-                suggestion.event_id and action == "attach"
-                and source_messages and getattr(first, "analysis_fragment_offset", 0)
+                suggestion.event_id
+                and action == "attach"
+                and source_messages
+                and getattr(first, "analysis_fragment_offset", 0)
             ):
                 previous = EventSuggestion.objects.filter(
                     event_id=suggestion.event_id,
@@ -881,7 +904,9 @@ def _store_events(job, note, messages, events):
                     status=EventSuggestion.Status.ACCEPTED,
                 ).exclude(pk=suggestion.pk).order_by("-id").first()
                 if previous:
-                    Event.objects.filter(pk=suggestion.event_id, content=previous.summary).update(
+                    Event.objects.filter(
+                        pk=suggestion.event_id, content=previous.summary
+                    ).update(
                         content=suggestion.summary, updated_at=timezone.now()
                     )
 
@@ -896,7 +921,9 @@ def _prepare_chunk(job, messages):
     language = _output_language(job.space)
     try:
         summary = _summarize_note(
-            payload, language, (job.specification or {}).get("chat_analysis_preferences")
+            payload,
+            language,
+            (job.specification or {}).get("chat_analysis_preferences"),
         )
         events = _extract_events(job, messages, payload, language)
     except Exception:
@@ -908,10 +935,14 @@ def _prepare_chunk(job, messages):
 def _messages_from_note(note):
     messages = [
         evidence.message
-        for evidence in note.evidence.select_related("message").order_by("message__ingest_seq")
+        for evidence in note.evidence.select_related("message").order_by(
+            "message__ingest_seq"
+        )
     ]
     if messages and ":offset:" in note.note_key:
-        start, end = map(int, note.note_key.rsplit(":offset:", 1)[1].split("-"))
+        start, end = map(
+            int, note.note_key.rsplit(":offset:", 1)[1].split("-")
+        )
         messages[0].analysis_fragment_offset = start
         messages[0].analysis_fragment_text = note.content[-(end - start):]
     return messages
@@ -922,7 +953,6 @@ def _enrich_note_with_llm(job, note, messages):
     summary, events = _prepare_chunk(job, messages)
     with transaction.atomic():
         _persist_enrichment(job, note, messages, summary, events)
-
 
 
 def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
@@ -966,9 +996,15 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
         )
     )
     batches = job.upload_batches.all()
-    scheduled_scope = (job.specification or {}).get("scheduled_message_scope") is True
-    if scheduled_scope and not getattr(settings, "CHAT_ANALYSIS_LLM_ENABLED", False):
-        raise RuntimeError("Scheduled event analysis requires the LLM to be enabled.")
+    scheduled_scope = (job.specification or {}).get(
+        "scheduled_message_scope"
+    ) is True
+    if scheduled_scope and not getattr(
+        settings, "CHAT_ANALYSIS_LLM_ENABLED", False
+    ):
+        raise RuntimeError(
+            "Scheduled event analysis requires the LLM to be enabled."
+        )
     while not excluded:
         offset = checkpoint.get("fragment_offset")
         query = Message.objects.filter(
@@ -998,7 +1034,10 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
         )
         if not messages:
             if offset is not None:
-                raise ValueError("The original message for the saved fragment is unavailable.")
+                raise ValueError(
+                    "The original message for the saved fragment "
+                    "is unavailable."
+                )
             break
         next_offset = None
         if getattr(settings, "CHAT_ANALYSIS_LLM_ENABLED", False):
@@ -1011,11 +1050,17 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
                 body = " / ".join(_message_texts(messages[0]))
                 digest = sha256(body.encode("utf-8")).hexdigest()
                 if checkpoint.get("fragment_digest", digest) != digest:
-                    raise RuntimeError("The original message changed after analysis started.")
-                fragment, next_offset = _message_fragment(job, messages[0], offset, body)
+                    raise RuntimeError(
+                        "The original message changed after analysis started."
+                    )
+                fragment, next_offset = _message_fragment(
+                    job, messages[0], offset, body
+                )
                 messages = [fragment]
         elif offset is not None:
-            raise RuntimeError("Continuing a fragmented message requires the LLM.")
+            raise RuntimeError(
+                "Continuing a fragmented message requires the LLM."
+            )
 
         job = renew_analysis_lease(
             job,
@@ -1024,16 +1069,25 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             lease_seconds=lease_seconds,
         )
         summary, events = None, None
-        if not settings.CHAT_ANALYSIS_LLM_ENABLED or not Note.objects.filter(
-            space=job.space, note_key=_chunk_note_key(job, messages), origin=Note.Origin.MANUAL
-        ).exists():
+        if (
+            not settings.CHAT_ANALYSIS_LLM_ENABLED
+            or not Note.objects.filter(
+                space=job.space,
+                note_key=_chunk_note_key(job, messages),
+                origin=Note.Origin.MANUAL,
+            ).exists()
+        ):
             summary, events = _prepare_chunk(job, messages)
         with transaction.atomic():
             locked = _lock_job(job.pk)
             _ensure_lease(locked, job.lease_owner, job.fencing_token)
-            written, chunk_partial = _write_chunk_note(job, messages, summary, events)
+            written, chunk_partial = _write_chunk_note(
+                job, messages, summary, events
+            )
             if chunk_partial and offset is not None:
-                raise RuntimeError("The model returned an incomplete message fragment.")
+                raise RuntimeError(
+                    "The model returned an incomplete message fragment."
+                )
             if scheduled_scope and chunk_partial:
                 partial = True
                 break
@@ -1044,7 +1098,9 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
                 last_seq = messages[-1].ingest_seq
                 if scheduled_scope:
                     AnalysisJobMessage.objects.filter(
-                        job=job, message__in=messages, completed_at__isnull=True
+                        job=job,
+                        message__in=messages,
+                        completed_at__isnull=True,
                     ).update(completed_at=timezone.now())
             checkpoint = {
                 "last_ingest_seq": last_seq,

@@ -17,6 +17,8 @@ from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
 
+from chat_analysis.schedule_window import DEFAULT_SCHEDULE
+
 # Import module-specific configurations
 from .billing import *
 from .database import *
@@ -55,7 +57,9 @@ SECRET_KEY = os.getenv(
     "django-insecure-$k0f0!qp@0k%1xa_)zy!+xvwpv)+&$q&!d69ma@l615bdc2ytd",
 )
 
-CHAT_ANALYSIS_MODEL_INPUT_TOKENS = int(os.getenv("CHAT_ANALYSIS_MODEL_INPUT_TOKENS", "12000"))
+CHAT_ANALYSIS_MODEL_INPUT_TOKENS = int(
+    os.getenv("CHAT_ANALYSIS_MODEL_INPUT_TOKENS", "12000")
+)
 CHAT_ANALYSIS_LLM_ENABLED = os.getenv(
     "CHAT_ANALYSIS_LLM_ENABLED", "false"
 ).lower() in {"1", "true", "yes"}
@@ -64,7 +68,7 @@ CHAT_ANALYSIS_AUTO_CREATE_EVENTS = os.getenv(
     "CHAT_ANALYSIS_AUTO_CREATE_EVENTS", "false"
 ).lower() in {"1", "true", "yes"}
 
-CHAT_ANALYSIS_SCHEDULE = os.getenv("CHAT_ANALYSIS_SCHEDULE", "11:00,18:00")
+CHAT_ANALYSIS_SCHEDULE = os.getenv("CHAT_ANALYSIS_SCHEDULE", DEFAULT_SCHEDULE)
 
 # A queued question or report with no worker result after this many seconds is
 # moved to a terminal state by the stale-task sweep.

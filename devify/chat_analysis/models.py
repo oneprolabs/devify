@@ -114,14 +114,28 @@ class ScheduledAnalysisRun(models.Model):
 class AnalysisJobMessage(models.Model):
     """Exact message assignment for a scheduled analysis job."""
 
-    job = models.ForeignKey(AnalysisJob, on_delete=models.CASCADE, related_name="scheduled_messages")
-    message = models.OneToOneField("chat_domain.Message", on_delete=models.CASCADE, related_name="scheduled_analysis")
+    job = models.ForeignKey(
+        AnalysisJob,
+        on_delete=models.CASCADE,
+        related_name="scheduled_messages",
+    )
+    message = models.OneToOneField(
+        "chat_domain.Message",
+        on_delete=models.CASCADE,
+        related_name="scheduled_analysis",
+    )
     completed_at = models.DateTimeField(null=True, blank=True)
     error = models.TextField(blank=True)
 
     def clean(self):
-        if self.job_id and self.message_id and self.job.conversation_id != self.message.conversation_id:
-            raise ValidationError({"message": "Message must belong to the job conversation."})
+        if (
+            self.job_id
+            and self.message_id
+            and self.job.conversation_id != self.message.conversation_id
+        ):
+            raise ValidationError(
+                {"message": "Message must belong to the job conversation."}
+            )
 
     def save(self, *args, **kwargs):
         self.clean()

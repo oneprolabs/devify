@@ -103,14 +103,15 @@ def _active_takeover(user, space):
 
 
 def _can_operate_batch(user, batch):
-    if getattr(user, "is_staff", False):
-        return SpacePermissionService.has_active_takeover(user, batch.space)
     membership = SpacePermissionService.membership(user, batch.space)
-    if not SpacePermissionService.can_write(membership):
-        return False
-    return (
+    if SpacePermissionService.can_write(membership) and (
         user.pk == batch.uploaded_by_id
         or SpacePermissionService.can_manage(membership)
+    ):
+        return True
+    return bool(
+        getattr(user, "is_staff", False)
+        and SpacePermissionService.has_active_takeover(user, batch.space)
     )
 
 

@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from spaces.models import Space, SpaceMembership, SpaceTakeover
+from spaces.models import Space, SpaceTakeover
 from spaces.services import SpacePermissionService, audit_space_action
 
 
@@ -105,13 +105,13 @@ class SpaceSourceListCreateAPIView(APIView):
 
 
 def can_manage_source_for_space(user, space):
-    if getattr(user, "is_staff", False):
-        return SpacePermissionService.has_active_takeover(user, space)
-    membership = SpacePermissionService.membership(user, space)
+    if SpacePermissionService.can_manage(
+        SpacePermissionService.membership(user, space)
+    ):
+        return True
     return bool(
-        membership
-        and membership.status == SpaceMembership.Status.ACTIVE
-        and SpacePermissionService.can_manage(membership)
+        getattr(user, "is_staff", False)
+        and SpacePermissionService.has_active_takeover(user, space)
     )
 
 

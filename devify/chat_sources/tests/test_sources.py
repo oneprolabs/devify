@@ -150,3 +150,26 @@ def test_source_status_verify_and_jobs_are_explicit_for_local_upload():
     assert status.status_code == 200
     assert status.data["data"]["capabilities"] == ["file_import"]
     assert client.get(f"/api/v1/sources/{source.pk}/jobs").data["data"] == []
+
+
+def test_staff_owner_can_create_source_in_own_space():
+    """Staff manage member spaces directly, not only through takeover."""
+    staff = User.objects.create_user(
+        username="staff-source-owner", is_staff=True
+    )
+    space = make_space(staff, "staff-source-team")
+    client = APIClient()
+    client.force_authenticate(user=staff)
+
+    response = client.post(
+        f"/api/v1/spaces/{space.pk}/sources",
+        {
+            "channel_type": "wechat",
+            "provider": "tauri_upload",
+            "external_account_key": "wxid-staff",
+            "display_name": "Staff WeChat",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 201

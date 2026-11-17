@@ -21,20 +21,25 @@ from threadline.serializers.space_email import (
 
 def authorized_space(user, space_id):
     space = get_object_or_404(Space.objects.select_for_update(), pk=space_id)
+    # Membership first, including for staff: every account owns a personal
+    # space and staff must be able to read the spaces they belong to.
+    is_member = SpaceMembership.objects.filter(
+        space=space, user=user, status=SpaceMembership.Status.ACTIVE
+    ).exists()
+    if not is_member and not user.is_staff:
+        return None, None
+    # Resolve an active takeover even for members: it authorises the action
+    # and its id is what the audit trail records.
+    takeover = None
     if user.is_staff:
         takeover = (
             SpaceTakeover.objects.select_for_update()
             .filter(space=space, admin=user, active=True)
             .first()
         )
-        if not takeover:
-            return None, None
-        return space, takeover
-    if not SpaceMembership.objects.filter(
-        space=space, user=user, status=SpaceMembership.Status.ACTIVE
-    ).exists():
+    if not is_member and not takeover:
         return None, None
-    return space, None
+    return space, takeover
 
 
 def space_email_q(space):

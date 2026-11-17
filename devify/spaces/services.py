@@ -74,32 +74,38 @@ class SpacePermissionService:
     def can_read(cls, user, space):
         if not getattr(user, "is_authenticated", False):
             return False
+        # Membership always wins, including for staff accounts: every account
+        # gets a personal space at bootstrap and the space list exposes it, so
+        # denying staff their own spaces left those pages failing with 404.
+        if cls.membership(user, space) is not None:
+            return True
         if getattr(user, "is_staff", False):
             return cls.has_active_takeover(user, space)
-        return cls.membership(user, space) is not None
+        return False
 
     @classmethod
     def readable_space_ids(cls, user):
         """Space ids this user may read right now.
 
-        Same rules as ``can_read``: active memberships for normal users,
+        Same rules as ``can_read``: active memberships for everyone, plus
         active takeovers for staff. Used to filter legacy per-user queries so
         they cannot bypass the space boundary.
         """
         if not getattr(user, "is_authenticated", False):
             return set()
-        if getattr(user, "is_staff", False):
-            return set(
-                SpaceTakeover.objects.filter(
-                    admin=user, active=True
-                ).values_list("space_id", flat=True)
-            )
-        return set(
+        space_ids = set(
             SpaceMembership.objects.filter(
                 user=user,
                 status=SpaceMembership.Status.ACTIVE,
             ).values_list("space_id", flat=True)
         )
+        if getattr(user, "is_staff", False):
+            space_ids |= set(
+                SpaceTakeover.objects.filter(
+                    admin=user, active=True
+                ).values_list("space_id", flat=True)
+            )
+        return space_ids
 
     @classmethod
     def can_upload(cls, user, space):
@@ -108,9 +114,11 @@ class SpacePermissionService:
             or space.status != Space.Status.ACTIVE
         ):
             return False
+        if cls.can_write(cls.membership(user, space)):
+            return True
         if getattr(user, "is_staff", False):
             return cls.has_active_takeover(user, space)
-        return cls.can_write(cls.membership(user, space))
+        return False
 
     @classmethod
     def can_delete_resource(cls, user, space, uploaded_by_id):
@@ -119,12 +127,14 @@ class SpacePermissionService:
             or space.status != Space.Status.ACTIVE
         ):
             return False
+        membership = cls.membership(user, space)
+        if membership and (
+            cls.can_manage(membership) or user.pk == uploaded_by_id
+        ):
+            return True
         if getattr(user, "is_staff", False):
             return cls.has_active_takeover(user, space)
-        membership = cls.membership(user, space)
-        if not membership:
-            return False
-        return cls.can_manage(membership) or user.pk == uploaded_by_id
+        return False
 
     @staticmethod
     def has_active_takeover(user, space):

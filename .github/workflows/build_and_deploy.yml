@@ -12,6 +12,18 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # Releases are published to Docker Hub first. Three things pull from it: the
+  # production host, the installer's default ("github") channel, and the
+  # compose files, whose ${DEVIFY_REGISTRY:-docker.io/oneprolabs} default
+  # points here. It is also the target the runner can actually reach — pushes
+  # to the Beijing ACR endpoint stalled for 80 minutes on v1.6.5, twice in a
+  # row, while the same layers reached the GitHub Actions cache in seconds.
+  #
+  # Aliyun ACR is now the China mirror only: the installer's "cn" channel and
+  # hosts inside China pull from it, and the mirror-to-acr job below copies the
+  # published Docker Hub manifests there when ALIYUN_PUSH is "true". Keep the
+  # namespace in step with install.sh's REGISTRY_GITHUB.
+  RELEASE_REGISTRY: docker.io/oneprolabs
   ALIYUN_REGISTRY: registry.cn-beijing.aliyuncs.com/oneprolabs
   IMAGE_NAME: ${{ vars.IMAGE_NAME }}
   UI_IMAGE_NAME: devify-ui
@@ -31,19 +43,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Aliyun ACR oneprolabs
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: registry.cn-beijing.aliyuncs.com
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract metadata for backend image
         id: backend-meta
         uses: docker/metadata-action@v4
         with:
           images: |
-            ${{ env.ALIYUN_REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ env.RELEASE_REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -51,6 +62,9 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push backend image
+        # A stalled push must fail the release instead of hanging: v1.6.5 spent
+        # 80 minutes silently uploading to ACR before it was cancelled by hand.
+        timeout-minutes: 20
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -68,11 +82,10 @@ jobs:
           # here — and to the verification below — when the release
           # needs it, ideally on a native arm runner rather than QEMU.
           platforms: linux/amd64
-          # Aliyun ACR rejects the OCI `empty.v1+json` media type that
-          # buildx uses for provenance and SBOM attestations. The image
-          # itself pushes fine and then the attestation is denied,
-          # failing the release — every one since 11 August. We do not
-          # consume the attestations, so they are turned off.
+          # Attestations stay off: we do not consume them, they add an
+          # unknown/unknown platform entry some clients mis-handle, and the
+          # copy to ACR would carry the OCI `empty.v1+json` media type that
+          # Aliyun rejects.
           provenance: false
           sbom: false
 
@@ -81,7 +94,7 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            ${{ env.ALIYUN_REGISTRY }}/${{ env.UI_IMAGE_NAME }}
+            ${{ env.RELEASE_REGISTRY }}/${{ env.UI_IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -89,6 +102,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push UI image
+        timeout-minutes: 20
         uses: docker/build-push-action@v5
         with:
           context: ./ui
@@ -110,11 +124,8 @@ jobs:
           # here — and to the verification below — when the release
           # needs it, ideally on a native arm runner rather than QEMU.
           platforms: linux/amd64
-          # Aliyun ACR rejects the OCI `empty.v1+json` media type that
-          # buildx uses for provenance and SBOM attestations. The image
-          # itself pushes fine and then the attestation is denied,
-          # failing the release — every one since 11 August. We do not
-          # consume the attestations, so they are turned off.
+          # See the backend image above: attestations are off, and staying off
+          # also keeps the ACR mirror free of the media type Aliyun rejects.
           provenance: false
           sbom: false
 
@@ -123,7 +134,7 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            ${{ env.ALIYUN_REGISTRY }}/${{ env.HOME_IMAGE_NAME }}
+            ${{ env.RELEASE_REGISTRY }}/${{ env.HOME_IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -136,6 +147,7 @@ jobs:
       # the same version. Its Dockerfile copies with paths relative to the
       # site root, so the context is home/ rather than the repository root.
       - name: Build and push homepage image
+        timeout-minutes: 20
         uses: docker/build-push-action@v5
         with:
           context: ./home
@@ -146,8 +158,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
-          # See the backend image above: Aliyun ACR rejects buildx
-          # attestations, so they are turned off here too.
+          # See the backend image above: attestations are off, and staying off
+          # also keeps the ACR mirror free of the media type Aliyun rejects.
           provenance: false
           sbom: false
 
@@ -158,7 +170,7 @@ jobs:
           set -euo pipefail
           version="${RELEASE_VERSION#v}"
           for image_name in "${IMAGE_NAME}" "${UI_IMAGE_NAME}" "${HOME_IMAGE_NAME}"; do
-            image="${ALIYUN_REGISTRY}/${image_name}:${version}"
+            image="${RELEASE_REGISTRY}/${image_name}:${version}"
             # Resolve through .Image rather than the raw manifest. A
             # single-platform push is a plain image manifest: it has no
             # .manifests array for the old jq to walk, and carries no
@@ -208,7 +220,11 @@ jobs:
           script: |
             set -e
             cd ~/devify-deploy
-            DEVIFY_REF=${{ github.ref_name }} ./deploy/scripts/devify-deploy.sh upgrade
+            # Pin the registry for this release so the host pulls from the one
+            # the workflow actually pushed to. Shell variables win over the
+            # compose --env-file, so a stale DEVIFY_REGISTRY in .env cannot
+            # send the pull to a registry that has no such tag.
+            DEVIFY_REGISTRY=${{ env.RELEASE_REGISTRY }} DEVIFY_REF=${{ github.ref_name }} ./deploy/scripts/devify-deploy.sh upgrade
             # Scoped to images this repository publishes. `docker system
             # prune -f` reaches the whole host, and this host also runs
             # sourcelens — itself blue/green, so a colour it had stopped for
@@ -219,19 +235,27 @@ jobs:
             docker image prune -f \
               --filter "label=org.opencontainers.image.source=https://github.com/oneprolabs/devify"
 
-  # Docker Hub is a convenience mirror, mainly for installs outside China
-  # that would otherwise pull from Aliyun ACR. It is deliberately a separate
-  # job that copies the already-published manifests rather than a second
-  # push target on the build steps: an expired Docker Hub token then fails
-  # this job alone, and never a production release. It also costs no build
-  # time, since imagetools copies the manifest instead of rebuilding.
-  mirror-to-dockerhub:
+  # Aliyun ACR is the China channel: the installer's "cn" channel and hosts
+  # inside China pull from it, while every other consumer uses Docker Hub. It
+  # is deliberately a separate, opt-in job that copies the already-published
+  # manifests rather than a second push target on the build steps: an ACR
+  # outage — v1.6.5 spent 80 minutes stuck pushing layers there, twice — or an
+  # expired credential then fails this job alone and never a production
+  # release. It costs no build time, since imagetools copies the manifest
+  # instead of rebuilding.
+  mirror-to-acr:
     runs-on: ubuntu-latest
     needs: build-and-deploy
-    if: ${{ vars.DOCKERHUB_NAMESPACE != '' }}
+    if: ${{ vars.ALIYUN_PUSH == 'true' }}
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to Aliyun ACR oneprolabs
         uses: docker/login-action@v3
@@ -240,24 +264,17 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Copy release images to Docker Hub
+      - name: Copy release images to Aliyun ACR
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
-          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
         run: |
           set -euo pipefail
           version="${RELEASE_VERSION#v}"
           major_minor="${version%.*}"
           major="${version%%.*}"
           for image_name in "${IMAGE_NAME}" "${UI_IMAGE_NAME}" "${HOME_IMAGE_NAME}"; do
-            source="${ALIYUN_REGISTRY}/${image_name}:${version}"
-            target="docker.io/${DOCKERHUB_NAMESPACE}/${image_name}"
+            source="${RELEASE_REGISTRY}/${image_name}:${version}"
+            target="${ALIYUN_REGISTRY}/${image_name}"
             docker buildx imagetools create \
               -t "${target}:${version}" \
               -t "${target}:${major_minor}" \

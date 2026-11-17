@@ -55,7 +55,8 @@ COPY devify /opt/devify
 COPY pyproject.toml LICENSE README.md /opt/devify/
 
 ARG DEV_MODE=0
-RUN set -eux; \
+RUN --mount=type=cache,target=/root/.cache/uv \
+    set -eux; \
     compile_options=(); \
     if [ "$DEV_MODE" = "1" ]; then \
         compile_options+=(--extra dev); \

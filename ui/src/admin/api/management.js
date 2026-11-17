@@ -18,6 +18,12 @@ export const managementApi = {
     return apiClient.post('/v1/management/users/', body).then(extractData)
   },
 
+  updateUser(userId, body) {
+    return apiClient
+      .patch(`/v1/management/users/${userId}/`, body)
+      .then(extractData)
+  },
+
   getGroups(params = {}) {
     return apiClient.get('/v1/management/groups/', { params }).then(extractData)
   },

@@ -65,6 +65,7 @@
                 <col class="w-36" />
                 <col class="w-48" />
                 <col class="w-48" />
+                <col class="w-24" />
               </colgroup>
               <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
                 <tr>
@@ -117,6 +118,11 @@
                     class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200"
                   >
                     {{ t('management.dateJoined') }}
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200"
+                  >
+                    {{ t('management.actions') }}
                   </th>
                 </tr>
               </thead>
@@ -268,6 +274,15 @@
                       {{ formatDate(u.date_joined) }}
                     </span>
                   </td>
+                  <td class="px-4 py-4 text-sm text-gray-500">
+                    <BaseButton
+                      variant="outline"
+                      size="sm"
+                      @click="openEditModal(u)"
+                    >
+                      {{ t('management.edit') }}
+                    </BaseButton>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -315,178 +330,16 @@
         </div>
       </div>
 
-      <BaseModal
-        :show="showCreateModal"
-        :title="t('management.createUser')"
-        @close="closeCreateModal"
-      >
-        <form @submit.prevent="submitCreateUser" class="space-y-4">
-          <p v-if="createError" class="text-sm text-red-600">
-            {{ createError }}
-          </p>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{
-              t('management.username')
-            }}</label>
-            <input
-              v-model="createForm.username"
-              type="text"
-              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-              :placeholder="t('management.username')"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{
-              t('management.email')
-            }}</label>
-            <input
-              v-model="createForm.email"
-              type="email"
-              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-              :placeholder="t('management.email')"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{
-              t('password.reset.newPassword')
-            }}</label>
-            <div class="relative">
-              <input
-                v-model="createForm.password"
-                :type="showPassword ? 'text' : 'password'"
-                class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                :placeholder="t('password.reset.newPasswordPlaceholder')"
-              />
-              <button
-                type="button"
-                class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                :aria-label="
-                  showPassword
-                    ? t('common.hidePassword')
-                    : t('common.showPassword')
-                "
-                @click="showPassword = !showPassword"
-              >
-                <svg
-                  v-if="showPassword"
-                  class="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                  />
-                </svg>
-                <svg
-                  v-else
-                  class="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{
-              t('management.language')
-            }}</label>
-            <select
-              v-model="createForm.language"
-              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white"
-            >
-              <option value="zh-CN">简体中文</option>
-              <option value="en-US">English</option>
-              <option value="ja-JP">日本語</option>
-              <option value="ko-KR">한국어</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{
-              t('management.timezone')
-            }}</label>
-            <select
-              v-model="createForm.timezone"
-              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 bg-white"
-            >
-              <option value="Asia/Shanghai">Asia/Shanghai</option>
-              <option value="UTC">UTC</option>
-              <option value="America/New_York">America/New_York</option>
-              <option value="Europe/London">Europe/London</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{
-              t('management.selectGroups')
-            }}</label>
-            <div
-              class="max-h-32 overflow-y-auto rounded-md border border-gray-300 bg-white p-2 space-y-2"
-            >
-              <label
-                v-for="g in groupOptions"
-                :key="g.id"
-                class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
-              >
-                <input
-                  v-model="createForm.group_ids"
-                  type="checkbox"
-                  :value="g.id"
-                  class="h-4 w-4 shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span class="text-sm text-gray-700">{{ g.name }}</span>
-              </label>
-              <p v-if="!groupOptions.length" class="text-sm text-gray-500 py-1">
-                {{ t('common.noData') }}
-              </p>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 py-1">
-            <input
-              v-model="createForm.is_staff"
-              type="checkbox"
-              id="create-user-is-staff"
-              class="h-4 w-4 shrink-0 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <label
-              for="create-user-is-staff"
-              class="text-sm font-medium text-gray-700 cursor-pointer"
-            >
-              {{ t('management.setAsAdmin') }}
-            </label>
-          </div>
-        </form>
-        <template #footer>
-          <div class="flex flex-row-reverse gap-2">
-            <BaseButton
-              variant="primary"
-              :loading="createLoading"
-              @click="submitCreateUser"
-            >
-              {{ t('common.confirm') }}
-            </BaseButton>
-            <BaseButton variant="outline" @click="closeCreateModal">
-              {{ t('common.cancel') }}
-            </BaseButton>
-          </div>
-        </template>
-      </BaseModal>
+      <UserFormModal
+        :show="showFormModal"
+        :mode="formMode"
+        :user="editingUser"
+        :groups="groupOptions"
+        :loading="formLoading"
+        :error="formError"
+        @close="closeFormModal"
+        @submit="submitUserForm"
+      />
     </div>
   </AdminLayout>
 </template>
@@ -497,7 +350,7 @@ import { useI18n } from 'vue-i18n'
 import AdminLayout from '@/admin/layout/AdminLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseLoading from '@/components/ui/BaseLoading.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
+import UserFormModal from '@/admin/pages/Management/UserFormModal.vue'
 import { managementApi } from '@/admin/api'
 
 const { t } = useI18n()
@@ -507,20 +360,12 @@ const error = ref(null)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const totalCount = ref(0)
-const showCreateModal = ref(false)
-const createLoading = ref(false)
-const createError = ref(null)
-const showPassword = ref(false)
+const showFormModal = ref(false)
+const formMode = ref('create')
+const editingUser = ref(null)
+const formLoading = ref(false)
+const formError = ref(null)
 const groupOptions = ref([])
-const createForm = ref({
-  username: '',
-  email: '',
-  password: '',
-  is_staff: false,
-  group_ids: [],
-  language: 'zh-CN',
-  timezone: 'Asia/Shanghai'
-})
 
 const totalPages = computed(() =>
   totalCount.value > 0 ? Math.ceil(totalCount.value / pageSize.value) : 1
@@ -533,24 +378,26 @@ const paginationShowing = computed(() => ({
   total: totalCount.value
 }))
 
-function closeCreateModal() {
-  showCreateModal.value = false
-  showPassword.value = false
-  createError.value = null
-  createForm.value = {
-    username: '',
-    email: '',
-    password: '',
-    is_staff: false,
-    group_ids: [],
-    language: 'zh-CN',
-    timezone: 'Asia/Shanghai'
-  }
+function closeFormModal() {
+  showFormModal.value = false
+  editingUser.value = null
+  formError.value = null
 }
 
 async function openCreateModal() {
-  showCreateModal.value = true
+  formMode.value = 'create'
+  editingUser.value = null
+  formError.value = null
+  showFormModal.value = true
   await loadGroupOptions()
+}
+
+async function openEditModal(user) {
+  formMode.value = 'edit'
+  editingUser.value = user
+  formError.value = null
+  showFormModal.value = true
+  if (!groupOptions.value.length) await loadGroupOptions()
 }
 
 async function loadGroupOptions() {
@@ -562,45 +409,51 @@ async function loadGroupOptions() {
   }
 }
 
-async function submitCreateUser() {
-  createError.value = null
-  const username = (createForm.value.username || '').trim()
-  const password = (createForm.value.password || '').trim()
-  if (!username) {
-    createError.value = t('management.usernameRequired')
-    return
+function formErrorFromResponse(e) {
+  const body = e?.response?.data
+  const codeMessages = {
+    username_required: t('management.usernameRequired'),
+    password_required: t('management.passwordRequired'),
+    username_taken: t('management.usernameTaken'),
+    username_immutable: t('management.usernameImmutable'),
+    email_taken: t('management.emailTaken'),
+    cannot_revoke_own_admin: t('management.cannotRevokeOwnAdmin'),
+    cannot_deactivate_self: t('management.cannotDeactivateSelf'),
+    superuser_protected: t('management.superuserProtected')
   }
-  if (!password) {
-    createError.value = t('management.passwordRequired')
-    return
+  if (body?.code && codeMessages[body.code]) return codeMessages[body.code]
+  if (typeof body?.detail === 'string') return body.detail
+  return e?.message || t('common.error')
+}
+
+async function submitUserForm(payload) {
+  formError.value = null
+  if (formMode.value === 'create') {
+    if (!payload.username) {
+      formError.value = t('management.usernameRequired')
+      return
+    }
+    if (!payload.password) {
+      formError.value = t('management.passwordRequired')
+      return
+    }
   }
-  createLoading.value = true
+  formLoading.value = true
   try {
-    await managementApi.createUser({
-      username,
-      email: (createForm.value.email || '').trim(),
-      password,
-      is_staff: createForm.value.is_staff,
-      group_ids: Array.isArray(createForm.value.group_ids)
-        ? createForm.value.group_ids
-        : [],
-      language: (createForm.value.language || '').trim() || 'zh-CN',
-      timezone: (createForm.value.timezone || '').trim() || 'Asia/Shanghai'
-    })
-    closeCreateModal()
+    if (formMode.value === 'create') {
+      await managementApi.createUser(payload)
+    } else {
+      const body = { ...payload }
+      delete body.username
+      if (!body.password) delete body.password
+      await managementApi.updateUser(editingUser.value.id, body)
+    }
+    closeFormModal()
     await fetchUsers()
   } catch (e) {
-    const detail = e?.response?.data?.detail
-    if (e?.response?.data?.code === 'username_taken') {
-      createError.value = t('management.usernameTaken')
-    } else if (e?.response?.data?.code === 'email_taken') {
-      createError.value = t('management.emailTaken')
-    } else {
-      createError.value =
-        typeof detail === 'string' ? detail : t('common.error')
-    }
+    formError.value = formErrorFromResponse(e)
   } finally {
-    createLoading.value = false
+    formLoading.value = false
   }
 }
 

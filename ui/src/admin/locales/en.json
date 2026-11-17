@@ -62,7 +62,20 @@
     "displayName": "Display name",
     "isActive": "Active",
     "permissionCount": "Permissions",
-    "selectGroups": "Select groups"
+    "selectGroups": "Select groups",
+    "actions": "Actions",
+    "edit": "Edit",
+    "editUser": "Edit User",
+    "saveChanges": "Save Changes",
+    "newPasswordOptional": "New password (optional)",
+    "passwordKeepHint": "Leave blank to keep the current password",
+    "usernameImmutable": "Username cannot be changed after creation",
+    "accountEnabled": "Account enabled",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "cannotRevokeOwnAdmin": "You cannot remove your own admin permission",
+    "cannotDeactivateSelf": "You cannot deactivate your own account",
+    "superuserProtected": "Only superusers can modify a superuser account"
   },
   "appSettings": {
     "menuTitle": "App Settings",

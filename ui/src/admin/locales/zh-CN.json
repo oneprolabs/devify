@@ -62,7 +62,20 @@
     "displayName": "显示名称",
     "isActive": "启用",
     "permissionCount": "权限数",
-    "selectGroups": "选择组"
+    "selectGroups": "选择组",
+    "actions": "操作",
+    "edit": "编辑",
+    "editUser": "编辑用户",
+    "saveChanges": "保存修改",
+    "newPasswordOptional": "新密码（可选）",
+    "passwordKeepHint": "留空则不修改当前密码",
+    "usernameImmutable": "用户名创建后不可修改",
+    "accountEnabled": "账号启用",
+    "firstName": "名",
+    "lastName": "姓",
+    "cannotRevokeOwnAdmin": "不能取消自己的管理员权限",
+    "cannotDeactivateSelf": "不能停用自己的账号",
+    "superuserProtected": "只有超级管理员可以修改超级管理员账号"
   },
   "appSettings": {
     "menuTitle": "应用设置",

@@ -42,7 +42,17 @@ export default {
 
   // OAuth endpoints
   endpoints: {
-    googleLogin: () => `${getOAuthBaseUrl()}/accounts/google/login/`,
+    // `next` is the in-app path to return to after the provider round trip
+    // (e.g. the desktop client's /auth/desktop/authorize?... link). The
+    // backend callback turns it into JWT tokens before handing the path back.
+    googleLogin: (next) => {
+      const loginUrl = `${getOAuthBaseUrl()}/accounts/google/login/`
+      if (!next) return loginUrl
+      const callbackUrl = `/accounts/oauth/callback/?${new URLSearchParams({
+        next
+      })}`
+      return `${loginUrl}?${new URLSearchParams({ next: callbackUrl })}`
+    },
     wechatLogin: () => `${getOAuthBaseUrl()}/accounts/weixin/login/`,
     oauthCallback: () => `${getOAuthBaseUrl()}/accounts/oauth/callback/`
   }

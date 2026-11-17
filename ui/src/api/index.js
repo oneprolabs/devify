@@ -38,6 +38,33 @@ function extractResponseData(response) {
   return body
 }
 
+// Pages that must not be remembered as a return destination, either because
+// they are the login flow itself or because their URL carries credentials.
+const AUTH_FLOW_PATHS = [
+  '/login',
+  '/register',
+  '/reset-password',
+  '/auth/oauth/'
+]
+
+// Build the login URL for a page that needs a signed-in user. Keeping the
+// current location in `next` lets password and Google sign-in return here,
+// which the desktop client relies on for its authorize link.
+export function loginRedirectUrl({ pathname, search }) {
+  if (AUTH_FLOW_PATHS.some((prefix) => pathname.startsWith(prefix))) {
+    return ''
+  }
+  const next = encodeURIComponent(`${pathname}${search}`)
+  return `/login?next=${next}`
+}
+
+function redirectToLogin() {
+  const url = loginRedirectUrl(window.location)
+  if (url) {
+    window.location.href = url
+  }
+}
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token')
@@ -108,14 +135,14 @@ api.interceptors.response.use(
           // Refresh failed, redirect to login
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
-          window.location.href = '/login'
+          redirectToLogin()
           return Promise.reject(refreshError)
         }
       } else {
         // No refresh token, redirect to login
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
-        window.location.href = '/login'
+        redirectToLogin()
         return Promise.reject(error)
       }
     }

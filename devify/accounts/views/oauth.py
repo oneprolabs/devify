@@ -6,15 +6,14 @@ and OAuth callback redirects.
 """
 
 import logging
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import redirect
 from django.utils.translation import gettext_lazy as _
 from django.views import View
-
 from drf_spectacular.utils import extend_schema
-
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -30,6 +29,21 @@ from ..serializers import (
 from ..services.user_bootstrap import UserBootstrapService
 
 logger = logging.getLogger(__name__)
+
+
+def safe_next_path(value):
+    """
+    Return a same-site path from a post-login redirect parameter.
+
+    The desktop client sends users to ``/auth/desktop/authorize?...`` before
+    they sign in, so the path (with its query string) has to survive the OAuth
+    round trip. Only site-relative paths are accepted to avoid open redirects.
+    """
+    if not value or not value.startswith("/"):
+        return ""
+    if value.startswith("//") or value.startswith("/\\"):
+        return ""
+    return value
 
 
 class CompleteGoogleSetupView(APIView):
@@ -208,10 +222,16 @@ class OAuthCallbackRedirectView(View):
                     access_token = str(refresh.access_token)
                     refresh_token = str(refresh)
 
+                    params = {
+                        "access_token": access_token,
+                        "refresh_token": refresh_token,
+                    }
+                    next_path = safe_next_path(request.GET.get("next", ""))
+                    if next_path:
+                        params["next"] = next_path
                     redirect_url = (
                         f"{settings.FRONTEND_URL}/auth/oauth/callback"
-                        f"?access_token={access_token}"
-                        f"&refresh_token={refresh_token}"
+                        f"?{urlencode(params)}"
                     )
 
                     logger.info(

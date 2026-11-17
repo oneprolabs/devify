@@ -611,10 +611,19 @@ const resetLoading = ref(false)
 const resetErrorMessage = ref('')
 const resetEmailSent = ref(false)
 
+const loginNextPath = computed(() => {
+  const next = route.query.next
+  if (typeof next !== 'string' || !next.startsWith('/')) return ''
+  if (next.startsWith('//') || next.startsWith('/\\')) return ''
+  return next
+})
+
 const googleOAuthUrl = computed(() => {
   // Use centralized API configuration
-  // Returns the configured Google OAuth login endpoint
-  return apiConfig.endpoints.googleLogin()
+  // Returns the configured Google OAuth login endpoint, carrying the
+  // post-login destination (e.g. the desktop client authorize link) so the
+  // OAuth round trip does not drop it.
+  return apiConfig.endpoints.googleLogin(loginNextPath.value)
 })
 
 watch(activeTab, (newTab) => {
@@ -673,9 +682,7 @@ const handleLogin = async () => {
       password: formData.password
     })
 
-    const next =
-      typeof route.query.next === 'string' ? route.query.next : '/workspace'
-    router.push(next)
+    router.push(loginNextPath.value || '/workspace')
   } catch (error) {
     console.error('Login error:', error)
     errorMessage.value = t('auth.loginError')

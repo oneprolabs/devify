@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/store/user'
@@ -104,6 +104,20 @@ const suggestedUsername = ref('')
 const error = ref('')
 const loading = ref(false)
 const setupFormRef = ref(null)
+
+// Where to go after the OAuth round trip. The desktop client's authorize link
+// arrives here as `next`, so signing in through Google still returns the
+// authorization code to the client instead of landing on the workspace.
+const nextPath = computed(() => {
+  const next = route.query.next
+  if (typeof next !== 'string' || !next.startsWith('/')) return ''
+  if (next.startsWith('//') || next.startsWith('/\\')) return ''
+  return next
+})
+
+const goToDestination = () => {
+  router.push(nextPath.value || '/workspace')
+}
 
 const handleSubmit = (e) => {
   e?.preventDefault()
@@ -130,7 +144,7 @@ const handleComplete = async (formValues) => {
         localStorage.setItem('refresh_token', responseData.refresh)
       }
 
-      router.push('/workspace')
+      goToDestination()
     }
   } catch (err) {
     console.error('Setup completion error:', err)
@@ -170,7 +184,7 @@ const handleOAuthCallback = async () => {
 
     if (user) {
       if (user.profile?.registration_completed) {
-        router.push('/workspace')
+        goToDestination()
       } else {
         needsSetup.value = true
         userEmail.value = user.email

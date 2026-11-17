@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.6
+
 # Production Dockerfile for Devify UI
 FROM node:22-alpine AS builder
 
@@ -23,8 +25,9 @@ ENV VITE_SENTRY_TRACES_SAMPLE_RATE=${VITE_SENTRY_TRACES_SAMPLE_RATE}
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production=false
+# Install dependencies. The npm cache mount keeps repeated builds from
+# re-downloading the whole tree.
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Copy source code
 COPY . .

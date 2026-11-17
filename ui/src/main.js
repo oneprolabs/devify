@@ -1,6 +1,5 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createHead } from '@vueuse/head'
 import * as Sentry from '@sentry/vue'
 import App from './App.vue'
 import router from './router'
@@ -14,7 +13,6 @@ import '@vuepic/vue-datepicker/dist/main.css'
 
 const app = createApp(App)
 const pinia = createPinia()
-const head = createHead()
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -32,7 +30,6 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 
 app.use(pinia)
 app.use(router)
-app.use(head)
 app.use(i18n)
 
 const preferencesStore = usePreferencesStore()

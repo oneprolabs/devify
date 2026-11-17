@@ -33,9 +33,23 @@ LOCAL_MODE="${LOCAL_MODE:-0}"
 log() { echo -e "\033[1;36m[devify-deploy]\033[0m $*"; }
 die() { echo -e "\033[1;31m[devify-deploy] ERROR:\033[0m $*" >&2; exit 1; }
 
-DEVIFY_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify"
-DEVIFY_UI_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify-ui"
-DEVIFY_HOME_IMAGE_REPO="registry.cn-beijing.aliyuncs.com/oneprolabs/devify-home"
+# Image repos follow DEVIFY_REGISTRY — the same variable the compose files
+# read, so the pull, the prune and the rollback check all agree on where a
+# release lives. Precedence mirrors `docker compose --env-file`: shell > .env >
+# default. Docker Hub is where releases are published; a host inside China can
+# point DEVIFY_REGISTRY at Aliyun ACR, which the release mirrors to.
+env_value() {
+    local key="$1"
+    [ -f "${ENV_FILE}" ] || return 0
+    grep -E "^${key}=" "${ENV_FILE}" | tail -n1 | cut -d= -f2- | tr -d "'\""
+}
+
+DEVIFY_REGISTRY="${DEVIFY_REGISTRY:-$(env_value DEVIFY_REGISTRY)}"
+DEVIFY_REGISTRY="${DEVIFY_REGISTRY:-docker.io/oneprolabs}"
+export DEVIFY_REGISTRY
+DEVIFY_IMAGE_REPO="${DEVIFY_IMAGE_REPO:-${DEVIFY_REGISTRY}/devify}"
+DEVIFY_UI_IMAGE_REPO="${DEVIFY_UI_IMAGE_REPO:-${DEVIFY_REGISTRY}/devify-ui}"
+DEVIFY_HOME_IMAGE_REPO="${DEVIFY_HOME_IMAGE_REPO:-${DEVIFY_REGISTRY}/devify-home}"
 
 # The deploy host runs images, not source. It needs the compose files, the
 # nginx/haraka/mysql config those files bind-mount, and this deploy tree —

@@ -186,7 +186,7 @@ def test_two_accounts_uploading_one_group_share_conversation_and_messages():
     assert MessageOrigin.objects.filter(
         message__conversation__space=space
     ).count() == 4
-    assert AnalysisJob.objects.filter(space=space).count() == 1
+    assert AnalysisJob.objects.filter(space=space).count() == 0
 
     # The second upload introduced nothing new and reports the hit.
     assert first.message_count == 2

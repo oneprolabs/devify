@@ -26,7 +26,7 @@
             </div>
             <span class="spacer"></span>
             <span class="sync-hint"
-              >定时上传 每 30 分钟 · 定时分析 09:00 / 21:00</span
+              >上传时间由客户端的备份设置决定，入库后等待分析</span
             >
           </div>
 
@@ -325,10 +325,11 @@ const statusInfo = (upload) => {
   const analysis = upload.analysis_summary
   if (!analysis || !analysis.job_count) {
     return Number(upload.message_count || 0) > 0
-      ? { text: '已完成', cls: 'ok' }
+      ? { text: '已入库，等待分析', cls: 'ac' }
       : { text: '无变化', cls: '' }
   }
-  if (analysis.running) return { text: '关联分析中', cls: 'ac' }
+  if (analysis.running) return { text: '分析中', cls: 'ac' }
+  if (analysis.queued) return { text: '分析排队中', cls: 'ac' }
   if (analysis.failed) return { text: '分析失败', cls: 'bad' }
   if (analysis.partial) return { text: '部分完成', cls: 'warn' }
   if (analysis.retried) return { text: '已重试成功', cls: 'ok' }
@@ -436,12 +437,14 @@ const stagesFor = (upload) => {
         ? `分析不完整 · 当前 ${eventCount} 个事件`
         : analysisDone
         ? `识别出 ${eventCount} 个事件`
-        : analysisRunning
+          : analysisRunning
           ? '正在识别事件'
+          : analysis.queued
+            ? '已排队，等待分析开始'
           : analysisFailed
             ? '事件识别失败'
             : completed
-              ? '已交给云端分析，等待事件识别'
+              ? '已入库，等待分析'
               : cancelled
                 ? '任务已取消，没有进入分析'
                 : '等待解析完成',

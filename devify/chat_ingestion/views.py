@@ -208,10 +208,8 @@ def _analysis_summaries(batches):
     result = {}
     for batch_id, summary in summaries.items():
         states = summary["states"]
-        running = any(
-            state in (AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING)
-            for state in states
-        )
+        queued = any(state == AnalysisJob.State.QUEUED for state in states)
+        running = any(state == AnalysisJob.State.RUNNING for state in states)
         failed = any(
             state in (AnalysisJob.State.FAILED, AnalysisJob.State.CANCELLED)
             for state in states
@@ -219,6 +217,8 @@ def _analysis_summaries(batches):
         partial = any(state == AnalysisJob.State.PARTIAL for state in states)
         if running:
             state = "running"
+        elif queued:
+            state = "queued"
         elif failed:
             state = "failed"
         elif partial:
@@ -230,7 +230,7 @@ def _analysis_summaries(batches):
         started = summary["started_at"]
         finished = summary["finished_at"]
         duration_seconds = None
-        if started and finished and not running:
+        if started and finished and not running and not queued:
             duration_seconds = max(
                 0, round((finished - started).total_seconds())
             )
@@ -238,6 +238,7 @@ def _analysis_summaries(batches):
             "state": state,
             "job_count": len(summary["job_ids"]),
             "event_count": len(events_by_batch[batch_id]),
+            "queued": queued,
             "running": running,
             "failed": failed,
             "partial": partial,

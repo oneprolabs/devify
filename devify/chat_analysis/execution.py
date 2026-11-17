@@ -13,15 +13,23 @@ import json
 import logging
 import os
 import time
+from copy import copy
 from dataclasses import dataclass
 from datetime import timedelta
+from hashlib import sha256
 
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from chat_analysis.keys import canonical_event_key, slugify_key
-from chat_analysis.models import AnalysisJob, Event, EventSuggestion, Note
+from chat_analysis.models import (
+    AnalysisJob,
+    AnalysisJobMessage,
+    Event,
+    EventSuggestion,
+    Note,
+)
 from chat_analysis.services import (
     ChatAnalysisError,
     ChatAnalysisPermissionError,
@@ -33,6 +41,11 @@ from chat_analysis.suggestions import (
     create_event_suggestion,
     review_event_suggestion,
 )
+from chat_analysis.token_budget import (
+    MessageExceedsBudget,
+    request_budget,
+    take_message_window,
+)
 from chat_domain.models import Message, MessagePart
 from core.tracking import LLMTracker
 from spaces.models import Space, SpaceWorkflowConfig
@@ -43,6 +56,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_LEASE_SECONDS = 300
 DEFAULT_MAX_ATTEMPTS = 3
 ANALYSIS_CHUNK_SIZE = 200
+MODEL_INPUT_TOKEN_BUDGET = 12000
 ENGINE_VERSION = "chat-analysis.v2"
 MAX_EVENTS_PER_CHUNK = 8
 EXISTING_EVENT_CONTEXT_LIMIT = 40
@@ -304,6 +318,8 @@ def _ensure_job_runnable(job):
 
 
 def _message_texts(message):
+    if hasattr(message, "analysis_fragment_text"):
+        return [message.analysis_fragment_text]
     return [
         part.text.strip()
         for part in message.parts.all()
@@ -313,7 +329,19 @@ def _message_texts(message):
     ]
 
 
-def _write_chunk_note(job, messages):
+def _chunk_note_key(job, messages):
+    note_key = (
+        f"job:{job.uuid}:{messages[0].ingest_seq}-{messages[-1].ingest_seq}"
+    )
+    first = messages[0]
+    if hasattr(first, "analysis_fragment_offset"):
+        start = first.analysis_fragment_offset
+        end = start + len(first.analysis_fragment_text)
+        note_key += f":offset:{start}-{end}"
+    return note_key
+
+
+def _write_chunk_note(job, messages, summary, events):
     """Create or refresh the automatic Note for one message chunk."""
     conversation = job.conversation
     lines = []
@@ -352,7 +380,7 @@ def _write_chunk_note(job, messages):
     note = create_note(
         actor=job.created_by,
         space=job.space,
-        note_key=f"job:{job.uuid}:{first_seq}-{last_seq}",
+        note_key=_chunk_note_key(job, messages),
         title=title,
         content="\n".join(lines),
         start_at=min(occurred_at) if occurred_at else None,
@@ -367,8 +395,26 @@ def _write_chunk_note(job, messages):
             note=note,
             message=message,
         )
-    partial = _enrich_note_with_llm(job, note, messages)
+    _persist_enrichment(job, note, messages, summary, events)
+    partial = settings.CHAT_ANALYSIS_LLM_ENABLED and (
+        summary is None or events is None
+    )
     return True, missing_content or partial
+
+
+def _persist_enrichment(job, note, messages, summary, events):
+    if summary is not None:
+        note.structured_data = summary
+        note.generation_version = "chat-note-llm.v1"
+        note.save(
+            update_fields=(
+                "structured_data",
+                "generation_version",
+                "updated_at",
+            )
+        )
+    if events is not None:
+        _store_events(job, note, messages, events)
 
 
 def _output_language(space):
@@ -378,6 +424,83 @@ def _output_language(space):
         .first()
     )
     return language or DEFAULT_OUTPUT_LANGUAGE
+
+
+def _model_input_budget():
+    return int(
+        getattr(
+            settings,
+            "CHAT_ANALYSIS_MODEL_INPUT_TOKENS",
+            MODEL_INPUT_TOKEN_BUDGET,
+        )
+    )
+
+
+def _request_sizer(job):
+    preferences = (job.specification or {}).get(
+        "chat_analysis_preferences"
+    ) or {}
+    language = _output_language(job.space)
+    prompt = _event_extraction_prompt(language, preferences)
+    summary_prompt = _note_summary_prompt(language, preferences)
+    title = job.conversation.title or job.conversation.identity_key
+    budget, count = request_budget(_model_input_budget())
+    base = count(prompt, _event_content(title, [], [], []))
+    # Leave up to a quarter of the usable space for existing events.
+    event_limit = budget - max(0, budget - base) // 4
+
+    def count_request(window):
+        payload = _message_payload(window)
+        event_size = count(prompt, _event_content(title, payload, [], []))
+        summary_size = count(
+            summary_prompt, json.dumps(payload, ensure_ascii=False)
+        )
+        return max(event_size + budget - event_limit, summary_size)
+
+    return budget, count_request
+
+
+def _messages_for_model(job, messages):
+    budget, count_request = _request_sizer(job)
+    window = take_message_window(messages, count_request, budget)
+    # A reply stays with the message it quotes. If it does not fit,
+    # both wait for the next window.
+    if len(window) < len(messages) and len(window) > 1:
+        nxt = messages[len(window)]
+        if nxt.reply_to_id and nxt.reply_to_id == window[-1].pk:
+            window = window[:-1]
+    return window
+
+
+def _message_fragment(job, message, offset, text):
+    if offset >= len(text):
+        raise ValueError(
+            "No message text remains at the saved fragment offset."
+        )
+    budget, count = _request_sizer(job)
+    fragment = copy(message)
+    fragment.analysis_fragment_offset = offset
+    fragment.analysis_fragment_text = text[offset:offset + 1]
+    if count([fragment]) > budget:
+        raise MessageExceedsBudget("Model budget cannot fit one character.")
+
+    # Avoid repeatedly tokenizing the entire remaining text for large uploads.
+    low, high = offset + 1, min(len(text) + 1, offset + budget * 4)
+    while high - low > 1:
+        end = (low + high) // 2
+        fragment.analysis_fragment_text = text[offset:end]
+        if count([fragment]) <= budget:
+            low = end
+        else:
+            high = end
+    if low < len(text):
+        newline = text.rfind("\n", offset + (low - offset) * 3 // 4, low)
+        if newline >= offset:
+            fragment.analysis_fragment_text = text[offset:newline + 1]
+            if count([fragment]) <= budget:
+                low = newline + 1
+    fragment.analysis_fragment_text = text[offset:low]
+    return fragment, low if low < len(text) else None
 
 
 def _message_payload(messages):
@@ -391,6 +514,11 @@ def _message_payload(messages):
                 else None
             ),
             "text": " / ".join(_message_texts(message)),
+            **(
+                {"fragment_offset": message.analysis_fragment_offset}
+                if hasattr(message, "analysis_fragment_offset")
+                else {}
+            ),
             "reply_to_seq": (
                 message.reply_to.ingest_seq
                 if message.reply_to_id
@@ -565,7 +693,10 @@ def _event_extraction_prompt(language, preferences):
         '"role":"matter"|"confirmation"}],"cross_decision":"same"|"related"'
         '|"separate"|null,"reason":""}]}. '
         "Input fields: conversation_title; messages with seq, sender, time, "
-        "text, reply_to_seq; open_events_same_conversation; "
+        "text, reply_to_seq and optional fragment_offset; "
+        "open_events_same_conversation; "
+        "A message with fragment_offset is a slice of the original message. "
+        "Use existing events to fold later slices into the same matter. "
         "cross_candidates. reply_to_seq is the quoted message when WeChat "
         "has one, otherwise null. open_events_same_conversation are "
         "unfinished events from this same chat. cross_candidates are "
@@ -621,6 +752,11 @@ def _event_extraction_prompt(language, preferences):
 
 
 def _call_json(*, prompt, content, node_name):
+    budget, count = request_budget(_model_input_budget())
+    if count(prompt, content) > budget:
+        raise MessageExceedsBudget(
+            "The model request exceeds the input budget."
+        )
     output, _usage = LLMTracker.call_and_track(
         prompt=prompt,
         content=content,
@@ -631,37 +767,40 @@ def _call_json(*, prompt, content, node_name):
     return output if isinstance(output, dict) else None
 
 
-def _summarize_note(note, payload, language, preferences=None):
+def _note_summary_prompt(language, preferences=None):
     preferences = preferences or {}
     style = preferences.get("summary_style", "concise")
     length = preferences.get("summary_length", "standard")
-    prompt = (
+    return (
         "Summarize one chunk of chat messages. Return JSON with exactly the "
         "keys facts, actions, risks and decisions. Every item must be an "
         "object with a short text field. Do not include events. Do not "
         f"invent facts. Write all text in {language}. "
         f"Summary style: {style}; level of detail: {length}."
     )
-    output = _call_json(
-        prompt=prompt,
+
+
+def _summarize_note(payload, language, preferences=None):
+    return _call_json(
+        prompt=_note_summary_prompt(language, preferences),
         content=json.dumps(payload, ensure_ascii=False),
         node_name="chat_note_structuring",
     )
-    if output is None:
-        return False
-    note.structured_data = output
-    note.generation_version = "chat-note-llm.v1"
-    note.save(
-        update_fields=(
-            "structured_data",
-            "generation_version",
-            "updated_at",
-        )
+
+
+def _event_content(title, payload, open_events, cross):
+    return json.dumps(
+        {
+            "conversation_title": title,
+            "messages": payload,
+            "open_events_same_conversation": open_events,
+            "cross_candidates": cross,
+        },
+        ensure_ascii=False,
     )
-    return True
 
 
-def _extract_events(job, note, messages, payload, language):
+def _extract_events(job, messages, payload, language):
     preferences = (job.specification or {}).get(
         "chat_analysis_preferences", {}
     )
@@ -670,34 +809,25 @@ def _extract_events(job, note, messages, payload, language):
         conversation.title or conversation.identity_key
     )
     prompt = _event_extraction_prompt(language, preferences)
-    content = json.dumps(
-        {
-            "conversation_title": conversation_title,
-            "messages": payload,
-            "open_events_same_conversation": (
-                _open_events_same_conversation(
-                    note.space,
-                    conversation,
-                )
-            ),
-            "cross_candidates": _cross_candidates(
-                note.space,
-                conversation,
-                messages,
-            ),
-        },
-        ensure_ascii=False,
-    )
+    open_events = _open_events_same_conversation(job.space, conversation)
+    cross = _cross_candidates(job.space, conversation, messages)
+    budget, count = request_budget(_model_input_budget())
+    content = _event_content(conversation_title, payload, open_events, cross)
+    while count(prompt, content) > budget and (cross or open_events):
+        (cross or open_events).pop()
+        content = _event_content(
+            conversation_title, payload, open_events, cross
+        )
     output = _call_json(
         prompt=prompt,
         content=content,
         node_name="chat_event_extraction",
     )
-    if output is None:
-        return False
-    events = output.get("events")
-    if not isinstance(events, list):
-        return False
+    events = output.get("events") if output is not None else None
+    return events if isinstance(events, list) else None
+
+
+def _store_events(job, note, messages, events):
     by_seq = {message.ingest_seq: message for message in messages}
     for index, event in enumerate(events[:MAX_EVENTS_PER_CHUNK]):
         if not isinstance(event, dict):
@@ -732,10 +862,13 @@ def _extract_events(job, note, messages, payload, language):
             for tag in (event.get("tags") or [])
             if str(tag).strip()
         ][:5]
-        event_key = str(
-            event.get("event_key")
-            or f"{job.uuid}:event:{messages[0].ingest_seq}:{index}"
-        )[:255]
+        first = messages[0]
+        fallback = (
+            f"{job.uuid}:{first.ingest_seq}:{slugify_key(title)}"
+            if hasattr(first, "analysis_fragment_offset")
+            else f"{job.uuid}:event:{first.ingest_seq}:{index}"
+        )
+        event_key = str(event.get("event_key") or fallback)[:255]
         suggestion = create_event_suggestion(
             actor=job.created_by,
             note=note,
@@ -758,47 +891,68 @@ def _extract_events(job, note, messages, payload, language):
             )
             if suggestion.event_id and not source_messages:
                 refresh_event_window(suggestion.event, messages=messages)
-    return True
+            if (
+                suggestion.event_id
+                and action == "attach"
+                and source_messages
+                and getattr(first, "analysis_fragment_offset", 0)
+            ):
+                previous = EventSuggestion.objects.filter(
+                    event_id=suggestion.event_id,
+                    analysis_job=job,
+                    note__evidence__message=first,
+                    status=EventSuggestion.Status.ACCEPTED,
+                ).exclude(pk=suggestion.pk).order_by("-id").first()
+                if previous:
+                    Event.objects.filter(
+                        pk=suggestion.event_id, content=previous.summary
+                    ).update(
+                        content=suggestion.summary, updated_at=timezone.now()
+                    )
 
 
-def _enrich_note_with_llm(job, note, messages):
-    """Structure a Note and propose Events without mutating Events.
-
-    Summary and event extraction are separate calls: one combined call used
-    to fill the model's output budget and silently drop the event list.
-    Returns True when part of the work could not be produced.
-    """
-    if not getattr(settings, "CHAT_ANALYSIS_LLM_ENABLED", False):
-        return False
+def _prepare_chunk(job, messages):
+    """Keep model calls and usage tracking outside the result transaction."""
+    if not settings.CHAT_ANALYSIS_LLM_ENABLED or not any(
+        _message_texts(message) for message in messages
+    ):
+        return None, None
     payload = _message_payload(messages)
-    language = _output_language(note.space)
-    partial = False
+    language = _output_language(job.space)
     try:
-        if not _summarize_note(
-            note,
+        summary = _summarize_note(
             payload,
             language,
             (job.specification or {}).get("chat_analysis_preferences"),
-        ):
-            partial = True
-            logger.warning(
-                "Chat analysis job %s: summary result incomplete", job.pk
-            )
+        )
+        events = _extract_events(job, messages, payload, language)
     except Exception:
-        # An unavailable LLM is an infrastructure failure, not a data gap:
-        # keep the job's state and let the caller retry.
-        logger.exception("LLM note structuring failed for job %s", job.pk)
-        raise RuntimeError("LLM note structuring failed") from None
-    try:
-        if not _extract_events(job, note, messages, payload, language):
-            partial = True
-            logger.warning(
-                "Chat analysis job %s: event result incomplete", job.pk
-            )
-    except Exception:
-        logger.exception("LLM event extraction failed for job %s", job.pk)
-        raise RuntimeError("LLM event extraction failed") from None
-    return partial
+        logger.exception("LLM chat analysis failed for job %s", job.pk)
+        raise RuntimeError("LLM chat analysis failed") from None
+    return summary, events
+
+
+def _messages_from_note(note):
+    messages = [
+        evidence.message
+        for evidence in note.evidence.select_related("message").order_by(
+            "message__ingest_seq"
+        )
+    ]
+    if messages and ":offset:" in note.note_key:
+        start, end = map(
+            int, note.note_key.rsplit(":offset:", 1)[1].split("-")
+        )
+        messages[0].analysis_fragment_offset = start
+        messages[0].analysis_fragment_text = note.content[-(end - start):]
+    return messages
+
+
+def _enrich_note_with_llm(job, note, messages):
+    """Backfill an existing automatic Note."""
+    summary, events = _prepare_chunk(job, messages)
+    with transaction.atomic():
+        _persist_enrichment(job, note, messages, summary, events)
 
 
 def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
@@ -842,44 +996,136 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
         )
     )
     batches = job.upload_batches.all()
+    scheduled_scope = (job.specification or {}).get(
+        "scheduled_message_scope"
+    ) is True
+    if scheduled_scope and not getattr(
+        settings, "CHAT_ANALYSIS_LLM_ENABLED", False
+    ):
+        raise RuntimeError(
+            "Scheduled event analysis requires the LLM to be enabled."
+        )
     while not excluded:
+        offset = checkpoint.get("fragment_offset")
         query = Message.objects.filter(
             conversation_id=job.conversation_id,
             ingest_seq__gt=last_seq,
             ingest_seq__lte=job.end_seq,
             orphaned_at__isnull=True,
         )
-        if cutoff:
+        if scheduled_scope:
+            query = query.filter(
+                scheduled_analysis__job=job,
+                scheduled_analysis__completed_at__isnull=True,
+                scheduled_analysis__error="",
+            )
+        elif cutoff:
             query = query.filter(occurred_at__gte=cutoff)
-        if batches.exists():
+        if not scheduled_scope and batches.exists():
             query = query.filter(
                 origins__upload_item__batch__in=batches
             ).distinct()
+        if offset is not None:
+            query = query.filter(ingest_seq=checkpoint["fragment_seq"])
         messages = list(
             query.select_related("reply_to")
             .prefetch_related("parts")
             .order_by("ingest_seq")[:ANALYSIS_CHUNK_SIZE]
         )
         if not messages:
+            if offset is not None:
+                raise ValueError(
+                    "The original message for the saved fragment "
+                    "is unavailable."
+                )
             break
-        written, chunk_partial = _write_chunk_note(job, messages)
-        partial = partial or chunk_partial
-        notes_written += int(written)
-        messages_processed += len(messages)
-        last_seq = messages[-1].ingest_seq
-        checkpoint = {
-            "last_ingest_seq": last_seq,
-            "messages_processed": messages_processed,
-            "notes_written": notes_written,
-            "partial": partial,
-        }
+        next_offset = None
+        if getattr(settings, "CHAT_ANALYSIS_LLM_ENABLED", False):
+            if offset is None:
+                try:
+                    messages = _messages_for_model(job, messages)
+                except MessageExceedsBudget:
+                    offset = 0
+            if offset is not None:
+                body = " / ".join(_message_texts(messages[0]))
+                digest = sha256(body.encode("utf-8")).hexdigest()
+                if checkpoint.get("fragment_digest", digest) != digest:
+                    raise RuntimeError(
+                        "The original message changed after analysis started."
+                    )
+                fragment, next_offset = _message_fragment(
+                    job, messages[0], offset, body
+                )
+                messages = [fragment]
+        elif offset is not None:
+            raise RuntimeError(
+                "Continuing a fragmented message requires the LLM."
+            )
+
         job = renew_analysis_lease(
             job,
             worker_id=job.lease_owner,
             fencing_token=job.fencing_token,
             lease_seconds=lease_seconds,
-            checkpoint=checkpoint,
         )
+        summary, events = None, None
+        if (
+            not settings.CHAT_ANALYSIS_LLM_ENABLED
+            or not Note.objects.filter(
+                space=job.space,
+                note_key=_chunk_note_key(job, messages),
+                origin=Note.Origin.MANUAL,
+            ).exists()
+        ):
+            summary, events = _prepare_chunk(job, messages)
+        with transaction.atomic():
+            locked = _lock_job(job.pk)
+            _ensure_lease(locked, job.lease_owner, job.fencing_token)
+            written, chunk_partial = _write_chunk_note(
+                job, messages, summary, events
+            )
+            if chunk_partial and offset is not None:
+                raise RuntimeError(
+                    "The model returned an incomplete message fragment."
+                )
+            if scheduled_scope and chunk_partial:
+                partial = True
+                break
+            partial = partial or chunk_partial
+            notes_written += int(written)
+            if next_offset is None:
+                messages_processed += len(messages)
+                last_seq = messages[-1].ingest_seq
+                if scheduled_scope:
+                    AnalysisJobMessage.objects.filter(
+                        job=job,
+                        message__in=messages,
+                        completed_at__isnull=True,
+                    ).update(completed_at=timezone.now())
+            checkpoint = {
+                "last_ingest_seq": last_seq,
+                "messages_processed": messages_processed,
+                "notes_written": notes_written,
+                "partial": partial,
+            }
+            if next_offset is not None:
+                checkpoint.update(
+                    fragment_seq=messages[0].ingest_seq,
+                    fragment_offset=next_offset,
+                    fragment_digest=digest,
+                )
+            job = renew_analysis_lease(
+                job,
+                worker_id=job.lease_owner,
+                fencing_token=job.fencing_token,
+                lease_seconds=lease_seconds,
+                checkpoint=checkpoint,
+            )
+
+    if scheduled_scope and AnalysisJobMessage.objects.filter(
+        job=job, completed_at__isnull=True
+    ).exists():
+        partial = True
 
     return {
         "checkpoint": checkpoint,

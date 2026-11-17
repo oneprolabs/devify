@@ -23,3 +23,9 @@ def register_periodic_tasks():
         task="chat_analysis.tasks.run_due_topic_reports_task",
         schedule=crontab(minute="*"),
     )
+    # Poll for missed cutoffs and retry unfinished work within each slot.
+    TASK_REGISTRY.add(
+        name="chat-analysis-run-due-scheduled-analysis",
+        task="chat_analysis.tasks.run_due_scheduled_analysis_task",
+        schedule=crontab(minute="*/5"),
+    )

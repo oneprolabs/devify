@@ -148,6 +148,8 @@ services:
     logging: *default-logging
     env_file:
       - ${DEVIFY_ENV_FILE:-./.env}
+    environment:
+      CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/logs/scheduler:/var/log/celery
     networks:

@@ -119,10 +119,38 @@ describe('SpaceOperations', () => {
     expect(wrapper.text()).toContain('MacBook Pro · 工作')
     expect(wrapper.text()).toContain('Windows 台式机 · 家')
     expect(wrapper.text()).toContain('9 会话 · 412 条')
-    expect(wrapper.text()).toContain('关联分析中')
+    expect(wrapper.text()).toContain('分析中')
     expect(wrapper.text()).toContain('手动')
     expect(wrapper.text()).toContain('定时')
     expect(wrapper.text()).toContain('无变化')
+  })
+
+  it('does not call an ingested batch finished before analysis exists', async () => {
+    spacesApi.getUploads.mockResolvedValue({
+      data: {
+        data: {
+          list: [{
+            ...uploads[0],
+            analysis_summary: {
+              state: '',
+              job_count: 0,
+              event_count: 0,
+              queued: false,
+              running: false,
+              failed: false,
+              partial: false,
+              retried: false,
+              duration_seconds: null
+            }
+          }],
+          pagination: { next: null }
+        }
+      }
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('已入库，等待分析')
+    expect(wrapper.text()).not.toContain('分析中')
   })
 
   it('expands a record into real pipeline stages', async () => {

@@ -58,6 +58,26 @@ describe('workspace navigation', () => {
     expect(links.some((link) => link.text() === '主题订阅')).toBe(true)
   })
 
+  it('shows a line icon on each workspace item', async () => {
+    const wrapper = mount(AppSidebar, { global: { stubs: { RouterLink } } })
+    await flushPromises()
+    const labels = [
+      '概览',
+      '会话',
+      '事件',
+      '主题订阅',
+      '报告',
+      '问答',
+      '同步记录',
+      '设备与设置'
+    ]
+    for (const label of labels) {
+      const link = wrapper.findAll('a').find((item) => item.text() === label)
+      expect(link, label).toBeTruthy()
+      expect(link.find('svg').classes(), label).toContain('tree-icon')
+    }
+  })
+
   it('keeps the app center cached and collapsed across navigation remounts', async () => {
     relayApi.getApps.mockResolvedValue([
       { key: 'relay' },

@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 from chat_analysis import topic_services
 from chat_analysis.models import (
     Event,
+    EventEvidence,
     EventNote,
     EventTag,
     EventTagAssignment,
@@ -832,6 +833,14 @@ def test_conversations_named_in_matches_titles_in_question():
     assert (
         topic_services.conversations_named_in(space, "张三说了什么") == set()
     )
+    broad = make_conversation(space, "broad", "客户")
+    specific = make_conversation(space, "specific", "客户群A")
+    assert topic_services.conversations_named_in(space, "总结一下客户群A") == {
+        specific.pk
+    }
+    assert broad.pk not in topic_services.conversations_named_in(
+        space, "总结一下客户群A"
+    )
 
 
 def test_answer_question_scopes_to_named_conversation():
@@ -856,6 +865,86 @@ def test_answer_question_scopes_to_named_conversation():
     assert result["scope"]["conversation_ids"] == [wang.pk]
 
 
+def test_cross_conversation_event_stays_out_of_the_answer():
+    owner = User.objects.create_user(username="cross-answer-owner")
+    space = make_space(owner, "cross-answer-team")
+    wang = make_conversation(space, "wang", "王欣")
+    other = make_conversation(space, "other", "项目群")
+    wang_message = make_message(wang, "wang-1", "周五前交付方案")
+    other_message = make_message(other, "other-1", "项目群里的另一件事")
+    mixed = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="mixed",
+        title="跨会话事件",
+        content="王欣和项目群都提到了交付",
+        status=Event.Status.OPEN,
+        last_activity_at=timezone.now(),
+    )
+    pure = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="pure",
+        title="只在王欣会话里",
+        content="王欣要求周五前交付",
+        status=Event.Status.OPEN,
+        last_activity_at=timezone.now(),
+    )
+    for event, message in (
+        (mixed, wang_message),
+        (mixed, other_message),
+        (pure, wang_message),
+    ):
+        EventEvidence.objects.create(
+            event=event, message=message, created_by=owner
+        )
+
+    context = question_context(space=space, conversation_ids=[wang.pk])
+
+    assert [item["id"] for item in context["events"]] == [pure.pk]
+    assert [item["id"] for item in context["messages"]] == [wang_message.pk]
+    assert context["related"]["other_conversations"] == 1
+
+
+def test_time_window_keeps_spanning_material_as_related():
+    owner = User.objects.create_user(username="window-owner")
+    space = make_space(owner, "window-team")
+    conversation = make_conversation(space, "window", "客户群")
+    now = timezone.now()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_message = make_message(
+        conversation, "today", "今天确认", occurred_at=now
+    )
+    make_message(
+        conversation,
+        "yesterday",
+        "昨天的内容",
+        occurred_at=today - timedelta(hours=1),
+    )
+    spanning = Note.objects.create(
+        space=space,
+        created_by=owner,
+        note_key="spanning",
+        title="跨天笔记",
+        content="从昨天一直记到今天",
+        start_at=today - timedelta(days=1),
+        end_at=now,
+    )
+    NoteEvidence.objects.create(
+        note=spanning,
+        message=today_message,
+        reference_key=NoteEvidence.build_reference_key(today_message.pk),
+    )
+
+    context = question_context(
+        space=space, since=today, until=today + timedelta(days=1)
+    )
+
+    assert context["notes"] == []
+    assert [item["id"] for item in context["messages"]] == [today_message.pk]
+    assert context["related"]["outside_time"] == 1
+
+
 def test_explicit_scope_is_not_replaced_by_named_conversation():
     owner = User.objects.create_user(username="named-explicit-owner")
     space = make_space(owner, "named-explicit-team")
@@ -877,6 +966,14 @@ def test_explicit_scope_is_not_replaced_by_named_conversation():
     records = json.loads(call.call_args.kwargs["content"])["records"]
     assert [item["id"] for item in records["messages"]] == [other_message.pk]
     assert result["scope"]["conversation_ids"] == [other.pk]
+
+
+def test_question_window_closes_yesterday():
+    zone = timezone.get_default_timezone()
+    now = timezone.make_aware(datetime(2026, 11, 11, 15, 30), zone)
+    since, until = topic_services.question_window("昨天聊了什么", now=now)
+    assert since == timezone.make_aware(datetime(2026, 11, 10, 0, 0), zone)
+    assert until == timezone.make_aware(datetime(2026, 11, 11, 0, 0), zone)
 
 
 @pytest.mark.parametrize(

@@ -465,6 +465,23 @@ function scopeCounts(turn) {
   }
 }
 
+function rangeBounds() {
+  const now = new Date()
+  if (range.value === 'today') {
+    const start = new Date(now)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 1)
+    return { since: start.toISOString(), until: end.toISOString() }
+  }
+  if (range.value === 'week') {
+    return {
+      since: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      until: now.toISOString()
+    }
+  }
+  return {}
+}
 function startOfToday() {
   const date = new Date()
   date.setHours(0, 0, 0, 0)
@@ -522,7 +539,7 @@ async function ask(text) {
   pendingQuestion.value = value
   question.value = ''
   try {
-    const payload = { question: value }
+    const payload = { question: value, ...rangeBounds() }
     if (continuing) payload.thread_id = continuing
     let answer = unwrap(await spacesApi.askQuestion(props.spaceId, payload))
     if (answer.status === 'queued') answer = await waitForAnswer(answer.id)

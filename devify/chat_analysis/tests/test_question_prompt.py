@@ -12,6 +12,8 @@ def test_question_prompt_requires_a_readable_answer():
     assert "Do not use tables or code fences." in QUESTION_PROMPT
     assert "Do not repeat the citations as another list." in QUESTION_PROMPT
     assert "Do not use circled numbers" in QUESTION_PROMPT
+    assert "related material exists" in QUESTION_PROMPT
+    assert "Do not describe it." in QUESTION_PROMPT
 
 
 def test_format_question_answer_splits_circled_numbers():

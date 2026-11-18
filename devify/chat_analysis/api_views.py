@@ -1007,22 +1007,27 @@ class SpaceQuestionAPIView(APIView):
             return Response(
                 {"detail": "Question thread not found."}, status=404
             )
+        scope = {
+            key: serializer.validated_data[key]
+            for key in (
+                "event_ids",
+                "note_ids",
+                "conversation_ids",
+                "tag_keys",
+                "keywords",
+            )
+            if serializer.validated_data.get(key)
+        }
+        for key in ("since", "until"):
+            bound = serializer.validated_data.get(key)
+            if bound:
+                scope[key] = bound.isoformat()
         question = QuestionAnswer.objects.create(
             space=space,
             created_by=request.user,
             question=serializer.validated_data["question"],
             thread=thread,
-            scope={
-                key: serializer.validated_data[key]
-                for key in (
-                    "event_ids",
-                    "note_ids",
-                    "conversation_ids",
-                    "tag_keys",
-                    "keywords",
-                )
-                if serializer.validated_data.get(key)
-            },
+            scope=scope,
         )
         transaction.on_commit(lambda: dispatch_question_answer(question))
         if takeover:

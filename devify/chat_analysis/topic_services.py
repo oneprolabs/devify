@@ -2,13 +2,20 @@
 
 import json
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from chat_analysis.models import Event, Note
+from chat_analysis.models import (
+    Event,
+    EventEvidence,
+    EventNote,
+    Note,
+    NoteEvidence,
+)
 from chat_domain.models import Conversation, Message
 from core.tracking import LLMTracker
 from spaces.services import SpacePermissionService
@@ -19,9 +26,12 @@ Use only the supplied records. If the records do not establish an answer, say
 so clearly; do not invent people, dates, decisions, or commitments.
 Records were preselected from conversations or time windows named in the
 question; records.scope describes that selection.
-If prior_turns is present, this question continues that conversation.
-Use those turns as context and do not repeat them. New facts still have
-to come from the records.
+State facts only from records.events, records.notes, and records.messages.
+If prior_turns is present, use them only to understand the question.
+Do not copy facts from them when those facts are not in the records.
+If records.related.other_conversations or records.related.outside_time
+is greater than zero, add one short sentence that related material exists
+outside the requested conversation or time. Do not describe it.
 Write the answer in the same language as the question, using Markdown.
 Start with one short sentence.
 When there are several matters, make each a Markdown section:
@@ -58,7 +68,9 @@ RECENT_DAYS = re.compile(
 RECENT_WEEK = re.compile(RECENT_PREFIX + r"\s*(?:一|1)?\s*(?:个)?(?:周|星期)")
 RECENT_MONTH = re.compile(RECENT_PREFIX + r"\s*(?:一|1)?\s*个?月")
 THIS_WEEK = re.compile(r"本周|这周|这一周|这个星期|本星期")
+LAST_WEEK = re.compile(r"上周|上星期|上一周")
 THIS_MONTH = re.compile(r"本月|这个月")
+LAST_MONTH = re.compile(r"上个月|上月")
 TODAY = re.compile(r"今天|今日")
 YESTERDAY = re.compile(r"昨天|昨日")
 _CIRCLED_NUMBERS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
@@ -135,16 +147,22 @@ def conversations_named_in(space, question):
         .exclude(title="")
         .values_list("id", "title")
     )
-    return {
-        pk
+    matches = [
+        (pk, _match_key(title))
         for pk, title in titles
         if len(_match_key(title)) >= MIN_TITLE_MATCH_CHARS
         and _match_key(title) in needle
+    ]
+    keys = [key for _, key in matches]
+    return {
+        pk
+        for pk, key in matches
+        if not any(key != other and key in other for other in keys)
     }
 
 
-def question_since(question, now=None):
-    """Return the start of a time window named in the question, if any."""
+def question_window(question, now=None):
+    """Return the closed time window named in the question, if any."""
     text = question or ""
     now = timezone.localtime(now or timezone.now())
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -152,20 +170,38 @@ def question_since(question, now=None):
     if days:
         value = days.group(1)
         count = int(value) if value.isdigit() else CHINESE_NUMBERS[value]
-        return now - timedelta(days=count)
+        return now - timedelta(days=count), now
     if TODAY.search(text):
-        return today
+        return today, today + timedelta(days=1)
     if YESTERDAY.search(text):
-        return today - timedelta(days=1)
+        return today - timedelta(days=1), today
+    if LAST_WEEK.search(text):
+        this_week = today - timedelta(days=today.weekday())
+        return this_week - timedelta(days=7), this_week
     if THIS_WEEK.search(text):
-        return today - timedelta(days=today.weekday())
+        start = today - timedelta(days=today.weekday())
+        return start, start + timedelta(days=7)
     if RECENT_WEEK.search(text):
-        return now - timedelta(days=7)
+        return now - timedelta(days=7), now
+    if LAST_MONTH.search(text):
+        this_month = today.replace(day=1)
+        previous = (this_month - timedelta(days=1)).replace(day=1)
+        return previous, this_month
     if THIS_MONTH.search(text):
-        return today.replace(day=1)
+        start = today.replace(day=1)
+        if start.month == 12:
+            end = start.replace(year=start.year + 1, month=1)
+        else:
+            end = start.replace(month=start.month + 1)
+        return start, end
     if RECENT_MONTH.search(text):
-        return now - timedelta(days=30)
-    return None
+        return now - timedelta(days=30), now
+    return None, None
+
+
+def question_since(question, now=None):
+    """Return the start of a time window named in the question, if any."""
+    return question_window(question, now=now)[0]
 
 
 def _context_limits():
@@ -207,6 +243,136 @@ def _fill_budget(values, budget, item_chars):
     return selected, used, truncated
 
 
+def _bound(value):
+    if not value:
+        return None
+    if isinstance(value, str):
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    else:
+        parsed = value
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(
+            parsed, timezone.get_current_timezone()
+        )
+    return parsed
+
+
+def _intersect_window(left_since, left_until, right_since, right_until):
+    sinces = [item for item in (left_since, right_since) if item]
+    untils = [item for item in (left_until, right_until) if item]
+    since = max(sinces) if sinces else None
+    until = min(untils) if untils else None
+    empty = bool(since and until and since >= until)
+    return since, until, empty
+
+
+def _conversation_boundary(events, notes, conversation_ids):
+    """Keep records that stay inside the named conversations."""
+    if not conversation_ids:
+        return events, notes, 0
+    note_in = NoteEvidence.objects.filter(
+        note_id=OuterRef("pk"),
+        message__conversation_id__in=conversation_ids,
+    )
+    note_out = NoteEvidence.objects.filter(note_id=OuterRef("pk")).exclude(
+        message__conversation_id__in=conversation_ids
+    )
+    notes = notes.annotate(
+        _note_in=Exists(note_in), _note_out=Exists(note_out)
+    )
+    related = notes.filter(_note_in=True, _note_out=True).count()
+    notes = notes.filter(_note_in=True, _note_out=False)
+    evidence_in = EventEvidence.objects.filter(
+        event_id=OuterRef("pk"),
+        message__conversation_id__in=conversation_ids,
+    )
+    evidence_out = EventEvidence.objects.filter(
+        event_id=OuterRef("pk")
+    ).exclude(message__conversation_id__in=conversation_ids)
+    link_in = EventNote.objects.filter(
+        event_id=OuterRef("pk"),
+        note__evidence__message__conversation_id__in=conversation_ids,
+    )
+    link_out = EventNote.objects.filter(
+        event_id=OuterRef("pk"),
+        note__evidence__message__isnull=False,
+    ).exclude(
+        note__evidence__message__conversation_id__in=conversation_ids
+    )
+    events = events.annotate(
+        _ev_in=Exists(evidence_in),
+        _ev_out=Exists(evidence_out),
+        _link_in=Exists(link_in),
+        _link_out=Exists(link_out),
+    )
+    related += events.filter(
+        Q(_ev_in=True) | Q(_link_in=True),
+        Q(_ev_out=True) | Q(_link_out=True),
+    ).count()
+    events = events.filter(
+        Q(_ev_in=True) | Q(_link_in=True),
+        _ev_out=False,
+        _link_out=False,
+    )
+    return events, notes, related
+
+
+def _time_boundary(events, notes, since, until):
+    """Keep records whose whole span sits inside the time window."""
+    if not since and not until:
+        return events, notes, 0
+    notes = notes.annotate(
+        _span_start=Coalesce("start_at", "created_at"),
+        _span_end=Coalesce("end_at", "start_at", "created_at"),
+    )
+    overlap = notes
+    inside = notes
+    if since:
+        overlap = overlap.filter(_span_end__gte=since)
+        inside = inside.filter(_span_start__gte=since)
+    if until:
+        overlap = overlap.filter(_span_start__lt=until)
+        inside = inside.filter(_span_end__lt=until)
+    related = overlap.exclude(pk__in=inside.values("pk")).count()
+    outside = Q()
+    if since:
+        outside |= Q(message__occurred_at__lt=since)
+    if until:
+        outside |= Q(message__occurred_at__gte=until)
+    events = events.annotate(
+        _activity=Coalesce("last_activity_at", "created_at")
+    )
+    if since:
+        events = events.filter(_activity__gte=since)
+    if until:
+        events = events.filter(_activity__lt=until)
+    if outside:
+        spill = EventEvidence.objects.filter(
+            event_id=OuterRef("pk")
+        ).filter(outside)
+        events = events.annotate(_spill=Exists(spill))
+        related += events.filter(_spill=True).count()
+        events = events.filter(_spill=False)
+    return events, inside, related
+
+
+def _empty_context(since, until):
+    return {
+        "events": [],
+        "notes": [],
+        "messages": [],
+        "related": {"other_conversations": 0, "outside_time": 1},
+        "scope": {
+            "event_ids": [],
+            "note_ids": [],
+            "conversation_ids": [],
+            "since": since.isoformat() if since else None,
+            "until": until.isoformat() if until else None,
+            "context_truncated": False,
+        },
+    }
+
+
 def question_context(
     *,
     space,
@@ -216,17 +382,18 @@ def question_context(
     tag_keys=None,
     keywords=None,
     since=None,
+    until=None,
+    empty_window=False,
 ):
+    since = _bound(since)
+    until = _bound(until)
+    if empty_window:
+        return _empty_context(since, until)
     event_ids = _ids(event_ids)
     note_ids = _ids(note_ids)
     conversation_ids = _ids(conversation_ids)
     events = Event.objects.filter(space=space)
     notes = Note.objects.filter(space=space)
-    if conversation_ids:
-        notes = notes.filter(
-            evidence__message__conversation_id__in=conversation_ids
-        ).distinct()
-        events = events.filter(note_links__note__in=notes).distinct()
     if note_ids:
         notes = notes.filter(id__in=note_ids)
         events = events.filter(note_links__note__in=notes).distinct()
@@ -249,20 +416,14 @@ def question_context(
             )
         events = events.filter(event_query)
         notes = notes.filter(note_query)
-    if since:
-        events = events.filter(
-            Q(last_activity_at__gte=since)
-            | Q(last_activity_at__isnull=True, created_at__gte=since)
-        )
-        notes = notes.filter(
-            Q(end_at__gte=since)
-            | Q(end_at__isnull=True, start_at__gte=since)
-            | Q(
-                end_at__isnull=True,
-                start_at__isnull=True,
-                created_at__gte=since,
-            )
-        )
+    events, notes, other_conversations = _conversation_boundary(
+        events, notes, conversation_ids
+    )
+    events, notes, outside_time = _time_boundary(events, notes, since, until)
+    related = {
+        "other_conversations": other_conversations,
+        "outside_time": outside_time,
+    }
     # Order before slicing so filtered questions also keep the newest rows.
     events = events.order_by("-last_activity_at", "-id")
     notes = notes.order_by("-start_at", "-id")
@@ -308,6 +469,8 @@ def question_context(
         ).distinct()
     if since:
         messages = messages.filter(occurred_at__gte=since)
+    if until:
+        messages = messages.filter(occurred_at__lt=until)
     message_rows = list(messages.order_by("-occurred_at", "-id")[:101])
     rows_truncated = rows_truncated or len(message_rows) > 100
     message_rows = message_rows[:100]
@@ -343,6 +506,7 @@ def question_context(
         "events": selected_events,
         "notes": selected_notes,
         "messages": selected_messages,
+        "related": related,
         "scope": {
             "event_ids": sorted(allowed_event_ids),
             "note_ids": sorted(allowed_note_ids),
@@ -351,6 +515,7 @@ def question_context(
                 | conversation_ids
             ),
             "since": since.isoformat() if since else None,
+            "until": until.isoformat() if until else None,
             "context_truncated": rows_truncated
             or notes_truncated
             or events_truncated
@@ -369,12 +534,18 @@ def answer_question(
     conversation_ids=None,
     tag_keys=None,
     keywords=None,
+    since=None,
+    until=None,
     prior_turns=None,
 ):
     if not SpacePermissionService.can_read(actor, space):
         raise PermissionError("Space is not visible to this user.")
     if not event_ids and not note_ids and not conversation_ids:
         conversation_ids = conversations_named_in(space, question)
+    text_since, text_until = question_window(question)
+    since, until, empty_window = _intersect_window(
+        _bound(since), _bound(until), text_since, text_until
+    )
     context = question_context(
         space=space,
         event_ids=event_ids,
@@ -382,7 +553,9 @@ def answer_question(
         conversation_ids=conversation_ids,
         tag_keys=tag_keys,
         keywords=keywords,
-        since=question_since(question),
+        since=since,
+        until=until,
+        empty_window=empty_window,
     )
     payload = {"question": question, "records": context}
     if prior_turns:

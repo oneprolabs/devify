@@ -496,6 +496,8 @@ class QuestionCreateSerializer(serializers.Serializer):
         default=list,
     )
     thread_id = serializers.IntegerField(required=False, min_value=1)
+    since = serializers.DateTimeField(required=False)
+    until = serializers.DateTimeField(required=False)
 
     def validate_question(self, value):
         value = value.strip()

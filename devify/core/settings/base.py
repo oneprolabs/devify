@@ -60,6 +60,9 @@ SECRET_KEY = os.getenv(
 CHAT_ANALYSIS_MODEL_INPUT_TOKENS = int(
     os.getenv("CHAT_ANALYSIS_MODEL_INPUT_TOKENS", "12000")
 )
+CHAT_ANALYSIS_MODEL_UUID = (
+    os.getenv("CHAT_ANALYSIS_MODEL_UUID", "").strip() or None
+)
 CHAT_ANALYSIS_LLM_ENABLED = os.getenv(
     "CHAT_ANALYSIS_LLM_ENABLED", "false"
 ).lower() in {"1", "true", "yes"}

@@ -495,6 +495,7 @@ class QuestionCreateSerializer(serializers.Serializer):
         allow_empty=True,
         default=list,
     )
+    thread_id = serializers.IntegerField(required=False, min_value=1)
 
     def validate_question(self, value):
         value = value.strip()
@@ -504,6 +505,8 @@ class QuestionCreateSerializer(serializers.Serializer):
 
 
 class QuestionAnswerSerializer(serializers.ModelSerializer):
+    thread_id = serializers.IntegerField(read_only=True, allow_null=True)
+
     class Meta:
         model = QuestionAnswer
         fields = (
@@ -518,6 +521,7 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
             "usage",
             "status",
             "error",
+            "thread_id",
             "created_at",
             "updated_at",
         )

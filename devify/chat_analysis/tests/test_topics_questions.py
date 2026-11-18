@@ -20,6 +20,7 @@ from chat_analysis.models import (
 from chat_analysis.question_tasks import (
     MODEL_FAILURE_MESSAGE,
     answer_question_task,
+    prior_question_turns,
 )
 from chat_analysis.topic_services import answer_question, question_context
 from chat_domain.models import Conversation, Message, MessagePart
@@ -111,6 +112,103 @@ def test_question_is_queued_and_scoped(on_commit, dispatch):
     assert response.data["data"]["status"] == "queued"
     dispatch.assert_called_once()
     assert response.data["data"]["scope"] == {"tag_keys": ["risk"]}
+    assert response.data["data"]["thread_id"] is None
+
+
+@patch("chat_analysis.api_views.dispatch_question_answer")
+@patch(
+    "chat_analysis.api_views.transaction.on_commit",
+    side_effect=lambda callback: callback(),
+)
+def test_follow_up_stays_on_the_open_thread(on_commit, dispatch):
+    owner = User.objects.create_user(username="question-thread")
+    other = User.objects.create_user(username="question-thread-other")
+    space = make_space(owner, "question-thread")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    first = client.post(
+        f"/api/v1/spaces/{space.pk}/questions",
+        {"question": "这周有什么问题"},
+        format="json",
+    ).data["data"]
+    second = client.post(
+        f"/api/v1/spaces/{space.pk}/questions",
+        {"question": "那登录呢", "thread_id": first["id"]},
+        format="json",
+    )
+    assert second.status_code == 202
+    assert second.data["data"]["thread_id"] == first["id"]
+    third = client.post(
+        f"/api/v1/spaces/{space.pk}/questions",
+        {"question": "再说具体一点", "thread_id": second.data["data"]["id"]},
+        format="json",
+    )
+    assert third.data["data"]["thread_id"] == first["id"]
+    listed = client.get(f"/api/v1/spaces/{space.pk}/questions").data["data"]
+    assert [item["id"] for item in listed if not item["thread_id"]] == [
+        first["id"]
+    ]
+    outsider = APIClient()
+    outsider.force_authenticate(user=other)
+    SpaceMembership.objects.create(
+        space=space,
+        user=other,
+        role=SpaceMembership.Role.USER,
+        status=SpaceMembership.Status.ACTIVE,
+    )
+    rejected = outsider.post(
+        f"/api/v1/spaces/{space.pk}/questions",
+        {"question": "别人的会话", "thread_id": first["id"]},
+        format="json",
+    )
+    assert rejected.status_code == 404
+
+
+def test_prior_turns_include_ready_answers_in_the_same_thread():
+    owner = User.objects.create_user(username="question-prior-rows")
+    space = make_space(owner, "question-prior-rows")
+    root = QuestionAnswer.objects.create(
+        space=space,
+        created_by=owner,
+        question="这周有什么问题",
+        answer="登录打不开。",
+        status=QuestionAnswer.Status.READY,
+    )
+    follow = QuestionAnswer.objects.create(
+        space=space,
+        created_by=owner,
+        question="那登录呢",
+        thread=root,
+        status=QuestionAnswer.Status.QUEUED,
+    )
+    assert prior_question_turns(follow) == [
+        {"question": "这周有什么问题", "answer": "登录打不开。"}
+    ]
+
+
+def test_answer_question_passes_prior_turns(monkeypatch):
+    owner = User.objects.create_user(username="question-prior")
+    space = make_space(owner, "question-prior")
+    captured = {}
+
+    def fake_call(**kwargs):
+        captured["content"] = kwargs["content"]
+        return {"answer": "继续说登录。", "citations": []}, {"model": "test"}
+
+    monkeypatch.setattr(
+        "chat_analysis.topic_services.LLMTracker.call_and_track",
+        fake_call,
+    )
+    answer_question(
+        actor=owner,
+        space=space,
+        question="那登录呢",
+        prior_turns=[{"question": "这周有什么问题", "answer": "登录打不开。"}],
+    )
+    payload = json.loads(captured["content"])
+    assert payload["prior_turns"] == [
+        {"question": "这周有什么问题", "answer": "登录打不开。"}
+    ]
 
 
 def test_question_requires_question_text():

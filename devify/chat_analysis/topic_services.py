@@ -19,6 +19,18 @@ Use only the supplied records. If the records do not establish an answer, say
 so clearly; do not invent people, dates, decisions, or commitments.
 Records were preselected from conversations or time windows named in the
 question; records.scope describes that selection.
+If prior_turns is present, this question continues that conversation.
+Use those turns as context and do not repeat them. New facts still have
+to come from the records.
+Write the answer in the same language as the question, using Markdown.
+Start with one short sentence.
+When there are several matters, make each a Markdown section:
+a blank line, then a "## " heading, then "- " bullets for the details.
+Put a blank line between sections.
+Do not use circled numbers such as ①②③, and do not use 一、二、三 as
+the only structure.
+Do not use tables or code fences.
+Do not repeat the citations as another list.
 Return JSON with exactly: answer (string), citations (array of objects with
 kind, id, title, and excerpt). Cite only supplied event, note, or message IDs.
 """
@@ -49,6 +61,46 @@ THIS_WEEK = re.compile(r"本周|这周|这一周|这个星期|本星期")
 THIS_MONTH = re.compile(r"本月|这个月")
 TODAY = re.compile(r"今天|今日")
 YESTERDAY = re.compile(r"昨天|昨日")
+_CIRCLED_NUMBERS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
+_NUMBERED_ITEM = re.compile(r"^\d{1,2}[.、．]\s")
+_CN_SECTION = re.compile(r"^[一二三四五六七八九十]、\s*(.+)$")
+
+
+def format_question_answer(answer):
+    """Split inline enumerations into separate lines.
+
+    Models often write ①②③ or "1. 2. 3." inside one paragraph. The clients
+    only start a new block at a line break, so those answers render as one
+    lump until the markers are put on their own lines.
+    """
+    text = (answer or "").replace("\r\n", "\n").replace("\r", "\n")
+    for index, mark in enumerate(_CIRCLED_NUMBERS, start=1):
+        text = text.replace(mark, f"\n{index}. ")
+    text = re.sub(r"[ \t]+(?=\d{1,2}[.、．]\s)", "\n", text)
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
+    formatted = []
+    seen_item = False
+    for line in lines:
+        section = _CN_SECTION.match(line)
+        if section:
+            title, _, rest = section.group(1).partition(" - ")
+            if formatted and formatted[-1] != "":
+                formatted.append("")
+            seen_item = True
+            formatted.append(f"## {title.strip()}")
+            details = [
+                part.strip() for part in rest.split(" - ") if part.strip()
+            ]
+            if details:
+                formatted.append("")
+                formatted.extend(f"- {part}" for part in details)
+            continue
+        item = _NUMBERED_ITEM.match(line) is not None
+        if item and formatted and not seen_item:
+            formatted.append("")
+        seen_item = seen_item or item
+        formatted.append(line)
+    return "\n".join(formatted).strip()
 
 
 # Character budget for the records sent to the question model. Auto-generated
@@ -317,6 +369,7 @@ def answer_question(
     conversation_ids=None,
     tag_keys=None,
     keywords=None,
+    prior_turns=None,
 ):
     if not SpacePermissionService.can_read(actor, space):
         raise PermissionError("Space is not visible to this user.")
@@ -331,10 +384,13 @@ def answer_question(
         keywords=keywords,
         since=question_since(question),
     )
+    payload = {"question": question, "records": context}
+    if prior_turns:
+        payload["prior_turns"] = prior_turns
     output, usage = LLMTracker.call_and_track(
         prompt=QUESTION_PROMPT,
         content=json.dumps(
-            {"question": question, "records": context},
+            payload,
             ensure_ascii=False,
             sort_keys=True,
         ),
@@ -390,7 +446,7 @@ def answer_question(
             )
     return {
         "question": question,
-        "answer": output["answer"].strip(),
+        "answer": format_question_answer(output["answer"]),
         "citations": normalized_citations,
         "scope": context["scope"],
         "usage": (

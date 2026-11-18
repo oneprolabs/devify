@@ -3,6 +3,7 @@
 import logging
 
 from celery import shared_task
+from django.db.models import Q
 
 from chat_analysis.models import QuestionAnswer
 from chat_analysis.topic_services import answer_question
@@ -19,6 +20,31 @@ def _failure_message(error):
     return str(error)[:2000]
 
 
+def prior_question_turns(question, limit=6):
+    """Earlier ready answers in the same thread, oldest first."""
+    root_id = question.thread_id or question.pk
+    rows = (
+        QuestionAnswer.objects.filter(
+            space_id=question.space_id,
+            created_by_id=question.created_by_id,
+        )
+        .filter(Q(pk=root_id) | Q(thread_id=root_id))
+        .exclude(pk=question.pk)
+        .order_by("created_at", "id")
+    )
+    turns = []
+    for item in rows:
+        if (
+            item.status != QuestionAnswer.Status.READY
+            or not item.answer.strip()
+        ):
+            continue
+        turns.append(
+            {"question": item.question, "answer": item.answer[:1200]}
+        )
+    return turns[-limit:]
+
+
 @shared_task(bind=True, max_retries=0)
 def answer_question_task(self, question_id):
     question = QuestionAnswer.objects.select_related(
@@ -31,6 +57,7 @@ def answer_question_task(self, question_id):
             actor=question.created_by,
             space=question.space,
             question=question.question,
+            prior_turns=prior_question_turns(question),
             **question.scope,
         )
     except Exception as error:

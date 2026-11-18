@@ -964,6 +964,20 @@ class SpaceQuestionAPIView(APIView):
     def _space(self, request, space_id):
         return _authorized_space(request.user, space_id)
 
+    def _thread(self, request, space, thread_id):
+        if not thread_id:
+            return None
+        anchor = (
+            QuestionAnswer.objects.filter(
+                pk=thread_id, space=space, created_by=request.user
+            )
+            .select_related("thread")
+            .first()
+        )
+        if anchor is None:
+            return False
+        return anchor.thread or anchor
+
     def get(self, request, space_id):
         space, _ = self._space(request, space_id)
         if space is None:
@@ -984,10 +998,20 @@ class SpaceQuestionAPIView(APIView):
             return Response({"detail": quota_error}, status=429)
         serializer = QuestionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        thread = self._thread(
+            request,
+            space,
+            serializer.validated_data.get("thread_id"),
+        )
+        if thread is False:
+            return Response(
+                {"detail": "Question thread not found."}, status=404
+            )
         question = QuestionAnswer.objects.create(
             space=space,
             created_by=request.user,
             question=serializer.validated_data["question"],
+            thread=thread,
             scope={
                 key: serializer.validated_data[key]
                 for key in (

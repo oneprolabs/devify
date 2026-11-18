@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from relay.models import RelayDelivery, RelaySubscription
+from threadline.models import EmailMessage
 from threadline.utils.issues.merge_policy import is_retry_trigger_source
 
 NEW = "new"
@@ -63,16 +64,22 @@ def _walk_email_cluster(email_message) -> list:
 
 
 def _latest_successful_delivery(subscription, email_message):
-    email_message_id = _email_message_id(email_message)
-    if email_message_id is None:
+    cluster_ids = [
+        _email_message_id(message)
+        for message in _walk_email_cluster(email_message)
+        if _email_message_id(message) is not None
+    ]
+    if not cluster_ids:
         return None
 
     return (
         RelayDelivery.objects.select_related("event", "subscription")
         .filter(
             subscription=subscription,
+            target_type=subscription.target_type,
             status=RelayDelivery.Status.SUCCESS,
-            event__email_message_id=email_message_id,
+            event__user_id=subscription.user_id,
+            event__email_message_id__in=cluster_ids,
         )
         .exclude(external_id__isnull=True)
         .exclude(external_id="")
@@ -81,7 +88,9 @@ def _latest_successful_delivery(subscription, email_message):
     )
 
 
-def _collect_related_issue_references(subscription, email_message) -> list[dict]:
+def _collect_related_issue_references(
+    subscription, email_message
+) -> list[dict]:
     cluster = _walk_email_cluster(email_message)
     if not cluster:
         return []
@@ -115,7 +124,9 @@ def _collect_related_issue_references(subscription, email_message) -> list[dict]
         if not external_id:
             continue
         metadata = delivery.metadata or {}
-        provider = str(metadata.get("provider") or delivery.target_type or "").strip()
+        provider = str(
+            metadata.get("provider") or delivery.target_type or ""
+        ).strip()
         github_repo = str(metadata.get("github_repo") or "").strip()
         identity = (provider.casefold(), github_repo.casefold(), external_id)
         if identity in seen_references:
@@ -131,12 +142,17 @@ def _collect_related_issue_references(subscription, email_message) -> list[dict]
     return related_issue_references
 
 
-def _has_merge_context(email_message) -> bool:
+def _has_manual_merge_context(email_message) -> bool:
     if not email_message:
         return False
+    manual_reason = EmailMessage.MergeReason.MANUAL.value
+    if getattr(email_message, "merge_reason", "") == manual_reason:
+        return True
     merged_children = getattr(email_message, "merged_children", None)
-    has_children = bool(merged_children and merged_children.exists())
-    return bool(getattr(email_message, "merged_into_id", None) or has_children)
+    return bool(
+        merged_children
+        and merged_children.filter(merge_reason=manual_reason).exists()
+    )
 
 
 def supports_linking(target_type: str) -> bool:
@@ -179,7 +195,9 @@ def resolve_delivery_plan(subscription, event, delivery) -> Dict[str, Any]:
         if reference_delivery
         else {}
     )
-    reference_github_repo = str(reference_metadata.get("github_repo") or "").strip()
+    reference_github_repo = str(
+        reference_metadata.get("github_repo") or ""
+    ).strip()
     reference_provider = str(
         reference_metadata.get("provider")
         or getattr(reference_delivery, "target_type", "")
@@ -187,7 +205,9 @@ def resolve_delivery_plan(subscription, event, delivery) -> Dict[str, Any]:
     ).strip()
     delivery_metadata = getattr(delivery, "metadata", None) or {}
     delivery_provider = str(
-        delivery_metadata.get("provider") or getattr(delivery, "target_type", "") or ""
+        delivery_metadata.get("provider")
+        or getattr(delivery, "target_type", "")
+        or ""
     ).strip()
     reference_external_id = delivery.external_id or (
         reference_delivery.external_id if reference_delivery else ""
@@ -196,7 +216,10 @@ def resolve_delivery_plan(subscription, event, delivery) -> Dict[str, Any]:
         delivery_provider if delivery.external_id else reference_provider
     )
     target_provider = str(subscription.target_type or "").strip().casefold()
-    if external_id_provider and external_id_provider.casefold() != target_provider:
+    if (
+        external_id_provider
+        and external_id_provider.casefold() != target_provider
+    ):
         reference_external_id = ""
     collected_references = _collect_related_issue_references(
         subscription, event.email_message
@@ -204,30 +227,33 @@ def resolve_delivery_plan(subscription, event, delivery) -> Dict[str, Any]:
     related_issue_references = [
         reference
         for reference in collected_references
-        if str(reference.get("provider") or "").strip().casefold() == target_provider
+        if str(reference.get("provider") or "").strip().casefold()
+        == target_provider
     ]
     related_issue_keys = list(
         dict.fromkeys(
             reference["external_id"] for reference in related_issue_references
         )
     )
-    has_merge_context = _has_merge_context(event.email_message)
+    has_manual_merge_context = _has_manual_merge_context(event.email_message)
     linking_supported = supports_linking(subscription.target_type)
     artifact_snapshot = getattr(event, "artifact_snapshot", None) or {}
     trigger_source = artifact_snapshot.get("trigger_source") or ""
     is_retry = bool(
-        (getattr(delivery, "metadata", None) or {}).get("relay_retry_requested")
+        (getattr(delivery, "metadata", None) or {}).get(
+            "relay_retry_requested"
+        )
         or is_retry_trigger_source(trigger_source)
     )
 
     if explicit_action in SUPPORTED_ACTIONS:
         action = explicit_action
         source = "explicit"
-    elif is_retry and reference_external_id and retry_action == UPDATE:
-        action = UPDATE
+    elif is_retry:
+        action = retry_action
         source = "retry"
-    elif has_merge_context and manual_strategy == "linked" and related_issue_keys:
-        action = NEW_AND_LINK
+    elif has_manual_merge_context:
+        action = NEW_AND_LINK if manual_strategy == "linked" else NEW
         source = "manual_merge"
     elif reference_external_id and auto_action == UPDATE:
         action = UPDATE
@@ -248,7 +274,9 @@ def resolve_delivery_plan(subscription, event, delivery) -> Dict[str, Any]:
         "action": action,
         "source": source,
         "reference_external_id": reference_external_id,
-        "reference_delivery_id": reference_delivery.id if reference_delivery else None,
+        "reference_delivery_id": (
+            reference_delivery.id if reference_delivery else None
+        ),
         "reference_github_repo": reference_github_repo,
         "reference_provider": reference_provider,
         "related_issue_keys": related_issue_keys,

@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from relay.models import RelaySubscription
-from relay.services.delivery_strategy import resolve_delivery_plan, supports_linking
+from relay.services.delivery_strategy import (
+    resolve_delivery_plan,
+    supports_linking,
+)
 
 
 def _make_subscription(
@@ -19,7 +24,9 @@ def _make_subscription(
     )
 
 
-def _make_event(*, merged_into_id=None, trigger_source="workflow") -> SimpleNamespace:
+def _make_event(
+    *, merged_into_id=None, trigger_source="workflow"
+) -> SimpleNamespace:
     return SimpleNamespace(
         email_message=SimpleNamespace(
             id=101,
@@ -69,7 +76,7 @@ def test_auto_merge_strategy_update_resolves_to_update(monkeypatch):
         lambda subscription, email_message: [],
     )
     monkeypatch.setattr(
-        "relay.services.delivery_strategy._has_merge_context",
+        "relay.services.delivery_strategy._has_manual_merge_context",
         lambda email_message: False,
     )
 
@@ -109,7 +116,7 @@ def test_manual_merge_strategy_linked_resolves_to_new_and_link(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        "relay.services.delivery_strategy._has_merge_context",
+        "relay.services.delivery_strategy._has_manual_merge_context",
         lambda email_message: True,
     )
 
@@ -142,7 +149,7 @@ def test_default_strategy_resolves_to_new(monkeypatch):
         lambda subscription, email_message: [],
     )
     monkeypatch.setattr(
-        "relay.services.delivery_strategy._has_merge_context",
+        "relay.services.delivery_strategy._has_manual_merge_context",
         lambda email_message: False,
     )
 
@@ -186,7 +193,7 @@ def test_provider_switch_excludes_incompatible_related_issues(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        "relay.services.delivery_strategy._has_merge_context",
+        "relay.services.delivery_strategy._has_manual_merge_context",
         lambda email_message: True,
     )
 
@@ -224,7 +231,7 @@ def test_retry_strategy_update_resolves_to_update(monkeypatch):
         lambda subscription, email_message: [],
     )
     monkeypatch.setattr(
-        "relay.services.delivery_strategy._has_merge_context",
+        "relay.services.delivery_strategy._has_manual_merge_context",
         lambda email_message: False,
     )
 
@@ -234,3 +241,96 @@ def test_retry_strategy_update_resolves_to_update(monkeypatch):
     assert plan["source"] == "retry"
     assert plan["reference_external_id"] == "REQ-555"
     assert plan["related_issue_keys"] == []
+
+
+@pytest.mark.parametrize(
+    "target_type", ["jira", "feishu_bitable", "github_issue"]
+)
+@pytest.mark.parametrize("automatic_action", ["update", "new"])
+def test_automatic_merge_does_not_use_manual_strategy(
+    monkeypatch, target_type, automatic_action,
+):
+    subscription = _make_subscription(
+        target_type=target_type,
+        strategies={
+            "auto_merge_strategy": automatic_action,
+            "manual_merge_strategy": "linked",
+        },
+    )
+    event = _make_event(merged_into_id=100)
+    event.email_message.merge_reason = "text_similarity"
+    monkeypatch.setattr(
+        "relay.services.delivery_strategy._latest_successful_delivery",
+        lambda *args: SimpleNamespace(
+            id=7,
+            external_id="original-1",
+            target_type=target_type,
+            metadata={},
+        ),
+    )
+    monkeypatch.setattr(
+        "relay.services.delivery_strategy._collect_related_issue_references",
+        lambda *args: [{
+            "external_id": "original-1", "provider": target_type,
+            "github_repo": "",
+        }],
+    )
+
+    plan = resolve_delivery_plan(subscription, event, _make_delivery())
+
+    assert plan["action"] == automatic_action
+    assert plan["source"] != "manual_merge"
+
+
+@pytest.mark.parametrize("manual_action", ["linked", "unlinked"])
+def test_manual_merge_respects_its_strategy_when_auto_update_is_enabled(
+    monkeypatch, manual_action,
+):
+    subscription = _make_subscription(strategies={
+        "auto_merge_strategy": "update",
+        "manual_merge_strategy": manual_action,
+    })
+    event = _make_event(merged_into_id=100)
+    event.email_message.merge_reason = "manual"
+    monkeypatch.setattr(
+        "relay.services.delivery_strategy._latest_successful_delivery",
+        lambda *args: SimpleNamespace(
+            id=7, external_id="REQ-original", target_type="jira", metadata={},
+        ),
+    )
+    monkeypatch.setattr(
+        "relay.services.delivery_strategy._collect_related_issue_references",
+        lambda *args: [{
+            "external_id": "REQ-original", "provider": "jira",
+            "github_repo": "",
+        }],
+    )
+
+    plan = resolve_delivery_plan(subscription, event, _make_delivery())
+
+    assert plan["action"] == (
+        "new_and_link" if manual_action == "linked" else "new"
+    )
+    assert plan["source"] == "manual_merge"
+
+
+def test_explicit_retry_new_does_not_fall_through_to_auto_update(monkeypatch):
+    subscription = _make_subscription(strategies={
+        "auto_merge_strategy": "update", "retry_issue_strategy": "new",
+    })
+    event = _make_event(trigger_source="api_retry")
+    monkeypatch.setattr(
+        "relay.services.delivery_strategy._latest_successful_delivery",
+        lambda *args: SimpleNamespace(
+            id=7, external_id="REQ-original", target_type="jira", metadata={},
+        ),
+    )
+    monkeypatch.setattr(
+        "relay.services.delivery_strategy._collect_related_issue_references",
+        lambda *args: [],
+    )
+
+    plan = resolve_delivery_plan(subscription, event, _make_delivery())
+
+    assert plan["action"] == "new"
+    assert plan["source"] == "retry"

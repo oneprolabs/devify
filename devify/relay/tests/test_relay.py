@@ -1047,7 +1047,8 @@ def test_relay_dispatcher_creates_and_links_related_issues_for_jira(
     parent_email = EmailMessageFactory(user=user)
     child_email = EmailMessageFactory(user=user)
     child_email.merged_into = parent_email
-    child_email.save(update_fields=["merged_into"])
+    child_email.merge_reason = "manual"
+    child_email.save(update_fields=["merged_into", "merge_reason"])
 
     prior_event = RelayEvent.objects.create(
         user=user,
@@ -1143,7 +1144,8 @@ def test_relay_dispatcher_creates_and_partially_links_for_feishu(
     parent_email = EmailMessageFactory(user=user)
     child_email = EmailMessageFactory(user=user)
     child_email.merged_into = parent_email
-    child_email.save(update_fields=["merged_into"])
+    child_email.merge_reason = "manual"
+    child_email.save(update_fields=["merged_into", "merge_reason"])
 
     prior_event = RelayEvent.objects.create(
         user=user,

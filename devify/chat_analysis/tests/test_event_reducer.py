@@ -5,9 +5,12 @@ from django.contrib.auth.models import User
 
 from chat_analysis.services import add_note_evidence, create_note
 from chat_analysis.suggestions import create_event_suggestion
-from chat_analysis.tests.test_event_extraction import (add_message,
-                                                       make_conversation,
-                                                       make_job, make_space)
+from chat_analysis.tests.test_event_extraction import (
+    add_message,
+    make_conversation,
+    make_job,
+    make_space,
+)
 
 
 @pytest.fixture

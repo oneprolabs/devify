@@ -9,8 +9,13 @@ from django.utils import timezone
 
 from chat_analysis import execution
 from chat_analysis.keys import canonical_event_key
-from chat_analysis.models import (AnalysisJob, Event, EventEvidence, EventNote,
-                                  Note)
+from chat_analysis.models import (
+    AnalysisJob,
+    Event,
+    EventEvidence,
+    EventNote,
+    Note,
+)
 from chat_domain.models import Conversation, Message, MessagePart
 from spaces.models import Space, SpaceMembership
 

@@ -1,11 +1,19 @@
 from django.db import transaction
 from django.utils import timezone
 
-from chat_analysis.keys import (canonical_entity_key, canonical_event_key,
-                                entity_from_text)
-from chat_analysis.models import (Event, EventEvidence, EventNote,
-                                  EventSuggestion, EventTag,
-                                  EventTagAssignment)
+from chat_analysis.keys import (
+    canonical_entity_key,
+    canonical_event_key,
+    entity_from_text,
+)
+from chat_analysis.models import (
+    Event,
+    EventEvidence,
+    EventNote,
+    EventSuggestion,
+    EventTag,
+    EventTagAssignment,
+)
 from chat_analysis.services import ensure_can_contribute, refresh_event_window
 from chat_domain.models import Message
 

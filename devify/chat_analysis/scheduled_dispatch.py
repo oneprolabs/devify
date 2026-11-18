@@ -7,10 +7,17 @@ from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
-from chat_analysis.models import (AnalysisJob, AnalysisJobMessage,
-                                  NoteEvidence, ScheduledAnalysisRun)
-from chat_analysis.schedule_window import (DEFAULT_SCHEDULE, due_slot,
-                                           slot_boundary)
+from chat_analysis.models import (
+    AnalysisJob,
+    AnalysisJobMessage,
+    NoteEvidence,
+    ScheduledAnalysisRun,
+)
+from chat_analysis.schedule_window import (
+    DEFAULT_SCHEDULE,
+    due_slot,
+    slot_boundary,
+)
 from chat_analysis.services import create_analysis_job
 from chat_domain.models import Conversation, Message, MessageOrigin
 from chat_ingestion.models import UploadBatch

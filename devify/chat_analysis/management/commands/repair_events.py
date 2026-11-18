@@ -7,12 +7,18 @@ from itertools import combinations
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from chat_analysis.keys import (canonical_event_key, entity_from_text,
-                                slugify_key)
+from chat_analysis.keys import (
+    canonical_event_key,
+    entity_from_text,
+    slugify_key,
+)
 from chat_analysis.models import Event, EventEvidence, EventRelation
-from chat_analysis.services import (ChatAnalysisConflict,
-                                    merge_blocked_by_relation, merge_events,
-                                    refresh_event_window)
+from chat_analysis.services import (
+    ChatAnalysisConflict,
+    merge_blocked_by_relation,
+    merge_events,
+    refresh_event_window,
+)
 from chat_domain.models import Message
 from spaces.models import Space
 

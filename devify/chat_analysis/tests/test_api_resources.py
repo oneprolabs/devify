@@ -2,8 +2,13 @@ import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
-from chat_analysis.models import (Event, EventEvidence, EventNote,
-                                  EventRelation, Note)
+from chat_analysis.models import (
+    Event,
+    EventEvidence,
+    EventNote,
+    EventRelation,
+    Note,
+)
 from chat_domain.models import Conversation, Message, MessagePart
 from spaces.models import Space, SpaceMembership
 

@@ -5,12 +5,23 @@ from django.db.models import Q
 from django.utils import timezone
 
 from chat_analysis.keys import canonical_entity_key, canonical_event_key
-from chat_analysis.models import (AnalysisJob, Event, EventEvidence, EventNote,
-                                  EventRelation, EventSuggestion,
-                                  EventTagAssignment, Note, NoteEvidence,
-                                  QuestionAnswer, ReportItemSource)
-from spaces.models import (SpaceWorkflowConfig,
-                           effective_chat_analysis_preferences)
+from chat_analysis.models import (
+    AnalysisJob,
+    Event,
+    EventEvidence,
+    EventNote,
+    EventRelation,
+    EventSuggestion,
+    EventTagAssignment,
+    Note,
+    NoteEvidence,
+    QuestionAnswer,
+    ReportItemSource,
+)
+from spaces.models import (
+    SpaceWorkflowConfig,
+    effective_chat_analysis_preferences,
+)
 from spaces.services import SpacePermissionService
 
 

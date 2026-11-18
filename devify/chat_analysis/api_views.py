@@ -8,42 +8,63 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from chat_analysis.api_serializers import (EventCreateSerializer,
-                                           EventEvidenceSerializer,
-                                           EventNoteSerializer,
-                                           EventRelationCreateSerializer,
-                                           EventRelationSerializer,
-                                           EventSerializer,
-                                           EventTagAssignmentCreateSerializer,
-                                           EventTagAssignmentSerializer,
-                                           EventTagCreateSerializer,
-                                           EventTagSerializer,
-                                           EventUpdateSerializer,
-                                           EvidenceCreateSerializer,
-                                           NoteCreateSerializer,
-                                           NoteEvidenceSerializer,
-                                           NoteSerializer,
-                                           NoteUpdateSerializer,
-                                           QuestionAnswerSerializer,
-                                           QuestionCreateSerializer,
-                                           ReportSerializer,
-                                           TopicSubscriptionCreateSerializer,
-                                           TopicSubscriptionSerializer)
-from chat_analysis.models import (Event, EventNote, EventRelation, EventTag,
-                                  EventTagAssignment, Note, NoteEvidence,
-                                  QuestionAnswer, Report, TopicSubscription)
+from chat_analysis.api_serializers import (
+    EventCreateSerializer,
+    EventEvidenceSerializer,
+    EventNoteSerializer,
+    EventRelationCreateSerializer,
+    EventRelationSerializer,
+    EventSerializer,
+    EventTagAssignmentCreateSerializer,
+    EventTagAssignmentSerializer,
+    EventTagCreateSerializer,
+    EventTagSerializer,
+    EventUpdateSerializer,
+    EvidenceCreateSerializer,
+    NoteCreateSerializer,
+    NoteEvidenceSerializer,
+    NoteSerializer,
+    NoteUpdateSerializer,
+    QuestionAnswerSerializer,
+    QuestionCreateSerializer,
+    ReportSerializer,
+    TopicSubscriptionCreateSerializer,
+    TopicSubscriptionSerializer,
+)
+from chat_analysis.models import (
+    Event,
+    EventNote,
+    EventRelation,
+    EventTag,
+    EventTagAssignment,
+    Note,
+    NoteEvidence,
+    QuestionAnswer,
+    Report,
+    TopicSubscription,
+)
 from chat_analysis.question_tasks import dispatch_question_answer
 from chat_analysis.report_services import create_report_snapshot
 from chat_analysis.report_tasks import dispatch_report_generation
-from chat_analysis.services import (ChatAnalysisConflict, ChatAnalysisError,
-                                    ChatAnalysisPermissionError,
-                                    add_note_evidence, assign_note_events,
-                                    create_event, create_note, delete_event,
-                                    delete_note, upsert_event_relation)
+from chat_analysis.services import (
+    ChatAnalysisConflict,
+    ChatAnalysisError,
+    ChatAnalysisPermissionError,
+    add_note_evidence,
+    assign_note_events,
+    create_event,
+    create_note,
+    delete_event,
+    delete_note,
+    upsert_event_relation,
+)
 from chat_domain.models import Message, MessagePart
 from spaces.models import Space, SpaceTakeover
-from spaces.services import (SpacePermissionService, audit_space_action,
-                             check_daily_ai_quota)
+from spaces.services import (
+    SpacePermissionService,
+    audit_space_action,
+    check_daily_ai_quota,
+)
 
 
 class AnalysisPagination(PageNumberPagination):

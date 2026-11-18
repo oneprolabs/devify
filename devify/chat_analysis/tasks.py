@@ -4,8 +4,10 @@ import logging
 
 from celery import shared_task
 
-from chat_analysis.execution import (execute_analysis_job,
-                                     publish_ready_event_batches)
+from chat_analysis.execution import (
+    execute_analysis_job,
+    publish_ready_event_batches,
+)
 from chat_analysis.models import AnalysisJob
 from chat_analysis.task_status import sweep_stale_tasks
 from chat_analysis.topic_scheduler import run_due_topic_reports

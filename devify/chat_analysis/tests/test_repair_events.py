@@ -6,10 +6,18 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.utils import timezone
 
-from chat_analysis.models import (Event, EventEvidence, EventRelation,
-                                  EventTag, EventTagAssignment, QuestionAnswer,
-                                  Report, ReportItem, ReportItemSource,
-                                  ReportSection)
+from chat_analysis.models import (
+    Event,
+    EventEvidence,
+    EventRelation,
+    EventTag,
+    EventTagAssignment,
+    QuestionAnswer,
+    Report,
+    ReportItem,
+    ReportItemSource,
+    ReportSection,
+)
 from chat_analysis.services import merge_events
 
 from .test_event_identity import add_message, make_conversation, make_space

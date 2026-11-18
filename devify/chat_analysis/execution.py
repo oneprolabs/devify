@@ -25,18 +25,34 @@ from django.utils import timezone
 
 from chat_analysis.event_metadata import participant_metadata
 from chat_analysis.event_reducer import prepare_event_reduction
-from chat_analysis.keys import (canonical_event_key, entity_from_text,
-                                slugify_key)
-from chat_analysis.models import (AnalysisJob, AnalysisJobMessage, Event,
-                                  EventSuggestion, Note)
-from chat_analysis.services import (ChatAnalysisError,
-                                    ChatAnalysisPermissionError,
-                                    add_note_evidence, create_note,
-                                    refresh_event_window)
-from chat_analysis.suggestions import (create_event_suggestion,
-                                       review_event_suggestion)
-from chat_analysis.token_budget import (MessageExceedsBudget, request_budget,
-                                        take_message_window)
+from chat_analysis.keys import (
+    canonical_event_key,
+    entity_from_text,
+    slugify_key,
+)
+from chat_analysis.models import (
+    AnalysisJob,
+    AnalysisJobMessage,
+    Event,
+    EventSuggestion,
+    Note,
+)
+from chat_analysis.services import (
+    ChatAnalysisError,
+    ChatAnalysisPermissionError,
+    add_note_evidence,
+    create_note,
+    refresh_event_window,
+)
+from chat_analysis.suggestions import (
+    create_event_suggestion,
+    review_event_suggestion,
+)
+from chat_analysis.token_budget import (
+    MessageExceedsBudget,
+    request_budget,
+    take_message_window,
+)
 from chat_domain.models import Message, MessagePart
 from core.tracking import LLMTracker
 from spaces.models import Space, SpaceWorkflowConfig

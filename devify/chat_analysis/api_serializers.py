@@ -1,11 +1,21 @@
 from rest_framework import serializers
 
-from chat_analysis.models import (Event, EventEvidence, EventRelation,
-                                  EventSuggestion, EventTag,
-                                  EventTagAssignment, Note, NoteEvidence,
-                                  QuestionAnswer, Report, ReportItem,
-                                  ReportItemSource, ReportSection,
-                                  TopicSubscription)
+from chat_analysis.models import (
+    Event,
+    EventEvidence,
+    EventRelation,
+    EventSuggestion,
+    EventTag,
+    EventTagAssignment,
+    Note,
+    NoteEvidence,
+    QuestionAnswer,
+    Report,
+    ReportItem,
+    ReportItemSource,
+    ReportSection,
+    TopicSubscription,
+)
 from chat_domain.serializers import message_preview
 
 

@@ -1,23 +1,12 @@
 from django.db import transaction
 from django.utils import timezone
 
-from chat_analysis.keys import (
-    canonical_entity_key,
-    canonical_event_key,
-    entity_from_text,
-)
-from chat_analysis.models import (
-    Event,
-    EventEvidence,
-    EventNote,
-    EventSuggestion,
-    EventTag,
-    EventTagAssignment,
-)
-from chat_analysis.services import (
-    ensure_can_contribute,
-    refresh_event_window,
-)
+from chat_analysis.keys import (canonical_entity_key, canonical_event_key,
+                                entity_from_text)
+from chat_analysis.models import (Event, EventEvidence, EventNote,
+                                  EventSuggestion, EventTag,
+                                  EventTagAssignment)
+from chat_analysis.services import ensure_can_contribute, refresh_event_window
 from chat_domain.models import Message
 
 
@@ -128,7 +117,7 @@ def _advance_event_status(event, status, *, source_messages):
 
 @transaction.atomic
 def review_event_suggestion(
-    *, actor, suggestion, decision, source_messages=None
+    *, actor, suggestion, decision, source_messages=None, target_event_key=None
 ):
     ensure_can_contribute(actor, suggestion.space)
     suggestion = EventSuggestion.objects.select_for_update().get(
@@ -143,7 +132,7 @@ def review_event_suggestion(
         if source_messages is None:
             source_messages = _resolve_source_messages(suggestion)
         canonical_key = canonical_event_key(
-            suggestion.event_key, title=suggestion.title
+            target_event_key or suggestion.event_key, title=suggestion.title
         )
         event, created = Event.objects.get_or_create(
             space=suggestion.space,

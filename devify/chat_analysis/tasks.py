@@ -4,7 +4,9 @@ import logging
 
 from celery import shared_task
 
-from chat_analysis.execution import execute_analysis_job
+from chat_analysis.execution import (execute_analysis_job,
+                                     publish_ready_event_batches)
+from chat_analysis.models import AnalysisJob
 from chat_analysis.task_status import sweep_stale_tasks
 from chat_analysis.topic_scheduler import run_due_topic_reports
 
@@ -18,6 +20,11 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
     result = execute_analysis_job(job_id, worker_id=worker)
     if result is None:
         return {"job_id": job_id, "claimed": False}
+    if result.job.specification.get("boundary") and result.job.state in (
+        AnalysisJob.State.READY, AnalysisJob.State.PARTIAL,
+        AnalysisJob.State.FAILED,
+    ):
+        publish_ready_event_batches()
     return {
         "job_id": result.job.pk,
         "state": result.job.state,
@@ -46,7 +53,9 @@ def run_due_scheduled_analysis_task(self):
     """
     from chat_analysis.scheduled_dispatch import dispatch_due_analysis
 
-    return dispatch_due_analysis()
+    result = dispatch_due_analysis()
+    publish_ready_event_batches()
+    return result
 
 
 @shared_task(bind=True, max_retries=0)

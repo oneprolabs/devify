@@ -1,21 +1,12 @@
 from rest_framework import serializers
 
-from chat_analysis.models import (
-    Event,
-    EventEvidence,
-    EventRelation,
-    EventSuggestion,
-    EventTag,
-    EventTagAssignment,
-    Note,
-    NoteEvidence,
-    QuestionAnswer,
-    Report,
-    ReportItem,
-    ReportItemSource,
-    ReportSection,
-    TopicSubscription,
-)
+from chat_analysis.models import (Event, EventEvidence, EventRelation,
+                                  EventSuggestion, EventTag,
+                                  EventTagAssignment, Note, NoteEvidence,
+                                  QuestionAnswer, Report, ReportItem,
+                                  ReportItemSource, ReportSection,
+                                  TopicSubscription)
+from chat_domain.serializers import message_preview
 
 
 class NoteCreateSerializer(serializers.Serializer):
@@ -155,6 +146,7 @@ class EventSerializer(serializers.ModelSerializer):
 
 
 class EventEvidenceSerializer(serializers.ModelSerializer):
+    content = serializers.SerializerMethodField()
     conversation_id = serializers.IntegerField(
         source="message.conversation_id", read_only=True
     )
@@ -168,6 +160,9 @@ class EventEvidenceSerializer(serializers.ModelSerializer):
         source="message.ingest_seq", read_only=True
     )
 
+    def get_content(self, obj):
+        return message_preview(obj.message)
+
     class Meta:
         model = EventEvidence
         fields = (
@@ -178,6 +173,7 @@ class EventEvidenceSerializer(serializers.ModelSerializer):
             "sender_name",
             "occurred_at",
             "ingest_seq",
+            "content",
             "created_at",
         )
         read_only_fields = fields

@@ -97,18 +97,28 @@ describe('SpaceSettings', () => {
     expect(wrapper.text()).toContain('macOS')
     expect(wrapper.text()).toContain('在线')
     expect(wrapper.text()).toContain('已绑定设备')
-    expect(
-      wrapper.get('a[href*="devify-desktop-releases"]').attributes('href')
-    ).toBe(
+    const download = wrapper.get('[data-testid="desktop-download"]')
+    expect(download.text()).toContain('下载客户端')
+    expect(download.attributes('href')).toBe(
       'https://github.com/oneprolabs/devify-desktop-releases/releases/latest'
     )
+    expect(download.attributes('target')).toBe('_blank')
   })
 
   it('refreshes device presence while the settings page remains open', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     let wrapper
     try {
-      authApi.getDesktopDevices.mockResolvedValueOnce({ data: { data: [{ ...device, last_seen_at: new Date(Date.now() - 20 * 60 * 1000).toISOString() }] } })
+      authApi.getDesktopDevices.mockResolvedValueOnce({
+        data: {
+          data: [
+            {
+              ...device,
+              last_seen_at: new Date(Date.now() - 20 * 60 * 1000).toISOString()
+            }
+          ]
+        }
+      })
       wrapper = mountPage()
       await flushPromises()
       expect(wrapper.text()).toContain('离线')

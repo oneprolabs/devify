@@ -18,22 +18,28 @@
       <div class="ws-pgbody">
         <div class="ws-wrap">
           <section class="ws-sect">
-            <div class="sh">
-              <h2>
-                已绑定设备
-                <span v-if="devices.length" class="count">{{
-                  devices.length
-                }}</span>
-              </h2>
-              <p>
-                在客户端登录这个账号即自动绑定。
-                <a
-                  href="https://github.com/oneprolabs/devify-desktop-releases/releases/latest"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  >下载客户端（Mac M 系列芯片）</a
-                >
-              </p>
+            <div class="sh device-head">
+              <div>
+                <h2>
+                  已绑定设备
+                  <span v-if="devices.length" class="count">{{
+                    devices.length
+                  }}</span>
+                </h2>
+                <p>
+                  在客户端登录这个账号即自动绑定。卸载后仍可在这里重新下载。
+                </p>
+              </div>
+              <a
+                class="ws-btn primary download-client"
+                data-testid="desktop-download"
+                href="https://github.com/oneprolabs/devify-desktop-releases/releases/latest"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                下载客户端
+                <span>Mac M 系列芯片</span>
+              </a>
             </div>
             <div class="ws-listcard">
               <div v-if="loading && !devices.length" class="ws-state">
@@ -479,6 +485,26 @@ onUnmounted(() => window.clearInterval(deviceRefreshTimer))
   flex-direction: column;
   gap: 3px;
 }
+.device-head {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.download-client {
+  flex: none;
+  height: auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 13px;
+  line-height: 1.25;
+}
+.download-client span {
+  font-size: 10.5px;
+  font-weight: 400;
+  opacity: 0.82;
+}
 .sh h2 {
   display: flex;
   align-items: center;
@@ -597,6 +623,10 @@ onUnmounted(() => window.clearInterval(deviceRefreshTimer))
   font-size: 12px;
 }
 @media (max-width: 720px) {
+  .device-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
   .device-row {
     gap: 10px;
   }

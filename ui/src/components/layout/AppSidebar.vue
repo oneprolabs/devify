@@ -50,7 +50,10 @@
                   route.query.view !== 'chats')
             )
           "
-          >概览</router-link
+          ><IconOverview
+            class="tree-icon"
+            aria-hidden="true"
+          />概览</router-link
         >
         <router-link
           :to="conversationPath"
@@ -62,7 +65,10 @@
                   route.query.view === 'chats')
             )
           "
-          >会话</router-link
+          ><IconConversations
+            class="tree-icon"
+            aria-hidden="true"
+          />会话</router-link
         >
         <router-link
           :to="analysisPath"
@@ -74,13 +80,16 @@
                 !route.query.panel
             )
           "
-          >事件</router-link
+          ><IconEvents class="tree-icon" aria-hidden="true" />事件</router-link
         >
         <router-link
           :to="topicsPath"
           class="tree-item"
           :class="itemClass(route.name === 'SpaceTopics')"
-          >主题订阅</router-link
+          ><IconTopics
+            class="tree-icon"
+            aria-hidden="true"
+          />主题订阅</router-link
         >
         <router-link
           :to="reportPath"
@@ -90,7 +99,7 @@
               route.name === 'SpaceAnalysis' && route.query.tab === 'reports'
             )
           "
-          >报告</router-link
+          ><IconReports class="tree-icon" aria-hidden="true" />报告</router-link
         >
         <router-link
           :to="askPath"
@@ -100,19 +109,25 @@
               route.name === 'SpaceAnalysis' && route.query.panel === 'ask'
             )
           "
-          >问答</router-link
+          ><IconAsk class="tree-icon" aria-hidden="true" />问答</router-link
         >
         <router-link
           :to="syncPath"
           class="tree-item"
           :class="itemClass(route.name === 'SpaceOperations')"
-          >同步记录</router-link
+          ><IconSync
+            class="tree-icon"
+            aria-hidden="true"
+          />同步记录</router-link
         >
         <router-link
           :to="settingsPath"
           class="tree-item"
           :class="itemClass(route.name === 'SpaceSettings')"
-          >设备与设置</router-link
+          ><IconDevice
+            class="tree-icon"
+            aria-hidden="true"
+          />设备与设置</router-link
         >
       </div>
     </nav>
@@ -232,12 +247,20 @@ import { useAccountSummary } from '@/composables/useAccountSummary'
 import { loadScopedApps, useScopedApps } from '@/composables/sidebarApps'
 import {
   IconApps,
+  IconAsk,
   IconBilling,
   IconChats,
+  IconConversations,
+  IconDevice,
+  IconEvents,
   IconExpense,
+  IconOverview,
   IconRelay,
+  IconReports,
   IconSettings,
-  IconTodos
+  IconSync,
+  IconTodos,
+  IconTopics
 } from './navIcons'
 
 const { t } = useI18n()
@@ -395,7 +418,12 @@ onMounted(ensureLoaded)
   gap: 2px;
 }
 .tree-item {
-  @apply flex h-8 items-center rounded px-2.5 text-[calc(13px*var(--fs))] text-ink-2 transition-colors;
+  @apply flex h-8 items-center gap-2 rounded px-2.5 text-[calc(13px*var(--fs))] text-ink-2 transition-colors;
+}
+.tree-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 .nav-parent {
   @apply flex h-[38px] items-center gap-2.5 rounded px-3 text-left text-[calc(13.5px*var(--fs))] text-ink transition-colors hover:bg-chip;

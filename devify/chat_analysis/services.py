@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from chat_analysis.keys import canonical_entity_key, canonical_event_key
@@ -10,8 +11,11 @@ from chat_analysis.models import (
     EventEvidence,
     EventNote,
     EventRelation,
+    EventSuggestion,
+    EventTagAssignment,
     Note,
     NoteEvidence,
+    QuestionAnswer,
     ReportItemSource,
 )
 from spaces.models import (
@@ -315,29 +319,145 @@ def refresh_event_window(event, *, messages=None):
     return event
 
 
+def merge_blocked_by_relation(relation):
+    return (
+        relation.decision == EventRelation.Decision.ACCEPTED
+        and relation.relation_kind != EventRelation.RelationKind.SAME
+    ) or (
+        relation.decision == EventRelation.Decision.REJECTED
+        and relation.relation_kind == EventRelation.RelationKind.SAME
+    )
+
+
+def _move_event_relations(source, target):
+    relations = EventRelation.objects.select_for_update().filter(
+        Q(left_event=source) | Q(right_event=source)
+    )
+    pending = EventRelation.Decision.PENDING
+    for relation in relations:
+        other_id = relation.right_event_id
+        if relation.right_event_id == source.pk:
+            other_id = relation.left_event_id
+        if other_id == target.pk:
+            if merge_blocked_by_relation(relation):
+                raise ChatAnalysisConflict(
+                    f"Event relation #{relation.pk} blocks this merge."
+                )
+            continue
+        left_id, right_id = sorted((target.pk, other_id))
+        existing = (
+            EventRelation.objects.select_for_update()
+            .filter(
+                space_id=target.space_id,
+                left_event_id=left_id,
+                right_event_id=right_id,
+            )
+            .first()
+        )
+        if existing is None:
+            relation.left_event_id = left_id
+            relation.right_event_id = right_id
+            relation.save(
+                update_fields=("left_event", "right_event", "updated_at")
+            )
+            continue
+        if (
+            relation.decision != pending
+            and existing.decision != pending
+            and (relation.relation_kind, relation.decision)
+            != (existing.relation_kind, existing.decision)
+        ):
+            raise ChatAnalysisConflict(
+                f"Event relations #{relation.pk} and #{existing.pk} conflict."
+            )
+        if existing.decision == pending and relation.decision != pending:
+            existing.relation_kind = relation.relation_kind
+            existing.decision = relation.decision
+            existing.decided_by_id = relation.decided_by_id
+            existing.decided_at = relation.decided_at
+        existing.source_note_ids = list(
+            dict.fromkeys(existing.source_note_ids + relation.source_note_ids)
+        )
+        existing.reason = "\n".join(
+            dict.fromkeys(
+                reason for reason in (existing.reason, relation.reason)
+                if reason
+            )
+        )
+        existing.save()
+
+
+def _move_event_citations(source, target):
+    questions = QuestionAnswer.objects.select_for_update().filter(
+        space_id=source.space_id
+    )
+    for question in questions.iterator():
+        changed_fields = []
+        for citation in question.citations:
+            if (
+                isinstance(citation, dict)
+                and citation.get("kind") == "event"
+                and citation.get("id") == source.pk
+            ):
+                citation["id"] = target.pk
+                changed_fields = ["citations"]
+        event_ids = question.scope.get("event_ids", [])
+        if source.pk in event_ids:
+            question.scope["event_ids"] = list(dict.fromkeys(
+                target.pk if event_id == source.pk else event_id
+                for event_id in event_ids
+            ))
+            changed_fields.append("scope")
+        if changed_fields:
+            question.save(update_fields=changed_fields + ["updated_at"])
+
+
 @transaction.atomic
 def merge_events(*, actor, source, target):
-    """Fold one Event into another and drop the source row."""
+    """Fold an event into another and preserve its links."""
     ensure_can_contribute(actor, source.space)
     if source.space_id != target.space_id:
         raise ChatAnalysisError("Events must share a space.")
     if source.pk == target.pk:
         return target
-    for link in EventNote.objects.filter(event=source).select_related("note"):
-        EventNote.objects.get_or_create(
-            event=target,
-            note=link.note,
-            defaults={"created_by": link.created_by},
-        )
-    for link in EventEvidence.objects.filter(event=source).select_related(
-        "message"
+    locked = {
+        event.pk: event
+        for event in Event.objects.select_for_update()
+        .filter(pk__in=(source.pk, target.pk))
+        .order_by("pk")
+    }
+    if source.pk not in locked or target.pk not in locked:
+        raise ChatAnalysisConflict("An event was already removed.")
+    source, target = locked[source.pk], locked[target.pk]
+    _move_event_relations(source, target)
+    for model, field in (
+        (EventNote, "note_id"),
+        (EventEvidence, "message_id"),
+        (EventTagAssignment, "tag_id"),
     ):
-        EventEvidence.objects.get_or_create(
-            event=target,
-            message=link.message,
-            defaults={"created_by": link.created_by},
+        retained = list(
+            model.objects.filter(event=target).values_list(field, flat=True)
         )
+        model.objects.filter(event=source).exclude(
+            **{f"{field}__in": retained}
+        ).update(event=target)
+    EventSuggestion.objects.filter(event=source).update(event=target)
     ReportItemSource.objects.filter(event=source).update(event=target)
+    _move_event_citations(source, target)
+    changed = []
+    if source.opened_at and (
+        not target.opened_at or source.opened_at < target.opened_at
+    ):
+        target.opened_at = source.opened_at
+        changed.append("opened_at")
+    if source.last_activity_at and (
+        not target.last_activity_at
+        or source.last_activity_at > target.last_activity_at
+    ):
+        target.last_activity_at = source.last_activity_at
+        changed.append("last_activity_at")
+    if changed:
+        target.save(update_fields=changed + ["updated_at"])
     refresh_event_window(target)
     source.delete()
     return target

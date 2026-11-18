@@ -63,9 +63,12 @@ def dispatch_due_analysis(now=None, schedule=None):
         ).values_list("conversation_id", flat=True)
     )
     jobs = 0
-    for conversation_id in conversation_ids:
-        if schedule_conversation(conversation_id, run.boundary) is not None:
-            jobs += 1
+    # Commit all reservations before the slot's workers can start.
+    with transaction.atomic():
+        ScheduledAnalysisRun.objects.select_for_update().get(pk=run.pk)
+        for conversation_id in sorted(conversation_ids):
+            if schedule_conversation(conversation_id, run.boundary):
+                jobs += 1
     return {"jobs": jobs, "slot": run.slot}
 
 

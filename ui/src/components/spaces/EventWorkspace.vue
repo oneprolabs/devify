@@ -222,101 +222,40 @@
                   查看整理信息 ↗
                 </button>
               </div>
-              <p v-if="notesLoading" class="ws-note" aria-busy="true">
-                正在加载关联信息…
-              </p>
-              <p v-else-if="notesError" class="ws-note" role="alert">
-                关联信息加载失败，请刷新后重试。
-              </p>
-              <p v-else-if="!notes.length" class="ws-note">
-                暂无关联的整理信息。
+              <p v-if="!selected.evidence?.length" class="ws-note">
+                暂无原文证据。
               </p>
               <div v-else class="ws-timeline">
-                <article v-for="note in notes" :key="note.id" class="ws-tl">
+                <article
+                  v-for="evidence in selected.evidence"
+                  :key="evidence.id"
+                  class="ws-tl"
+                >
                   <div class="ws-tl-time">
-                    {{ formatShort(note.start_at || note.created_at) }}
+                    {{ formatShort(evidence.occurred_at) }}
                   </div>
-                  <div class="ws-tl-rail">
+                  <div class="ws-tl-rail" aria-hidden="true">
                     <span class="ws-tl-dot"></span>
                     <span class="ws-tl-line"></span>
                   </div>
                   <div class="ws-tl-body">
                     <div class="ws-tl-top">
-                      <span class="ws-tag">{{
-                        note.origin === 'manual' ? '人工整理' : '整理信息'
+                      <span v-if="evidence.sender_name">{{
+                        evidence.sender_name
                       }}</span>
-                      <span
-                        v-for="kind in noteKinds(note)"
-                        :key="`${note.id}-${kind}`"
-                        class="ws-tag ac"
-                        >{{ kind }}</span
+                      <button
+                        type="button"
+                        class="ws-link"
+                        @click="openEvidence(evidence)"
                       >
-                      <span>{{ note.title }}</span>
+                        查看原文 ↗
+                      </button>
                     </div>
-                    <div class="ws-tl-text">{{ noteTimelineText(note) }}</div>
-                    <details
-                      v-if="note.evidence?.length"
-                      class="ws-evidence-box"
-                    >
-                      <summary class="ws-tag">
-                        原文 {{ note.evidence.length }} 条 →
-                      </summary>
-                      <div class="ws-evidence">
-                        <button
-                          v-for="(evidence, index) in note.evidence"
-                          :key="evidence.id"
-                          type="button"
-                          class="ws-tag"
-                          @click="openEvidence(evidence)"
-                        >
-                          第 {{ index + 1 }} 条
-                          <template v-if="evidence.sender_name">
-                            · {{ evidence.sender_name }}
-                          </template>
-                          →
-                        </button>
-                      </div>
-                    </details>
+                    <div v-if="evidence.content" class="ws-tl-text">
+                      {{ evidence.content }}
+                    </div>
                   </div>
                 </article>
-              </div>
-              <button
-                v-if="notesNext"
-                type="button"
-                class="ws-more"
-                :disabled="notesLoadingMore"
-                @click="loadMoreNotes"
-              >
-                {{ notesLoadingMore ? '加载中…' : '加载更多整理信息' }}
-              </button>
-            </section>
-
-            <section
-              v-if="selected.evidence?.length"
-              class="ws-sect"
-              aria-labelledby="event-evidence-title"
-            >
-              <div class="ws-sectt">
-                <span id="event-evidence-title">原文证据</span>
-                <span class="spacer"></span>
-                <span class="ws-tag"
-                  >{{ selected.evidence.length }} 条消息</span
-                >
-              </div>
-              <div class="ws-evidence">
-                <button
-                  v-for="evidence in selected.evidence"
-                  :key="evidence.id"
-                  type="button"
-                  class="ws-tag"
-                  @click="openEvidence(evidence)"
-                >
-                  {{ formatShort(evidence.occurred_at) }}
-                  <template v-if="evidence.sender_name">
-                    · {{ evidence.sender_name }}
-                  </template>
-                  →
-                </button>
               </div>
             </section>
 
@@ -341,7 +280,8 @@
             />
             <div class="ws-composer-foot">
               <span class="ws-tag ac"
-                >范围：本事件 · {{ notes.length }} 条整理</span
+                >范围：本事件 ·
+                {{ selected.note_ids?.length || 0 }} 条整理</span
               >
               <span class="spacer"></span>
               <span class="hint">回答会保存到「问答」</span>
@@ -402,43 +342,6 @@ const summaryText = computed(() => {
     ? `${content.slice(0, 240)}…`
     : content
 })
-const notes = ref([])
-const notesLoading = ref(false)
-const notesError = ref(false)
-const notesNext = ref(false)
-const notesLoadingMore = ref(false)
-let requestId = 0
-
-const noteStructuredItems = (note) =>
-  ['facts', 'actions', 'risks', 'decisions'].flatMap((key) => {
-    const values = note.structured_data?.[key]
-    if (!Array.isArray(values)) return []
-    return values
-      .map((value) =>
-        typeof value === 'string'
-          ? value.trim()
-          : String(value?.text || value?.title || value?.content || '').trim()
-      )
-      .filter(Boolean)
-  })
-const noteKinds = (note) =>
-  [
-    ['facts', '事实'],
-    ['actions', '待办'],
-    ['risks', '风险'],
-    ['decisions', '决定']
-  ]
-    .filter(
-      ([key]) =>
-        Array.isArray(note.structured_data?.[key]) &&
-        note.structured_data[key].length
-    )
-    .map(([, label]) => label)
-const noteTimelineText = (note) => {
-  const items = noteStructuredItems(note)
-  return items.length ? items.slice(0, 3).join('；') : note.content
-}
-
 const openCount = computed(
   () => props.events.filter((item) => item.status !== 'done').length
 )
@@ -519,25 +422,8 @@ function openEvidence(evidence) {
     id: evidence.message_id,
     conversation_id: evidence.conversation_id,
     title: evidence.sender_name || '原始消息',
-    excerpt: evidence.reference_key
+    excerpt: evidence.content
   })
-}
-async function loadMoreNotes() {
-  if (!notesNext.value || notesLoadingMore.value || !props.selected?.id) return
-  notesLoadingMore.value = true
-  try {
-    const response = await spacesApi.getEventNotes(props.selected.id, {
-      page: Math.floor(notes.value.length / 100) + 1,
-      page_size: 100
-    })
-    const data = response.data.data || response.data
-    notes.value = [...notes.value, ...(data.list || [])]
-    notesNext.value = Boolean(data.pagination?.next)
-  } catch {
-    notesError.value = true
-  } finally {
-    notesLoadingMore.value = false
-  }
 }
 async function loadTags() {
   try {
@@ -587,39 +473,10 @@ async function removeTag(tag) {
   }
 }
 
-watch(
-  () => [
-    props.spaceId,
-    props.selected?.id,
-    props.selected?.note_ids,
-    props.detailLoading
-  ],
-  async () => {
-    const current = ++requestId
-    notes.value = []
-    notesError.value = false
-    notesLoading.value = false
-    followup.value = ''
-    summaryExpanded.value = false
-    if (props.detailLoading || !props.selected?.note_ids?.length) return
-    notesLoading.value = true
-    try {
-      const response = await spacesApi.getEventNotes(props.selected.id, {
-        page_size: 100
-      })
-      const data = response.data.data || response.data
-      if (current === requestId) {
-        notes.value = data.list || []
-        notesNext.value = Boolean(data.pagination?.next)
-      }
-    } catch {
-      if (current === requestId) notesError.value = true
-    } finally {
-      if (current === requestId) notesLoading.value = false
-    }
-  },
-  { immediate: true }
-)
+watch([() => props.spaceId, () => props.selected?.id], () => {
+  followup.value = ''
+  summaryExpanded.value = false
+})
 watch(
   () => props.spaceId,
   () => {
@@ -672,29 +529,8 @@ watch(
   font-size: 12.5px;
   line-height: 1.7;
 }
-.ws-evidence {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-}
-.ws-evidence-box summary {
-  display: inline-flex;
-  list-style: none;
-  cursor: pointer;
-}
-.ws-evidence-box summary::-webkit-details-marker {
-  display: none;
-}
 .ws-tl-text {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-}
-.ws-evidence .ws-tag {
-  cursor: pointer;
+  overflow-wrap: anywhere;
 }
 .ws-det-foot {
   flex: none;

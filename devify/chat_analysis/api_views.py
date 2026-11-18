@@ -427,9 +427,10 @@ class EventDetailAPIView(APIView):
             event.note_links.order_by("id").values_list("note_id", flat=True)
         )
         data["evidence"] = EventEvidenceSerializer(
-            event.evidence.select_related("message").order_by(
-                "message__occurred_at", "id"
-            )[:200],
+            event.evidence.filter(message__conversation__space=space)
+            .select_related("message")
+            .prefetch_related("message__parts")
+            .order_by("message__occurred_at", "id")[:200],
             many=True,
         ).data
         data["relation_ids"] = list(

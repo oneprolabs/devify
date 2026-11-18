@@ -2,7 +2,13 @@ import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
-from chat_analysis.models import Event, EventNote, EventRelation, Note
+from chat_analysis.models import (
+    Event,
+    EventEvidence,
+    EventNote,
+    EventRelation,
+    Note,
+)
 from chat_domain.models import Conversation, Message, MessagePart
 from spaces.models import Space, SpaceMembership
 
@@ -228,6 +234,15 @@ def test_event_notes_include_message_evidence():
     assert (
         entries[0]["evidence"][0]["conversation_id"] == message.conversation_id
     )
+
+    detail_url = f"/api/v1/events/{event['id']}"
+    assert client.get(detail_url).data["data"]["evidence"] == []
+    EventEvidence.objects.create(
+        event_id=event["id"], message=message, created_by=owner
+    )
+    detail = client.get(detail_url).data["data"]
+    assert detail["evidence"][0]["message_id"] == message.pk
+    assert detail["evidence"][0]["content"] == "source evidence"
 
 
 def test_cross_space_note_and_event_are_not_visible():

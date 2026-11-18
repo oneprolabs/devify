@@ -20,9 +20,16 @@ from hashlib import sha256
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
-from chat_analysis.keys import canonical_event_key, slugify_key
+from chat_analysis.event_metadata import participant_metadata
+from chat_analysis.event_reducer import prepare_event_reduction
+from chat_analysis.keys import (
+    canonical_event_key,
+    entity_from_text,
+    slugify_key,
+)
 from chat_analysis.models import (
     AnalysisJob,
     AnalysisJobMessage,
@@ -605,6 +612,26 @@ def _other_conversation_title(event, conversation_id):
     return ""
 
 
+def _anchored_events(space, messages):
+    quoted = {
+        message.reply_to_id for message in messages if message.reply_to_id
+    }
+    entities = {
+        entity for message in messages for text in _message_texts(message)
+        if (entity := entity_from_text(text))
+    }
+    if not (quoted or entities):
+        return []
+    return list(
+        Event.objects.filter(space=space)
+        .filter(
+            Q(evidence__message_id__in=quoted) | Q(entity_key__in=entities)
+        )
+        .prefetch_related("evidence__message__conversation")
+        .distinct()[:CROSS_CANDIDATE_LIMIT]
+    )
+
+
 def _cross_candidates(space, conversation, messages):
     events = (
         _unfinished_event_qs(space)
@@ -699,8 +726,9 @@ def _event_extraction_prompt(language, preferences):
         "Use existing events to fold later slices into the same matter. "
         "cross_candidates. reply_to_seq is the quoted message when WeChat "
         "has one, otherwise null. open_events_same_conversation are "
-        "unfinished events from this same chat. cross_candidates are "
-        "unfinished events from other chats that already share a person or "
+        "events from this chat, including closed matters explicitly cited. "
+        "An explicit update can reopen a closed matter; a mention cannot. "
+        "cross_candidates are events from other chats sharing a person or "
         "a concrete subject with this chunk. Do not treat that list as the "
         "whole space. If a candidate is not in the list, do not merge with "
         "it. "
@@ -742,6 +770,9 @@ def _event_extraction_prompt(language, preferences):
         "the confirmation. conversation_title is the group or chat name, "
         "not a numeric id. role is matter or confirmation. status is "
         "open, in_progress or done. tags are at most five short labels. "
+        "Name the concrete matter in title, entity and tags. Keep sender "
+        "names, nicknames and shortened aliases in summary or source "
+        "messages, where they can identify who did what. "
         f"Return at most {MAX_EVENTS_PER_CHUNK} events. Do not invent "
         f"facts. Write title, summary and reason in {language}. "
         f"Event granularity: {granularity}. For coarse granularity combine "
@@ -814,11 +845,54 @@ def _extract_events(job, messages, payload, language):
     )
     prompt = _event_extraction_prompt(language, preferences)
     open_events = _open_events_same_conversation(job.space, conversation)
+    if _defer_event_publication(job):
+        prior_ids = {
+            message.reply_to_id for message in messages if message.reply_to_id
+        } | {
+            message.pk for message in messages
+            if getattr(message, "analysis_fragment_offset", 0)
+        }
+        if prior_ids:
+            drafts = EventSuggestion.objects.filter(
+                analysis_job=job, status=EventSuggestion.Status.PENDING,
+                note__evidence__message_id__in=prior_ids,
+            ).order_by("-pk").distinct()[:CROSS_CANDIDATE_LIMIT]
+            open_events = [
+                {
+                    "event_key": draft.event_key,
+                    "title": draft.title,
+                    "summary": draft.summary,
+                    "status": draft.proposed_status,
+                    "entity": draft.entity_key,
+                    "conversation_title": conversation_title,
+                }
+                for draft in drafts
+            ] + open_events
     cross = _cross_candidates(job.space, conversation, messages)
+    anchors = _anchored_events(job.space, messages)
+    anchor_keys = {event.event_key for event in anchors}
+    for event in reversed(anchors):
+        other_title = _other_conversation_title(event, conversation.pk)
+        same_chat = any(
+            link.message.conversation_id == conversation.pk
+            for link in event.evidence.all()
+        )
+        candidates = open_events if same_chat else cross
+        candidates[:] = [
+            item for item in candidates if item["event_key"] != event.event_key
+        ]
+        candidates.insert(0, _event_prompt_item(
+            event, conversation_title if same_chat else other_title,
+        ))
     budget, count = request_budget(_model_input_budget())
     content = _event_content(conversation_title, payload, open_events, cross)
     while count(prompt, content) > budget and (cross or open_events):
-        (cross or open_events).pop()
+        for pool in (cross, open_events):
+            if pool and pool[-1]["event_key"] not in anchor_keys:
+                pool.pop()
+                break
+        else:
+            (cross or open_events).pop()
         content = _event_content(
             conversation_title, payload, open_events, cross
         )
@@ -828,11 +902,40 @@ def _extract_events(job, messages, payload, language):
         node_name="chat_event_extraction",
     )
     events = output.get("events") if output is not None else None
-    return events if isinstance(events, list) else None
+    if not isinstance(events, list):
+        return None
+    if _defer_event_publication(job):
+        allowed = {item["event_key"] for item in open_events + cross}
+        validated = []
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            action = str(event.get("action") or "create").strip().lower()
+            key = canonical_event_key(event.get("event_key"))
+            if action in ("attach", "drop") and key in allowed:
+                validated.append(
+                    {**event, "action": action, "event_key": key}
+                )
+            elif action != "drop":
+                validated.append(
+                    {**event, "action": "create", "event_key": ""}
+                )
+        return validated
+    return events
+
+
+def _defer_event_publication(job):
+    return (
+        (job.specification or {}).get("scheduled_message_scope") is True
+        and settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS
+    )
 
 
 def _store_events(job, note, messages, events):
     by_seq = {message.ingest_seq: message for message in messages}
+    senders = {
+        message.sender_name or message.sender_key for message in messages
+    }
     for index, event in enumerate(events[:MAX_EVENTS_PER_CHUNK]):
         if not isinstance(event, dict):
             continue
@@ -861,11 +964,13 @@ def _store_events(job, note, messages, events):
         )
         if status == Event.Status.DONE and confirmation_only:
             status = Event.Status.IN_PROGRESS
-        tags = [
-            str(tag).strip()
-            for tag in (event.get("tags") or [])
-            if str(tag).strip()
-        ][:5]
+        raw_tags = event.get("tags")
+        title, entity, tags = participant_metadata(
+            title, event.get("entity"),
+            raw_tags if isinstance(raw_tags, list) else (), summary, senders,
+        )
+        if not title:
+            continue
         first = messages[0]
         fallback = (
             f"{job.uuid}:{first.ingest_seq}:{slugify_key(title)}"
@@ -878,7 +983,7 @@ def _store_events(job, note, messages, events):
             note=note,
             analysis_job=job,
             event_key=event_key,
-            entity_key=str(event.get("entity") or ""),
+            entity_key=entity,
             title=title,
             summary=summary,
             status=status,
@@ -887,7 +992,10 @@ def _store_events(job, note, messages, events):
                 message.ingest_seq for message in source_messages
             ],
         )
-        if getattr(settings, "CHAT_ANALYSIS_AUTO_CREATE_EVENTS", False):
+        if (
+            settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS
+            and not _defer_event_publication(job)
+        ):
             suggestion = review_event_suggestion(
                 actor=job.created_by,
                 suggestion=suggestion,
@@ -913,6 +1021,158 @@ def _store_events(job, note, messages, events):
                     ).update(
                         content=suggestion.summary, updated_at=timezone.now()
                     )
+
+
+def _publish_reduced_events(job, lease_seconds):
+    candidates = list(
+        EventSuggestion.objects.filter(
+            analysis_job=job, status=EventSuggestion.Status.PENDING,
+        ).select_related("note", "analysis_job").order_by("pk")
+    )
+    if not candidates:
+        return
+    job = renew_analysis_lease(
+        job, worker_id=job.lease_owner, fencing_token=job.fencing_token,
+        lease_seconds=lease_seconds,
+    )
+    groups = prepare_event_reduction(job, candidates, call_json=_call_json)
+    with transaction.atomic():
+        locked = _lock_job(job.pk)
+        _ensure_lease(locked, job.lease_owner, job.fencing_token)
+        Space.objects.select_for_update().only("pk").get(pk=job.space_id)
+        _apply_reduced_groups(job, candidates, groups)
+
+
+def _apply_reduced_groups(job, candidates, groups):
+    existing_keys = set(
+        Event.objects.filter(
+            space_id=job.space_id,
+            event_key__in={item.event_key for item in candidates},
+        ).values_list("event_key", flat=True)
+    )
+    for group in groups:
+        destinations = {item.event_key for item in group} & existing_keys
+        if len(destinations) > 1:
+            for item in group:
+                _accept_reduced_group(job, [item], item.event_key)
+            continue
+        key = next(iter(destinations), group[0].event_key)
+        _accept_reduced_group(job, group, key)
+
+
+def _pending_batch_candidates():
+    return EventSuggestion.objects.filter(
+        status=EventSuggestion.Status.PENDING,
+        analysis_job__state=AnalysisJob.State.READY,
+        analysis_job__checkpoint__event_map_ready=True,
+        analysis_job__specification__boundary__isnull=False,
+    )
+
+
+def _active_batch_jobs(space_id, boundary):
+    specs = AnalysisJob.objects.filter(
+        space_id=space_id,
+        state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
+    ).values_list("specification", flat=True)
+    return any(
+        spec.get("scheduled_message_scope") is True
+        and spec.get("boundary") == boundary
+        for spec in specs
+    )
+
+
+def _publish_event_batch(space_id, boundary):
+    pending = _pending_batch_candidates().filter(space_id=space_id)
+
+    def current_candidates():
+        return [
+            item for item in pending.select_related(
+                "note", "analysis_job__conversation",
+                "analysis_job__created_by",
+            ).order_by("pk")
+            if item.analysis_job.specification.get("boundary") == boundary
+        ]
+
+    if _active_batch_jobs(space_id, boundary):
+        return False
+    candidates = current_candidates()
+    if not candidates:
+        return False
+    job = candidates[0].analysis_job
+    groups = prepare_event_reduction(job, candidates, call_json=_call_json)
+    with transaction.atomic():
+        Space.objects.select_for_update().only("pk").get(pk=space_id)
+        if _active_batch_jobs(space_id, boundary) or [
+            item.pk for item in candidates
+        ] != [item.pk for item in current_candidates()]:
+            return False
+        _apply_reduced_groups(job, candidates, groups)
+    return True
+
+
+def publish_ready_event_batches():
+    """Retry unpublished slot candidates on the existing analysis queue."""
+    if not (
+        settings.CHAT_ANALYSIS_LLM_ENABLED
+        and settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS
+    ):
+        return 0
+    candidates = _pending_batch_candidates().order_by("pk").values_list(
+        "space_id", "analysis_job__specification",
+    )
+    batches = dict.fromkeys(
+        (space_id, spec["boundary"]) for space_id, spec in candidates
+        if spec.get("boundary")
+    )
+    published = 0
+    for space_id, boundary in batches:
+        try:
+            published += _publish_event_batch(space_id, boundary)
+        except Exception:
+            logger.exception(
+                "Event reduction failed for space %s at %s", space_id, boundary
+            )
+    return published
+
+
+def _accept_reduced_group(job, group, event_key):
+    event = Event.objects.select_for_update().filter(
+        space_id=job.space_id, event_key=event_key,
+    ).first()
+    previous_activity = event.last_activity_at if event else None
+    same_job = event is not None and event.suggestion_sources.filter(
+        analysis_job=job,
+    ).exists()
+    applied = []
+    for item in group:
+        if not EventSuggestion.objects.filter(
+            pk=item.pk, status=EventSuggestion.Status.PENDING,
+        ).exists():
+            continue
+        suggestion = review_event_suggestion(
+            actor=item.analysis_job.created_by, suggestion=item,
+            decision=EventSuggestion.Status.ACCEPTED,
+            target_event_key=event_key,
+        )
+        if suggestion.event_id:
+            applied.append(suggestion)
+    if not applied:
+        return
+    updated = applied[-1].event
+    updated.refresh_from_db(fields=("last_activity_at", "content"))
+    if updated.last_activity_at is not None and (
+        previous_activity is None
+        or previous_activity < updated.last_activity_at
+        or (same_job and previous_activity == updated.last_activity_at)
+    ):
+        if all(item.event_key == event_key for item in applied):
+            summary = applied[-1].summary
+        else:
+            summaries = dict.fromkeys(item.summary for item in applied)
+            summary = "\n".join(summaries)
+        if updated.content != summary:
+            updated.content = summary
+            updated.save(update_fields=("content", "updated_at"))
 
 
 def _prepare_chunk(job, messages):
@@ -1126,9 +1386,16 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
                 checkpoint=checkpoint,
             )
 
-    if scheduled_scope and AnalysisJobMessage.objects.filter(
+    incomplete = scheduled_scope and AnalysisJobMessage.objects.filter(
         job=job, completed_at__isnull=True
-    ).exists():
+    ).exists()
+    if _defer_event_publication(job) and not incomplete:
+        if (job.specification or {}).get("boundary"):
+            checkpoint["event_map_ready"] = True
+        else:
+            _publish_reduced_events(job, lease_seconds)
+
+    if incomplete:
         partial = True
 
     return {

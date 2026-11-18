@@ -47,7 +47,7 @@ describe('EventWorkspace', () => {
     expect(wrapper.text()).toContain('没有符合条件的事件')
   })
 
-  it('renders linked notes and their evidence, then opens the message', async () => {
+  it('renders only event evidence in the timeline and opens its message', async () => {
     spacesApi.getEventNotes.mockResolvedValue({
       data: {
         data: {
@@ -72,15 +72,33 @@ describe('EventWorkspace', () => {
         }
       }
     })
-    const wrapper = render({ selected: { ...events[0], note_ids: [3] } })
+    const wrapper = render({
+      selected: {
+        ...events[0],
+        note_ids: [3],
+        evidence: [
+          {
+            id: 5,
+            message_id: 55,
+            conversation_id: 9,
+            sender_name: '王小明',
+            occurred_at: '2026-11-18T01:15:00Z',
+            content: '发布窗口确认在周四'
+          }
+        ]
+      }
+    })
     await flushPromises()
-    expect(spacesApi.getEventNotes).toHaveBeenCalledWith(1, { page_size: 100 })
-    expect(wrapper.text()).toContain('整理记录')
-    expect(wrapper.text()).toContain('原文 1 条')
-    await wrapper.find('.ws-evidence button').trigger('click')
+    const timeline = wrapper.get('[aria-labelledby="event-timeline-title"]')
+    expect(timeline.text()).toContain('发布窗口确认在周四')
+    expect(timeline.text()).toContain('王小明')
+    expect(timeline.text()).not.toContain('整理记录')
+    expect(timeline.text()).not.toContain('真实内容')
+    expect(timeline.text()).not.toContain('张卫震')
+    await timeline.get('article button').trigger('click')
     expect(wrapper.emitted('select-citation')[0][0]).toMatchObject({
       kind: 'message',
-      id: 44,
+      id: 55,
       conversation_id: 9
     })
   })
@@ -131,11 +149,13 @@ describe('EventWorkspace', () => {
     expect(wrapper.find('[aria-label="移除标签 紧急"]').exists()).toBe(false)
   })
 
-  it('reports a linked note loading error', async () => {
-    spacesApi.getEventNotes.mockRejectedValue(new Error('network'))
+  it('shows an empty timeline and keeps linked notes accessible without evidence', async () => {
     const wrapper = render({ selected: { ...events[0], note_ids: [3] } })
     await flushPromises()
-    expect(wrapper.find('[role=alert]').text()).toContain('加载失败')
+    const timeline = wrapper.get('[aria-labelledby="event-timeline-title"]')
+    expect(timeline.text()).toContain('暂无原文证据')
+    await timeline.get('button').trigger('click')
+    expect(wrapper.emitted('show-notes')).toHaveLength(1)
   })
 
   it('emits a follow-up question instead of answering inline', async () => {

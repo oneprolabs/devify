@@ -321,3 +321,169 @@ def test_rebuild_events_replaces_old_events_with_evidence(settings):
     assert event.opened_at == occurred_at
     assert EventEvidence.objects.filter(event=event).count() == 1
     assert "rebuilt_notes=1" in out.getvalue()
+
+
+def test_scheduled_reduction_reuses_candidates_after_failure(
+    monkeypatch, settings,
+):
+    from chat_analysis.models import AnalysisJobMessage, EventSuggestion
+
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    owner = User.objects.create_user(username="reduce-owner")
+    space = make_space(owner, "reduce-space")
+    conversation = make_conversation(space)
+    start = timezone.now() - timedelta(days=5)
+    job = make_job(space, owner, conversation, end_seq=2)
+    job.specification = {"scheduled_message_scope": True}
+    job.save(update_fields=("specification",))
+    for seq, title in enumerate(("Client icon missing", "Logo restored"), 1):
+        message = add_message(
+            conversation, seq, title, start + timedelta(days=seq),
+        )
+        AnalysisJobMessage.objects.create(job=job, message=message)
+
+    mapped = []
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, messages: messages[:1],
+    )
+
+    def map_chunk(job, messages):
+        seq = messages[0].ingest_seq
+        mapped.append(seq)
+        return {}, [{
+            "action": "create",
+            "title": ("Client icon missing", "Logo restored")[seq - 1],
+            "summary": ("Icon was missing", "Icon has been restored")[seq - 1],
+            "status": ("open", "done")[seq - 1], "source_seqs": [seq],
+        }]
+
+    reducer_attempts = []
+
+    def reduce(job, candidates, *, call_json):
+        reducer_attempts.append(len(candidates))
+        assert not Event.objects.filter(space=space).exists()
+        if len(reducer_attempts) == 1:
+            raise RuntimeError("Transient reducer failure")
+        return [candidates]
+
+    monkeypatch.setattr(execution, "_prepare_chunk", map_chunk)
+    monkeypatch.setattr(execution, "prepare_event_reduction", reduce)
+    result = execution.execute_analysis_job(job.pk, worker_id="reduce")
+    assert result.job.state == AnalysisJob.State.QUEUED
+    assert EventSuggestion.objects.filter(analysis_job=job).count() == 2
+    assert not Event.objects.filter(space=space).exists()
+
+    result = execution.execute_analysis_job(job.pk, worker_id="reduce-retry")
+    assert result.job.state == AnalysisJob.State.READY
+    assert mapped == [1, 2]
+    assert reducer_attempts == [2, 2]
+    event = Event.objects.get(space=space)
+    assert event.status == Event.Status.DONE
+    assert "Icon has been restored" in event.content
+    assert event.evidence.count() == 2
+
+
+def test_scheduled_analysis_exposes_old_closed_quoted_event(
+    monkeypatch, settings,
+):
+    from chat_analysis.models import AnalysisJobMessage
+
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    owner = User.objects.create_user(username="old-quote-owner")
+    space = make_space(owner, "old-quote-space")
+    conversation = make_conversation(space)
+    start = timezone.now() - timedelta(days=30)
+    original = add_message(conversation, 1, "图标修好了", start)
+    follow_up = add_message(conversation, 2, "新版又看不到了", timezone.now())
+    follow_up.reply_to = original
+    follow_up.save(update_fields=("reply_to",))
+    closed = Event.objects.create(
+        space=space, created_by=owner, event_key="client-icon",
+        title="修复客户端图标", status=Event.Status.DONE, last_activity_at=start,
+    )
+    EventEvidence.objects.create(
+        event=closed, message=original, created_by=owner,
+    )
+    job = make_job(space, owner, conversation, start_seq=1, end_seq=2)
+    job.specification = {"scheduled_message_scope": True}
+    job.save(update_fields=("specification",))
+    AnalysisJobMessage.objects.create(job=job, message=follow_up)
+
+    def analyze(*, prompt, content, node_name, **kwargs):
+        import json
+        if node_name == "chat_note_structuring":
+            return {}, {}
+        prompt_data = json.loads(content)
+        candidate, = prompt_data["open_events_same_conversation"]
+        assert candidate["event_key"] == "client-icon"
+        return {"events": [{
+            "action": "attach", "event_key": candidate["event_key"],
+            "title": "修复客户端图标", "summary": "新版再次出现该问题",
+            "status": "in_progress", "source_seqs": [2],
+        }]}, {}
+
+    monkeypatch.setattr(execution.LLMTracker, "call_and_track", analyze)
+    result = execution.execute_analysis_job(job.pk, worker_id="quote")
+    assert result.job.state == AnalysisJob.State.READY
+    closed.refresh_from_db()
+    assert Event.objects.filter(space=space).count() == 1
+    assert closed.status == Event.Status.IN_PROGRESS
+    assert closed.content == "新版再次出现该问题"
+    assert closed.evidence.count() == 2
+
+
+def test_scheduled_slot_reduces_two_conversations_together(
+    monkeypatch, settings,
+):
+    from chat_analysis.models import AnalysisJobMessage
+
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    owner = User.objects.create_user(username="slot-reduce-owner")
+    space = make_space(owner, "slot-reduce-space")
+    start = timezone.now()
+    jobs = []
+    for i, title in enumerate(("图标缺少", "已补上标识")):
+        chat = make_conversation(space, f"slot-chat-{i}")
+        job = make_job(space, owner, chat, end_seq=1, request_key=f"slot-{i}")
+        job.specification = {
+            "scheduled_message_scope": True, "boundary": start.isoformat(),
+        }
+        job.save(update_fields=("specification",))
+        message = add_message(chat, 1, title, start + timedelta(minutes=i))
+        AnalysisJobMessage.objects.create(job=job, message=message)
+        jobs.append(job)
+
+    def extract(job, messages):
+        return {}, [{
+            "title": job.conversation.title,
+            "summary": execution._message_texts(messages[0])[0],
+            "source_seqs": [1],
+        }]
+
+    def reduce(job, suggestions, *, call_json):
+        assert {s.analysis_job_id for s in suggestions} == {
+            item.pk for item in jobs
+        }
+        return [suggestions]
+
+    monkeypatch.setattr(execution, "_prepare_chunk", extract)
+    monkeypatch.setattr(execution, "prepare_event_reduction", reduce)
+    execution.execute_analysis_job(jobs[0].pk, worker_id="slot-first")
+    assert not Event.objects.filter(space=space).exists()
+    assert execution.publish_ready_event_batches() == 0
+    second = execution.execute_analysis_job(
+        jobs[1].pk, worker_id="slot-second",
+    )
+    assert second.job.state == AnalysisJob.State.READY, second.job.error
+    assert second.job.checkpoint.get("event_map_ready"), second.job.checkpoint
+    pending = execution._pending_batch_candidates()
+    assert pending.count() == 2, list(
+        AnalysisJob.objects.values_list("checkpoint", "specification")
+    )
+    assert execution.publish_ready_event_batches() == 1
+    event = Event.objects.get(space=space)
+    assert event.evidence.count() == 2
+    assert execution.publish_ready_event_batches() == 0

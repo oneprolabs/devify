@@ -11,7 +11,6 @@ from threadline.tests.fixtures.factories import EmailMessageFactory
 
 from .helpers import build_real_jira_subscription_config, make_test_label
 
-
 User = get_user_model()
 
 
@@ -31,7 +30,9 @@ def _create_successful_delivery(*, event, subscription, external_id):
     )
 
 
-def _build_jira_subscription(*, user, name: str, strategies: dict) -> RelaySubscription:
+def _build_jira_subscription(
+    *, user, name: str, strategies: dict
+) -> RelaySubscription:
     return RelaySubscription.objects.create(
         user=user,
         target_type=RelaySubscription.TargetType.JIRA,
@@ -86,25 +87,36 @@ def test_jira_strategy_default_creates_new_issue(monkeypatch):
     )
     monkeypatch.setattr(
         "relay.services.drivers.jira_handler.JiraIssueHandler.update_issue",
-        lambda self, *args, **kwargs: pytest.fail("update_issue should not be called"),
+        lambda self, *args, **kwargs: pytest.fail(
+            "update_issue should not be called"
+        ),
     )
     monkeypatch.setattr(
-        "relay.services.drivers.jira_handler.JiraIssueHandler.link_related_issues",
-        lambda self, *args, **kwargs: pytest.fail("link_related_issues should not be called"),
+        "relay.services.drivers.jira_handler."
+        "JiraIssueHandler.link_related_issues",
+        lambda self, *args, **kwargs: pytest.fail(
+            "link_related_issues should not be called"
+        ),
     )
     monkeypatch.setattr(
         "relay.services.drivers.jira_handler.JiraIssueHandler.get_issue_url",
         lambda self, issue_key: f"https://jira.devify.test/browse/{issue_key}",
     )
 
-    summary = RelayDispatcher.dispatch_event(event, task_id="task-devify-test-new")
+    summary = RelayDispatcher.dispatch_event(
+        event, task_id="task-devify-test-new"
+    )
 
-    refreshed = RelayDelivery.objects.get(event=event, subscription=subscription)
+    refreshed = RelayDelivery.objects.get(
+        event=event, subscription=subscription
+    )
     assert summary["success"] == 1
     assert refreshed.external_id == "DEVIFY-TEST-NEW-1"
     assert refreshed.metadata["relay_strategy"] == "new"
     assert refreshed.metadata["relay_strategy_source"] == "default"
-    assert calls["create"]["issue_data"]["title"] == make_test_label("default", "summary")
+    assert calls["create"]["issue_data"]["title"] == make_test_label(
+        "default", "summary"
+    )
 
 
 def test_jira_strategy_auto_merge_updates_existing_issue(monkeypatch):
@@ -148,7 +160,9 @@ def test_jira_strategy_auto_merge_updates_existing_issue(monkeypatch):
         event_type=RelayEvent.EventType.WORKFLOW_COMPLETED,
         artifact_snapshot={
             "summary_title": make_test_label("auto", "updated", "summary"),
-            "summary_content": make_test_label("auto", "updated", "description"),
+            "summary_content": make_test_label(
+                "auto", "updated", "description"
+            ),
             "trigger_source": "workflow",
         },
     )
@@ -165,22 +179,30 @@ def test_jira_strategy_auto_merge_updates_existing_issue(monkeypatch):
     )
     monkeypatch.setattr(
         "relay.services.drivers.jira_handler.JiraIssueHandler.create_issue",
-        lambda self, **kwargs: pytest.fail("create_issue should not be called"),
+        lambda self, **kwargs: pytest.fail(
+            "create_issue should not be called"
+        ),
     )
     monkeypatch.setattr(
         "relay.services.drivers.jira_handler.JiraIssueHandler.get_issue_url",
         lambda self, issue_key: f"https://jira.devify.test/browse/{issue_key}",
     )
 
-    summary = RelayDispatcher.dispatch_event(event, task_id="task-devify-test-auto")
+    summary = RelayDispatcher.dispatch_event(
+        event, task_id="task-devify-test-auto"
+    )
 
-    refreshed = RelayDelivery.objects.get(event=event, subscription=subscription)
+    refreshed = RelayDelivery.objects.get(
+        event=event, subscription=subscription
+    )
     assert summary["success"] == 1
     assert refreshed.external_id == "DEVIFY-TEST-REQ-123"
     assert refreshed.metadata["relay_strategy"] == "update"
     assert refreshed.metadata["relay_strategy_source"] == "auto_merge"
     assert calls["update"]["issue_key"] == "DEVIFY-TEST-REQ-123"
-    assert calls["update"]["issue_data"]["title"] == make_test_label("auto", "updated", "summary")
+    assert calls["update"]["issue_data"]["title"] == make_test_label(
+        "auto", "updated", "summary"
+    )
 
 
 def test_jira_strategy_manual_merge_creates_and_links(monkeypatch):
@@ -198,7 +220,8 @@ def test_jira_strategy_manual_merge_creates_and_links(monkeypatch):
         subject=make_test_label("manual", "child", "summary"),
     )
     child_email.merged_into = parent_email
-    child_email.save(update_fields=["merged_into"])
+    child_email.merge_reason = "manual"
+    child_email.save(update_fields=["merged_into", "merge_reason"])
 
     parent_event = RelayEvent.objects.create(
         user=user,
@@ -206,7 +229,9 @@ def test_jira_strategy_manual_merge_creates_and_links(monkeypatch):
         event_type=RelayEvent.EventType.WORKFLOW_COMPLETED,
         artifact_snapshot={
             "summary_title": make_test_label("manual", "parent", "summary"),
-            "summary_content": make_test_label("manual", "parent", "description"),
+            "summary_content": make_test_label(
+                "manual", "parent", "description"
+            ),
             "trigger_source": "workflow",
         },
         status=RelayEvent.Status.COMPLETED,
@@ -217,7 +242,9 @@ def test_jira_strategy_manual_merge_creates_and_links(monkeypatch):
         event_type=RelayEvent.EventType.WORKFLOW_COMPLETED,
         artifact_snapshot={
             "summary_title": make_test_label("manual", "child", "summary"),
-            "summary_content": make_test_label("manual", "child", "description"),
+            "summary_content": make_test_label(
+                "manual", "child", "description"
+            ),
             "trigger_source": "workflow",
         },
     )
@@ -255,7 +282,8 @@ def test_jira_strategy_manual_merge_creates_and_links(monkeypatch):
         fake_create,
     )
     monkeypatch.setattr(
-        "relay.services.drivers.jira_handler.JiraIssueHandler.link_related_issues",
+        "relay.services.drivers.jira_handler."
+        "JiraIssueHandler.link_related_issues",
         fake_link,
     )
     monkeypatch.setattr(
@@ -263,14 +291,20 @@ def test_jira_strategy_manual_merge_creates_and_links(monkeypatch):
         lambda self, issue_key: f"https://jira.devify.test/browse/{issue_key}",
     )
 
-    summary = RelayDispatcher.dispatch_event(event, task_id="task-devify-test-manual")
+    summary = RelayDispatcher.dispatch_event(
+        event, task_id="task-devify-test-manual"
+    )
 
-    refreshed = RelayDelivery.objects.get(event=event, subscription=subscription)
+    refreshed = RelayDelivery.objects.get(
+        event=event, subscription=subscription
+    )
     assert summary["success"] == 1
     assert refreshed.external_id == "DEVIFY-TEST-REQ-222"
     assert refreshed.metadata["relay_strategy"] == "new_and_link"
     assert refreshed.metadata["relay_strategy_source"] == "manual_merge"
-    assert calls["create"]["issue_data"]["title"] == make_test_label("manual", "child", "summary")
+    assert calls["create"]["issue_data"]["title"] == make_test_label(
+        "manual", "child", "summary"
+    )
     assert calls["link"]["issue_key"] == "DEVIFY-TEST-REQ-222"
     assert calls["link"]["related_issue_keys"] == ["DEVIFY-TEST-REQ-111"]
 
@@ -329,14 +363,18 @@ def test_jira_strategy_retry_updates_existing_issue(monkeypatch):
     )
     monkeypatch.setattr(
         "relay.services.drivers.jira_handler.JiraIssueHandler.create_issue",
-        lambda self, **kwargs: pytest.fail("create_issue should not be called"),
+        lambda self, **kwargs: pytest.fail(
+            "create_issue should not be called"
+        ),
     )
     monkeypatch.setattr(
         "relay.services.drivers.jira_handler.JiraIssueHandler.get_issue_url",
         lambda self, issue_key: f"https://jira.devify.test/browse/{issue_key}",
     )
 
-    summary = RelayDispatcher.retry_delivery(delivery, task_id="task-devify-test-retry")
+    summary = RelayDispatcher.retry_delivery(
+        delivery, task_id="task-devify-test-retry"
+    )
 
     refreshed = RelayDelivery.objects.get(id=delivery.id)
     assert summary["success"] == 1
@@ -345,4 +383,6 @@ def test_jira_strategy_retry_updates_existing_issue(monkeypatch):
     assert refreshed.metadata["relay_strategy"] == "update"
     assert refreshed.metadata["relay_strategy_source"] == "retry"
     assert calls["update"]["issue_key"] == "DEVIFY-TEST-REQ-555"
-    assert calls["update"]["issue_data"]["title"] == make_test_label("retry", "summary")
+    assert calls["update"]["issue_data"]["title"] == make_test_label(
+        "retry", "summary"
+    )

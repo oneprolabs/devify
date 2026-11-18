@@ -73,13 +73,12 @@
       <summary class="cursor-pointer text-gray-600">环境与诊断信息</summary>
       <pre
         class="mt-2 p-3 bg-gray-50 rounded overflow-auto max-h-64 text-xs whitespace-pre-wrap break-all"
-        >{{
-          JSON.stringify(
-            { context: report.context, diagnostics: report.diagnostics },
-            null,
-            2
-          )
-        }}</pre
+        >{{ JSON.stringify(report.context, null, 2) }}</pre
+      >
+      <pre
+        v-if="diagnosticsText"
+        class="mt-2 p-3 bg-gray-50 rounded overflow-auto max-h-64 text-xs whitespace-pre-wrap break-all"
+        >{{ diagnosticsText }}</pre
       >
     </details>
     <form
@@ -226,6 +225,15 @@ let loadToken = 0
 let disposed = false
 
 const attachments = computed(() => props.report.attachments || [])
+
+// Version 2 diagnostics are already one greppable line per record; older
+// reports keep the structured JSON so nothing becomes unreadable.
+const diagnosticsText = computed(() => {
+  const diagnostics = props.report.diagnostics
+  if (!diagnostics) return ''
+  if (Array.isArray(diagnostics.lines)) return diagnostics.lines.join('\n')
+  return JSON.stringify(diagnostics, null, 2)
+})
 
 const activePreview = computed(() => {
   if (activeIndex.value < 0) return null

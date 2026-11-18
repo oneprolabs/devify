@@ -74,6 +74,25 @@ def test_submit_retry_and_changed_content_conflict(client):
     )
 
 
+def test_text_diagnostics_are_persisted_as_lines(client):
+    key = str(uuid.uuid4())
+    diagnostics = {
+        "schema_version": 2,
+        "generated_at": "2026-11-18T09:00:00Z",
+        "lines": [
+            "2026-11-18T09:00:00.000+08:00\tERROR\tauth.failure\t"
+            "method=POST url=https://devify.test/api/v1/auth/login "
+            "code=NETWORK_TIMEOUT"
+        ],
+    }
+    response = submit(client, client_id=key, diagnostics=diagnostics)
+    assert response.status_code == 201
+    stored = Feedback.objects.get().diagnostics
+    assert stored["schema_version"] == 2
+    assert stored["lines"][0].endswith("code=NETWORK_TIMEOUT")
+    assert response.data["diagnostics"] == stored
+
+
 def test_feedback_and_private_attachment_are_owner_scoped(client):
     report = submit(client).data
     attachment_url = report["attachments"][0]["download_path"]

@@ -76,6 +76,51 @@ def test_unknown_diagnostic_fields_are_rejected(key):
     assert not serializer.is_valid()
 
 
+def test_text_diagnostics_are_accepted_and_round_trip():
+    data = payload()
+    data["diagnostics"] = {
+        "schema_version": 2,
+        "generated_at": "2026-11-18T09:00:00Z",
+        "lines": [
+            "2026-11-18T09:00:00.000+08:00\tERROR\tupload.failure\t"
+            "method=POST url=https://devify.test/api/v1/chat/uploads/1/"
+            "archive status=503 duration_ms=1200 code=HTTP_ERROR "
+            "body={\"token\":\"***\"}"
+        ],
+    }
+    serializer = CreateFeedbackSerializer(data=data)
+    assert serializer.is_valid(), serializer.errors
+    encoded = json.loads(json.dumps(serializer.data))["diagnostics"]
+    assert encoded["schema_version"] == 2
+    assert encoded["lines"][0].startswith("2026-11-18T09:00:00.000+08:00")
+    assert "\tERROR\tupload.failure\t" in encoded["lines"][0]
+
+
+def test_diagnostic_shape_must_match_its_version():
+    data = payload()
+    data["diagnostics"] = {
+        "schema_version": 2,
+        "generated_at": "2026-11-18T09:00:00Z",
+        "events": [],
+    }
+    assert not CreateFeedbackSerializer(data=data).is_valid()
+
+    data["diagnostics"] = {
+        "schema_version": 1,
+        "generated_at": "2026-11-18T09:00:00Z",
+        "events": [],
+        "lines": [],
+    }
+    assert not CreateFeedbackSerializer(data=data).is_valid()
+
+    data["diagnostics"] = {
+        "schema_version": 2,
+        "generated_at": "2026-11-18T09:00:00Z",
+        "lines": ["x" * 4001],
+    }
+    assert not CreateFeedbackSerializer(data=data).is_valid()
+
+
 def test_host_environment_is_optional_and_bounded():
     data = payload()
     data["context"].update(

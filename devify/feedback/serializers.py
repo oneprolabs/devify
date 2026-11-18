@@ -63,10 +63,44 @@ class EventSerializer(StrictSerializer):
     duration_ms = serializers.IntegerField(required=False, min_value=0)
 
 
-class DiagnosticsSerializer(StrictSerializer):
+class DiagnosticsV1Serializer(StrictSerializer):
     schema_version = serializers.IntegerField(min_value=1, max_value=1)
     generated_at = serializers.DateTimeField()
     events = EventSerializer(many=True, max_length=1000)
+
+
+class DiagnosticsV2Serializer(StrictSerializer):
+    schema_version = serializers.IntegerField(min_value=2, max_value=2)
+    generated_at = serializers.DateTimeField()
+    # One greppable text line per record: time, level, event, content.
+    lines = serializers.ListField(
+        child=serializers.CharField(max_length=4000, trim_whitespace=False),
+        max_length=1000,
+    )
+
+
+class DiagnosticsField(serializers.Field):
+    """Accept both diagnostic shapes; version 1 is the structured event list
+    sent by older clients, version 2 is the plain-text line list."""
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("诊断内容格式无效。")
+        version = data.get("schema_version")
+        serializer_class = (
+            DiagnosticsV2Serializer
+            if version == 2
+            else DiagnosticsV1Serializer
+        )
+        # Run validation directly: `is_valid(raise_exception=True)` would build
+        # `serializer.errors`, which cannot represent StrictSerializer's bare
+        # validation message.
+        return serializer_class().run_validation(data)
+
+    def to_representation(self, value):
+        if value.get("schema_version") == 2:
+            return DiagnosticsV2Serializer(value).data
+        return DiagnosticsV1Serializer(value).data
 
 
 class CreateFeedbackSerializer(StrictSerializer):
@@ -79,7 +113,7 @@ class CreateFeedbackSerializer(StrictSerializer):
         max_length=200, required=False, allow_blank=True, default=""
     )
     context = ContextSerializer()
-    diagnostics = DiagnosticsSerializer(required=False)
+    diagnostics = DiagnosticsField(required=False)
 
 
 class UpdateFeedbackSerializer(serializers.ModelSerializer):

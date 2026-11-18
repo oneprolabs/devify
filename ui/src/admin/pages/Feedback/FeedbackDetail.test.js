@@ -199,6 +199,44 @@ describe('feedback support handling', () => {
     wrapper.unmount()
   })
 
+  it('renders text diagnostics as lines and keeps legacy JSON readable', async () => {
+    const lines = [
+      '2026-11-18T17:00:00.000+08:00\tERROR\tupload.failure\tmethod=POST url=https://devify.test/api/v1/x status=503'
+    ]
+    const wrapper = mount(FeedbackDetail, {
+      props: {
+        report: {
+          ...report,
+          context: { app_version: '0.1.9' },
+          diagnostics: {
+            schema_version: 2,
+            generated_at: '2026-11-18T09:00:00Z',
+            lines
+          }
+        }
+      }
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain(lines[0])
+    wrapper.unmount()
+
+    const legacy = mount(FeedbackDetail, {
+      props: {
+        report: {
+          ...report,
+          diagnostics: {
+            schema_version: 1,
+            generated_at: '2026-11-13T09:00:00Z',
+            events: [{ at: '2026-11-13T09:00:00Z', module: 'upload' }]
+          }
+        }
+      }
+    })
+    await flushPromises()
+    expect(legacy.text()).toContain('"schema_version": 1')
+    legacy.unmount()
+  })
+
   it('stops queued previews after the component unmounts', async () => {
     let releaseFirst
     feedbackApi.fetchAttachment.mockImplementation(

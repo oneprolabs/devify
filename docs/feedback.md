@@ -46,9 +46,11 @@ API 与 worker 必须能访问同一目录，禁止配置到任何公开静态�
     "related_batch_ids": [42]
   },
   "diagnostics": {
-    "schema_version": 1,
-    "generated_at": "2026-11-13T09:00:00Z",
-    "events": [{"at": "2026-11-13T09:00:00Z", "module": "upload", "operation": "failure", "code": "COMMAND_FAILED", "duration_ms": 37}]
+    "schema_version": 2,
+    "generated_at": "2026-11-18T09:00:00Z",
+    "lines": [
+      "2026-11-18T17:00:00.123+08:00\tERROR\tupload.failure\tmethod=POST url=https://devify.test/api/v1/chat/uploads/42/archive status=503 duration_ms=1200 code=HTTP_ERROR request_id=desktop-123 body={\"device_id\":\"42\",\"token\":\"***\"}"
+    ]
   }
 }
 ```
@@ -63,8 +65,13 @@ API 与 worker 必须能访问同一目录，禁止配置到任何公开静态�
 - `client_id` 在用户范围内唯一；同内容重放返回原反馈（200），
   同编号不同内容返回 409，新建返回 201。服务端自行计算内容摘要。
 - 描述最长 5000 字；诊断 JSON 最多 512 KiB、
-  1000 条事件；最多 3 张 PNG/JPEG，每张输入不超过 3 MiB，
+  1000 条事件或文本行；最多 3 张 PNG/JPEG，每张输入不超过 3 MiB，
   总请求不超过 10 MiB。截图实际解码、去元数据并重新编码。
+- 诊断支持两种结构：`schema_version: 2` 使用 `lines`（每条一行
+  `时间 级别 事件 内容`，单行最多 4000 字），旧客户端的
+  `schema_version: 1` 仍按 `events` 结构化事件接收。客户端在网络失败时会附带
+  请求地址、方法和脱敏后的 JSON 请求体；密码、Token、账号标识以及笔记/事件/
+  问答等正文类字段替换为 `***`，请求体截断到 2 KB，上传包只记录字段名和大小。
 - 截图 30 天后拒绝下载，每日清理字节并保留过期标记和反馈处理结果。
 - 诊断字段采用白名单；客户端不扫描应用数据目录，不采集聊天正文、
   解密数据库、密钥、登录凭据或 Agent 原始输入输出。

@@ -8,9 +8,11 @@ from chat_ingestion.views import (
     UploadBatchDetailAPIView,
     UploadBatchItemDetailAPIView,
     UploadBatchRetryAPIView,
+    UploadBatchRecoveryAPIView,
 )
 
 urlpatterns = [
+    path("spaces/<uuid:space_id>/chat/uploads/recovery", UploadBatchRecoveryAPIView.as_view(), name="chat-upload-recovery"),
     path(
         "spaces/<uuid:space_id>/chat/uploads",
         UploadBatchCreateAPIView.as_view(),

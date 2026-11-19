@@ -797,6 +797,13 @@ class QuestionAnswer(models.Model):
         max_length=20, choices=Status.choices, default=Status.QUEUED
     )
     error = models.TextField(blank=True)
+    thread = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="turns",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

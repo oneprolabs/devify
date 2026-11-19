@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 from chat_analysis import topic_services
 from chat_analysis.models import (
     Event,
+    EventEvidence,
     EventNote,
     EventTag,
     EventTagAssignment,
@@ -20,6 +21,7 @@ from chat_analysis.models import (
 from chat_analysis.question_tasks import (
     MODEL_FAILURE_MESSAGE,
     answer_question_task,
+    prior_question_turns,
 )
 from chat_analysis.topic_services import answer_question, question_context
 from chat_domain.models import Conversation, Message, MessagePart
@@ -111,6 +113,103 @@ def test_question_is_queued_and_scoped(on_commit, dispatch):
     assert response.data["data"]["status"] == "queued"
     dispatch.assert_called_once()
     assert response.data["data"]["scope"] == {"tag_keys": ["risk"]}
+    assert response.data["data"]["thread_id"] is None
+
+
+@patch("chat_analysis.api_views.dispatch_question_answer")
+@patch(
+    "chat_analysis.api_views.transaction.on_commit",
+    side_effect=lambda callback: callback(),
+)
+def test_follow_up_stays_on_the_open_thread(on_commit, dispatch):
+    owner = User.objects.create_user(username="question-thread")
+    other = User.objects.create_user(username="question-thread-other")
+    space = make_space(owner, "question-thread")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    first = client.post(
+        f"/api/v1/spaces/{space.pk}/questions",
+        {"question": "这周有什么问题"},
+        format="json",
+    ).data["data"]
+    second = client.post(
+        f"/api/v1/spaces/{space.pk}/questions",
+        {"question": "那登录呢", "thread_id": first["id"]},
+        format="json",
+    )
+    assert second.status_code == 202
+    assert second.data["data"]["thread_id"] == first["id"]
+    third = client.post(
+        f"/api/v1/spaces/{space.pk}/questions",
+        {"question": "再说具体一点", "thread_id": second.data["data"]["id"]},
+        format="json",
+    )
+    assert third.data["data"]["thread_id"] == first["id"]
+    listed = client.get(f"/api/v1/spaces/{space.pk}/questions").data["data"]
+    assert [item["id"] for item in listed if not item["thread_id"]] == [
+        first["id"]
+    ]
+    outsider = APIClient()
+    outsider.force_authenticate(user=other)
+    SpaceMembership.objects.create(
+        space=space,
+        user=other,
+        role=SpaceMembership.Role.USER,
+        status=SpaceMembership.Status.ACTIVE,
+    )
+    rejected = outsider.post(
+        f"/api/v1/spaces/{space.pk}/questions",
+        {"question": "别人的会话", "thread_id": first["id"]},
+        format="json",
+    )
+    assert rejected.status_code == 404
+
+
+def test_prior_turns_include_ready_answers_in_the_same_thread():
+    owner = User.objects.create_user(username="question-prior-rows")
+    space = make_space(owner, "question-prior-rows")
+    root = QuestionAnswer.objects.create(
+        space=space,
+        created_by=owner,
+        question="这周有什么问题",
+        answer="登录打不开。",
+        status=QuestionAnswer.Status.READY,
+    )
+    follow = QuestionAnswer.objects.create(
+        space=space,
+        created_by=owner,
+        question="那登录呢",
+        thread=root,
+        status=QuestionAnswer.Status.QUEUED,
+    )
+    assert prior_question_turns(follow) == [
+        {"question": "这周有什么问题", "answer": "登录打不开。"}
+    ]
+
+
+def test_answer_question_passes_prior_turns(monkeypatch):
+    owner = User.objects.create_user(username="question-prior")
+    space = make_space(owner, "question-prior")
+    captured = {}
+
+    def fake_call(**kwargs):
+        captured["content"] = kwargs["content"]
+        return {"answer": "继续说登录。", "citations": []}, {"model": "test"}
+
+    monkeypatch.setattr(
+        "chat_analysis.topic_services.LLMTracker.call_and_track",
+        fake_call,
+    )
+    answer_question(
+        actor=owner,
+        space=space,
+        question="那登录呢",
+        prior_turns=[{"question": "这周有什么问题", "answer": "登录打不开。"}],
+    )
+    payload = json.loads(captured["content"])
+    assert payload["prior_turns"] == [
+        {"question": "这周有什么问题", "answer": "登录打不开。"}
+    ]
 
 
 def test_question_requires_question_text():
@@ -734,6 +833,14 @@ def test_conversations_named_in_matches_titles_in_question():
     assert (
         topic_services.conversations_named_in(space, "张三说了什么") == set()
     )
+    broad = make_conversation(space, "broad", "客户")
+    specific = make_conversation(space, "specific", "客户群A")
+    assert topic_services.conversations_named_in(space, "总结一下客户群A") == {
+        specific.pk
+    }
+    assert broad.pk not in topic_services.conversations_named_in(
+        space, "总结一下客户群A"
+    )
 
 
 def test_answer_question_scopes_to_named_conversation():
@@ -758,6 +865,86 @@ def test_answer_question_scopes_to_named_conversation():
     assert result["scope"]["conversation_ids"] == [wang.pk]
 
 
+def test_cross_conversation_event_stays_out_of_the_answer():
+    owner = User.objects.create_user(username="cross-answer-owner")
+    space = make_space(owner, "cross-answer-team")
+    wang = make_conversation(space, "wang", "王欣")
+    other = make_conversation(space, "other", "项目群")
+    wang_message = make_message(wang, "wang-1", "周五前交付方案")
+    other_message = make_message(other, "other-1", "项目群里的另一件事")
+    mixed = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="mixed",
+        title="跨会话事件",
+        content="王欣和项目群都提到了交付",
+        status=Event.Status.OPEN,
+        last_activity_at=timezone.now(),
+    )
+    pure = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="pure",
+        title="只在王欣会话里",
+        content="王欣要求周五前交付",
+        status=Event.Status.OPEN,
+        last_activity_at=timezone.now(),
+    )
+    for event, message in (
+        (mixed, wang_message),
+        (mixed, other_message),
+        (pure, wang_message),
+    ):
+        EventEvidence.objects.create(
+            event=event, message=message, created_by=owner
+        )
+
+    context = question_context(space=space, conversation_ids=[wang.pk])
+
+    assert [item["id"] for item in context["events"]] == [pure.pk]
+    assert [item["id"] for item in context["messages"]] == [wang_message.pk]
+    assert context["related"]["other_conversations"] == 1
+
+
+def test_time_window_keeps_spanning_material_as_related():
+    owner = User.objects.create_user(username="window-owner")
+    space = make_space(owner, "window-team")
+    conversation = make_conversation(space, "window", "客户群")
+    now = timezone.now()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_message = make_message(
+        conversation, "today", "今天确认", occurred_at=now
+    )
+    make_message(
+        conversation,
+        "yesterday",
+        "昨天的内容",
+        occurred_at=today - timedelta(hours=1),
+    )
+    spanning = Note.objects.create(
+        space=space,
+        created_by=owner,
+        note_key="spanning",
+        title="跨天笔记",
+        content="从昨天一直记到今天",
+        start_at=today - timedelta(days=1),
+        end_at=now,
+    )
+    NoteEvidence.objects.create(
+        note=spanning,
+        message=today_message,
+        reference_key=NoteEvidence.build_reference_key(today_message.pk),
+    )
+
+    context = question_context(
+        space=space, since=today, until=today + timedelta(days=1)
+    )
+
+    assert context["notes"] == []
+    assert [item["id"] for item in context["messages"]] == [today_message.pk]
+    assert context["related"]["outside_time"] == 1
+
+
 def test_explicit_scope_is_not_replaced_by_named_conversation():
     owner = User.objects.create_user(username="named-explicit-owner")
     space = make_space(owner, "named-explicit-team")
@@ -779,6 +966,14 @@ def test_explicit_scope_is_not_replaced_by_named_conversation():
     records = json.loads(call.call_args.kwargs["content"])["records"]
     assert [item["id"] for item in records["messages"]] == [other_message.pk]
     assert result["scope"]["conversation_ids"] == [other.pk]
+
+
+def test_question_window_closes_yesterday():
+    zone = timezone.get_default_timezone()
+    now = timezone.make_aware(datetime(2026, 11, 11, 15, 30), zone)
+    since, until = topic_services.question_window("昨天聊了什么", now=now)
+    assert since == timezone.make_aware(datetime(2026, 11, 10, 0, 0), zone)
+    assert until == timezone.make_aware(datetime(2026, 11, 11, 0, 0), zone)
 
 
 @pytest.mark.parametrize(

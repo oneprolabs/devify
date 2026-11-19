@@ -360,7 +360,9 @@ def test_across_chats_same_matter_attaches_and_other_matters_stay_separate(
     ops = _group(space, "cross-ops")
     weekend = _group(space, "cross-weekend")
     sales_message = add_message(sales, 1, text="客户订单库连不上")
-    ops_message = add_message(ops, 1, text="订单库连接池耗尽，服务已重启")
+    ops_message = add_message(
+        ops, 1, text="INC100 订单库连接池耗尽，服务已重启"
+    )
     weekend_message = add_message(weekend, 1, text="周日中午聚餐")
     sales_job = make_job(space, owner, sales, end_seq=1, key="cross-sales-job")
     ops_job = make_job(space, owner, ops, end_seq=1, key="cross-ops-job")
@@ -381,7 +383,7 @@ def test_across_chats_same_matter_attaches_and_other_matters_stay_separate(
         [
             {
                 "action": "create",
-                "event_key": "order-db-outage",
+                "entity": "inc100",
                 "title": "订单库连接故障",
                 "summary": "客户订单库无法连接。",
                 "status": "in_progress",
@@ -389,12 +391,14 @@ def test_across_chats_same_matter_attaches_and_other_matters_stay_separate(
             }
         ],
     )
+    outage_key = Event.objects.get(space=space).event_key
     run(
         ops_job,
         [
             {
                 "action": "attach",
-                "event_key": "order-db-outage",
+                "event_key": outage_key,
+                "status_scope": "event",
                 "title": "订单库连接故障",
                 "summary": "连接池耗尽，服务已重启。",
                 "status": "done",
@@ -417,8 +421,8 @@ def test_across_chats_same_matter_attaches_and_other_matters_stay_separate(
         ],
     )
 
-    outage = Event.objects.get(space=space, event_key="order-db-outage")
-    lunch = Event.objects.get(space=space, event_key="sunday-lunch")
+    outage = Event.objects.get(space=space, event_key=outage_key)
+    lunch = Event.objects.get(space=space, title="周日聚餐")
     assert Event.objects.filter(space=space).count() == 2
     assert outage.status == Event.Status.DONE
     assert set(
@@ -455,7 +459,7 @@ def test_token_budget_splits_long_text_and_keeps_a_reply_with_its_parent(
         settings.CHAT_ANALYSIS_MODEL_INPUT_TOKENS = budget
         try:
             return len(execution._messages_for_model(job, messages))
-        except MessageExceedsBudget:
+        except (MessageExceedsBudget, ValueError):
             return 0
 
     low, high = 1, 20000

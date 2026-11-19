@@ -165,6 +165,7 @@ def test_auto_create_events_accepts_llm_suggestions(settings):
                 "event_key": "quote-follow-up",
                 "title": "Prepare quote",
                 "summary": "Prepare the annual quote.",
+                "source_seqs": [1],
             }
         ],
     }

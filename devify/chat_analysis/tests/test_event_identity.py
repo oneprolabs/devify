@@ -379,7 +379,8 @@ def test_scheduled_reduction_reuses_candidates_after_failure(
     assert mapped == [1, 2]
     assert reducer_attempts == [2, 2]
     event = Event.objects.get(space=space)
-    assert event.status == Event.Status.DONE
+    # A separate candidate being done cannot close the newly grouped goal.
+    assert event.status == Event.Status.OPEN
     assert "Icon has been restored" in event.content
     assert event.evidence.count() == 2
 
@@ -421,7 +422,7 @@ def test_scheduled_analysis_exposes_old_closed_quoted_event(
         return {"events": [{
             "action": "attach", "event_key": candidate["event_key"],
             "title": "修复客户端图标", "summary": "新版再次出现该问题",
-            "status": "in_progress", "source_seqs": [2],
+            "status": "in_progress", "status_scope": "event", "source_seqs": [2],
         }]}, {}
 
     monkeypatch.setattr(execution.LLMTracker, "call_and_track", analyze)

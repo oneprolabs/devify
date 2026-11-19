@@ -16,14 +16,12 @@ from chat_ingestion.tests.archives import DEFAULT_MESSAGES, build_archive
 from chat_ingestion.tests.test_content_dedup import upload
 from core.tracking import LLMTracker
 
-from .test_e2e_chain import chain as chain_fixture
-from .test_e2e_chain import (
-    client_for,
-    make_space,
-    run_scheduled_analysis,
-)
+from . import test_e2e_chain
 
-chain = chain_fixture
+chain = test_e2e_chain.chain
+client_for = test_e2e_chain.client_for
+make_space = test_e2e_chain.make_space
+run_scheduled_analysis = test_e2e_chain.run_scheduled_analysis
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 

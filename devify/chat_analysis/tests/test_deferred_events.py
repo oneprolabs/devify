@@ -1,4 +1,4 @@
-"""Exercise deferred event candidates through the real analysis and publish paths."""
+"""Exercise deferred candidates through real analysis and publication."""
 
 import pytest
 from django.contrib.auth.models import User
@@ -43,7 +43,10 @@ def analyze(request, monkeypatch):
     def run(chat, message, output, *, key=None, before_publish=None):
         owner, space, conversation = chat
         job = make_job(
-            space, owner, conversation, end_seq=message.ingest_seq,
+            space,
+            owner,
+            conversation,
+            end_seq=message.ingest_seq,
             key=key or f"message-{message.pk}",
         )
         job.start_seq = message.ingest_seq - 1
@@ -80,7 +83,9 @@ def clarify(current, anchor, ids, *, action="create", key="", role="matter"):
     return {
         "action": action,
         "event_key": key,
-        "context_decision": "continuation" if action == "attach" else "independent",
+        "context_decision": (
+            "continuation" if action == "attach" else "independent"
+        ),
         "title": "核对订单 A 到账",
         "summary": "今天需确认订单 A 是否到账。",
         "status": "open",
@@ -96,29 +101,62 @@ def clarify(current, anchor, ids, *, action="create", key="", role="matter"):
 def test_malformed_citation_cannot_create_event(chat, analyze, bad_sources):
     _, space, conversation = chat
     message = add_message(conversation, 1, "请核对订单 A。")
-    sources = [{"seq": bad_sources, "role": "matter"}] if not isinstance(bad_sources, dict) else bad_sources
-    analyze(chat, message, [{
-        "action": "create", "title": "核对订单 A", "summary": "请核对订单 A。",
-        "status": "open", "sources": sources, "source_seqs": [1],
-    }])
+    sources = (
+        [{"seq": bad_sources, "role": "matter"}]
+        if not isinstance(bad_sources, dict)
+        else bad_sources
+    )
+    analyze(
+        chat,
+        message,
+        [
+            {
+                "action": "create",
+                "title": "核对订单 A",
+                "summary": "请核对订单 A。",
+                "status": "open",
+                "sources": sources,
+                "source_seqs": [1],
+            }
+        ],
+    )
     assert not Event.objects.filter(space=space).exists()
 
 
 @pytest.mark.parametrize("status", ["in_progress", "done"])
-def test_bare_ack_never_advances_status_even_when_model_calls_it_matter(chat, analyze, status):
+def test_bare_ack_never_advances_status_even_when_model_calls_it_matter(
+    chat, analyze, status
+):
     owner, space, conversation = chat
     original = add_message(conversation, 1, "请核对订单 A。")
     event = Event.objects.create(
-        space=space, created_by=owner, event_key="ack-ticket", title="核对订单 A",
-        content="待核对。", status=Event.Status.OPEN,
+        space=space,
+        created_by=owner,
+        event_key="ack-ticket",
+        title="核对订单 A",
+        content="待核对。",
+        status=Event.Status.OPEN,
     )
-    EventEvidence.objects.create(event=event, message=original, created_by=owner)
+    EventEvidence.objects.create(
+        event=event, message=original, created_by=owner
+    )
     current = add_message(conversation, 2, "收到。", reply_to=original)
-    analyze(chat, current, [{
-        "action": "attach", "event_key": event.event_key, "title": event.title,
-        "summary": "已收到。", "status": status, "status_scope": "event",
-        "execution_seqs": [2], "sources": [{"seq": 2, "role": "matter"}],
-    }])
+    analyze(
+        chat,
+        current,
+        [
+            {
+                "action": "attach",
+                "event_key": event.event_key,
+                "title": event.title,
+                "summary": "已收到。",
+                "status": status,
+                "status_scope": "event",
+                "execution_seqs": [2],
+                "sources": [{"seq": 2, "role": "matter"}],
+            }
+        ],
+    )
     event.refresh_from_db()
     assert event.status == Event.Status.OPEN
     assert event.evidence.filter(message=current).exists()
@@ -129,45 +167,91 @@ def test_partial_execution_only_starts_open_event(chat, analyze, before):
     owner, space, conversation = chat
     original = add_message(conversation, 1, "请核对订单 A。")
     event = Event.objects.create(
-        space=space, created_by=owner, event_key="partial-ticket", title="核对订单 A",
-        content="核对账目。", status=before,
+        space=space,
+        created_by=owner,
+        event_key="partial-ticket",
+        title="核对订单 A",
+        content="核对账目。",
+        status=before,
     )
-    EventEvidence.objects.create(event=event, message=original, created_by=owner)
-    current = add_message(conversation, 2, "已经核对第一笔，第二笔待查。", reply_to=original)
-    analyze(chat, current, [{
-        "action": "attach", "event_key": event.event_key, "title": event.title,
-        "summary": "已核对第一笔。", "status": "in_progress", "status_scope": "progress",
-        "execution_seqs": [2], "sources": [{"seq": 2, "role": "matter"}],
-    }])
+    EventEvidence.objects.create(
+        event=event, message=original, created_by=owner
+    )
+    current = add_message(
+        conversation, 2, "已经核对第一笔，第二笔待查。", reply_to=original
+    )
+    analyze(
+        chat,
+        current,
+        [
+            {
+                "action": "attach",
+                "event_key": event.event_key,
+                "title": event.title,
+                "summary": "已核对第一笔。",
+                "status": "in_progress",
+                "status_scope": "progress",
+                "execution_seqs": [2],
+                "sources": [{"seq": 2, "role": "matter"}],
+            }
+        ],
+    )
     event.refresh_from_db()
-    assert event.status == (Event.Status.IN_PROGRESS if before == Event.Status.OPEN else before)
+    assert event.status == (
+        Event.Status.IN_PROGRESS if before == Event.Status.OPEN else before
+    )
     assert event.evidence.filter(message=current).exists()
 
 
 def test_unresolved_target_cannot_publish_as_create(chat, analyze):
     _, space, conversation = chat
     message = add_message(conversation, 1, ANCHOR_TEXT)
-    analyze(chat, message, [{
-        **defer(1), "action": "create", "target_resolution": "unresolved",
-        "title": "确认订单 A/B", "summary": ANCHOR_TEXT, "status": "open",
-    }])
+    analyze(
+        chat,
+        message,
+        [
+            {
+                **defer(1),
+                "action": "create",
+                "target_resolution": "unresolved",
+                "title": "确认订单 A/B",
+                "summary": ANCHOR_TEXT,
+                "status": "open",
+            }
+        ],
+    )
     assert DeferredEventCandidate.objects.filter(message=message).count() == 1
     assert not Event.objects.filter(space=space).exists()
 
 
-@pytest.mark.parametrize("execution_seqs,expected", [
-    (None, Event.Status.OPEN), ([], Event.Status.OPEN),
-    ([99], Event.Status.OPEN), ([1], Event.Status.IN_PROGRESS),
-])
-def test_new_event_needs_current_execution_evidence(chat, analyze, execution_seqs, expected):
+@pytest.mark.parametrize(
+    "execution_seqs,expected",
+    [
+        (None, Event.Status.OPEN),
+        ([], Event.Status.OPEN),
+        ([99], Event.Status.OPEN),
+        ([1], Event.Status.IN_PROGRESS),
+    ],
+)
+def test_new_event_needs_current_execution_evidence(
+    chat, analyze, execution_seqs, expected
+):
     _, space, conversation = chat
     message = add_message(
-        conversation, 1,
-        "我已开始对银行流水。" if execution_seqs == [1] else "请今天核对订单A。",
+        conversation,
+        1,
+        (
+            "我已开始对银行流水。"
+            if execution_seqs == [1]
+            else "请今天核对订单A。"
+        ),
     )
     candidate = {
-        "action": "create", "title": "核对订单A", "summary": "核对银行流水。",
-        "status": "in_progress", "status_scope": "event",
+        "action": "create",
+        "title": "核对订单A",
+        "summary": "核对银行流水。",
+        "status": "in_progress",
+        "status_scope": "event",
         "sources": [{"seq": 1, "role": "matter"}],
     }
     if execution_seqs is not None:
@@ -177,11 +261,15 @@ def test_new_event_needs_current_execution_evidence(chat, analyze, execution_seq
 
 
 @pytest.mark.parametrize("direct_reply", [True, False])
-def test_selected_candidate_can_recover_background_from_direct_reply(chat, analyze, direct_reply):
+def test_selected_candidate_can_recover_background_from_direct_reply(
+    chat, analyze, direct_reply
+):
     _, space, conversation = chat
     anchor, candidate = defer_first(chat, analyze)
     current = add_message(
-        conversation, 2, "我说的是订单 A，今天核对到账。",
+        conversation,
+        2,
+        "我说的是订单 A，今天核对到账。",
         reply_to=anchor if direct_reply else None,
     )
     output = clarify(current, anchor, [candidate.pk])
@@ -192,25 +280,48 @@ def test_selected_candidate_can_recover_background_from_direct_reply(chat, analy
     candidate.refresh_from_db()
     assert event.evidence.filter(message=anchor).exists() == direct_reply
     assert candidate.status == (
-        DeferredEventCandidate.Status.RESOLVED if direct_reply
+        DeferredEventCandidate.Status.RESOLVED
+        if direct_reply
         else DeferredEventCandidate.Status.PENDING
     )
 
 
-@pytest.mark.parametrize("basis,basis_seqs,status,published", [
-    ("none", [1], "open", False), ("explicit_work", [99], "open", False),
-    ("explicit_work", [1], "open", True), ("lasting_result", [1], "open", False),
-    ("lasting_result", [1], "done", True),
-])
-def test_event_admission_needs_current_basis(chat, analyze, basis, basis_seqs, status, published):
+@pytest.mark.parametrize(
+    "basis,basis_seqs,status,published",
+    [
+        ("none", [1], "open", False),
+        ("explicit_work", [99], "open", False),
+        ("explicit_work", [1], "open", True),
+        ("lasting_result", [1], "open", False),
+        ("lasting_result", [1], "done", True),
+    ],
+)
+def test_event_admission_needs_current_basis(
+    chat, analyze, basis, basis_seqs, status, published
+):
     _, space, conversation = chat
-    text = "财务已签批并归档预算单。" if status == "done" else "请财务明天核对到账。"
+    text = (
+        "财务已签批并归档预算单。"
+        if status == "done"
+        else "请财务明天核对到账。"
+    )
     message = add_message(conversation, 1, text)
-    analyze(chat, message, [{
-        "action": "create", "title": "核对事项", "summary": text,
-        "status": status, "status_scope": "event", "new_event_basis": basis,
-        "basis_seqs": basis_seqs, "sources": [{"seq": 1, "role": "matter"}],
-    }])
+    analyze(
+        chat,
+        message,
+        [
+            {
+                "action": "create",
+                "title": "核对事项",
+                "summary": text,
+                "status": status,
+                "status_scope": "event",
+                "new_event_basis": basis,
+                "basis_seqs": basis_seqs,
+                "sources": [{"seq": 1, "role": "matter"}],
+            }
+        ],
+    )
     assert Event.objects.filter(space=space).exists() == published
     if published:
         assert Event.objects.get(space=space).status == status
@@ -230,65 +341,108 @@ def defer_first(chat, analyze):
 
 @pytest.mark.parametrize("same_candidate", [True, False])
 def test_repeated_defer_requires_a_shown_candidate_and_original_evidence(
-    chat, analyze, same_candidate,
+    chat,
+    analyze,
+    same_candidate,
 ):
     _, space, conversation = chat
     anchor, candidate = defer_first(chat, analyze)
-    current = add_message(conversation, 2, "仍需今天核对，编号还没确认。", reply_to=anchor)
+    current = add_message(
+        conversation, 2, "仍需今天核对，编号还没确认。", reply_to=anchor
+    )
     output = defer(current.ingest_seq)
-    output["same_deferred_id"] = candidate.pk if same_candidate else candidate.pk + 100
+    output["same_deferred_id"] = (
+        candidate.pk if same_candidate else candidate.pk + 100
+    )
     output["sources"].append({"seq": anchor.ingest_seq, "role": "background"})
 
     analyze(chat, current, [output])
 
     candidate.refresh_from_db()
     assert candidate.status == DeferredEventCandidate.Status.PENDING
-    assert DeferredEventCandidate.objects.filter(space=space).count() == (1 if same_candidate else 2)
+    assert DeferredEventCandidate.objects.filter(space=space).count() == (
+        1 if same_candidate else 2
+    )
 
 
 def test_started_event_does_not_return_to_open_while_waiting(chat, analyze):
     owner, space, conversation = chat
     original = add_message(conversation, 1, "原件已交盖章窗口。")
     event = Event.objects.create(
-        space=space, created_by=owner, event_key="fd552", title="原件盖章",
-        content="正在办理。", status=Event.Status.IN_PROGRESS,
+        space=space,
+        created_by=owner,
+        event_key="fd552",
+        title="原件盖章",
+        content="正在办理。",
+        status=Event.Status.IN_PROGRESS,
     )
-    EventEvidence.objects.create(event=event, message=original, created_by=owner)
+    EventEvidence.objects.create(
+        event=event, message=original, created_by=owner
+    )
     current = add_message(conversation, 2, "窗口尚未盖章，改到明天办理。")
-    analyze(chat, current, [{
-        "action": "attach", "event_key": event.event_key,
-        "context_decision": "continuation", "event_change": "material",
-        "title": event.title, "summary": "原件已交窗口，明天继续办理。",
-        "status": "open", "status_scope": "event",
-        "sources": [{"seq": 2, "role": "matter"}],
-    }])
+    analyze(
+        chat,
+        current,
+        [
+            {
+                "action": "attach",
+                "event_key": event.event_key,
+                "context_decision": "continuation",
+                "event_change": "material",
+                "title": event.title,
+                "summary": "原件已交窗口，明天继续办理。",
+                "status": "open",
+                "status_scope": "event",
+                "sources": [{"seq": 2, "role": "matter"}],
+            }
+        ],
+    )
     event.refresh_from_db()
     assert event.status == Event.Status.IN_PROGRESS
     assert event.evidence.filter(message=current).exists()
 
 
-def test_unchanged_event_does_not_gain_evidence_when_another_event_changes(chat, analyze):
+def test_unchanged_event_does_not_gain_evidence_when_another_event_changes(
+    chat, analyze
+):
     owner, space, conversation = chat
     original = add_message(conversation, 1, "工单 A 与 B 都已经关闭。")
     for key in ("ticket-a", "ticket-b"):
         event = Event.objects.create(
-            space=space, created_by=owner, event_key=key, title=key,
-            content="已关闭。", status=Event.Status.DONE,
+            space=space,
+            created_by=owner,
+            event_key=key,
+            title=key,
+            content="已关闭。",
+            status=Event.Status.DONE,
         )
-        EventEvidence.objects.create(event=event, message=original, created_by=owner)
+        EventEvidence.objects.create(
+            event=event, message=original, created_by=owner
+        )
     current = add_message(
-        conversation, 2, "A 已复现，我开始排查；B 不受影响，保持关闭。", reply_to=original,
+        conversation,
+        2,
+        "A 已复现，我开始排查；B 不受影响，保持关闭。",
+        reply_to=original,
     )
     output = {
-        "action": "attach", "context_decision": "continuation", "title": "工单复核",
-        "summary": "工单 A 已复现并开始排查。", "status": "in_progress",
-        "status_scope": "event", "execution_seqs": [2],
+        "action": "attach",
+        "context_decision": "continuation",
+        "title": "工单复核",
+        "summary": "工单 A 已复现并开始排查。",
+        "status": "in_progress",
+        "status_scope": "event",
+        "execution_seqs": [2],
         "sources": [{"seq": 2, "role": "matter"}],
     }
-    analyze(chat, current, [
-        {**output, "event_key": "ticket-a", "event_change": "material"},
-        {**output, "event_key": "ticket-b", "event_change": "none"},
-    ])
+    analyze(
+        chat,
+        current,
+        [
+            {**output, "event_key": "ticket-a", "event_change": "material"},
+            {**output, "event_key": "ticket-b", "event_change": "none"},
+        ],
+    )
 
     changed = Event.objects.get(space=space, event_key="ticket-a")
     unchanged = Event.objects.get(space=space, event_key="ticket-b")
@@ -310,7 +464,11 @@ def test_unchanged_event_does_not_gain_evidence_when_another_event_changes(chat,
     ],
 )
 def test_deferring_keeps_evidence_out_of_formal_events(
-    chat, analyze, signal, reason, urgent,
+    chat,
+    analyze,
+    signal,
+    reason,
+    urgent,
 ):
     _, space, conversation = chat
     anchor = add_message(conversation, 1, ANCHOR_TEXT)
@@ -331,9 +489,12 @@ def test_deferring_keeps_evidence_out_of_formal_events(
 
 
 @pytest.mark.parametrize(
-    "invalid", ["acknowledgment", "no_current_source", "invalid_signal"],
+    "invalid",
+    ["acknowledgment", "no_current_source", "invalid_signal"],
 )
-def test_only_actionable_current_evidence_can_be_deferred(chat, analyze, invalid):
+def test_only_actionable_current_evidence_can_be_deferred(
+    chat, analyze, invalid
+):
     _, space, conversation = chat
     anchor = add_message(conversation, 1, ANCHOR_TEXT)
     text = "好的。" if invalid == "acknowledgment" else "今天必须确认。"
@@ -351,23 +512,36 @@ def test_only_actionable_current_evidence_can_be_deferred(chat, analyze, invalid
 
 @pytest.mark.parametrize("action", ["create", "attach"])
 def test_clarification_resolves_once_and_preserves_both_sources(
-    chat, analyze, action,
+    chat,
+    analyze,
+    action,
 ):
     owner, space, conversation = chat
     anchor, candidate = defer_first(chat, analyze)
     existing = None
     if action == "attach":
         existing = Event.objects.create(
-            space=space, created_by=owner, event_key="order-a-payment",
-            title="核对订单 A 到账", content="订单 A 到账待核实。",
+            space=space,
+            created_by=owner,
+            event_key="order-a-payment",
+            title="核对订单 A 到账",
+            content="订单 A 到账待核实。",
             status=Event.Status.OPEN,
         )
-        EventEvidence.objects.create(event=existing, message=anchor, created_by=owner)
+        EventEvidence.objects.create(
+            event=existing, message=anchor, created_by=owner
+        )
     current = add_message(
-        conversation, 2, "我说的是订单 A，今天核对到账。", reply_to=anchor,
+        conversation,
+        2,
+        "我说的是订单 A，今天核对到账。",
+        reply_to=anchor,
     )
     output = clarify(
-        current, anchor, [candidate.pk, candidate.pk], action=action,
+        current,
+        anchor,
+        [candidate.pk, candidate.pk],
+        action=action,
         key=existing.event_key if existing else "",
     )
 
@@ -375,10 +549,16 @@ def test_clarification_resolves_once_and_preserves_both_sources(
         candidate.refresh_from_db()
         assert candidate.status == DeferredEventCandidate.Status.PENDING
         assert candidate.resolved_event_id is None
-        assert Event.objects.filter(space=space).count() == int(existing is not None)
+        assert Event.objects.filter(space=space).count() == int(
+            existing is not None
+        )
 
     payload = analyze(chat, current, [output], before_publish=before_publish)
-    presented = next(item for item in payload["deferred_candidates"] if item["id"] == candidate.pk)
+    presented = next(
+        item
+        for item in payload["deferred_candidates"]
+        if item["id"] == candidate.pk
+    )
     assert presented["anchor_seq"] == anchor.ingest_seq
     assert presented["text"] == ANCHOR_TEXT
     assert presented["reason"] == "ambiguous_target"
@@ -390,21 +570,30 @@ def test_clarification_resolves_once_and_preserves_both_sources(
         assert event.pk == existing.pk
     assert candidate.status == DeferredEventCandidate.Status.RESOLVED
     assert candidate.resolved_event_id == event.pk
-    assert set(event.evidence.values_list("message_id", flat=True)) == {anchor.pk, current.pk}
+    assert set(event.evidence.values_list("message_id", flat=True)) == {
+        anchor.pk,
+        current.pk,
+    }
     assert DeferredEventCandidate.objects.filter(message=anchor).count() == 1
 
     replay = add_message(conversation, 3, "已说明是订单 A。", reply_to=anchor)
     replay_payload = analyze(chat, replay, [])
-    assert candidate.pk not in [item["id"] for item in replay_payload["deferred_candidates"]]
+    assert candidate.pk not in [
+        item["id"] for item in replay_payload["deferred_candidates"]
+    ]
     candidate.refresh_from_db()
     assert candidate.status == DeferredEventCandidate.Status.RESOLVED
     assert candidate.resolved_event_id == event.pk
     assert Event.objects.filter(space=space).count() == 1
 
 
-@pytest.mark.parametrize("scenario", ["silence", "ack", "unrelated", "unknown_id", "no_anchor"])
+@pytest.mark.parametrize(
+    "scenario", ["silence", "ack", "unrelated", "unknown_id", "no_anchor"]
+)
 def test_pending_candidate_is_not_confirmed_without_grounded_clarification(
-    chat, analyze, scenario,
+    chat,
+    analyze,
+    scenario,
 ):
     _, space, conversation = chat
     anchor, candidate = defer_first(chat, analyze)
@@ -445,24 +634,38 @@ def test_pending_candidate_is_not_confirmed_without_grounded_clarification(
     elif scenario == "unrelated":
         event = Event.objects.get(space=space)
         assert event.title == output["title"]
-        assert set(event.evidence.values_list("message_id", flat=True)) == {current.pk}
+        assert set(event.evidence.values_list("message_id", flat=True)) == {
+            current.pk
+        }
 
 
-@pytest.mark.parametrize("different_space", [False, True], ids=["other-chat", "other-space"])
-def test_foreign_candidate_is_not_exposed_or_resolved(chat, analyze, different_space):
+@pytest.mark.parametrize(
+    "different_space", [False, True], ids=["other-chat", "other-space"]
+)
+def test_foreign_candidate_is_not_exposed_or_resolved(
+    chat, analyze, different_space
+):
     owner, space, _ = chat
     foreign_anchor, foreign_candidate = defer_first(chat, analyze)
     if different_space:
         space = make_space(owner, "other-deferred-space")
-    conversation = make_conversation(space, "separate-payments", "另外的付款讨论")
+    conversation = make_conversation(
+        space, "separate-payments", "另外的付款讨论"
+    )
     local_anchor = add_message(conversation, 1, "本群的订单 A 等待到账。")
-    current = add_message(conversation, 2, "我说的是订单 A。", reply_to=local_anchor)
+    current = add_message(
+        conversation, 2, "我说的是订单 A。", reply_to=local_anchor
+    )
     payload = analyze(
-        (owner, space, conversation), current,
+        (owner, space, conversation),
+        current,
         [clarify(current, local_anchor, [foreign_candidate.pk])],
     )
 
-    assert all(item["id"] != foreign_candidate.pk for item in payload["deferred_candidates"])
+    assert all(
+        item["id"] != foreign_candidate.pk
+        for item in payload["deferred_candidates"]
+    )
     foreign_candidate.refresh_from_db()
     assert foreign_candidate.status == DeferredEventCandidate.Status.PENDING
     assert foreign_candidate.resolution_suggestion_id is None
@@ -488,7 +691,10 @@ def test_manual_dismissal_wins_before_reservation(chat, analyze, monkeypatch):
     candidate.refresh_from_db()
     assert candidate.status == DeferredEventCandidate.Status.DISMISSED
     assert not Event.objects.filter(space=space).exists()
-    assert EventSuggestion.objects.get(space=space).status == EventSuggestion.Status.REJECTED
+    assert (
+        EventSuggestion.objects.get(space=space).status
+        == EventSuggestion.Status.REJECTED
+    )
 
 
 def test_manual_dismissal_wins_over_staged_publication(chat, analyze):
@@ -505,17 +711,26 @@ def test_manual_dismissal_wins_over_staged_publication(chat, analyze):
         candidate.save(update_fields=("status",))
         dismissed = True
 
-    analyze(chat, current, [clarify(current, anchor, [candidate.pk])],
-            before_publish=dismiss_before_publish)
+    analyze(
+        chat,
+        current,
+        [clarify(current, anchor, [candidate.pk])],
+        before_publish=dismiss_before_publish,
+    )
     if dismissed:
         candidate.refresh_from_db()
         assert candidate.status == DeferredEventCandidate.Status.DISMISSED
         assert not Event.objects.filter(space=space).exists()
-        assert candidate.resolution_suggestion.status == EventSuggestion.Status.REJECTED
+        assert (
+            candidate.resolution_suggestion.status
+            == EventSuggestion.Status.REJECTED
+        )
 
 
 def test_reprocessing_same_message_does_not_reopen_terminal_candidate(
-    chat, analyze, monkeypatch,
+    chat,
+    analyze,
+    monkeypatch,
 ):
     owner, space, conversation = chat
     anchor, candidate = defer_first(chat, analyze)
@@ -523,7 +738,9 @@ def test_reprocessing_same_message_does_not_reopen_terminal_candidate(
     # message reservation remains intact.
     candidate.status = DeferredEventCandidate.Status.DISMISSED
     candidate.save(update_fields=("status",))
-    immediate_job = make_job(space, owner, conversation, end_seq=1, key="replay-anchor")
+    immediate_job = make_job(
+        space, owner, conversation, end_seq=1, key="replay-anchor"
+    )
     run_job(immediate_job, monkeypatch, [defer(1)], [])
 
     assert immediate_job.state == AnalysisJob.State.READY, immediate_job.error

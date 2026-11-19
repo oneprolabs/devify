@@ -109,7 +109,10 @@ def _advance_event_status(event, status, *, source_messages):
     if status not in Event.Status.values:
         return
     # Waiting for a remaining step does not undo work already performed.
-    if event.status == Event.Status.IN_PROGRESS and status == Event.Status.OPEN:
+    if (
+        event.status == Event.Status.IN_PROGRESS
+        and status == Event.Status.OPEN
+    ):
         return
     newest = max(
         (
@@ -130,7 +133,12 @@ def _advance_event_status(event, status, *, source_messages):
 
 @transaction.atomic
 def review_event_suggestion(
-    *, actor, suggestion, decision, source_messages=None, target_event_key=None,
+    *,
+    actor,
+    suggestion,
+    decision,
+    source_messages=None,
+    target_event_key=None,
     apply_proposed_status=True,
 ):
     ensure_can_contribute(actor, suggestion.space)
@@ -149,19 +157,30 @@ def review_event_suggestion(
             target_event_key or suggestion.event_key, title=suggestion.title
         )
         Event.objects.select_for_update().filter(
-            space=suggestion.space, event_key=canonical_key,
+            space=suggestion.space,
+            event_key=canonical_key,
         ).first()
-        reserved = list(DeferredEventCandidate.objects.select_for_update().filter(
-            resolution_suggestion=suggestion,
-        ).order_by("pk"))
+        reserved = list(
+            DeferredEventCandidate.objects.select_for_update()
+            .filter(
+                resolution_suggestion=suggestion,
+            )
+            .order_by("pk")
+        )
         if any(
-            item.status != DeferredEventCandidate.Status.PENDING for item in reserved
+            item.status != DeferredEventCandidate.Status.PENDING
+            for item in reserved
         ):
             settle_resolutions(suggestion)
             suggestion.status = EventSuggestion.Status.REJECTED
-            suggestion.save(update_fields=(
-                "status", "reviewed_by", "reviewed_at", "updated_at",
-            ))
+            suggestion.save(
+                update_fields=(
+                    "status",
+                    "reviewed_by",
+                    "reviewed_at",
+                    "updated_at",
+                )
+            )
             return suggestion
         status = suggestion.proposed_status if apply_proposed_status else ""
         event, created = Event.objects.get_or_create(
@@ -177,16 +196,22 @@ def review_event_suggestion(
         )
         activity_messages = source_messages
         if source_messages:
-            current_ids = set(suggestion.note.evidence.filter(
-                message_id__in=[message.pk for message in source_messages],
-            ).values_list("message_id", flat=True))
+            current_ids = set(
+                suggestion.note.evidence.filter(
+                    message_id__in=[message.pk for message in source_messages],
+                ).values_list("message_id", flat=True)
+            )
             if current_ids:
                 # Background is linked for traceability, not as new activity.
                 activity_messages = [
-                    message for message in source_messages if message.pk in current_ids
+                    message
+                    for message in source_messages
+                    if message.pk in current_ids
                 ]
         if not created and status:
-            _advance_event_status(event, status, source_messages=activity_messages)
+            _advance_event_status(
+                event, status, source_messages=activity_messages
+            )
         EventNote.objects.get_or_create(
             event=event,
             note=suggestion.note,

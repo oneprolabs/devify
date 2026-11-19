@@ -739,26 +739,38 @@ class DeferredEventCandidate(models.Model):
 
     space = models.ForeignKey(Space, on_delete=models.CASCADE)
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE)
-    message = models.OneToOneField("chat_domain.Message", on_delete=models.CASCADE)
+    message = models.OneToOneField(
+        "chat_domain.Message", on_delete=models.CASCADE
+    )
     reason = models.CharField(max_length=24, choices=Reason.choices)
     question = models.CharField(max_length=300)
     urgent = models.BooleanField(default=False)
     status = models.CharField(
-        max_length=12, choices=Status.choices, default=Status.PENDING,
+        max_length=12,
+        choices=Status.choices,
+        default=Status.PENDING,
     )
-    resolved_event = models.ForeignKey(Event, null=True, on_delete=models.SET_NULL)
+    resolved_event = models.ForeignKey(
+        Event, null=True, on_delete=models.SET_NULL
+    )
     resolution_suggestion = models.ForeignKey(
-        EventSuggestion, null=True, on_delete=models.SET_NULL,
+        EventSuggestion,
+        null=True,
+        on_delete=models.SET_NULL,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         indexes = [
-            models.Index(fields=("conversation", "status", "-created_at", "-id"),
-                         name="defer_chat_status_recent"),
-            models.Index(fields=("space", "status", "urgent", "created_at"),
-                         name="defer_space_review"),
+            models.Index(
+                fields=("conversation", "status", "-created_at", "-id"),
+                name="defer_chat_status_recent",
+            ),
+            models.Index(
+                fields=("space", "status", "urgent", "created_at"),
+                name="defer_space_review",
+            ),
         ]
 
 

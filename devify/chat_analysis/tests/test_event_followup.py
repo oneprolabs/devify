@@ -45,7 +45,8 @@ def run_followup(request, chat, monkeypatch):
         job.start_seq = message.ingest_seq - 1
         if request.param:
             job.specification = {
-                **job.specification, "scheduled_message_scope": True,
+                **job.specification,
+                "scheduled_message_scope": True,
             }
             AnalysisJobMessage.objects.create(job=job, message=message)
         job.save(update_fields=("start_seq", "specification"))
@@ -89,13 +90,20 @@ def candidate(action, *, key="", status="in_progress", seq=None, scope=None):
     return result
 
 
-@pytest.mark.parametrize("target_exists", [False, True], ids=["missing", "hidden"])
-def test_unshown_attach_is_ignored_not_created(chat, run_followup, target_exists):
+@pytest.mark.parametrize(
+    "target_exists", [False, True], ids=["missing", "hidden"]
+)
+def test_unshown_attach_is_ignored_not_created(
+    chat, run_followup, target_exists
+):
     _, space, conversation = chat
     target = "other-client-release"
     if target_exists:
         existing_event(
-            chat, key=target, title="另一轮客户端发版", status=Event.Status.DONE,
+            chat,
+            key=target,
+            title="另一轮客户端发版",
+            status=Event.Status.DONE,
             source_text="上一轮客户端已完成验收。",
         )
     message = add_message(conversation, 2, "这次复测仍能复现。")
@@ -106,26 +114,43 @@ def test_unshown_attach_is_ignored_not_created(chat, run_followup, target_exists
         for pool in ("open_events_same_conversation", "cross_candidates")
         for item in payload[pool]
     }
-    keys = Event.objects.filter(space=space).values_list("event_key", flat=True)
+    keys = Event.objects.filter(space=space).values_list(
+        "event_key", flat=True
+    )
     assert list(keys) == ([target] if target_exists else [])
     assert not EventEvidence.objects.filter(message=message).exists()
     assert not EventSuggestion.objects.filter(space=space).exists()
 
 
 @pytest.mark.parametrize("action", ["create", "attach"])
-@pytest.mark.parametrize("bad_seq", [None, 1], ids=["missing", "outside-chunk"])
+@pytest.mark.parametrize(
+    "bad_seq", [None, 1], ids=["missing", "outside-chunk"]
+)
 def test_explicit_auto_write_requires_current_citation(
-    chat, run_followup, action, bad_seq,
+    chat,
+    run_followup,
+    action,
+    bad_seq,
 ):
     _, space, conversation = chat
     event = existing_event(
-        chat, key="client-release", title="客户端发版",
-        status=Event.Status.IN_PROGRESS, source_text="开始发版验证。",
+        chat,
+        key="client-release",
+        title="客户端发版",
+        status=Event.Status.IN_PROGRESS,
+        source_text="开始发版验证。",
     )
     message = add_message(conversation, 2, "登录已复测。")
-    payload = run_followup(message, [candidate(
-        action, key=event.event_key if action == "attach" else "", seq=bad_seq,
-    )])
+    payload = run_followup(
+        message,
+        [
+            candidate(
+                action,
+                key=event.event_key if action == "attach" else "",
+                seq=bad_seq,
+            )
+        ],
+    )
 
     assert event.event_key in {
         item["event_key"] for item in payload["open_events_same_conversation"]
@@ -149,23 +174,44 @@ def test_create_with_current_citation_is_published(chat, run_followup):
     ("before", "proposed", "text"),
     [
         (Event.Status.IN_PROGRESS, Event.Status.DONE, "客户端发版已验收。"),
-        (Event.Status.DONE, Event.Status.IN_PROGRESS, "同一问题又复现，需要重开。"),
+        (
+            Event.Status.DONE,
+            Event.Status.IN_PROGRESS,
+            "同一问题又复现，需要重开。",
+        ),
     ],
     ids=["close", "reopen"],
 )
 def test_attach_changes_event_state_only_with_event_scope(
-    chat, run_followup, scope, before, proposed, text,
+    chat,
+    run_followup,
+    scope,
+    before,
+    proposed,
+    text,
 ):
     _, space, conversation = chat
     event = existing_event(
-        chat, key="client-release", title="客户端发版", status=before,
+        chat,
+        key="client-release",
+        title="客户端发版",
+        status=before,
         source_text="跟进客户端发版。",
     )
     original = event.evidence.get().message
     message = add_message(conversation, 2, text, reply_to=original)
-    run_followup(message, [candidate(
-        "attach", key=event.event_key, status=proposed, seq=2, scope=scope,
-    )])
+    run_followup(
+        message,
+        [
+            candidate(
+                "attach",
+                key=event.event_key,
+                status=proposed,
+                seq=2,
+                scope=scope,
+            )
+        ],
+    )
 
     event.refresh_from_db()
     assert Event.objects.filter(space=space).count() == 1
@@ -183,25 +229,40 @@ def test_attach_changes_event_state_only_with_event_scope(
     ids=["ticket", "qualified-release", "bare-version"],
 )
 def test_closed_event_candidate_requires_concrete_anchor(
-    chat, run_followup, label, entity, followup, anchored,
+    chat,
+    run_followup,
+    label,
+    entity,
+    followup,
+    anchored,
 ):
     owner, space, conversation = chat
     old = existing_event(
-        chat, key="previous-client-work", title=f"{label}：安装验证",
-        status=Event.Status.DONE, source_text=f"{label} 的安装已验收。",
+        chat,
+        key="previous-client-work",
+        title=f"{label}：安装验证",
+        status=Event.Status.DONE,
+        source_text=f"{label} 的安装已验收。",
         entity=entity,
     )
     newer = add_message(conversation, 2, "等另一轮报告。")
     unrelated = Event.objects.create(
-        space=space, created_by=owner, event_key="unrelated-work",
-        title="报告待提交", status=Event.Status.OPEN,
+        space=space,
+        created_by=owner,
+        event_key="unrelated-work",
+        title="报告待提交",
+        status=Event.Status.OPEN,
         last_activity_at=newer.occurred_at,
     )
-    EventEvidence.objects.create(event=unrelated, message=newer, created_by=owner)
+    EventEvidence.objects.create(
+        event=unrelated, message=newer, created_by=owner
+    )
     message = add_message(conversation, 3, followup)
     payload = run_followup(message, [])
 
-    keys = [item["event_key"] for item in payload["open_events_same_conversation"]]
+    keys = [
+        item["event_key"] for item in payload["open_events_same_conversation"]
+    ]
     assert unrelated.event_key in keys
     if anchored:
         assert keys[0] == old.event_key
@@ -209,9 +270,9 @@ def test_closed_event_candidate_requires_concrete_anchor(
         assert old.event_key not in keys
 
 
-
 def test_release_progress_groups_without_closing_or_absorbing_other_work(
-    chat, monkeypatch,
+    chat,
+    monkeypatch,
 ):
     owner, space, conversation = chat
     rows = [
@@ -229,17 +290,21 @@ def test_release_progress_groups_without_closing_or_absorbing_other_work(
 
     def model(*, prompt, content, json_mode, node_name, state):
         if node_name == "chat_event_extraction":
-            return {"events": [
-                {
-                    **candidate(
-                        "create", seq=seq, scope="event",
-                        status="done" if seq == 2 else "open",
-                    ),
-                    "title": title,
-                    "summary": text,
-                }
-                for seq, (title, text) in enumerate(rows, 1)
-            ]}, {}
+            return {
+                "events": [
+                    {
+                        **candidate(
+                            "create",
+                            seq=seq,
+                            scope="event",
+                            status="done" if seq == 2 else "open",
+                        ),
+                        "title": title,
+                        "summary": text,
+                    }
+                    for seq, (title, text) in enumerate(rows, 1)
+                ]
+            }, {}
         if node_name == "chat_event_reduce":
             items = json.loads(content)["candidates"]
             assert [item["title"] for item in items] == [r[0] for r in rows]
@@ -249,10 +314,15 @@ def test_release_progress_groups_without_closing_or_absorbing_other_work(
     monkeypatch.setattr(execution.LLMTracker, "call_and_track", model)
     execution.execute_analysis_job(job.pk, worker_id="release-test")
 
-    events = {event.title: event for event in Event.objects.filter(space=space)}
+    events = {
+        event.title: event for event in Event.objects.filter(space=space)
+    }
     assert set(events) == {rows[0][0], rows[2][0], rows[3][0]}
     release = events[rows[0][0]]
     assert release.status == Event.Status.OPEN
-    assert set(release.evidence.values_list("message__ingest_seq", flat=True)) == {
-        1, 2,
+    assert set(
+        release.evidence.values_list("message__ingest_seq", flat=True)
+    ) == {
+        1,
+        2,
     }

@@ -64,9 +64,7 @@ def build_identity_key(
     if not conversation_id and not scope:
         raise ValueError("source_conversation_id or scope_key is required.")
     component = conversation_id or f"scope:{scope}"
-    key = ":".join(
-        quote(part, safe="") for part in (platform, component)
-    )
+    key = ":".join(quote(part, safe="") for part in (platform, component))
     if len(key) > 700:
         raise ValueError("Conversation identity key is too long.")
     return key
@@ -311,7 +309,8 @@ def upsert_message(
         next_seq = (
             Message.objects.filter(conversation=conversation).aggregate(
                 last=Max("ingest_seq")
-            )["last"] or 0
+            )["last"]
+            or 0
         ) + 1
     try:
         with transaction.atomic():
@@ -596,6 +595,7 @@ def apply_message_fingerprints(message_ids):
 def _rewrite_merged_source_seqs(source_seqs, source_seq, target_seq):
     if not isinstance(source_seqs, list):
         return source_seqs
+
     def sequence(value):
         if type(value) is int:
             return value
@@ -621,30 +621,49 @@ def _rewrite_merged_source_seqs(source_seqs, source_seq, target_seq):
 
 
 def _merge_event_candidate_references(source, target):
-    """Rehome analysis references or veto a merge that loses a final decision."""
-    from chat_analysis.models import AnalysisJob, DeferredEventCandidate, EventSuggestion
+    """Rehome references or veto a merge that loses a final decision."""
+    from chat_analysis.models import (
+        AnalysisJob,
+        DeferredEventCandidate,
+        EventSuggestion,
+    )
 
     jobs = AnalysisJob.objects.filter(conversation_id=source.conversation_id)
 
     # Publication locks suggestions before their candidate rows. Lock pending
     # suggestions in this conversation first, including background citations
     # that are not represented by NoteEvidence of the suggestion's own note.
-    suggestions = list(EventSuggestion.objects.filter(
-        analysis_job_id__in=jobs.values("pk"),
-        status=EventSuggestion.Status.PENDING,
-    ).select_for_update().order_by("pk"))
-    candidates = list(DeferredEventCandidate.objects.filter(
-        message_id__in=(source.pk, target.pk),
-    ).select_for_update().order_by("pk"))
+    suggestions = list(
+        EventSuggestion.objects.filter(
+            analysis_job_id__in=jobs.values("pk"),
+            status=EventSuggestion.Status.PENDING,
+        )
+        .select_for_update()
+        .order_by("pk")
+    )
+    candidates = list(
+        DeferredEventCandidate.objects.filter(
+            message_id__in=(source.pk, target.pk),
+        )
+        .select_for_update()
+        .order_by("pk")
+    )
     pending = DeferredEventCandidate.Status.PENDING
-    final = [candidate for candidate in candidates if candidate.status != pending]
-    conflicting = len({(item.status, item.resolved_event_id) for item in final}) > 1
+    final = [
+        candidate for candidate in candidates if candidate.status != pending
+    ]
+    conflicting = (
+        len({(item.status, item.resolved_event_id) for item in final}) > 1
+    )
     invalidated = set()
     if len(candidates) > 1:
         # Two candidate IDs now describe one message; neither staged proposal
         # can safely claim its original reservation. Keep other candidates in
-        # those proposals pending and let a subsequent analysis cite them again.
-        invalidated = {candidate.resolution_suggestion_id for candidate in candidates}
+        # those proposals pending and let a subsequent analysis cite them
+        # again.
+        invalidated = {
+            candidate.resolution_suggestion_id for candidate in candidates
+        }
     rejected = set()
     for suggestion in suggestions:
         if suggestion.pk in invalidated:
@@ -655,14 +674,17 @@ def _merge_event_candidate_references(source, target):
         if conflicting:
             continue
         seqs = _rewrite_merged_source_seqs(
-            suggestion.source_seqs, source.ingest_seq, target.ingest_seq,
+            suggestion.source_seqs,
+            source.ingest_seq,
+            target.ingest_seq,
         )
         if seqs != suggestion.source_seqs:
             suggestion.source_seqs = seqs
             suggestion.save(update_fields=("source_seqs", "updated_at"))
     if rejected:
         DeferredEventCandidate.objects.filter(
-            status=pending, conversation_id=source.conversation_id,
+            status=pending,
+            conversation_id=source.conversation_id,
             resolution_suggestion_id__in=rejected,
         ).update(resolution_suggestion=None)
 
@@ -740,9 +762,7 @@ def merge_messages(*, source, target):
         ).exists():
             evidence.delete()
             continue
-        evidence.save(
-            update_fields=("message", "reference_key")
-        )
+        evidence.save(update_fields=("message", "reference_key"))
 
     for evidence in list(EventEvidence.objects.filter(message=source)):
         EventEvidence.objects.get_or_create(
@@ -763,9 +783,9 @@ def consolidate_conversation_messages(conversation, *, fingerprints=None):
     rows this batch created that turned out to be duplicates.
     """
 
-    query = Message.objects.filter(
-        conversation=conversation
-    ).exclude(content_fingerprint="")
+    query = Message.objects.filter(conversation=conversation).exclude(
+        content_fingerprint=""
+    )
     if fingerprints:
         query = query.filter(content_fingerprint__in=fingerprints)
     groups = list(

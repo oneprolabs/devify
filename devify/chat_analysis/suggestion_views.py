@@ -119,42 +119,62 @@ class DeferredEventCandidateListAPIView(APIView):
         space, takeover = _authorized_space(request.user, space_id)
         if space is None:
             return Response({"detail": "Space not found."}, status=404)
-        candidates = _reviewable_deferred_candidates(space).filter(
-            status=DeferredEventCandidate.Status.PENDING
-        ).select_related("message").prefetch_related(
-            Prefetch(
-                "message__parts",
-                queryset=MessagePart.objects.filter(kind=MessagePart.Kind.TEXT)
-                .exclude(text="").order_by("ordinal", "id")[:1],
-                to_attr="deferred_review_text",
+        candidates = (
+            _reviewable_deferred_candidates(space)
+            .filter(status=DeferredEventCandidate.Status.PENDING)
+            .select_related("message")
+            .prefetch_related(
+                Prefetch(
+                    "message__parts",
+                    queryset=MessagePart.objects.filter(
+                        kind=MessagePart.Kind.TEXT
+                    )
+                    .exclude(text="")
+                    .order_by("ordinal", "id")[:1],
+                    to_attr="deferred_review_text",
+                )
             )
-        ).order_by("created_at", "pk")
+            .order_by("created_at", "pk")
+        )
         paginator = AnalysisPagination()
         page = paginator.paginate_queryset(candidates, request, view=self)
         if takeover:
             audit_space_action(
-                actor=request.user, space=space,
+                actor=request.user,
+                space=space,
                 action="chat.deferred_event_candidates_viewed",
                 resource_type="deferred_event_candidate",
                 metadata={"takeover_id": takeover.pk},
             )
-        return Response({"data": {
-            "list": [_deferred_review_row(candidate) for candidate in page],
-            "pagination": _pagination_data(paginator),
-        }})
+        return Response(
+            {
+                "data": {
+                    "list": [
+                        _deferred_review_row(candidate) for candidate in page
+                    ],
+                    "pagination": _pagination_data(paginator),
+                }
+            }
+        )
 
 
 class DeferredEventCandidateReviewSerializer(serializers.Serializer):
     decision = serializers.ChoiceField(choices=("dismiss", "link"))
     event_id = serializers.IntegerField(
-        required=False, min_value=1, max_value=2**63 - 1,
+        required=False,
+        min_value=1,
+        max_value=2**63 - 1,
     )
 
     def validate(self, attrs):
         if (attrs["decision"] == "link") != ("event_id" in attrs):
-            raise serializers.ValidationError({
-                "event_id": "Provide an event_id only when linking a candidate.",
-            })
+            raise serializers.ValidationError(
+                {
+                    "event_id": (
+                        "Provide an event_id only when linking a candidate."
+                    ),
+                }
+            )
         return attrs
 
 
@@ -168,7 +188,8 @@ class DeferredEventCandidateReviewAPIView(APIView):
             return Response({"detail": "Space not found."}, status=404)
         if not SpacePermissionService.can_upload(request.user, space):
             return Response(
-                {"detail": "Candidate review permission required."}, status=403,
+                {"detail": "Candidate review permission required."},
+                status=403,
             )
         serializer = DeferredEventCandidateReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -177,7 +198,8 @@ class DeferredEventCandidateReviewAPIView(APIView):
         if decision == "link":
             # Publication locks Event before DeferredEventCandidate too.
             target = get_object_or_404(
-                Event.objects.select_for_update(), space=space,
+                Event.objects.select_for_update(),
+                space=space,
                 pk=serializer.validated_data["event_id"],
             )
         candidate = get_object_or_404(
@@ -191,28 +213,41 @@ class DeferredEventCandidateReviewAPIView(APIView):
             )
         if target is not None:
             EventEvidence.objects.get_or_create(
-                event=target, message_id=candidate.message_id,
+                event=target,
+                message_id=candidate.message_id,
                 defaults={"created_by": request.user},
             )
         candidate.status = (
             DeferredEventCandidate.Status.RESOLVED
-            if target is not None else DeferredEventCandidate.Status.DISMISSED
+            if target is not None
+            else DeferredEventCandidate.Status.DISMISSED
         )
         candidate.resolved_event = target
         # Retain any staged suggestion link so publication can recognize
         # and suppress a proposal superseded by this human decision.
-        candidate.save(update_fields=("status", "resolved_event", "updated_at"))
-        metadata = {"decision": decision, "event_id": candidate.resolved_event_id}
+        candidate.save(
+            update_fields=("status", "resolved_event", "updated_at")
+        )
+        metadata = {
+            "decision": decision,
+            "event_id": candidate.resolved_event_id,
+        }
         if takeover:
             metadata["takeover_id"] = takeover.pk
         audit_space_action(
-            actor=request.user, space=space,
+            actor=request.user,
+            space=space,
             action="chat.deferred_event_candidate_reviewed",
-            resource_type="deferred_event_candidate", resource_id=candidate.pk,
+            resource_type="deferred_event_candidate",
+            resource_id=candidate.pk,
             metadata=metadata,
         )
-        return Response({"data": {
-            "id": candidate.pk,
-            "status": candidate.status,
-            "resolved_event_id": candidate.resolved_event_id,
-        }})
+        return Response(
+            {
+                "data": {
+                    "id": candidate.pk,
+                    "status": candidate.status,
+                    "resolved_event_id": candidate.resolved_event_id,
+                }
+            }
+        )

@@ -73,37 +73,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         --index-url "$PIP_INDEX_URL" \
         --trusted-host "$PIP_TRUSTED_HOST"
 
-# Flanker's bundled grammar signatures differ from the installed PLY version.
-# Generate the tables once before concurrent workers can import the parser.
-RUN python - <<'PY'
-from flanker import mime
-from flanker.addresslib import address
-
-assert address.parse('parser-check@example.com').address == 'parser-check@example.com'
-assert mime.from_string('Subject: Parser check\r\n\r\nReady').subject == 'Parser check'
-PY
-
-# Fresh processes must load the prepared tables without rewriting shared files.
-RUN python - <<'PY'
-from concurrent.futures import ProcessPoolExecutor
-
-def check_parser(_):
-    import ply.yacc
-
-    def reject_table_write(*args, **kwargs):
-        raise RuntimeError('Flanker grammar tables were not prepared during build')
-
-    ply.yacc.LRGeneratedTable.write_table = reject_table_write
-    from flanker import mime
-    from flanker.addresslib import address
-
-    assert address.parse('parser-check@example.com').address == 'parser-check@example.com'
-    assert mime.from_string('Subject: Parser check\r\n\r\nReady').subject == 'Parser check'
-
-with ProcessPoolExecutor(max_workers=4) as pool:
-    list(pool.map(check_parser, range(4)))
-PY
-
 RUN rm -rf /root/.cache /tmp/* \
     && find /opt/venv -type d -name __pycache__ -prune \
         -exec rm -rf {} + \

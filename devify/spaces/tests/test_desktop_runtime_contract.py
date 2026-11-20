@@ -29,17 +29,26 @@ def test_native_automatic_batch_roundtrip(platform, settings, tmp_path):
     settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = False
     settings.CHAT_UPLOAD_ARCHIVE_DIR = str(tmp_path / "archives")
     settings.CHAT_MEDIA_DIR = str(tmp_path / "media")
-    fixture = Path(__file__).parent / "fixtures" / "desktop-runtime" / f"{platform}.zip"
+    fixture = (
+        Path(__file__).parent
+        / "fixtures"
+        / "desktop-runtime"
+        / f"{platform}.zip"
+    )
     raw = fixture.read_bytes()
     with zipfile.ZipFile(fixture) as archive:
         manifest = json.loads(archive.read("manifest.json"))
         names = manifest["scope"]["conversation_ids"]
     user = User.objects.create_user(username=f"native-contract-{platform}")
     space = SpaceBootstrapService.ensure_personal_space(user)
-    DesktopDevice.objects.create(user=user, device_id="native-test", status="active")
+    DesktopDevice.objects.create(
+        user=user, device_id="native-test", status="active"
+    )
     client = APIClient()
     client.force_authenticate(user=user)
-    target = dict(platform=platform, source_account_id=manifest["source_namespace"])
+    target = dict(
+        platform=platform, source_account_id=manifest["source_namespace"]
+    )
     config = dict(
         schema_version=1,
         device_id="native-test",
@@ -102,7 +111,10 @@ def test_native_automatic_batch_roundtrip(platform, settings, tmp_path):
     assert result.data["data"]["status"] == "completed"
     count = Message.objects.filter(conversation__space=space).count()
     assert count == manifest["counts"]["messages"]
-    assert client.post(f"/api/v1/chat/uploads/{batch_id}/complete").status_code == 200
+    assert (
+        client.post(f"/api/v1/chat/uploads/{batch_id}/complete").status_code
+        == 200
+    )
     assert Message.objects.filter(conversation__space=space).count() == count
     assert UploadBatch.objects.filter(space=space).count() == 1
     for name in names:
@@ -118,7 +130,8 @@ def test_native_automatic_batch_roundtrip(platform, settings, tmp_path):
         conversation = lookup.data["data"]["conversation"]
         assert conversation is not None
         readback = client.get(
-            f"/api/v1/spaces/{space.pk}/conversations/{conversation['id']}/messages",
+            f"/api/v1/spaces/{space.pk}/conversations/"
+            f"{conversation['id']}/messages",
             {"page": "last", "page_size": 100},
         )
         assert readback.status_code == 200, readback.data

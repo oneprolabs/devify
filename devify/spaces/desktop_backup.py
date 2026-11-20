@@ -1,4 +1,4 @@
-"""Single-direction desktop backup settings; no merge or remote-version protocol."""
+"""Desktop backup settings without merging remote versions."""
 
 import hashlib
 import json
@@ -6,8 +6,8 @@ import json
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import JSONParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -42,7 +42,8 @@ class RangeSerializer(StrictSerializer):
 class BackupSerializer(StrictSerializer):
     mode = serializers.ChoiceField(choices=("interval", "times", "manual"))
     times = serializers.ListField(
-        child=serializers.RegexField(r"^([01][0-9]|2[0-3]):[0-5][0-9]$"), max_length=24
+        child=serializers.RegexField(r"^([01][0-9]|2[0-3]):[0-5][0-9]$"),
+        max_length=24,
     )
     window_enabled = serializers.BooleanField()
     window_mode = serializers.ChoiceField(choices=("allow", "deny"))
@@ -62,7 +63,9 @@ class PayloadSerializer(StrictSerializer):
         child=serializers.CharField(max_length=255), max_length=1000
     )
     initial_ranges = serializers.DictField(child=RangeSerializer())
-    sync_interval_seconds = serializers.IntegerField(min_value=60, max_value=3596400)
+    sync_interval_seconds = serializers.IntegerField(
+        min_value=60, max_value=3596400
+    )
     backup = BackupSerializer()
 
     def validate(self, data):
@@ -89,13 +92,15 @@ class SaveSerializer(StrictSerializer):
 
 class DesktopBackupConfigAPIView(APIView):
     permission_classes = [IsAuthenticated]
-    # Conversation identifiers are opaque map keys, never camel-case transformed.
+    # Conversation IDs are opaque keys; never camel-case them.
     parser_classes = [JSONParser]
 
     @transaction.atomic
     def put(self, request, space_id):
         if len(request.body) > 2 * 1024 * 1024:
-            return Response({"detail": "Configuration exceeds 2 MiB."}, status=413)
+            return Response(
+                {"detail": "Configuration exceeds 2 MiB."}, status=413
+            )
         space = get_object_or_404(Space, pk=space_id)
         if not SpacePermissionService.can_upload(request.user, space):
             return Response({"detail": "Space not found."}, status=404)
@@ -112,22 +117,32 @@ class DesktopBackupConfigAPIView(APIView):
             .first()
         )
         if device is None:
-            return Response({"detail": "Device authorization is required."}, status=403)
+            return Response(
+                {"detail": "Device authorization is required."}, status=403
+            )
         digest = hashlib.sha256(
             json.dumps(values, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        scope = dict(user=request.user, space=space, device_id=device.device_id)
+        scope = dict(
+            user=request.user, space=space, device_id=device.device_id
+        )
         receipt = DesktopConfigReceipt.objects.filter(
             **scope, mutation_id=values["mutation_id"]
         ).first()
         if receipt:
             if receipt.digest != digest:
-                return Response({"detail": "IDEMPOTENCY_KEY_REUSED"}, status=409)
+                return Response(
+                    {"detail": "IDEMPOTENCY_KEY_REUSED"}, status=409
+                )
             return Response({"data": receipt.result})
         target = (
-            values["target"]["platform"] + ":" + values["target"]["source_account_id"]
+            values["target"]["platform"]
+            + ":"
+            + values["target"]["source_account_id"]
         )
-        config, _ = DesktopBackupConfig.objects.get_or_create(**scope, target=target)
+        config, _ = DesktopBackupConfig.objects.get_or_create(
+            **scope, target=target
+        )
         payload = values["payload"]
         if payload["setup_state"] == "completed":
             config.completed = payload
@@ -142,7 +157,10 @@ class DesktopBackupConfigAPIView(APIView):
             "saved": True,
         }
         DesktopConfigReceipt.objects.create(
-            **scope, mutation_id=values["mutation_id"], digest=digest, result=result
+            **scope,
+            mutation_id=values["mutation_id"],
+            digest=digest,
+            result=result,
         )
         return Response({"data": result})
 
@@ -162,7 +180,10 @@ class DesktopMessageKeysAPIView(APIView):
         if not SpacePermissionService.can_upload(request.user, space):
             return Response({"detail": "Space not found."}, status=404)
         data = request.data
-        if not isinstance(data, dict) or set(data) != {"source_account_id", "queries"}:
+        if not isinstance(data, dict) or set(data) != {
+            "source_account_id",
+            "queries",
+        }:
             return Response({"detail": "Invalid key query."}, status=400)
         account = data["source_account_id"]
         queries = data["queries"]
@@ -177,7 +198,10 @@ class DesktopMessageKeysAPIView(APIView):
         result = []
         total = 0
         for query in queries:
-            if not isinstance(query, dict) or set(query) != {"username", "keys"}:
+            if not isinstance(query, dict) or set(query) != {
+                "username",
+                "keys",
+            }:
                 return Response({"detail": "Invalid key query."}, status=400)
             name, keys = query["username"], query["keys"]
             if (
@@ -185,27 +209,38 @@ class DesktopMessageKeysAPIView(APIView):
                 or not isinstance(keys, list)
                 or any(not isinstance(k, str) or len(k) > 255 for k in keys)
             ):
-                return Response({"detail": "Invalid message keys."}, status=400)
+                return Response(
+                    {"detail": "Invalid message keys."}, status=400
+                )
             total += len(keys)
             if total > 1000:
-                return Response({"detail": "Too many message keys."}, status=400)
+                return Response(
+                    {"detail": "Too many message keys."}, status=400
+                )
             conversations = list(
                 Conversation.objects.filter(
                     space=space, platform="wechat", source_conversation_id=name
                 )[:2]
             )
             if len(conversations) > 1:
-                return Response({"detail": "Ambiguous conversation."}, status=409)
+                return Response(
+                    {"detail": "Ambiguous conversation."}, status=409
+                )
             found = []
             if conversations:
                 c = conversations[0]
-                # Canonical keys may belong to another source account. Namespace aliases
-                # are authoritative for local src IDs after canonical consolidation.
+                # Canonical keys may belong to another source account.
+                # Namespace aliases identify local src IDs after consolidation.
                 aliases = MessageAlias.objects.filter(
-                    conversation=c, source_namespace=account, alias_key__in=keys
+                    conversation=c,
+                    source_namespace=account,
+                    alias_key__in=keys,
                 ).select_related("message")
                 found.extend(
-                    {"message_key": a.alias_key, "occurred_at": a.message.occurred_at}
+                    {
+                        "message_key": a.alias_key,
+                        "occurred_at": a.message.occurred_at,
+                    }
                     for a in aliases
                 )
                 alias_keys = {item["message_key"] for item in found}
@@ -214,7 +249,10 @@ class DesktopMessageKeysAPIView(APIView):
                         conversation=c, message_key__in=set(keys) - alias_keys
                     )
                     found.extend(
-                        {"message_key": m.message_key, "occurred_at": m.occurred_at}
+                        {
+                            "message_key": m.message_key,
+                            "occurred_at": m.occurred_at,
+                        }
                         for m in rows
                     )
             result.append({"username": name, "keys": found})
@@ -222,7 +260,7 @@ class DesktopMessageKeysAPIView(APIView):
 
 
 class DesktopConversationLookupAPIView(APIView):
-    """Exact, lightweight lookup after the user opens locally missing records."""
+    """Look up a backup when the opened local records are missing."""
 
     permission_classes = [IsAuthenticated]
 
@@ -260,7 +298,9 @@ class DesktopConversationLookupAPIView(APIView):
         return Response(
             {
                 "data": {
-                    "conversation": {"id": row.pk, "title": row.title} if row else None
+                    "conversation": (
+                        {"id": row.pk, "title": row.title} if row else None
+                    )
                 }
             }
         )

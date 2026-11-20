@@ -490,13 +490,22 @@ class UploadBatchRecoveryAPIView(APIView):
         digest = request.query_params.get("archive_sha256", "")
         if not device_id or not account or bool(key) == bool(digest):
             return Response(
-                {"detail": "Provide a device, source account and one recovery key."},
+                {
+                    "detail": (
+                        "Provide a device, source account "
+                        "and one recovery key."
+                    )
+                },
                 status=400,
             )
         if not DesktopDevice.objects.filter(
-            user=request.user, device_id=device_id, status=DesktopDevice.Status.ACTIVE
+            user=request.user,
+            device_id=device_id,
+            status=DesktopDevice.Status.ACTIVE,
         ).exists():
-            return Response({"detail": "Device authorization is required."}, status=403)
+            return Response(
+                {"detail": "Device authorization is required."}, status=403
+            )
         batches = UploadBatch.objects.filter(
             space=space,
             uploaded_by=request.user,
@@ -518,8 +527,12 @@ class UploadBatchRecoveryAPIView(APIView):
         return Response(
             {
                 "data": {
-                    "batch": UploadBatchSerializer(batch).data if batch else None,
-                    "archive_received": bool(batch and batch.archive_received_at),
+                    "batch": (
+                        UploadBatchSerializer(batch).data if batch else None
+                    ),
+                    "archive_received": bool(
+                        batch and batch.archive_received_at
+                    ),
                 }
             }
         )
@@ -697,7 +710,9 @@ class UploadBatchRetryAPIView(APIView):
             )
         try:
             transition_batch(
-                batch, UploadBatch.Status.UPLOADING, error_message="",
+                batch,
+                UploadBatch.Status.UPLOADING,
+                error_message="",
                 save=False,
             )
             complete_upload(batch)

@@ -1,7 +1,9 @@
 import copy
+
 import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
+
 from accounts.models import DesktopDevice
 from spaces.models import DesktopBackupConfig, DesktopConfigReceipt
 from spaces.services import SpaceBootstrapService
@@ -13,7 +15,9 @@ pytestmark = pytest.mark.django_db
 def fixture():
     user = User.objects.create_user(username="desktop-config-owner")
     space = SpaceBootstrapService.ensure_personal_space(user)
-    DesktopDevice.objects.create(user=user, device_id="desktop", status="active")
+    DesktopDevice.objects.create(
+        user=user, device_id="desktop", status="active"
+    )
     client = APIClient()
     client.force_authenticate(user=user)
     payload = dict(
@@ -110,11 +114,14 @@ def test_opaque_conversation_keys_are_not_transformed(fixture):
         "wxid_Test_123": {"since": 100, "until": None}
     }
     response = client.put(
-        f"/api/v1/spaces/{space.pk}/desktop/sync-config", payload, format="json"
+        f"/api/v1/spaces/{space.pk}/desktop/sync-config",
+        payload,
+        format="json",
     )
     assert response.status_code == 200, response.data
     assert (
-        "wxid_Test_123" in DesktopBackupConfig.objects.get().completed["initial_ranges"]
+        "wxid_Test_123"
+        in DesktopBackupConfig.objects.get().completed["initial_ranges"]
     )
 
 
@@ -162,7 +169,9 @@ def test_existing_upload_retry_ignores_new_upload_quota(fixture):
     }
     first = client.post(url, payload, format="json")
     assert first.status_code == 201, first.data
-    with patch("chat_ingestion.views.check_storage_quota", return_value="full"):
+    with patch(
+        "chat_ingestion.views.check_storage_quota", return_value="full"
+    ):
         retry = client.post(url, payload, format="json")
         assert retry.status_code == 200, retry.data
         assert retry.data["data"]["id"] == first.data["data"]["id"]
@@ -171,8 +180,9 @@ def test_existing_upload_retry_ignores_new_upload_quota(fixture):
 
 
 def test_batch_key_lookup_preserves_namespace_and_bounds(fixture):
-    from chat_domain.models import Conversation, Message
     from django.utils import timezone
+
+    from chat_domain.models import Conversation, Message
 
     client, space, _ = fixture
     c = Conversation.objects.create(
@@ -183,7 +193,10 @@ def test_batch_key_lookup_preserves_namespace_and_bounds(fixture):
         identity_key="wechat:chat",
     )
     Message.objects.create(
-        conversation=c, message_key="src:1", ingest_seq=1, occurred_at=timezone.now()
+        conversation=c,
+        message_key="src:1",
+        ingest_seq=1,
+        occurred_at=timezone.now(),
     )
     url = f"/api/v1/spaces/{space.pk}/desktop/message-keys"
     payload = {
@@ -192,12 +205,15 @@ def test_batch_key_lookup_preserves_namespace_and_bounds(fixture):
     }
     response = client.post(url, payload, format="json")
     assert response.status_code == 200, response.data
-    assert [row["message_key"] for row in response.data["data"]["list"][0]["keys"]] == [
-        "src:1"
-    ]
+    assert [
+        row["message_key"] for row in response.data["data"]["list"][0]["keys"]
+    ] == ["src:1"]
     payload["source_account_id"] = "another-account"
     assert (
-        client.post(url, payload, format="json").data["data"]["list"][0]["keys"] == []
+        client.post(url, payload, format="json").data["data"]["list"][0][
+            "keys"
+        ]
+        == []
     )
     payload["queries"][0]["keys"] = ["k"] * 1001
     assert client.post(url, payload, format="json").status_code == 400

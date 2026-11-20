@@ -260,9 +260,11 @@ class SpaceQuota(models.Model):
 
 
 class DesktopBackupConfig(models.Model):
-    """Client-owned settings mirror; never an authority for local data access."""
+    """Client-owned settings mirror; does not authorize local data access."""
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
     space = models.ForeignKey(Space, on_delete=models.CASCADE)
     device_id = models.CharField(max_length=100)
     target = models.CharField(max_length=300)
@@ -280,7 +282,9 @@ class DesktopBackupConfig(models.Model):
 
 
 class DesktopConfigReceipt(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
     space = models.ForeignKey(Space, on_delete=models.CASCADE)
     device_id = models.CharField(max_length=100)
     mutation_id = models.CharField(max_length=100)

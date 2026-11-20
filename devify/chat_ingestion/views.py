@@ -697,9 +697,11 @@ class UploadBatchRetryAPIView(APIView):
             )
         try:
             transition_batch(
-                batch, UploadBatch.Status.UPLOADING, error_message=""
+                batch, UploadBatch.Status.UPLOADING, error_message="",
+                save=False,
             )
-        except UploadTransitionError as error:
+            complete_upload(batch)
+        except (ArchiveMissing, UploadTransitionError) as error:
             return Response({"detail": str(error)}, status=409)
         result = _enqueue_parse(batch)
         if result and result.get("status") == UploadBatch.Status.FAILED:

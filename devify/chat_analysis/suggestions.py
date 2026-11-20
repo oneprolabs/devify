@@ -104,7 +104,7 @@ def _resolve_source_messages(suggestion):
     )
 
 
-def _advance_event_status(event, status, *, source_messages):
+def _advance_event_status(event, status, *, source_messages, summary):
     """Let newer evidence move an existing event's status forward."""
     if status not in Event.Status.values:
         return
@@ -128,7 +128,8 @@ def _advance_event_status(event, status, *, source_messages):
         return
     if event.status != status:
         event.status = status
-        event.save(update_fields=("status", "updated_at"))
+        event.content = summary
+        event.save(update_fields=("status", "content", "updated_at"))
 
 
 @transaction.atomic
@@ -210,7 +211,8 @@ def review_event_suggestion(
                 ]
         if not created and status:
             _advance_event_status(
-                event, status, source_messages=activity_messages
+                event, status, source_messages=activity_messages,
+                summary=suggestion.summary,
             )
         EventNote.objects.get_or_create(
             event=event,

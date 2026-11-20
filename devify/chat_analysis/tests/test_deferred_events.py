@@ -1,5 +1,7 @@
 """Exercise deferred candidates through real analysis and publication."""
 
+from datetime import timedelta
+
 import pytest
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -67,6 +69,39 @@ def analyze(request, monkeypatch):
         return captured[0][1]
 
     return run
+
+
+@pytest.mark.parametrize("evidence_offset", [0, -60], ids=["equal", "older"])
+def test_completion_keeps_status_and_summary_in_sync(
+    chat, analyze, evidence_offset,
+):
+    owner, space, conversation = chat
+    first = add_message(conversation, 1, "待会点外卖，尚未下单。")
+    event = Event.objects.create(
+        space=space, created_by=owner, event_key="takeout",
+        title="点家常豆腐外卖", content="尚未下单。",
+        status=Event.Status.IN_PROGRESS, last_activity_at=first.occurred_at,
+    )
+    EventEvidence.objects.create(event=event, message=first, created_by=owner)
+    current = add_message(conversation, 2, "买了，外卖已经下单。")
+    delta = timedelta(seconds=evidence_offset)
+    current.occurred_at = first.occurred_at + delta
+    current.save(update_fields=("occurred_at",))
+    analyze(chat, current, [{
+        "action": "attach", "event_key": event.event_key,
+        "title": event.title, "summary": "外卖已下单。",
+        "status": "done", "status_scope": "event",
+        "event_change": "material", "context_decision": "continuation",
+        "sources": [{"seq": 2, "role": "matter"}],
+    }])
+    event.refresh_from_db()
+    assert event.evidence.filter(message=current).exists()
+    if evidence_offset == 0:
+        assert event.status == Event.Status.DONE
+        assert event.content == "外卖已下单。"
+    else:
+        assert event.status == Event.Status.IN_PROGRESS
+        assert event.content == "尚未下单。"
 
 
 def defer(seq, *, signal="deadline", reason="ambiguous_target"):

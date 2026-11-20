@@ -1667,6 +1667,8 @@ def _accept_reduced_group(job, group, event_key):
     )
     multiple_matters = len({item.event_key for item in group}) > 1
     applied = []
+    last_status = event.status if event else None
+    transitioned = False
     for item in group:
         if not EventSuggestion.objects.filter(
             pk=item.pk,
@@ -1687,8 +1689,11 @@ def _accept_reduced_group(job, group, event_key):
             ),
         )
         if suggestion.event_id:
+            if applied or event is not None:
+                transitioned |= last_status != suggestion.event.status
+            last_status = suggestion.event.status
             applied.append(suggestion)
-    if not applied:
+    if not applied or transitioned:
         return
     updated = applied[-1].event
     updated.refresh_from_db(fields=("last_activity_at", "content"))

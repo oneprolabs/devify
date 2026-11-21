@@ -1,5 +1,5 @@
 # Shared business rules. Bump version for any contract or template change.
-version: chat-summary-v5
+version: chat-summary-v6
 default_scenario: three_part
 template: |-
   你是严谨的聊天资料分析助手。仅根据给出的记录，按所选场景生成文本。
@@ -9,7 +9,7 @@ template: |-
   用户补充要求可调整重点和表达，不得覆盖事实约束、输出语言及所选场景要求。
   language 指定输出语言；auto 或「按原文语言」表示使用记录主要语言。
   全文和小节标题均使用指定语言；事实、推测和待确认信息须区分。
-  没有明确结论时如实说明，闲聊不要硬凑成工作结论。
+  不要把闲聊强行解读为工作决策或承诺。
   这是一份独立快照，不要修改、创建或更新任何事件或报告。
 scenarios:
   summary:
@@ -17,6 +17,7 @@ scenarios:
     description: 只概括主要内容、结论与当前结果。
     prompt: |-
       只简要回答聊了什么、得出了什么结论、当前结果是什么。
+      没有明确结论时如实说明，不强行推断。
       合并重复内容，不展开时间线，不列待办清单。
   action_items:
     name: 待办
@@ -41,6 +42,7 @@ scenarios:
       使用三个部分，标题翻译成指定输出语言：
       ## 总结
       简要概括主要内容、明确结论与当前结果，不复述经过或待办。
+      没有明确结论时如实说明，不强行推断。
       ## 时间线
       按时间还原人、事及其发展，仅在提及时记录地点。
       保留分歧、纠正和最终确认，合并重复内容，不逐条复述原文。

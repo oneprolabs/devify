@@ -36,7 +36,7 @@ Authorization: Bearer <access_token>
 | data 字段 | 用法 |
 | --- | --- |
 | `schema_version` | 必须为整数 `1`；未知版本保留原缓存 |
-| `version` | 整个提示词目录的版本，例如 `chat-summary-v6` |
+| `version` | 整个提示词目录的版本，例如 `chat-summary-v7` |
 | `default_scenario` | 初始选择此 ID；当前为 `three_part` |
 | `scenarios` | 场景列表，每项字段见下表 |
 | `scope` | `server/account_id/space_id/capabilities`，用于隔离缓存 |
@@ -169,7 +169,7 @@ const body = {
 ```json
 {
   "schema_version": 1,
-  "version": "chat-summary-v6",
+  "version": "chat-summary-v7",
   "min_check_interval_seconds": 21600
 }
 ```

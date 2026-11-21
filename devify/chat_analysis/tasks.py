@@ -9,6 +9,7 @@ from chat_analysis.execution import (
     publish_ready_event_batches,
 )
 from chat_analysis.models import AnalysisJob
+from chat_analysis.summaries.tasks import generate_chat_summary  # noqa: F401
 from chat_analysis.task_status import sweep_stale_tasks
 from chat_analysis.topic_scheduler import run_due_topic_reports
 
@@ -23,7 +24,8 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
     if result is None:
         return {"job_id": job_id, "claimed": False}
     if result.job.specification.get("boundary") and result.job.state in (
-        AnalysisJob.State.READY, AnalysisJob.State.PARTIAL,
+        AnalysisJob.State.READY,
+        AnalysisJob.State.PARTIAL,
         AnalysisJob.State.FAILED,
     ):
         publish_ready_event_batches()

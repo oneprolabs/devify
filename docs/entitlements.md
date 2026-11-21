@@ -23,7 +23,7 @@ Authorization: Bearer <access token>
       "status": "active",
       "current_period_end": "2026-12-16T00:00:00+00:00"
     },
-    "features": ["ingest.upload", "cloud.ask", "bridge.agent_cli"],
+    "features": ["ingest.upload", "cloud.ask", "bridge.agent_cli", "cloud.chat_summary"],
     "limits": {"limits.ingest.conversations": 500},
     "quotas": {"quotas.cloud.ask_per_day": 100},
     "usage": {},
@@ -35,11 +35,12 @@ Authorization: Bearer <access token>
 }
 ```
 
-没有生效订阅时 `plan` 为 `null`、`features` 为空、`internal` 为 `false`。
+没有生效订阅时 `plan` 为 `null`、`internal` 为 `false`；活跃账号的
+`features` 仍包含免费基线能力 `cloud.chat_summary`。
 
 ## 数据来源
 
-权益全部来自 `Plan.metadata`，服务端不硬编码套餐名：
+套餐权益来自 `Plan.metadata`，另有上述免费基线能力；服务端不硬编码套餐名：
 
 | 键 | 类型 | 说明 |
 | --- | --- | --- |
@@ -49,7 +50,8 @@ Authorization: Bearer <access token>
 | `fallback_features` | `string[]` | 快照过期后仍然保留的能力 |
 | `enforced` | `bool` | 是否启用限制。只有当该套餐同时提供 `features` 时才会生效 |
 
-`enforced` 是显式开关：在套餐的 `features` 尚未列全之前不要打开，否则客户端会把
+`enforced` 按套餐原始功能列表判断，服务端追加的免费基线能力不会触发限制。
+它是显式开关：在套餐的 `features` 尚未列全之前不要打开，否则客户端会把
 未列出的能力判为「不在套餐内」。未开启时客户端保持「全部允许」的旧行为。
 
 ## 内部账号

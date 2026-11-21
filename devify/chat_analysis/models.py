@@ -8,6 +8,61 @@ from chat_domain.models import Conversation
 from spaces.models import Space
 
 
+class ChatSummary(models.Model):
+    """User-owned summary snapshots, isolated from event analysis."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RUNNING = "running", "Running"
+        READY = "ready", "Ready"
+        FAILED = "failed", "Failed"
+
+    space = models.ForeignKey(Space, on_delete=models.CASCADE)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
+    request_key = models.UUIDField()
+    input_hash = models.CharField(max_length=64)
+    platform = models.CharField(max_length=30)
+    source_namespace = models.CharField(max_length=160)
+    source_conversation_id = models.CharField(max_length=200)
+    title = models.CharField(max_length=500)
+    range_label = models.CharField(max_length=120)
+    mode = models.CharField(max_length=10)
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField()
+    language = models.CharField(max_length=30, default="中文")
+    input_messages = models.JSONField(default=list)
+    sessions = models.JSONField(default=list)
+    message_count = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.QUEUED
+    )
+    dispatch_token = models.UUIDField(default=uuid.uuid4)
+    body = models.TextField(blank=True)
+    error = models.CharField(max_length=500, blank=True)
+    model = models.CharField(max_length=160, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["space", "created_by", "request_key"],
+                name="chat_summary_request_unique",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["space", "created_by", "-created_at"],
+                name="chat_summary_owner_time",
+            ),
+            models.Index(
+                fields=["status", "updated_at"], name="chat_summary_stale"
+            ),
+        ]
+
+
 class AnalysisJob(models.Model):
     """A resumable extraction job over a fixed window of an upload batch."""
 

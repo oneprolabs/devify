@@ -61,6 +61,24 @@ CELERY_TASK_ROUTES = (
         "chat_analysis.tasks.execute_analysis_job_task": {
             "queue": "chat_analysis"
         },
+        "chat_analysis.question_tasks.answer_question_task": {
+            "queue": "chat_analysis"
+        },
+        "chat_analysis.report_tasks.generate_report_task": {
+            "queue": "chat_analysis"
+        },
+        "chat_analysis.summary_tasks.generate_chat_summary": {
+            "queue": "chat_analysis"
+        },
+        "chat_analysis.tasks.run_due_topic_reports_task": {
+            "queue": "chat_analysis"
+        },
+        "chat_analysis.tasks.run_due_scheduled_analysis_task": {
+            "queue": "chat_analysis"
+        },
+        "chat_analysis.tasks.sweep_stale_async_tasks": {
+            "queue": "chat_analysis"
+        },
     }
     if os.getenv("CHAT_UPLOAD_DEDICATED_QUEUE", "false").lower()
     in {"1", "true", "yes"}

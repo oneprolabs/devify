@@ -1,11 +1,9 @@
 from django.urls import path
 
-from spaces.desktop_backup import (
+from spaces.views import (
     DesktopBackupConfigAPIView,
     DesktopConversationLookupAPIView,
     DesktopMessageKeysAPIView,
-)
-from spaces.views import (
     OwnerlessSpaceListAPIView,
     SpaceAuditLogListAPIView,
     SpaceDetailAPIView,

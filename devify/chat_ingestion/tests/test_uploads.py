@@ -505,9 +505,9 @@ def test_complete_enqueues_parser_when_async_mode_is_enabled(settings):
     )
     settings.CHAT_UPLOAD_PARSE_INLINE = False
     with (
-        patch("chat_ingestion.views.dispatch_parse_chat_upload") as dispatch,
+        patch("chat_ingestion.tasks.dispatch_parse_chat_upload") as dispatch,
         patch(
-            "chat_ingestion.views.transaction.on_commit",
+            "chat_ingestion.services.dispatch.transaction.on_commit",
             side_effect=lambda callback: callback(),
         ),
     ):
@@ -644,7 +644,7 @@ def test_batch_state_machine_rejects_skipped_steps():
         transition_batch(batch, UploadBatch.Status.UPLOADING)
 
 
-@patch("chat_ingestion.views._enqueue_parse")
+@patch("chat_ingestion.views.lifecycle._enqueue_parse")
 def test_failed_upload_can_be_retried_and_item_is_readable(enqueue):
     owner = User.objects.create_user(username="upload-retry-owner")
     space = make_team(owner, slug="upload-retry-team")
@@ -683,7 +683,7 @@ def test_retry_missing_archive_keeps_failed_state():
         status=UploadBatch.Status.FAILED,
         error_message="previous failure",
     )
-    with patch("chat_ingestion.views._enqueue_parse") as enqueue:
+    with patch("chat_ingestion.views.lifecycle._enqueue_parse") as enqueue:
         response = auth_client(owner).post(batch_url(batch, "retry"))
     assert response.status_code == 409
     batch.refresh_from_db()
@@ -717,9 +717,9 @@ def test_retry_dispatches_processing_batch_and_worker_completes(settings):
     batch.save(update_fields=("status",))
     settings.CHAT_UPLOAD_PARSE_INLINE = False
     with (
-        patch("chat_ingestion.views.dispatch_parse_chat_upload") as dispatch,
+        patch("chat_ingestion.tasks.dispatch_parse_chat_upload") as dispatch,
         patch(
-            "chat_ingestion.views.transaction.on_commit",
+            "chat_ingestion.services.dispatch.transaction.on_commit",
             side_effect=lambda cb: cb(),
         ),
     ):

@@ -170,7 +170,7 @@ def test_existing_upload_retry_ignores_new_upload_quota(fixture):
     first = client.post(url, payload, format="json")
     assert first.status_code == 201, first.data
     with patch(
-        "chat_ingestion.views.check_storage_quota", return_value="full"
+        "chat_ingestion.views.batches.check_storage_quota", return_value="full"
     ):
         retry = client.post(url, payload, format="json")
         assert retry.status_code == 200, retry.data

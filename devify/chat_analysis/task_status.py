@@ -190,7 +190,8 @@ def recover_expired_analysis_jobs(
         state = AnalysisJob.State.QUEUED if retry else AnalysisJob.State.FAILED
         error = (
             "lease_expired: requeued after worker timeout."
-            if retry else "lease_expired: max attempts reached "
+            if retry
+            else "lease_expired: max attempts reached "
             f"({job.attempts}/{max_attempts})."
         )
         updated = stale.filter(
@@ -218,9 +219,13 @@ def recover_expired_analysis_jobs(
 def sweep_stale_tasks(*, now=None):
     """Move every abandoned async record into a terminal state."""
 
+    from chat_analysis.summaries.services import expire_stale_summaries
+
+    summaries = expire_stale_summaries(now=now)
     jobs = recover_expired_analysis_jobs(now=now)
     queued = recover_stale_queued_analysis_jobs(now=now)
     counts = {
+        "summaries_failed": summaries,
         "questions_failed": expire_stale_questions(now=now),
         "reports_expired": expire_stale_reports(now=now),
         "jobs_requeued": jobs["requeued"] + queued["requeued"],

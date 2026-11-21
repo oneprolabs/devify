@@ -33,7 +33,7 @@ def test_free_user_is_not_internal(test_user_with_free_subscription):
     data = response.json()["data"]
     assert data["plan"]["slug"] == "free"
     assert data["internal"] is False
-    assert data["features"] == []
+    assert data["features"] == ["cloud.chat_summary"]
     assert data["enforced"] is False
 
 
@@ -77,6 +77,7 @@ def test_plan_metadata_is_exposed(
         "ai.local_agent",
         "bridge.agent_cli",
         "ingest.upload",
+        "cloud.chat_summary",
     ]
     assert data["limits"] == {"limits.ingest.conversations": 500}
     assert data["quotas"] == {"quotas.cloud.ask_per_day": 100}
@@ -93,7 +94,7 @@ def test_enforced_requires_a_feature_list(
     assert _data(test_user_with_internal_subscription)["enforced"] is False
 
 
-def test_canceled_subscription_grants_nothing(
+def test_canceled_subscription_keeps_only_baseline_summary(
     test_user_with_internal_subscription,
 ):
     Subscription.objects.filter(
@@ -104,4 +105,4 @@ def test_canceled_subscription_grants_nothing(
 
     assert data["plan"] is None
     assert data["internal"] is False
-    assert data["features"] == []
+    assert data["features"] == ["cloud.chat_summary"]

@@ -11,6 +11,13 @@ from typing import Any
 
 from billing.services.subscription_service import SubscriptionService
 
+CHAT_SUMMARY_FEATURE = "cloud.chat_summary"
+
+
+def can_use_chat_summary(user):
+    """Allow active users to use baseline cloud summaries."""
+    return bool(user.is_authenticated and user.is_active)
+
 
 def _string_list(value: Any) -> list[str]:
     if not isinstance(value, (list, tuple)):
@@ -62,6 +69,9 @@ def build_entitlements(user) -> dict:
         metadata = plan.metadata
 
     features = _string_list(metadata.get("features"))
+    enforced = bool(metadata.get("enforced")) and bool(features)
+    if can_use_chat_summary(user) and CHAT_SUMMARY_FEATURE not in features:
+        features.append(CHAT_SUMMARY_FEATURE)
     return {
         "plan": (
             {
@@ -81,7 +91,7 @@ def build_entitlements(user) -> dict:
         "limits": _counter_map(metadata.get("limits")),
         "quotas": _counter_map(metadata.get("quotas")),
         "usage": {},
-        "enforced": bool(metadata.get("enforced")) and bool(features),
+        "enforced": enforced,
         "fallback_features": _string_list(metadata.get("fallback_features")),
         "expires_at": None,
         "internal": bool(plan is not None and plan.is_internal),

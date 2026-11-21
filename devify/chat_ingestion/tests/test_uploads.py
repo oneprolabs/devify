@@ -505,9 +505,9 @@ def test_complete_enqueues_parser_when_async_mode_is_enabled(settings):
     )
     settings.CHAT_UPLOAD_PARSE_INLINE = False
     with (
-        patch("chat_ingestion.views.dispatch_parse_chat_upload") as dispatch,
+        patch("chat_ingestion.tasks.dispatch_parse_chat_upload") as dispatch,
         patch(
-            "chat_ingestion.views.transaction.on_commit",
+            "chat_ingestion.services.dispatch.transaction.on_commit",
             side_effect=lambda callback: callback(),
         ),
     ):
@@ -644,15 +644,22 @@ def test_batch_state_machine_rejects_skipped_steps():
         transition_batch(batch, UploadBatch.Status.UPLOADING)
 
 
-@patch("chat_ingestion.views._enqueue_parse")
+@patch("chat_ingestion.views.lifecycle._enqueue_parse")
 def test_failed_upload_can_be_retried_and_item_is_readable(enqueue):
     owner = User.objects.create_user(username="upload-retry-owner")
     space = make_team(owner, slug="upload-retry-team")
     client = auth_client(owner)
     response = client.post(
-        create_url(space), payload("retry-batch"), format="json"
+        create_url(space),
+        {"source_type": "wechat", "idempotency_key": "retry-batch"},
+        format="json",
     )
     batch = UploadBatch.objects.get(pk=response.data["data"]["id"])
+    client.put(
+        batch_url(batch, "archive"),
+        {"archive": archive_file(build_archive())},
+        format="multipart",
+    )
     batch.status = UploadBatch.Status.FAILED
     batch.error_message = "temporary parser failure"
     batch.save(update_fields=("status", "error_message", "updated_at"))
@@ -660,5 +667,71 @@ def test_failed_upload_can_be_retried_and_item_is_readable(enqueue):
     retried = client.post(batch_url(batch, "retry"))
     batch.refresh_from_db()
     assert retried.status_code == 202
-    assert batch.status == UploadBatch.Status.UPLOADING
+    assert batch.status == UploadBatch.Status.PROCESSING
+    assert batch.parse_started_at is not None
     enqueue.assert_called_once_with(batch)
+
+
+def test_retry_missing_archive_keeps_failed_state():
+    owner = User.objects.create_user(username="upload-missing-retry-owner")
+    space = make_team(owner, slug="upload-missing-retry-team")
+    batch = UploadBatch.objects.create(
+        space=space,
+        uploaded_by=owner,
+        source_type="wechat",
+        idempotency_key="missing-retry",
+        status=UploadBatch.Status.FAILED,
+        error_message="previous failure",
+    )
+    with patch("chat_ingestion.views.lifecycle._enqueue_parse") as enqueue:
+        response = auth_client(owner).post(batch_url(batch, "retry"))
+    assert response.status_code == 409
+    batch.refresh_from_db()
+    assert batch.status == UploadBatch.Status.FAILED
+    assert batch.error_message == "previous failure"
+    enqueue.assert_not_called()
+
+
+def test_retry_dispatches_processing_batch_and_worker_completes(settings):
+    owner = User.objects.create_user(username="upload-real-retry-owner")
+    space = make_team(owner, slug="upload-real-retry-team")
+    client = auth_client(owner)
+    response = client.post(
+        create_url(space),
+        {
+            "source_type": "wechat",
+            "source_account_id": "local-account-1",
+            "idempotency_key": "real-retry",
+        },
+        format="json",
+    )
+    batch = UploadBatch.objects.get(pk=response.data["data"]["id"])
+    client.put(
+        batch_url(batch, "archive"),
+        {
+            "archive": archive_file(build_archive()),
+        },
+        format="multipart",
+    )
+    batch.status = UploadBatch.Status.FAILED
+    batch.save(update_fields=("status",))
+    settings.CHAT_UPLOAD_PARSE_INLINE = False
+    with (
+        patch("chat_ingestion.tasks.dispatch_parse_chat_upload") as dispatch,
+        patch(
+            "chat_ingestion.services.dispatch.transaction.on_commit",
+            side_effect=lambda cb: cb(),
+        ),
+    ):
+        retried = client.post(batch_url(batch, "retry"))
+    assert retried.status_code == 202
+    batch.refresh_from_db()
+    assert batch.status == UploadBatch.Status.PROCESSING
+    dispatch.assert_called_once()
+    from chat_ingestion.tasks import parse_chat_upload_task
+
+    result = parse_chat_upload_task.run(batch.pk)
+    batch.refresh_from_db()
+    assert result["status"] == UploadBatch.Status.COMPLETED
+    assert batch.status == UploadBatch.Status.COMPLETED
+    assert batch.message_count == 2

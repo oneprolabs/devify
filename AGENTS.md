@@ -16,7 +16,8 @@
 - The release gate (backend on MariaDB, frontend unit tests, production build, migration check) is documented in `docs/test-gate.md` and enforced by `.github/workflows/test-gate.yml`.
 
 ## Coding Style & Naming Conventions
-- Python follows PEP 8 with 4-space indentation, `snake_case` for functions/modules, and `PascalCase` for classes.
+- Python follows PEP 8 with 4-space indentation, a maximum of 79 characters per line, `snake_case` for functions/modules, and `PascalCase` for classes.
+- Organize domain models, views, and services into responsibility-focused `models/`, `views/`, and `services/` packages. Keep public exports in `__init__.py`. Views handle HTTP, authorization, and serialization; services own business operations and transactions.
 - Frontend files use Prettier defaults from `ui/.prettierrc`: 2-space indentation, single quotes, no semicolons, and LF line endings.
 - Keep Vue component names descriptive and multi-word; follow existing patterns under `ui/src/components/` and `ui/src/pages/`.
 - Prefer small, domain-focused modules over large shared helpers.

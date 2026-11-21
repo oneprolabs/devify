@@ -1,6 +1,9 @@
 from django.urls import path
 
 from spaces.views import (
+    DesktopBackupConfigAPIView,
+    DesktopConversationLookupAPIView,
+    DesktopMessageKeysAPIView,
     OwnerlessSpaceListAPIView,
     SpaceAuditLogListAPIView,
     SpaceDetailAPIView,
@@ -18,6 +21,21 @@ from spaces.views import (
 )
 
 urlpatterns = [
+    path(
+        "spaces/<uuid:space_id>/desktop/conversation",
+        DesktopConversationLookupAPIView.as_view(),
+        name="desktop-conversation",
+    ),
+    path(
+        "spaces/<uuid:space_id>/desktop/message-keys",
+        DesktopMessageKeysAPIView.as_view(),
+        name="desktop-message-keys",
+    ),
+    path(
+        "spaces/<uuid:space_id>/desktop/sync-config",
+        DesktopBackupConfigAPIView.as_view(),
+        name="desktop-backup-config",
+    ),
     path("spaces", SpaceListCreateAPIView.as_view(), name="space-list-create"),
     path(
         "spaces/invitations",

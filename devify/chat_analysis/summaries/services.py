@@ -1,5 +1,7 @@
 """Expire abandoned summaries and dispatch generation tasks."""
 
+import hashlib
+import json
 import logging
 from datetime import timedelta
 
@@ -10,7 +12,17 @@ from chat_analysis.models import ChatSummary
 logger = logging.getLogger("chat_analysis.summary_views")
 
 
+def summary_input_hash(values):
+    """Hash validated input before applying the current prompt catalog."""
+    return hashlib.sha256(
+        json.dumps(
+            values, sort_keys=True, default=str, ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+
+
 def expire_stale_summaries(*, now=None):
+    """Mark abandoned work failed without dispatching any retries."""
     now = now or timezone.now()
     return ChatSummary.objects.filter(
         status__in=["queued", "running"],
@@ -19,6 +31,7 @@ def expire_stale_summaries(*, now=None):
 
 
 def dispatch(summary):
+    """Queue one token-bound attempt after its database transaction commits."""
     from chat_analysis.summaries.tasks import generate_chat_summary
 
     try:

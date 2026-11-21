@@ -5,7 +5,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from chat_analysis.summaries.input import summary_content
-from chat_analysis.summaries.tasks import PROMPT
+from chat_analysis.summaries.prompts import cloud_prompt, current_snapshot
 
 
 def record(messages):
@@ -81,7 +81,8 @@ def test_midsize_mixed_language_chat_is_not_rejected_for_transport_metadata():
     ]
     content = summary_content(record(messages))
     # Exercise the strict byte-based fallback; no change to token/model limits.
-    assert 64 + len(PROMPT.encode()) + len(content.encode()) < 12000
+    prompt = cloud_prompt(current_snapshot())
+    assert 64 + len(prompt.encode()) + len(content.encode()) < 12000
     original = json.dumps({"messages": messages}, ensure_ascii=False)
     assert len(original.encode()) > 12000
     assert sum(len(c["messages"]) for c in json.loads(content)["chats"]) == 68
@@ -103,4 +104,5 @@ def test_large_text_is_not_truncated_to_make_the_budget_pass():
         )
     )
     assert json.loads(content)["chats"][0]["messages"][0][2] == text
-    assert 64 + len(PROMPT.encode()) + len(content.encode()) > 12000
+    prompt = cloud_prompt(current_snapshot())
+    assert 64 + len(prompt.encode()) + len(content.encode()) > 12000

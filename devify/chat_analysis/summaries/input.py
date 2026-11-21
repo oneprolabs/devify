@@ -8,9 +8,10 @@ from django.utils import timezone
 
 
 def summary_content(record):
+    """Serialize source records and user requirements without truncation."""
     # Names and conversation identities repeat in the transport format.
-    # Keep display names once; database IDs carry no meaning for the model.
-    # for the summary. Every original text and its timestamp remain present.
+    # Keep display names once and omit database IDs from the model input.
+    # Preserve every original message and its timestamp.
     speakers = []
     speaker_ids = {}
     chats = {}
@@ -32,14 +33,20 @@ def summary_content(record):
                 message["text"],
             ]
         )
+    content = {
+        "title": record.title,
+        "range": record.range_label,
+        "language": record.language,
+        "speakers": speakers,
+        "chats": list(chats.values()),
+    }
+    instructions = getattr(record, "prompt_snapshot", {}).get(
+        "user_instructions", ""
+    )
+    if instructions:
+        content["instructions"] = instructions
     return json.dumps(
-        {
-            "title": record.title,
-            "range": record.range_label,
-            "language": record.language,
-            "speakers": speakers,
-            "chats": list(chats.values()),
-        },
+        content,
         ensure_ascii=False,
         separators=(",", ":"),
     )

@@ -3,9 +3,11 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import pytest
 from celery import current_app
 from django.urls import resolve
 
+from chat_analysis.summaries.prompts import cloud_prompt, sha256
 from chat_analysis.summaries.services import dispatch
 from chat_analysis.summaries.tasks import generate_chat_summary
 from chat_analysis.summaries.views import SummaryDetail, SummaryList
@@ -63,9 +65,25 @@ def test_rejected_summary_claim_does_not_call_the_model():
     model.assert_not_called()
 
 
-def test_duplicate_summary_delivery_calls_the_model_once(settings):
+@pytest.mark.parametrize(
+    "snapshot",
+    [
+        {},
+        {
+            "version": "archived-test-version",
+            "sha256": sha256("Archived business rules"),
+            "template": "Archived business rules",
+            "cloud_input_rules": "Archived input adapter",
+        },
+    ],
+)
+def test_duplicate_summary_delivery_calls_pinned_model_once(
+    settings, snapshot
+):
     settings.CHAT_ANALYSIS_MODEL_UUID = None
-    record = SimpleNamespace(created_by=object(), space=object())
+    record = SimpleNamespace(
+        created_by=object(), space=object(), prompt_snapshot=snapshot
+    )
     with (
         patch(
             "chat_analysis.summaries.tasks.ChatSummary.objects.filter"
@@ -101,6 +119,7 @@ def test_duplicate_summary_delivery_calls_the_model_once(settings):
     assert first == {"summary_id": 42, "status": "ready", "persisted": True}
     assert duplicate == {"summary_id": 42, "claimed": False}
     model.assert_called_once()
+    assert model.call_args.kwargs["prompt"] == cloud_prompt(snapshot)
     completed = updates.call_args_list[1].kwargs
     assert completed["status"] == "ready"
     assert completed["body"] == "## Summary"

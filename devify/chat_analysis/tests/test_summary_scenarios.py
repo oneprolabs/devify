@@ -25,8 +25,8 @@ def test_one_common_template_plus_selected_scenario(scenario):
     assert snapshot["template"].endswith(
         config["scenarios"][scenario]["prompt"]
     )
-    assert "\n## 结论" in current_snapshot(config, "three_part")["template"]
-    assert "\n## 结论" not in current_snapshot(config, "custom")["template"]
+    assert "\n## 总结" in current_snapshot(config, "three_part")["template"]
+    assert "\n## 总结" not in current_snapshot(config, "custom")["template"]
 
 
 def test_user_instructions_stay_outside_the_system_prompt_and_count_as_input():

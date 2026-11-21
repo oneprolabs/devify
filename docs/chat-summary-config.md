@@ -24,7 +24,7 @@ Authorization: Bearer <access token>
 | 字段 | 含义 |
 | --- | --- |
 | `schema_version` | 当前为整数 `1`；协议兼容能力，不是应用发布版本 |
-| `version` | 模板目录版本，当前为 `chat-summary-v3` |
+| `version` | 模板目录版本，当前为 `chat-summary-v4` |
 | `sha256` | `template` 原始 UTF-8 字节的 SHA-256，小写十六进制 |
 | `template` | 默认场景的无变量系统规则全文；不绑定到用户编辑界面 |
 | `default_scenario` | 默认场景 ID，当前为 `summary` |
@@ -56,7 +56,7 @@ Authorization: Bearer <access token>
 ```json
 {
   "schema_version": 1,
-  "version": "chat-summary-v3",
+  "version": "chat-summary-v4",
   "sha256": "<模板的64位小写十六进制摘要>",
   "min_check_interval_seconds": 21600
 }
@@ -98,13 +98,14 @@ JWT 登录与刷新接口不变，不添加新的轮询任务。
 
 | ID | 用途 |
 | --- | --- |
-| `summary` | 默认简洁总结：主要内容、重要进展与明确结论 |
-| `three_part` | 三段式复盘：结论、详细经过、行动项 |
-| `action_items` | 待办文字清单：明确行动、负责人、期限及待确认项 |
-| `timeline` | 经过整理：按时间还原发展、分歧、纠正及最终确认 |
+| `summary` | 总结（默认）：只概括主要内容、结论与当前结果 |
+| `action_items` | 待办：只列行动、负责人、期限及待确认项 |
+| `timeline` | 时间线：只按时间顺序整理经过 |
+| `three_part` | 综合：总结、时间线、待办三项都有 |
 | `custom` | 自定义目标和结构，不强制三段式；必须填写用户要求 |
 
 `scenarios` 每项含 `id/name/description/requires_instructions/template/sha256/budgets`。
+三个单项各自只输出对应内容，只有综合场景组合三项；`three_part` 是综合场景的稳定 ID。
 顶层 `template/sha256/budgets` 对应默认场景；选择其他场景时须使用该项的摘要和预算。
 任何场景变更都递增目录 `version`；心跳摘要只是默认场景的变更提示，客户端同时比较版本。
 
@@ -161,7 +162,7 @@ max_content_bytes = max(0, max_request_bytes
 
 ```json
 {
-  "prompt_version": "chat-summary-v3",
+  "prompt_version": "chat-summary-v4",
   "prompt_digest": "<所选场景的模板 SHA-256 摘要>",
   "scenario": "timeline",
   "instructions": "重点整理交付日期如何发生变化。",
@@ -206,5 +207,5 @@ Worker 与手动失败重试只读这份快照；结果 API 返回 `prompt_versi
 不扫描或重跑历史任务。发布先应用迁移；新 API 接受任务前，需停止旧版本总结
 消费者并完成 Worker 升级（可先暂停总结入口、排空旧消费者），避免旧 Worker
 忽略快照。回滚应用代码也需先暂停并处理新规则任务，不能让旧 Worker 接管。
-控制端与桌面端分别发布；控制端上线后，新云端任务使用所选场景或默认简洁总结，
+控制端与桌面端分别发布；控制端上线后，新云端任务使用所选场景或默认的单项总结，
 桌面端完成上述接入后才能对齐本地 CLI 总结。

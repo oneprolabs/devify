@@ -5,6 +5,7 @@ from datetime import timedelta
 from rest_framework import serializers
 
 from chat_analysis.models import ChatSummary
+from chat_analysis.summaries.prompts import LANGUAGES, pinned_snapshot
 
 
 class InputMessage(serializers.Serializer):
@@ -25,12 +26,16 @@ class SummaryCreate(serializers.Serializer):
     mode = serializers.ChoiceField(choices=["time", "pick"])
     period_start = serializers.DateTimeField()
     period_end = serializers.DateTimeField()
-    language = serializers.ChoiceField(
-        choices=["中文", "English", "按原文语言"], default="中文"
-    )
+    language = serializers.ChoiceField(choices=LANGUAGES, default="中文")
+    prompt_version = serializers.CharField(max_length=80, required=False)
+    prompt_digest = serializers.RegexField(r"^[0-9a-f]{64}$", required=False)
     messages = InputMessage(many=True, allow_empty=False, max_length=2000)
 
     def validate(self, attrs):
+        if ("prompt_version" in attrs) != ("prompt_digest" in attrs):
+            raise serializers.ValidationError(
+                "prompt_version 和 prompt_digest 必须同时提供。"
+            )
         start, end = attrs["period_start"], attrs["period_end"]
         if start > end or end - start > timedelta(days=7):
             raise serializers.ValidationError(
@@ -57,6 +62,15 @@ class SummaryCreate(serializers.Serializer):
 
 
 class SummaryOutput(serializers.ModelSerializer):
+    prompt_version = serializers.SerializerMethodField()
+    prompt_digest = serializers.SerializerMethodField()
+
+    def get_prompt_version(self, record):
+        return pinned_snapshot(record.prompt_snapshot)["version"]
+
+    def get_prompt_digest(self, record):
+        return pinned_snapshot(record.prompt_snapshot)["sha256"]
+
     class Meta:
         model = ChatSummary
         fields = [
@@ -76,6 +90,8 @@ class SummaryOutput(serializers.ModelSerializer):
             "body",
             "error",
             "model",
+            "prompt_version",
+            "prompt_digest",
             "created_at",
             "updated_at",
         ]

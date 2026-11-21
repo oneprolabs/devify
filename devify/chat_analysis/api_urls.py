@@ -19,9 +19,15 @@ from chat_analysis.api_views import (
     TopicRunAPIView,
     TopicSubscriptionDetailAPIView,
 )
+from chat_analysis.summaries.configuration import SummaryConfiguration
 from chat_analysis.summaries.views import SummaryDetail, SummaryList
 
 urlpatterns = [
+    path(
+        "spaces/<uuid:space_id>/chat-summary-config",
+        SummaryConfiguration.as_view(),
+        name="chat-summary-config",
+    ),
     path(
         "spaces/<uuid:space_id>/chat-summaries",
         SummaryList.as_view(),

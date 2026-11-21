@@ -2,6 +2,7 @@ import base64
 import hashlib
 import secrets
 from datetime import timedelta
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -236,3 +237,31 @@ def test_register_adopts_a_legacy_device_without_a_label():
     assert legacy.label == "MacOS27"
     assert legacy.platform == "macos"
     assert DesktopDevice.objects.filter(user=user).count() == 1
+
+
+def test_heartbeat_only_sends_opt_in_metadata_and_survives_config_failure():
+    user = User.objects.create_user(username="desktop-summary-hint")
+    client = APIClient()
+    client.force_authenticate(user)
+    url = "/api/v1/auth/desktop/devices"
+    payload = {"device_id": "summary-config-device"}
+    old_client = client.post(url, payload, format="json")
+    assert "chat_summary_config" not in old_client.data["data"]
+    payload["summary_config_schema"] = 1
+    response = client.post(url, payload, format="json")
+    assert response.status_code == 201
+    hint = response.data["data"]["chat_summary_config"]
+    assert set(hint) == {
+        "schema_version",
+        "version",
+        "sha256",
+        "min_check_interval_seconds",
+    }
+    with patch(
+        "chat_analysis.summaries.configuration.prompt_metadata",
+        side_effect=ValueError("bad config"),
+    ):
+        failure = client.post(url, payload, format="json")
+    assert failure.status_code == 201
+    assert failure.data["data"]["device_id"] == payload["device_id"]
+    assert "chat_summary_config" not in failure.data["data"]

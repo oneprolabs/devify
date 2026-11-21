@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from billing.entitlements import can_use_chat_summary
 from chat_analysis.models import ChatSummary
+from chat_analysis.summaries.prompts import current_snapshot
 from chat_analysis.summaries.serializers import SummaryCreate, SummaryOutput
 from chat_analysis.summaries.services import dispatch, expire_stale_summaries
 from spaces.models import Space
@@ -101,6 +102,20 @@ class SummaryList(APIView):
                     status=409,
                 )
             return Response({"data": SummaryOutput(existing).data})
+        snapshot = current_snapshot()
+        version = values.pop("prompt_version", snapshot["version"])
+        prompt_digest = values.pop("prompt_digest", snapshot["sha256"])
+        if (version, prompt_digest) != (
+            snapshot["version"],
+            snapshot["sha256"],
+        ):
+            return Response(
+                {
+                    "detail": "总结配置已更新，请刷新配置后重新提交。",
+                    "error_code": "summary_config_changed",
+                },
+                status=409,
+            )
         expire_stale_summaries()
         if (
             ChatSummary.objects.filter(
@@ -130,6 +145,7 @@ class SummaryList(APIView):
             space=space,
             created_by=request.user,
             input_hash=digest,
+            prompt_snapshot=snapshot,
             input_messages=messages,
             sessions=list(sessions.values()),
             message_count=len(messages),

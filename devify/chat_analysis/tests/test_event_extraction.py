@@ -167,7 +167,7 @@ def test_confirmation_attaches_and_does_not_mark_done(
     event.refresh_from_db()
     assert Event.objects.filter(space=space).count() == 1
     assert EventEvidence.objects.filter(event=event).count() == 2
-    assert event.status == Event.Status.IN_PROGRESS
+    assert event.status == Event.Status.OPEN
     assert event.content == "等待报价。"
 
 

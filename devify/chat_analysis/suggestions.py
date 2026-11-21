@@ -1,12 +1,14 @@
 from django.db import transaction
 from django.utils import timezone
 
+from chat_analysis.deferred_events import settle_resolutions
 from chat_analysis.keys import (
     canonical_entity_key,
     canonical_event_key,
     entity_from_text,
 )
 from chat_analysis.models import (
+    DeferredEventCandidate,
     Event,
     EventEvidence,
     EventNote,
@@ -102,9 +104,15 @@ def _resolve_source_messages(suggestion):
     )
 
 
-def _advance_event_status(event, status, *, source_messages):
+def _advance_event_status(event, status, *, source_messages, summary):
     """Let newer evidence move an existing event's status forward."""
     if status not in Event.Status.values:
+        return
+    # Waiting for a remaining step does not undo work already performed.
+    if (
+        event.status == Event.Status.IN_PROGRESS
+        and status == Event.Status.OPEN
+    ):
         return
     newest = max(
         (
@@ -120,12 +128,19 @@ def _advance_event_status(event, status, *, source_messages):
         return
     if event.status != status:
         event.status = status
-        event.save(update_fields=("status", "updated_at"))
+        event.content = summary
+        event.save(update_fields=("status", "content", "updated_at"))
 
 
 @transaction.atomic
 def review_event_suggestion(
-    *, actor, suggestion, decision, source_messages=None, target_event_key=None
+    *,
+    actor,
+    suggestion,
+    decision,
+    source_messages=None,
+    target_event_key=None,
+    apply_proposed_status=True,
 ):
     ensure_can_contribute(actor, suggestion.space)
     suggestion = EventSuggestion.objects.select_for_update().get(
@@ -142,6 +157,33 @@ def review_event_suggestion(
         canonical_key = canonical_event_key(
             target_event_key or suggestion.event_key, title=suggestion.title
         )
+        Event.objects.select_for_update().filter(
+            space=suggestion.space,
+            event_key=canonical_key,
+        ).first()
+        reserved = list(
+            DeferredEventCandidate.objects.select_for_update()
+            .filter(
+                resolution_suggestion=suggestion,
+            )
+            .order_by("pk")
+        )
+        if any(
+            item.status != DeferredEventCandidate.Status.PENDING
+            for item in reserved
+        ):
+            settle_resolutions(suggestion)
+            suggestion.status = EventSuggestion.Status.REJECTED
+            suggestion.save(
+                update_fields=(
+                    "status",
+                    "reviewed_by",
+                    "reviewed_at",
+                    "updated_at",
+                )
+            )
+            return suggestion
+        status = suggestion.proposed_status if apply_proposed_status else ""
         event, created = Event.objects.get_or_create(
             space=suggestion.space,
             event_key=canonical_key,
@@ -149,15 +191,28 @@ def review_event_suggestion(
                 "created_by": actor,
                 "title": suggestion.title,
                 "content": suggestion.summary,
-                "status": suggestion.proposed_status or Event.Status.OPEN,
+                "status": status or Event.Status.OPEN,
                 "entity_key": suggestion.entity_key,
             },
         )
-        if not created and suggestion.proposed_status:
+        activity_messages = source_messages
+        if source_messages:
+            current_ids = set(
+                suggestion.note.evidence.filter(
+                    message_id__in=[message.pk for message in source_messages],
+                ).values_list("message_id", flat=True)
+            )
+            if current_ids:
+                # Background is linked for traceability, not as new activity.
+                activity_messages = [
+                    message
+                    for message in source_messages
+                    if message.pk in current_ids
+                ]
+        if not created and status:
             _advance_event_status(
-                event,
-                suggestion.proposed_status,
-                source_messages=source_messages,
+                event, status, source_messages=activity_messages,
+                summary=suggestion.summary,
             )
         EventNote.objects.get_or_create(
             event=event,
@@ -177,8 +232,11 @@ def review_event_suggestion(
                 ],
                 ignore_conflicts=True,
             )
-            refresh_event_window(event, messages=source_messages)
+            refresh_event_window(event, messages=activity_messages)
         suggestion.event = event
+        settle_resolutions(suggestion, event, source_messages=source_messages)
+    elif decision == EventSuggestion.Status.REJECTED:
+        settle_resolutions(suggestion)
     suggestion.save(
         update_fields=(
             "status",

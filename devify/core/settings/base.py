@@ -63,6 +63,10 @@ CHAT_ANALYSIS_MODEL_INPUT_TOKENS = int(
 CHAT_ANALYSIS_MODEL_UUID = (
     os.getenv("CHAT_ANALYSIS_MODEL_UUID", "").strip() or None
 )
+CHAT_SUMMARY_CONFIG_PATH = os.getenv(
+    "CHAT_SUMMARY_CONFIG_PATH",
+    str(BASE_DIR.parent / "conf" / "chat_analysis" / "summary.yaml"),
+)
 CHAT_ANALYSIS_LLM_ENABLED = os.getenv(
     "CHAT_ANALYSIS_LLM_ENABLED", "false"
 ).lower() in {"1", "true", "yes"}

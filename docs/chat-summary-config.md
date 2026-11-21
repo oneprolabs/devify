@@ -16,18 +16,21 @@ Authorization: Bearer <access token>
 需要有效登录、活跃账号及空间读取权限。响应沿用全局
 `{"code":0,"message":"success","data":{...}}` 包装，键名为 snake_case。
 不支持的或缺失的 `schema_version` 返回 400；无空间权限返回 404。
-配置请求失败不影响已经成功的登录，也不阻止备份等其他功能。
+在登录成功后作为独立后台步骤初始化；配置请求失败不影响登录成功，
+也不阻止备份等其他功能。
 
 `data` 的字段如下：
 
 | 字段 | 含义 |
 | --- | --- |
 | `schema_version` | 当前为整数 `1`；协议兼容能力，不是应用发布版本 |
-| `version` | 业务模板版本，首版为 `chat-summary-v1` |
+| `version` | 业务模板版本，当前为 `chat-summary-v2` |
 | `sha256` | `template` 原始 UTF-8 字节的 SHA-256，小写十六进制 |
 | `template` | 无变量的业务规则全文；三段为结论、详细经过、行动项 |
 | `variables` | 当前为空数组；客户端不做字符串变量替换 |
-| `languages` | `中文`、`English`、`按原文语言` |
+| `languages` | 配置支持的输出语言代码，当前为 `zh-CN`、`en-US`、`es`、`auto` |
+| `language_names` | 语言代码到显示名称的映射，供客户端展示或作为翻译回退 |
+| `default_language` | 当前账号偏好；不可用时采用服务端配置默认语言 |
 | `output_format` | `markdown` |
 | `scope.server` | 当前请求的服务 origin，含协议及端口、不带结尾 `/` |
 | `scope.account_id` | 当前账号 ID，字符串 |
@@ -50,7 +53,7 @@ Authorization: Bearer <access token>
 ```json
 {
   "schema_version": 1,
-  "version": "chat-summary-v1",
+  "version": "chat-summary-v2",
   "sha256": "<模板的64位小写十六进制摘要>",
   "min_check_interval_seconds": 21600
 }
@@ -90,6 +93,13 @@ JWT 登录与刷新接口不变，不添加新的轮询任务。
 
 ## 输入与任务固定
 
+客户端界面语言和总结输出语言独立。单次请求的 `language` 优先；未提供时，
+服务端读取账号 `Profile.language`，不支持该偏好时使用配置的 `default_language`。
+`auto` 让模型按原文主要语言总结。输出正文及三个小节标题均使用选定语言，
+无需按语言复制业务模板。客户端应使用配置中的语言选项，不另写固定枚举。
+旧参数 `中文`、`English`、`按原文语言` 仍接受，分别转换为 `zh-CN`、`en-US`、
+`auto`。其他不支持的语言返回 400，不静默替换为中文。
+
 业务模板不包含云端 JSON 输入解释或本地 CLI 执行封装。桌面端拼接：缓存业务
 模板 + 输出语言 + CLI 执行限制（禁止工具、文件读取、联网）+ 用户补充要求
 + 统计信息与选定原文。补充要求不能覆盖事实约束。不要修改仍被事件、报告等
@@ -119,8 +129,9 @@ max_content_bytes = max(0, max_request_bytes
 
 ```json
 {
-  "prompt_version": "chat-summary-v1",
-  "prompt_digest": "<缓存中的模板 SHA-256 摘要>"
+  "prompt_version": "chat-summary-v2",
+  "prompt_digest": "<缓存中的模板 SHA-256 摘要>",
+  "language": "es"
 }
 ```
 
@@ -129,19 +140,28 @@ max_content_bytes = max(0, max_request_bytes
 同一 `request_key` 重发必须保持原请求内容，服务端先查幂等记录，再检查当前
 模板，因此配置更新后仍能取回原任务。仅当该错误码明确表明尚未建任务时，
 才以刷新后的配置重发新请求；其他 409 是请求内容冲突，勿自动重跑已有任务。
-旧客户端可不传这两个字段，由服务端选择当前模板。
+该错误码是已确认的配置变更，可触发一次合并后的条件下载，不必等待 6 小时；
+仍遵守单个更新在途和失败后 15 分钟退避，不为每次生成重复下载。
+旧客户端可不传两个版本字段，由服务端选择当前模板。
 
 服务端将业务规则、版本、摘要与云端输入解释作为一份 `prompt_snapshot` 存储。
 Worker 与手动失败重试只读这份快照；结果 API 返回 `prompt_version` 和
-`prompt_digest`，不下发内部快照。迁移前记录的空快照固定对应冻结的
-`legacy-cloud-v1`，不会在重试时升级为新规则。
+`prompt_digest` 和已解析的 `language`，不下发内部快照。迁移前记录的空快照
+固定对应冻结的 `legacy-cloud-v1`，不会在重试时升级为新规则。
 本地任务也需在创建时保存模板快照、版本、摘要、scope 和来源（如
-`server` / `validated_cache`），执行和重试时沿用，便于结果追溯。
+`server` / `validated_cache`）及本次输出语言，执行和重试时沿用。
+语言或账号偏好变化不影响已有任务，同一请求键也不会因为偏好变化重复建任务。
+本地未指定语言时优先使用当前账号偏好，再用缓存中的 `default_language`。
 
 ## 维护与发布
 
-初期直接维护 `devify/chat_analysis/summaries/prompts.py` 中的版本化配置，
-改规则必须同时递增 `VERSION`；不引入管理平台。`LEGACY_TEMPLATE` 保持冻结。
+初期维护 `devify/conf/chat_analysis/summary.yaml` 中的模板、语言列表、旧参数别名
+和默认语言；增加语种不修改 Python 枚举。用 `CHAT_SUMMARY_CONFIG_PATH` 指向部署方
+维护的外部配置文件，可以在不重发应用代码的情况下更新模板。
+采用原子文件替换；每次初始化、心跳版本提示和新任务创建读取有效配置。
+内容/语言配置变化时必须递增 `version`；模板更新后客户端仍按上述间隔检查。
+`legacy-cloud-v1.txt` 随代码冻结，不受外部配置覆盖。无效配置拒绝下发和创建新任务，
+已有任务执行、原请求重发和失败任务重试不依赖当前配置文件。
 协议破坏性变化才升级 schema，模板规则修改只升模板版本。
 
 新增迁移 `0008_chatsummary_prompt_snapshot` 仅增加 JSON 字段，默认 `{}`，

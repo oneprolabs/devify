@@ -11,10 +11,11 @@ from rest_framework.views import APIView
 
 from billing.entitlements import build_entitlements
 from chat_analysis.summaries.prompts import (
-    LANGUAGES,
     cloud_prompt,
     current_snapshot,
+    load_config,
     sha256,
+    summary_language,
 )
 from chat_analysis.summaries.views import summary_space
 from chat_analysis.token_budget import request_budget
@@ -23,9 +24,9 @@ CHECK_INTERVAL = 21600
 RETRY_INTERVAL = 900
 
 
-def prompt_metadata():
+def prompt_metadata(snapshot=None):
     """A public change hint, never a scoped cache or an entitlement grant."""
-    snapshot = current_snapshot()
+    snapshot = current_snapshot() if snapshot is None else snapshot
     return {
         "schema_version": 1,
         "version": snapshot["version"],
@@ -56,14 +57,15 @@ class SummaryConfiguration(APIView):
                 {"detail": "Unsupported summary configuration schema."},
                 status=400,
             )
-        snapshot = current_snapshot()
+        config = load_config()
+        snapshot = current_snapshot(config)
         configured = int(
             getattr(settings, "CHAT_ANALYSIS_MODEL_INPUT_TOKENS", 12000)
         )
         cloud_limit, _ = request_budget(configured)
         entitlements = build_entitlements(request.user)
         data = {
-            **prompt_metadata(),
+            **prompt_metadata(snapshot),
             "scope": {
                 "server": request.build_absolute_uri("/").rstrip("/"),
                 "account_id": str(request.user.pk),
@@ -76,7 +78,9 @@ class SummaryConfiguration(APIView):
             },
             "template": snapshot["template"],
             "variables": [],
-            "languages": list(LANGUAGES),
+            "languages": list(config["languages"]),
+            "language_names": config["languages"],
+            "default_language": summary_language(None, request.user, config),
             "output_format": "markdown",
             "budgets": {
                 "cloud": input_budget(cloud_limit, cloud_prompt(snapshot), 64),

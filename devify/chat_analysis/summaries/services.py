@@ -1,5 +1,7 @@
 """Expire abandoned summaries and dispatch generation tasks."""
 
+import hashlib
+import json
 import logging
 from datetime import timedelta
 
@@ -8,6 +10,14 @@ from django.utils import timezone
 from chat_analysis.models import ChatSummary
 
 logger = logging.getLogger("chat_analysis.summary_views")
+
+
+def summary_input_hash(values):
+    return hashlib.sha256(
+        json.dumps(
+            values, sort_keys=True, default=str, ensure_ascii=False
+        ).encode()
+    ).hexdigest()
 
 
 def expire_stale_summaries(*, now=None):

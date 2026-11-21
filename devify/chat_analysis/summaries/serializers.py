@@ -5,7 +5,7 @@ from datetime import timedelta
 from rest_framework import serializers
 
 from chat_analysis.models import ChatSummary
-from chat_analysis.summaries.prompts import LANGUAGES, pinned_snapshot
+from chat_analysis.summaries.prompts import pinned_snapshot
 
 
 class InputMessage(serializers.Serializer):
@@ -26,7 +26,7 @@ class SummaryCreate(serializers.Serializer):
     mode = serializers.ChoiceField(choices=["time", "pick"])
     period_start = serializers.DateTimeField()
     period_end = serializers.DateTimeField()
-    language = serializers.ChoiceField(choices=LANGUAGES, default="中文")
+    language = serializers.CharField(max_length=30, required=False)
     prompt_version = serializers.CharField(max_length=80, required=False)
     prompt_digest = serializers.RegexField(r"^[0-9a-f]{64}$", required=False)
     messages = InputMessage(many=True, allow_empty=False, max_length=2000)
@@ -84,6 +84,7 @@ class SummaryOutput(serializers.ModelSerializer):
             "mode",
             "period_start",
             "period_end",
+            "language",
             "sessions",
             "message_count",
             "status",

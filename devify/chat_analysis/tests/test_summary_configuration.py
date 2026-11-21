@@ -31,14 +31,25 @@ def config_api(settings):
             "enforced": False,
         }
 
-        def fetch(*, user_id=1, schema="1", authenticated=True, **headers):
+        def fetch(
+            *,
+            user_id=1,
+            schema="1",
+            authenticated=True,
+            preferred="",
+            **headers,
+        ):
             request = APIRequestFactory().get(
                 URL, {"schema_version": schema}, **headers
             )
             if authenticated:
                 force_authenticate(
                     request,
-                    user=SimpleNamespace(pk=user_id, is_authenticated=True),
+                    user=SimpleNamespace(
+                        pk=user_id,
+                        is_authenticated=True,
+                        profile=SimpleNamespace(language=preferred),
+                    ),
                 )
             return configuration.SummaryConfiguration.as_view()(
                 request, space_id="space-1"
@@ -57,9 +68,12 @@ def test_configuration_contains_business_rules_and_conservative_budgets(
     data = response.data["data"]
     assert data["sha256"] == prompts.sha256(data["template"])
     assert data["template"] == prompts.current_snapshot()["template"]
-    assert prompts.CLOUD_INPUT_RULES not in data["template"]
+    config = prompts.load_config()
+    assert config["cloud_input_rules"] not in data["template"]
     assert data["variables"] == []
-    assert data["languages"] == list(prompts.LANGUAGES)
+    assert data["languages"] == list(config["languages"])
+    assert data["language_names"]["es"] == "Español"
+    assert data["default_language"] == config["default_language"]
     assert data["scope"]["capabilities"] == config_api.grants.return_value
     cloud = data["budgets"]["cloud"]
     assert cloud["max_request_bytes"] == 10000
@@ -91,7 +105,8 @@ def test_unchanged_configuration_has_no_body(config_api, weak):
 
 
 @pytest.mark.parametrize(
-    "changed", ["user", "space", "server", "capabilities", "budget"]
+    "changed",
+    ["user", "space", "server", "capabilities", "budget", "language"],
 )
 def test_context_or_budget_change_never_reuses_another_etag(
     config_api, changed
@@ -106,6 +121,8 @@ def test_context_or_budget_change_never_reuses_another_etag(
         headers["HTTP_HOST"] = "other.example"
     elif changed == "capabilities":
         config_api.grants.return_value["features"].append("ai.local_agent")
+    elif changed == "language":
+        headers["preferred"] = "es"
     else:
         config_api.budget.return_value = (9000, None)
     response = config_api.fetch(**headers)
@@ -140,6 +157,6 @@ def test_corrupt_snapshot_fails_instead_of_silently_using_current(snapshot):
 
 def test_historical_snapshot_stays_frozen_after_current_template_changes():
     before = prompts.cloud_prompt({})
-    with patch.object(prompts, "TEMPLATE", "New business rules"):
-        assert prompts.cloud_prompt({}) == before == prompts.LEGACY_TEMPLATE
+    with patch.object(prompts, "load_config", side_effect=FileNotFoundError):
+        assert prompts.cloud_prompt({}) == before
         assert prompts.pinned_snapshot({})["version"] == "legacy-cloud-v1"

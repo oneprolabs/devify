@@ -1,7 +1,5 @@
 """Authenticated, space-scoped conversation summary endpoints."""
 
-import hashlib
-import json
 import uuid
 
 from django.contrib.auth import get_user_model
@@ -15,9 +13,17 @@ from rest_framework.views import APIView
 
 from billing.entitlements import can_use_chat_summary
 from chat_analysis.models import ChatSummary
-from chat_analysis.summaries.prompts import current_snapshot
+from chat_analysis.summaries.prompts import (
+    current_snapshot,
+    load_config,
+    summary_language,
+)
 from chat_analysis.summaries.serializers import SummaryCreate, SummaryOutput
-from chat_analysis.summaries.services import dispatch, expire_stale_summaries
+from chat_analysis.summaries.services import (
+    dispatch,
+    expire_stale_summaries,
+    summary_input_hash,
+)
 from spaces.models import Space
 from spaces.services import SpacePermissionService, check_daily_ai_quota
 
@@ -85,24 +91,31 @@ class SummaryList(APIView):
         values = data.validated_data.copy()
         # Serialize admission and request-key retries for this user.
         get_user_model().objects.select_for_update().get(pk=request.user.pk)
-        digest = hashlib.sha256(
-            json.dumps(
-                values, sort_keys=True, default=str, ensure_ascii=False
-            ).encode()
-        ).hexdigest()
+        digest = summary_input_hash(values)
         existing = ChatSummary.objects.filter(
             space=space,
             created_by=request.user,
             request_key=values["request_key"],
         ).first()
         if existing:
-            if existing.input_hash != digest:
+            matches = existing.input_hash == digest
+            if (
+                not matches
+                and existing.prompt_snapshot == {}
+                and "language" not in values
+            ):
+                # Released servers hashed the implicit Chinese default.
+                matches = existing.input_hash == summary_input_hash(
+                    {**values, "language": "中文"}
+                )
+            if not matches:
                 return Response(
                     {"detail": "同一请求已使用不同内容，请重新提交。"},
                     status=409,
                 )
             return Response({"data": SummaryOutput(existing).data})
-        snapshot = current_snapshot()
+        config = load_config()
+        snapshot = current_snapshot(config)
         version = values.pop("prompt_version", snapshot["version"])
         prompt_digest = values.pop("prompt_digest", snapshot["sha256"])
         if (version, prompt_digest) != (
@@ -116,6 +129,12 @@ class SummaryList(APIView):
                 },
                 status=409,
             )
+        try:
+            values["language"] = summary_language(
+                values.get("language"), request.user, config
+            )
+        except ValueError as error:
+            raise ValidationError({"language": str(error)}) from error
         expire_stale_summaries()
         if (
             ChatSummary.objects.filter(

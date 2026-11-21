@@ -16,10 +16,12 @@ LEGACY_PATH = (
 
 
 def sha256(text):
+    """Return the SHA-256 of an exact UTF-8 string."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def load_config():
+    """Read and validate the versioned system rules and scenario catalog."""
     with open(settings.CHAT_SUMMARY_CONFIG_PATH, encoding="utf-8") as source:
         config = yaml.safe_load(source)
     if not isinstance(config, dict):
@@ -27,31 +29,8 @@ def load_config():
     for field in ("version", "template", "cloud_input_rules"):
         if not isinstance(config.get(field), str) or not config[field].strip():
             raise ValueError(f"Invalid summary configuration: {field}.")
-    languages = config.get("languages")
-    if (
-        len(config["version"]) > 80
-        or not isinstance(languages, dict)
-        or not languages
-        or any(
-            not isinstance(code, str)
-            or len(code) > 30
-            or not re.fullmatch(r"[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*|auto", code)
-            or not isinstance(label, str)
-            or not label.strip()
-            for code, label in languages.items()
-        )
-        or not isinstance(config.get("default_language"), str)
-        or config["default_language"] not in languages
-    ):
-        raise ValueError("Invalid summary language configuration.")
-    aliases = config.get("language_aliases", {})
-    if not isinstance(aliases, dict) or any(
-        not isinstance(alias, str)
-        or not isinstance(target, str)
-        or target not in languages
-        for alias, target in aliases.items()
-    ):
-        raise ValueError("Invalid summary language aliases.")
+    if len(config["version"]) > 80:
+        raise ValueError("Summary prompt version is too long.")
     scenarios = config.get("scenarios")
     if not isinstance(scenarios, dict) or not scenarios:
         raise ValueError("Missing summary scenarios.")
@@ -78,24 +57,8 @@ def load_config():
     return config
 
 
-def summary_language(language, user, config):
-    """Resolve one task's explicit language, then account, then default."""
-    lookup = {code.casefold(): code for code in config["languages"]}
-    lookup.update(
-        (alias.casefold(), code)
-        for alias, code in config.get("language_aliases", {}).items()
-    )
-    if language is None:
-        profile = getattr(user, "profile", None)
-        preferred = getattr(profile, "language", "") or ""
-        return lookup.get(preferred.casefold(), config["default_language"])
-    resolved = lookup.get(language.casefold())
-    if resolved is None:
-        raise ValueError("Unsupported summary output language.")
-    return resolved
-
-
 def current_snapshot(config=None, scenario=None):
+    """Compose immutable system rules for one selected scenario."""
     config = load_config() if config is None else config
     scenario = config["default_scenario"] if scenario is None else scenario
     if scenario not in config["scenarios"]:
@@ -114,6 +77,7 @@ def current_snapshot(config=None, scenario=None):
 
 
 def pinned_snapshot(snapshot):
+    """Validate stored rules, preserving pre-migration task behavior."""
     if snapshot == {}:
         template = LEGACY_PATH.read_text(encoding="utf-8").rstrip("\n")
         return {
@@ -137,6 +101,7 @@ def pinned_snapshot(snapshot):
 
 
 def cloud_prompt(snapshot):
+    """Append cloud input framing to the stored business template."""
     pinned = pinned_snapshot(snapshot)
     return "\n".join(
         part

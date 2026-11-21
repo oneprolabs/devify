@@ -19,8 +19,11 @@ from chat_analysis.api_views import (
     TopicRunAPIView,
     TopicSubscriptionDetailAPIView,
 )
-from chat_analysis.summaries.configuration import SummaryConfiguration
-from chat_analysis.summaries.views import SummaryDetail, SummaryList
+from chat_analysis.summaries.views import (
+    SummaryConfiguration,
+    SummaryDetail,
+    SummaryList,
+)
 
 urlpatterns = [
     path(

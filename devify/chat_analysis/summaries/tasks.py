@@ -26,6 +26,7 @@ logger = logging.getLogger("chat_analysis.summary_tasks")
     time_limit=300,
 )
 def generate_chat_summary(self, summary_id, token):
+    """Claim a single attempt and execute its immutable prompt snapshot."""
     scope = ChatSummary.objects.filter(pk=summary_id, dispatch_token=token)
     if not scope.filter(status="queued").update(
         status="running", updated_at=timezone.now()

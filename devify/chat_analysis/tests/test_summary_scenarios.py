@@ -2,6 +2,7 @@
 
 import json
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -11,6 +12,7 @@ from chat_analysis.summaries.prompts import (
     cloud_prompt,
     current_snapshot,
     load_config,
+    pinned_snapshot,
 )
 
 
@@ -52,6 +54,8 @@ def test_user_instructions_stay_outside_the_system_prompt_and_count_as_input():
 @pytest.mark.parametrize(
     "change",
     [
+        {"template": ""},
+        {"version": ""},
         {"scenarios": {}},
         {"default_scenario": "missing"},
         {"scenarios": {"broken": {"name": "Missing prompt"}}},
@@ -66,3 +70,19 @@ def test_invalid_scenario_configuration_is_rejected(
     settings.CHAT_SUMMARY_CONFIG_PATH = str(path)
     with pytest.raises(ValueError):
         load_config()
+
+
+@pytest.mark.parametrize("snapshot", [None, [], {"version": "broken"}])
+def test_corrupt_snapshot_fails_instead_of_silently_using_current(snapshot):
+    with pytest.raises(ValueError):
+        cloud_prompt(snapshot)
+
+
+def test_historical_snapshot_does_not_depend_on_current_configuration():
+    before = cloud_prompt({})
+    with patch(
+        "chat_analysis.summaries.prompts.load_config",
+        side_effect=FileNotFoundError,
+    ):
+        assert cloud_prompt({}) == before
+        assert pinned_snapshot({})["version"] == "legacy-cloud-v1"

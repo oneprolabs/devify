@@ -16,6 +16,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import DesktopAuthorizationCode, DesktopDevice
 from accounts.utils import default_device_label
+from chat_analysis.summaries.configuration import prompt_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -283,10 +284,6 @@ class DesktopDeviceListAPIView(APIView):
             # Opt-in hints only; prompt/config failures cannot break device
             # registration or heartbeat. Never send templates or credentials.
             try:
-                from chat_analysis.summaries.configuration import (
-                    prompt_metadata,
-                )
-
                 payload["chat_summary_config"] = prompt_metadata()
             except Exception:
                 logger.exception("Unable to attach summary config metadata")

@@ -1,211 +1,223 @@
-# 聊天总结配置：控制端与桌面端接入约定
+# 聊天总结：最终需求与客户端接口
 
-对应 [#160](https://github.com/oneprolabs/devify/issues/160)。本轮实现控制端；
-缓存、初始化编排、并发合并与本地 CLI 拼接由桌面端继续实现。
-本接口只管独立聊天总结，不适用于事件抽取、主题订阅或定时报告。
+对应 [#160](https://github.com/oneprolabs/devify/issues/160)。本轮只实现控制端，
+客户端在 `oneprolabs/devify-desktop` 接入。API 当前在 PR 中，尚未部署。
 
-## 初始化与条件更新
+## 最终需求
 
-登录成功并选定空间后，首次初始化请求：
+- 默认 **综合分析**，包含总结、时间线、待办；三个单项只输出自己的内容。
+- 自定义允许用户描述目标、关注点与结构，必须填写要求。
+- 公共系统规则统一维护，语言只是每次请求的输出选项，不维护各语言版本的系统提示词。
+- 用户只编辑自己的要求。客户端界面显示场景名称和说明，不提供系统模板编辑器。
+- 云端和本地 CLI 使用同一目录版本。任务创建后固定模板、场景、语言和用户要求。
+- 只生成文本；原有空间权限、订阅权益、配额和消息范围限制继续生效。
+
+| 场景 ID | 名称 | 输出 |
+| --- | --- | --- |
+| `three_part` | 综合分析（默认） | 总结、时间线、待办三项都有 |
+| `summary` | 总结 | 主要内容、结论与当前结果 |
+| `action_items` | 待办 | 行动、负责人、期限与待确认项 |
+| `timeline` | 时间线 | 按时间整理事情经过 |
+| `custom` | 自定义 | 按用户要求组织内容，不强制三段式 |
+
+## 1. 登录后下载配置（新增接口）
+
+登录成功、选定空间后，在后台初始化一次：
 
 ```http
 GET /api/v1/spaces/{space_id}/chat-summary-config?schema_version=1
-Authorization: Bearer <access token>
+Authorization: Bearer <access_token>
 ```
 
-需要有效登录、活跃账号及空间读取权限。响应沿用全局
-`{"code":0,"message":"success","data":{...}}` 包装，键名为 snake_case。
-不支持的或缺失的 `schema_version` 返回 400；无空间权限返回 404。
-在登录成功后作为独立后台步骤初始化；配置请求失败不影响登录成功，
-也不阻止备份等其他功能。
+需要有效登录、活跃账号及空间读取权限。响应使用现有包装
+`{"code":0,"message":"success","data":{...}}`，键为 snake_case。
+读取 `data` 后保留 HTTP 响应头 `ETag`，包括其引号。
 
-`data` 的字段如下：
-
-| 字段 | 含义 |
+| data 字段 | 用法 |
 | --- | --- |
-| `schema_version` | 当前为整数 `1`；协议兼容能力，不是应用发布版本 |
-| `version` | 模板目录版本，当前为 `chat-summary-v4` |
-| `sha256` | `template` 原始 UTF-8 字节的 SHA-256，小写十六进制 |
-| `template` | 默认场景的无变量系统规则全文；不绑定到用户编辑界面 |
-| `default_scenario` | 默认场景 ID，当前为 `summary` |
-| `scenarios` | 场景列表，字段见下文 |
-| `max_instructions_chars` | 用户要求长度上限，当前为 `4000` |
-| `variables` | 当前为空数组；客户端不做字符串变量替换 |
-| `languages` | 配置支持的输出语言代码，当前为 `zh-CN`、`en-US`、`es`、`auto` |
-| `language_names` | 语言代码到显示名称的映射，供客户端展示或作为翻译回退 |
-| `default_language` | 当前账号偏好；不可用时采用服务端配置默认语言 |
-| `output_format` | `markdown` |
-| `scope.server` | 当前请求的服务 origin，含协议及端口、不带结尾 `/` |
-| `scope.account_id` | 当前账号 ID，字符串 |
-| `scope.space_id` | 当前空间 UUID，字符串 |
-| `scope.capabilities` | 原权益的 `features`、`enforced`、`internal`，仅用于区分缓存上下文 |
-| `budgets.cloud` / `budgets.local_cli` | 下述输入预算 |
-| `min_check_interval_seconds` | `21600`，6 小时 |
-| `retry_after_seconds` | `900`，失败后至少等待 15 分钟再自动重试 |
+| `schema_version` | 必须为整数 `1`；未知版本保留原缓存 |
+| `version` | 整个提示词目录的版本，例如 `chat-summary-v5` |
+| `default_scenario` | 初始选择此 ID；当前为 `three_part` |
+| `scenarios` | 场景列表，每项字段见下表 |
+| `scope` | `server/account_id/space_id/capabilities`，用于隔离缓存 |
+| `max_instructions_chars` | 用户要求上限，当前 4000 字符 |
+| `output_format` | 结果文本按 Markdown 展示 |
+| `min_check_interval_seconds` | 普通条件检查最小间隔，当前 21600 秒 |
+| `retry_after_seconds` | 更新失败后自动重试退避，当前 900 秒 |
 | `no_cache_behavior` | `require_online_initialization` |
 
-响应头含 `ETag`（配置及其 scope 的摘要，保留原有引号），以及
-`Cache-Control: private, no-cache`、`Vary: Authorization, Cookie`。
-模板版本与 ETag 不同：权限或预算变化也会改变 ETag。
-后续用同一个 URL、同一身份发送 `If-None-Match: <ETag>`；没有变化时返回
-**304，无正文**。权限检查在 ETag 比较之前执行，撤销权限不会被 304 绕过。
+每个 `scenarios[]` 包含：
 
-现有设备注册/心跳 `POST /api/v1/auth/desktop/devices` 可以额外传入整数
-`"summary_config_schema": 1`，响应 `data.chat_summary_config` 包含：
+| 字段 | 用法 |
+| --- | --- |
+| `id/name/description` | 稳定 ID、显示名称及说明 |
+| `requires_instructions` | 是否必须填写用户要求，当前自定义为 true |
+| `template` | 已组合好的公共规则与场景规则，供内部执行，不做变量替换 |
+| `sha256` | 该项 template 的 UTF-8 SHA-256，小写十六进制 |
+| `budgets.cloud/local_cli` | 该场景的预算和模板开销，见第 6 节 |
+
+模板和摘要只在所选场景内取，不另返回一份重复的默认模板。语言选项沿用客户端，
+不由这个目录下发。客户端须校验每项模板摘要，不能将不兼容或不完整数据覆盖原缓存。
+
+`scope.capabilities` 只是当前权益的快照，不能作为新增授权。原有
+`/api/v1/me/entitlements` 仍是权益来源。本地 CLI 保留内部账号和
+`ai.local_agent` 检查，工具接入保留 `internal + bridge.agent_cli` 检查。
+接口不分发模型凭据。
+
+菜单文案按客户端现有 i18n 显示；这与模型输出语言、系统模板内容互相独立。
+scope.account_id 是字符串，space_id 是 UUID 字符串，server 是含端口且无结尾斜杠的 origin。
+
+## 2. 确定场景与输出语言（客户端）
+
+初始选择 `config.default_scenario`。用户单次选择优先，语言否则使用现有总结语言设置；
+“跟随界面”需要先解析成实际语言，不能把这个标签直接发给服务端：
+
+```ts
+const scenarioId = chosenScenario ?? config.default_scenario
+const selected = config.scenarios.find(item => item.id === scenarioId)
+if (!selected) throw new Error('所选场景不可用，请更新配置')
+
+const savedLanguage = settings.language.summary === '跟随界面'
+  ? settings.language.ui
+  : settings.language.summary
+const language = chosenLanguage ?? savedLanguage
+```
+
+服务端原样使用传入的语言，接受现有 `中文/English/按原文语言`，也接受
+`zh-CN/en-US/es` 等语言代码及 `auto`。原文语言选项由模型识别主要语言。
+不传语言时保留旧接口的中文默认值；正常客户端应始终显式发送最终选择。
+服务端不会再根据账号偏好或 HTTP 界面语言覆盖它。
+
+当前客户端的“本机总结语言”已经用于本地 CLI；云端入队仍在
+`ConversationSummary.tsx` 中从 DOM 界面语言构造 language。接入时应统一为
+上面解析出的最终值，在入队时固定，云端和本地使用相同结果。
+本地分支也不能无条件覆盖用户明确的单次选择，设置名称和说明需同步。
+
+## 3. 创建云端任务（现有接口扩展）
+
+```http
+POST /api/v1/spaces/{space_id}/chat-summaries
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+沿用现有消息、来源、时间范围等字段，在原 body 上加入以下选择：
+
+```ts
+const body = {
+  ...existingSummaryRequest,
+  scenario: selected.id,
+  language,
+  instructions: userInstructions.trim(),
+  prompt_version: config.version,
+  prompt_digest: selected.sha256,
+}
+```
+
+`existingSummaryRequest` 仍包含 `request_key/platform/source_namespace/`
+`source_conversation_id/title/range_label/mode/period_start/period_end/messages`。
+`request_key` 是本次意图的新 UUID；网络重发保留它以及完整 body。
+自定义要求不能为空，其他场景可以为空；上限取 `max_instructions_chars`。
+`scenario` 未传时用综合分析；两个版本字段可以都省略以兼容旧客户端，不能只传一个。
+用户要求独立放入模型 user 消息，系统模板始终由控制端选择。
+
+- **202**：已创建 queued 任务，保存返回的 `data.id`。
+- **200**：同请求键、相同内容的重发，返回原任务。
+- **400**：参数不合法，包括未知场景、自定义要求为空、语言未解析或要求过长。
+- **409 + data.error_code=summary_config_changed**：尚未建任务，配置已更新；按第 5 节更新后再提交。
+- **其他 409**：同请求键对应不同内容，不要自动改键重跑已有任务。
+- **429**：已有三个任务处理，或达到原有配额。
+- **401/403/404**：按现有登录、权益与空间权限处理。
+
+消息边界不变：最多 2000 条、8 个会话、7 天，原文总计最多 120000 字符。
+用户要求也计入模型输入预算，不静默截断聊天原文。
+
+现有结果接口不变：
+
+| 调用 | 用途 |
+| --- | --- |
+| GET `.../chat-summaries/{id}` | 读取 queued/running/ready/failed 状态与结果 |
+| POST `.../chat-summaries/{id}` | 手动重试原失败任务，保留原场景、语言与要求 |
+| DELETE `.../chat-summaries/{id}` | 删除终态任务，处理中不能删除 |
+
+结果增加 `language/scenario/instructions/prompt_version/prompt_digest`，只展示用户自己的要求，
+不返回内部系统快照。历史未标注场景的记录返回 scenario=null；不得因此重处理历史记录。
+换场景、语言或要求是新意图，使用新的请求键；普通重试不接受新要求。
+
+## 4. 本地 CLI 使用同一模板
+
+无需调用云端任务创建接口。选取有效缓存中的场景，拼接：
+
+```text
+所选场景的 template（原样）
++ CLI 执行限制（禁工具、读文件、联网）
++ 最终输出语言
++ 用户要求（独立分区）
++ 统计信息与聊天原文（资料分区）
+```
+
+创建本地任务时保存所选模板、目录版本、摘要、场景、语言和用户要求；
+重试与执行均读取这份快照，不读取之后更新的配置。
+不要改动被其他功能共用的 `agent.rs::build_prompt`；为此次聊天输出使用独立入口。
+本地执行需要缓存模板；界面不展示不代表本地模板保密，模板中不得包含凭据。
+
+## 5. 配置更新、缓存与失败
+
+复用已有设备注册/心跳，在原 POST `/api/v1/auth/desktop/devices` body 中加
+`"summary_config_schema": 1`，可获得轻量提示：
 
 ```json
 {
   "schema_version": 1,
-  "version": "chat-summary-v4",
-  "sha256": "<模板的64位小写十六进制摘要>",
+  "version": "chat-summary-v5",
   "min_check_interval_seconds": 21600
 }
 ```
 
-这是全局模板更新提示，不是授权或空间配置。未传参数的旧客户端响应不变。
-心跳不含模板、模型密钥或完整权益；提示生成失败时仍正常完成设备注册/心跳。
-JWT 登录与刷新接口不变，不添加新的轮询任务。
+提示位于 `data.chat_summary_config`，不含模板正文。未传参数的旧客户端响应不变，
+提示失败也不会导致设备注册或心跳失败。不增加高频轮询或新的心跳定时器。
 
-桌面端接收现有心跳/权益刷新通知后，可在距离上次检查至少 6 小时时执行一次
-条件 GET，从而发现模板、预算或权益变化；不因打开聊天、切换页面或生成总结
-而发请求。不要求增加心跳频率。每个缓存上下文最多一个检查在途，其余通知
-合并；未变化时只接收 304。检查失败保留旧缓存，并按 15 分钟退避；退避后的
-重试同样由已有通知驱动。首次无缓存的初始化不受 6 小时间隔限制。
+收到已有通知后，普通检查最多每 6 小时一次，带保存的 ETag 调用初始化 GET：
 
-## 缓存、兼容与离线
+```http
+If-None-Match: "<已保存的ETag>"
+```
 
-缓存键包括规范化的客户端配置服务地址、账号 ID、空间 ID、schema 及
-`scope.capabilities`。服务地址应保留部署路径；校验返回的 origin 与请求地址
-一致，不能只按显示名称或模板版本共用缓存。权益变化后先刷新权益，再选择
-匹配的缓存。模板本身不授予任何能力；本地 CLI 总结仍保留现有内部账号限制和
-`ai.local_agent` 权益检查，工具接入仍检查 `internal` 与 `bridge.agent_cli`。
+**304 没有 JSON 正文**，继续使用缓存；200 校验整份配置后原子替换。
+同一上下文最多一个更新在途，其余通知合并；失败保留原缓存并退避 15 分钟。
+明确的 `summary_config_changed` 可以触发一次必要更新，不必等 6 小时，仍须合并和退避。
+不要在每次启动、打开聊天、切换页面、生成任务时重新下载。
 
-下载后先校验 schema、scope、支持的语言、空 `variables`、Markdown 格式、
-模板非空及 SHA-256、每个场景的模板摘要和预算字段。遇到不兼容配置时保留有效旧缓存，
-不以未知 schema 或变量尝试执行；提示需要升级客户端。
+缓存按规范化服务地址（含部署路径）、账号、空间和能力上下文隔离。
+写入正文、版本、摘要与 ETag 的同一个临时文件，刷盘后原子替换；提交前确认登录
+和空间上下文未变，丢弃旧上下文的迟到响应。重启后重新校验缓存。
+离线或失败时使用同一上下文的有效缓存并遵守原权益过期策略；完全无缓存时提示
+联网初始化，只暂停此次本地聊天输出，不影响登录和备份。旧服务返回 404 也按配置不可用处理。
 
-将正文、版本、摘要、ETag、scope 和校验结果写入同一个缓存文件，使用临时文件、
-刷盘后原子替换。只有下载完成并通过全部校验后才提交更新；提交前再次确认
-账号、服务地址和空间仍为发起请求时的上下文，丢弃切换前的迟到响应。
-重启或断电后必须再次校验整份缓存，不单独写版本号。
+## 6. 预算、实现与发布边界
 
-离线/更新失败时优先使用当前上下文的有效缓存，同时继续遵守原权益缓存及其
-过期策略。没有有效缓存时，明确提示“请联网完成总结配置初始化”，只暂停
-本地聊天总结；不内置另一份三段式业务模板。服务端未升级而返回 404 时也是
-配置不可用，不能据此打开付费能力。
+每项预算包含 `unit=utf8_bytes/max_request_bytes/prompt_bytes/reserved_overhead_bytes/`
+`max_content_bytes`；可用内容额度为上限减模板和预留开销，最低为 0。
+云端预留 64 字节封装，本地预留 2048 字节给语言、CLI 限制、用户要求和统计；
+实际附加内容更长时按实际开销计算，本地还须满足所选 CLI 模型自己的上下文和输出预留。
 
-## 场景、用户要求与输出语言
+目录仅提供现有配置的输入上限与实际模板开销，不访问模型 SDK。
+云端 Worker 执行前仍按当前模型及输出预留检查完整输入；目录预算不是模型的最终承诺。
+云端内容格式见 `summaries/input.py`，用户要求和 JSON 转义也需要计量。
 
-| ID | 用途 |
+| 模块 | 职责 |
 | --- | --- |
-| `summary` | 总结（默认）：只概括主要内容、结论与当前结果 |
-| `action_items` | 待办：只列行动、负责人、期限及待确认项 |
-| `timeline` | 时间线：只按时间顺序整理经过 |
-| `three_part` | 综合：总结、时间线、待办三项都有 |
-| `custom` | 自定义目标和结构，不强制三段式；必须填写用户要求 |
+| summaries/views.py | HTTP、空间权限、ETag、任务接口 |
+| summaries/configuration.py | 目录响应与心跳版本提示，不依赖模型调用 |
+| summaries/prompts.py | 读取/验证单份 YAML，组合和校验任务快照 |
+| summaries/serializers.py | 校验请求，保留用户选项，输出结果 |
+| summaries/input.py / tasks.py | 独立 user 输入、预算检查、单次执行 |
+| summaries/services.py | 请求摘要、超时状态、提交后分发 |
 
-`scenarios` 每项含 `id/name/description/requires_instructions/template/sha256/budgets`。
-三个单项各自只输出对应内容，只有综合场景组合三项；`three_part` 是综合场景的稳定 ID。
-顶层 `template/sha256/budgets` 对应默认场景；选择其他场景时须使用该项的摘要和预算。
-任何场景变更都递增目录 `version`；心跳摘要只是默认场景的变更提示，客户端同时比较版本。
+维护 `devify/conf/chat_analysis/summary.yaml`，可用 `CHAT_SUMMARY_CONFIG_PATH` 指向部署方文件；
+变更模板、默认场景或场景列表时递增 version，并采用原子文件替换。
+迁移 0008 仅增加 prompt_snapshot JSON 字段，场景和要求不再加字段；
+历史空快照对应随代码冻结的 legacy-cloud-v1.txt，不受新配置影响。
 
-客户端只展示场景名称、说明、输出语言及“我的要求”输入框。系统规则统一由控制端
-维护，不提供给用户修改；`custom` 只放开目标、关注点和结构，事实约束保持有效。
-本地 CLI 仍需内部缓存模板用于执行；“界面不展示”不等于模板未下发或本地文件保密。
-云端不接受用户上传系统模板，只接收场景 ID 和用户要求。
-预设场景可附加要求，最多 4000 字符；补充要求不得覆盖事实约束、所选场景和输出语言。
-自定义场景没有固定三段式要求。云端将用户要求放在 user 消息中，不拼入 system 消息。
-本地 CLI 使用清晰的规则、语言、用户要求和原文分区，不让用户输入替换系统模板。
-
-客户端界面语言和总结输出语言独立。单次请求的 `language` 优先；未提供时，
-服务端读取账号 `Profile.language`，不支持该偏好时使用配置的 `default_language`。
-`auto` 让模型按原文主要语言生成。输出正文及小节标题均使用选定语言，
-无需按语言复制业务模板。客户端应使用配置中的语言选项，不另写固定枚举。
-旧参数 `中文`、`English`、`按原文语言` 仍接受，分别转换为 `zh-CN`、`en-US`、
-`auto`。其他不支持的语言返回 400，不静默替换为中文。
-
-业务模板不包含云端 JSON 输入解释或本地 CLI 执行封装。桌面端拼接：缓存业务
-模板 + 输出语言 + CLI 执行限制（禁止工具、文件读取、联网）+ 用户补充要求
-+ 统计信息与选定原文。补充要求不能覆盖事实约束。不要修改仍被事件、报告等
-流程共用的 `agent.rs::build_prompt`；为聊天总结使用独立入口。
-
-核对客户端默认分支后，当前“本机总结语言”经 `summary_language()` 用于本地 CLI；
-云端入队的 `language` 仍由 `ConversationSummary.tsx` 从 DOM 界面语言构造。
-接入时应集中解析最终输出语言：优先单次选择，其次客户端保存的总结语言设置；
-“跟随界面”先解析为实际语言。云端和本地入队均保存这个结果，不从 DOM 独立推导，
-也不让本地分支覆盖明确的单次选择。现有设置名称和说明需随此行为同步。
-
-## 输入预算与任务固定
-
-每项预算包含 `unit=utf8_bytes`、`max_request_bytes`、`prompt_bytes`、
-`reserved_overhead_bytes`、`max_content_bytes`，满足：
-
-```text
-max_content_bytes = max(0, max_request_bytes
-                        - prompt_bytes - reserved_overhead_bytes)
-```
-
-云端预算对完整压缩 JSON 模型输入计量，不是原始文字字符数。输入格式见
-`summaries/input.py::summary_content`：`title/range/language/speakers/chats` 和可选
-`instructions`，用户要求与 JSON 转义开销也计入预算，
-其中消息行为 `[带时区时间, speakers索引, 原文]`。云端额度取配置的单次输入
-上限与已知模型扣除输出预留后的输入上限之较小值，预留 64 字节封装开销，
-提示词开销包含服务端 JSON 解释。代理模型使用 UTF-8 字节保守估算；已知模型
-实际执行可能使用 tokenizer。服务端执行前仍会检查当前模型的实际预算。
-
-本地预算沿用单次输入配置上限，额外预留 2048 字节给 CLI 限制、统计、用户要求
-和封装。**这不是 CLI 模型上下文容量声明**：客户端还须检查自己的模型容量和
-输出预留；实际附加内容超过预留时，按更大的实际开销计算。提示词更新后必须
-重新计算可用原文额度，不静默截断原文，不自动拆分或改用 map-reduce。
-
-新客户端创建云端总结时，在现有 POST 请求中同时提交：
-
-```json
-{
-  "prompt_version": "chat-summary-v4",
-  "prompt_digest": "<所选场景的模板 SHA-256 摘要>",
-  "scenario": "timeline",
-  "instructions": "重点整理交付日期如何发生变化。",
-  "language": "es"
-}
-```
-
-两个版本字段缺一返回 400；未知场景、自定义要求为空或要求过长也返回 400。
-未传 `scenario` 时使用配置默认场景。新请求版本/摘要过期返回 409，且响应
-`data.error_code=summary_config_changed`，更新配置后再提交。
-同一 `request_key` 重发必须保持原请求内容，服务端先查幂等记录，再检查当前
-模板，因此配置更新后仍能取回原任务。仅当该错误码明确表明尚未建任务时，
-才以刷新后的配置重发新请求；其他 409 是请求内容冲突，勿自动重跑已有任务。
-该错误码是已确认的配置变更，可触发一次合并后的条件下载，不必等待 6 小时；
-仍遵守单个更新在途和失败后 15 分钟退避，不为每次生成重复下载。
-旧客户端可不传两个版本字段和场景，由服务端选择当前默认场景模板。
-
-服务端将业务规则、版本、摘要与云端输入解释作为一份 `prompt_snapshot` 存储。
-Worker 与手动失败重试只读这份快照；结果 API 返回 `prompt_version` 和
-`prompt_digest`、`language`、`scenario` 和用户自己的 `instructions`，不下发内部快照。
-场景和用户要求一并保存在快照中，不增加额外数据库字段。迁移前记录的空快照
-固定对应冻结的 `legacy-cloud-v1`，不会在重试时升级为新规则。
-本地任务也需在创建时保存模板快照、版本、摘要、scope 和来源（如
-`server` / `validated_cache`）、场景、用户要求及本次输出语言，执行和重试时沿用。
-语言或账号偏好变化不影响已有任务，同一请求键也不会因为偏好变化重复建任务。
-本地未指定语言时优先使用当前账号偏好，再用缓存中的 `default_language`。
-改场景或要求时创建新的请求键；重试已有任务不会接受新的要求。历史记录未标注场景时
-返回 `scenario: null`，不得据此重新处理历史记录。
-
-## 维护与发布
-
-初期维护 `devify/conf/chat_analysis/summary.yaml` 中的公共规则、场景模板、语言列表、旧参数别名
-和默认语言；增加语种不修改 Python 枚举。用 `CHAT_SUMMARY_CONFIG_PATH` 指向部署方
-维护的外部配置文件，可以在不重发应用代码的情况下更新模板。
-采用原子文件替换；每次初始化、心跳版本提示和新任务创建读取有效配置。
-内容、场景或语言配置变化时必须递增 `version`；模板更新后客户端仍按上述间隔检查。
-`legacy-cloud-v1.txt` 随代码冻结，不受外部配置覆盖。无效配置拒绝下发和创建新任务，
-已有任务执行、原请求重发和失败任务重试不依赖当前配置文件。
-协议破坏性变化才升级 schema，模板规则修改只升模板版本。
-
-新增迁移 `0008_chatsummary_prompt_snapshot` 仅增加 JSON 字段，默认 `{}`，
-不扫描或重跑历史任务。发布先应用迁移；新 API 接受任务前，需停止旧版本总结
-消费者并完成 Worker 升级（可先暂停总结入口、排空旧消费者），避免旧 Worker
-忽略快照。回滚应用代码也需先暂停并处理新规则任务，不能让旧 Worker 接管。
-控制端与桌面端分别发布；控制端上线后，新云端任务使用所选场景或默认的单项总结，
-桌面端完成上述接入后才能对齐本地 CLI 总结。
+发布先应用迁移，并在新 API 接受任务前升级总结消费者，避免旧 Worker 忽略快照。
+配置更新不重新触发任何历史任务。本轮不更改事件分析、报告、备份、模型凭据或客户端代码。

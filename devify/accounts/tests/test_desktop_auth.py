@@ -254,11 +254,10 @@ def test_heartbeat_only_sends_opt_in_metadata_and_survives_config_failure():
     assert set(hint) == {
         "schema_version",
         "version",
-        "sha256",
         "min_check_interval_seconds",
     }
     with patch(
-        "chat_analysis.summaries.configuration.prompt_metadata",
+        "accounts.views.desktop_auth.prompt_metadata",
         side_effect=ValueError("bad config"),
     ):
         failure = client.post(url, payload, format="json")

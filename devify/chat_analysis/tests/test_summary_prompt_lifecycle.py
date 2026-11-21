@@ -1,5 +1,6 @@
 """Real API lifecycle tests; external inference is always mocked."""
 
+import json
 import uuid
 from datetime import timedelta
 from unittest.mock import patch
@@ -14,6 +15,7 @@ from chat_analysis.summaries import prompts
 from chat_analysis.summaries.input import summary_content
 from chat_analysis.summaries.serializers import SummaryCreate
 from chat_analysis.summaries.services import summary_input_hash
+from chat_analysis.summaries.tasks import generate_chat_summary
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -55,11 +57,10 @@ def summary_api():
 def test_creation_replay_retry_and_worker_keep_the_original_prompt(
     summary_api,
 ):
-    from chat_analysis.summaries.tasks import generate_chat_summary
-
     client, url, payload = summary_api
     response = client.post(url, payload, format="json")
     assert response.status_code == 202, response.data
+    assert response.data["data"]["scenario"] == "three_part"
     pk = response.data["data"]["id"]
     record = ChatSummary.objects.get(pk=pk)
     snapshot = record.prompt_snapshot
@@ -136,16 +137,12 @@ def test_configuration_revalidation_cannot_bypass_space_membership(
 ):
     client, url, _ = summary_api
     config_url = url.replace("chat-summaries", "chat-summary-config")
-    with patch(
-        "chat_analysis.summaries.configuration.request_budget",
-        return_value=(12000, None),
-    ):
-        response = client.get(config_url, {"schema_version": 1})
-        assert response.status_code == 200
-        etag = response["ETag"]
-        unchanged = client.get(
-            config_url, {"schema_version": 1}, HTTP_IF_NONE_MATCH=etag
-        )
+    response = client.get(config_url, {"schema_version": 1})
+    assert response.status_code == 200
+    etag = response["ETag"]
+    unchanged = client.get(
+        config_url, {"schema_version": 1}, HTTP_IF_NONE_MATCH=etag
+    )
     assert unchanged.status_code == 304
     assert unchanged.content == b""
     other = get_user_model().objects.create_user(username="prompt-outsider")
@@ -165,16 +162,14 @@ def test_configuration_revalidation_cannot_bypass_space_membership(
         ("en-US", "en-US"),
         ("es", "es"),
         ("auto", "auto"),
-        ("中文", "zh-CN"),
-        ("English", "en-US"),
-        ("按原文语言", "auto"),
+        ("中文", "中文"),
+        ("English", "English"),
+        ("按原文语言", "按原文语言"),
     ],
 )
 def test_output_language_is_independent_of_client_ui_language(
     summary_api, language, expected
 ):
-    import json
-
     client, url, payload = summary_api
     payload["language"] = language
     response = client.post(
@@ -186,26 +181,22 @@ def test_output_language_is_independent_of_client_ui_language(
     assert json.loads(summary_content(record))["language"] == expected
 
 
-def test_account_language_changes_do_not_change_existing_tasks(summary_api):
+def test_omitted_language_keeps_the_legacy_default_and_replays(summary_api):
     client, url, payload = summary_api
-    user = get_user_model().objects.get(username="prompt-lifecycle")
-    profile = user.profile
-    profile.language = "es"
-    profile.save(update_fields=["language"])
-    client.force_authenticate(user)
-    created = client.post(url, payload, format="json")
+    created = client.post(
+        url, payload, format="json", HTTP_ACCEPT_LANGUAGE="es"
+    )
     assert created.status_code == 202
-    assert created.data["data"]["language"] == "es"
-    profile.language = "en-US"
-    profile.save(update_fields=["language"])
+    assert created.data["data"]["language"] == "中文"
     replay = client.post(url, payload, format="json")
     assert replay.status_code == 200
-    assert replay.data["data"]["language"] == "es"
+    assert replay.data["data"]["language"] == "中文"
     assert replay.data["data"]["id"] == created.data["data"]["id"]
     payload["request_key"] = str(uuid.uuid4())
+    payload["language"] = "es"
     next_task = client.post(url, payload, format="json")
     assert next_task.status_code == 202
-    assert next_task.data["data"]["language"] == "en-US"
+    assert next_task.data["data"]["language"] == "es"
 
 
 def test_legacy_implicit_language_replay_survives_configuration_failure(
@@ -243,10 +234,6 @@ def test_legacy_implicit_language_replay_survives_configuration_failure(
 def test_scenario_and_user_instructions_are_pinned_through_retry(
     summary_api, scenario
 ):
-    import json
-
-    from chat_analysis.summaries.tasks import generate_chat_summary
-
     client, url, payload = summary_api
     expected = prompts.current_snapshot(scenario=scenario)
     payload.update(
@@ -294,7 +281,9 @@ def test_scenario_and_user_instructions_are_pinned_through_retry(
     assert row.status == "ready"
 
 
-@pytest.mark.parametrize("invalid", ["empty_custom", "unknown", "too_long"])
+@pytest.mark.parametrize(
+    "invalid", ["empty_custom", "unknown", "too_long", "invalid_language"]
+)
 def test_invalid_scenario_requests_do_not_create_work(summary_api, invalid):
     client, url, payload = summary_api
     if invalid == "empty_custom":
@@ -302,6 +291,8 @@ def test_invalid_scenario_requests_do_not_create_work(summary_api, invalid):
         payload["instructions"] = "   "
     elif invalid == "unknown":
         payload["scenario"] = "not_a_scenario"
+    elif invalid == "invalid_language":
+        payload["language"] = "跟随界面"
     else:
         payload["instructions"] = "x" * 4001
     response = client.post(url, payload, format="json")

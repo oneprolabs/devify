@@ -52,6 +52,29 @@ def load_config():
         for alias, target in aliases.items()
     ):
         raise ValueError("Invalid summary language aliases.")
+    scenarios = config.get("scenarios")
+    if not isinstance(scenarios, dict) or not scenarios:
+        raise ValueError("Missing summary scenarios.")
+    for key, scenario in scenarios.items():
+        if (
+            not isinstance(key, str)
+            or not re.fullmatch(r"[a-z][a-z0-9_]{0,39}", key)
+            or not isinstance(scenario, dict)
+            or any(
+                not isinstance(scenario.get(field), str)
+                or not scenario[field].strip()
+                for field in ("name", "description", "prompt")
+            )
+            or not isinstance(
+                scenario.get("requires_instructions", False), bool
+            )
+        ):
+            raise ValueError("Invalid summary scenario.")
+    if (
+        not isinstance(config.get("default_scenario"), str)
+        or config["default_scenario"] not in scenarios
+    ):
+        raise ValueError("Invalid default summary scenario.")
     return config
 
 
@@ -72,13 +95,21 @@ def summary_language(language, user, config):
     return resolved
 
 
-def current_snapshot(config=None):
+def current_snapshot(config=None, scenario=None):
     config = load_config() if config is None else config
+    scenario = config["default_scenario"] if scenario is None else scenario
+    if scenario not in config["scenarios"]:
+        raise ValueError("Unsupported summary scenario.")
+    template = "\n\n".join(
+        (config["template"], config["scenarios"][scenario]["prompt"])
+    )
     return {
         "version": config["version"],
-        "sha256": sha256(config["template"]),
-        "template": config["template"],
+        "sha256": sha256(template),
+        "template": template,
         "cloud_input_rules": config["cloud_input_rules"],
+        "scenario": scenario,
+        "user_instructions": "",
     }
 
 
@@ -98,6 +129,7 @@ def pinned_snapshot(snapshot):
         or not isinstance(snapshot.get("template"), str)
         or not snapshot["template"]
         or not isinstance(snapshot.get("cloud_input_rules"), str)
+        or not isinstance(snapshot.get("user_instructions", ""), str)
         or snapshot.get("sha256") != sha256(snapshot["template"])
     ):
         raise ValueError("Invalid pinned summary prompt.")

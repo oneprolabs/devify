@@ -125,7 +125,10 @@ def test_new_request_rejects_stale_config_but_old_clients_still_work(
         created = client.post(url, payload, format="json")
         assert created.status_code == 202
         row = ChatSummary.objects.get(pk=created.data["data"]["id"])
-        assert row.prompt_snapshot["template"] == "Updated business rules"
+        assert (
+            row.prompt_snapshot["template"]
+            == prompts.current_snapshot(updated)["template"]
+        )
 
 
 def test_configuration_revalidation_cannot_bypass_space_membership(
@@ -232,3 +235,77 @@ def test_legacy_implicit_language_replay_survives_configuration_failure(
     assert replay.data["data"]["language"] == "中文"
     payload["language"] = "es"
     assert client.post(url, payload, format="json").status_code == 409
+
+
+@pytest.mark.parametrize(
+    "scenario", ["summary", "three_part", "action_items", "timeline", "custom"]
+)
+def test_scenario_and_user_instructions_are_pinned_through_retry(
+    summary_api, scenario
+):
+    import json
+
+    from chat_analysis.summaries.tasks import generate_chat_summary
+
+    client, url, payload = summary_api
+    expected = prompts.current_snapshot(scenario=scenario)
+    payload.update(
+        scenario=scenario,
+        instructions="请用表格重点整理客户提出的交付要求。",
+        language="es",
+        prompt_digest=expected["sha256"],
+    )
+    created = client.post(url, payload, format="json")
+    assert created.status_code == 202, created.data
+    row = ChatSummary.objects.get(pk=created.data["data"]["id"])
+    assert created.data["data"]["scenario"] == scenario
+    assert created.data["data"]["instructions"] == payload["instructions"]
+    assert row.prompt_snapshot["template"] == expected["template"]
+    original = row.prompt_snapshot
+    changed = {**payload, "instructions": "A different request."}
+    assert client.post(url, changed, format="json").status_code == 409
+    ChatSummary.objects.filter(pk=row.pk).update(status="failed")
+    with patch(
+        "chat_analysis.summaries.views.load_config",
+        side_effect=FileNotFoundError,
+    ):
+        assert client.post(f"{url}/{row.pk}").status_code == 202
+    row.refresh_from_db()
+    assert row.prompt_snapshot == original
+    with (
+        patch(
+            "chat_analysis.summaries.tasks.LLMTracker.call_and_track",
+            return_value=("## Resultado", {"model": "test"}),
+        ) as model,
+        patch(
+            "chat_analysis.summaries.tasks.request_budget",
+            return_value=(12000, lambda *_: 1),
+        ),
+    ):
+        generate_chat_summary.run(row.pk, str(row.dispatch_token))
+    args = model.call_args.kwargs
+    assert args["prompt"] == prompts.cloud_prompt(original)
+    assert payload["instructions"] not in args["prompt"]
+    assert (
+        json.loads(args["content"])["instructions"] == payload["instructions"]
+    )
+    assert json.loads(args["content"])["language"] == "es"
+    row.refresh_from_db()
+    assert row.status == "ready"
+
+
+@pytest.mark.parametrize("invalid", ["empty_custom", "unknown", "too_long"])
+def test_invalid_scenario_requests_do_not_create_work(summary_api, invalid):
+    client, url, payload = summary_api
+    if invalid == "empty_custom":
+        payload["scenario"] = "custom"
+        payload["instructions"] = "   "
+    elif invalid == "unknown":
+        payload["scenario"] = "not_a_scenario"
+    else:
+        payload["instructions"] = "x" * 4001
+    response = client.post(url, payload, format="json")
+    assert response.status_code == 400
+    assert not ChatSummary.objects.filter(
+        request_key=payload["request_key"]
+    ).exists()

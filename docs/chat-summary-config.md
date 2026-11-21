@@ -24,9 +24,12 @@ Authorization: Bearer <access token>
 | 字段 | 含义 |
 | --- | --- |
 | `schema_version` | 当前为整数 `1`；协议兼容能力，不是应用发布版本 |
-| `version` | 业务模板版本，当前为 `chat-summary-v2` |
+| `version` | 模板目录版本，当前为 `chat-summary-v3` |
 | `sha256` | `template` 原始 UTF-8 字节的 SHA-256，小写十六进制 |
-| `template` | 无变量的业务规则全文；三段为结论、详细经过、行动项 |
+| `template` | 默认场景的无变量系统规则全文；不绑定到用户编辑界面 |
+| `default_scenario` | 默认场景 ID，当前为 `summary` |
+| `scenarios` | 场景列表，字段见下文 |
+| `max_instructions_chars` | 用户要求长度上限，当前为 `4000` |
 | `variables` | 当前为空数组；客户端不做字符串变量替换 |
 | `languages` | 配置支持的输出语言代码，当前为 `zh-CN`、`en-US`、`es`、`auto` |
 | `language_names` | 语言代码到显示名称的映射，供客户端展示或作为翻译回退 |
@@ -53,7 +56,7 @@ Authorization: Bearer <access token>
 ```json
 {
   "schema_version": 1,
-  "version": "chat-summary-v2",
+  "version": "chat-summary-v3",
   "sha256": "<模板的64位小写十六进制摘要>",
   "min_check_interval_seconds": 21600
 }
@@ -74,11 +77,11 @@ JWT 登录与刷新接口不变，不添加新的轮询任务。
 缓存键包括规范化的客户端配置服务地址、账号 ID、空间 ID、schema 及
 `scope.capabilities`。服务地址应保留部署路径；校验返回的 origin 与请求地址
 一致，不能只按显示名称或模板版本共用缓存。权益变化后先刷新权益，再选择
-匹配的缓存。模板本身不授予任何能力；本地总结仍检查现有 `ai.local_agent`
-权益，内部工具接入仍检查 `internal` 与 `bridge.agent_cli`。
+匹配的缓存。模板本身不授予任何能力；本地 CLI 总结仍保留现有内部账号限制和
+`ai.local_agent` 权益检查，工具接入仍检查 `internal` 与 `bridge.agent_cli`。
 
 下载后先校验 schema、scope、支持的语言、空 `variables`、Markdown 格式、
-模板非空及 SHA-256、预算字段及其非负关系。遇到不兼容配置时保留有效旧缓存，
+模板非空及 SHA-256、每个场景的模板摘要和预算字段。遇到不兼容配置时保留有效旧缓存，
 不以未知 schema 或变量尝试执行；提示需要升级客户端。
 
 将正文、版本、摘要、ETag、scope 和校验结果写入同一个缓存文件，使用临时文件、
@@ -91,11 +94,31 @@ JWT 登录与刷新接口不变，不添加新的轮询任务。
 本地聊天总结；不内置另一份三段式业务模板。服务端未升级而返回 404 时也是
 配置不可用，不能据此打开付费能力。
 
-## 输入与任务固定
+## 场景、用户要求与输出语言
+
+| ID | 用途 |
+| --- | --- |
+| `summary` | 默认简洁总结：主要内容、重要进展与明确结论 |
+| `three_part` | 三段式复盘：结论、详细经过、行动项 |
+| `action_items` | 待办文字清单：明确行动、负责人、期限及待确认项 |
+| `timeline` | 经过整理：按时间还原发展、分歧、纠正及最终确认 |
+| `custom` | 自定义目标和结构，不强制三段式；必须填写用户要求 |
+
+`scenarios` 每项含 `id/name/description/requires_instructions/template/sha256/budgets`。
+顶层 `template/sha256/budgets` 对应默认场景；选择其他场景时须使用该项的摘要和预算。
+任何场景变更都递增目录 `version`；心跳摘要只是默认场景的变更提示，客户端同时比较版本。
+
+客户端只展示场景名称、说明、输出语言及“我的要求”输入框。系统规则统一由控制端
+维护，不提供给用户修改；`custom` 只放开目标、关注点和结构，事实约束保持有效。
+本地 CLI 仍需内部缓存模板用于执行；“界面不展示”不等于模板未下发或本地文件保密。
+云端不接受用户上传系统模板，只接收场景 ID 和用户要求。
+预设场景可附加要求，最多 4000 字符；补充要求不得覆盖事实约束、所选场景和输出语言。
+自定义场景没有固定三段式要求。云端将用户要求放在 user 消息中，不拼入 system 消息。
+本地 CLI 使用清晰的规则、语言、用户要求和原文分区，不让用户输入替换系统模板。
 
 客户端界面语言和总结输出语言独立。单次请求的 `language` 优先；未提供时，
 服务端读取账号 `Profile.language`，不支持该偏好时使用配置的 `default_language`。
-`auto` 让模型按原文主要语言总结。输出正文及三个小节标题均使用选定语言，
+`auto` 让模型按原文主要语言生成。输出正文及小节标题均使用选定语言，
 无需按语言复制业务模板。客户端应使用配置中的语言选项，不另写固定枚举。
 旧参数 `中文`、`English`、`按原文语言` 仍接受，分别转换为 `zh-CN`、`en-US`、
 `auto`。其他不支持的语言返回 400，不静默替换为中文。
@@ -104,6 +127,14 @@ JWT 登录与刷新接口不变，不添加新的轮询任务。
 模板 + 输出语言 + CLI 执行限制（禁止工具、文件读取、联网）+ 用户补充要求
 + 统计信息与选定原文。补充要求不能覆盖事实约束。不要修改仍被事件、报告等
 流程共用的 `agent.rs::build_prompt`；为聊天总结使用独立入口。
+
+核对客户端默认分支后，当前“本机总结语言”经 `summary_language()` 用于本地 CLI；
+云端入队的 `language` 仍由 `ConversationSummary.tsx` 从 DOM 界面语言构造。
+接入时应集中解析最终输出语言：优先单次选择，其次客户端保存的总结语言设置；
+“跟随界面”先解析为实际语言。云端和本地入队均保存这个结果，不从 DOM 独立推导，
+也不让本地分支覆盖明确的单次选择。现有设置名称和说明需随此行为同步。
+
+## 输入预算与任务固定
 
 每项预算包含 `unit=utf8_bytes`、`max_request_bytes`、`prompt_bytes`、
 `reserved_overhead_bytes`、`max_content_bytes`，满足：
@@ -114,7 +145,8 @@ max_content_bytes = max(0, max_request_bytes
 ```
 
 云端预算对完整压缩 JSON 模型输入计量，不是原始文字字符数。输入格式见
-`summaries/input.py::summary_content`：`title/range/language/speakers/chats`，
+`summaries/input.py::summary_content`：`title/range/language/speakers/chats` 和可选
+`instructions`，用户要求与 JSON 转义开销也计入预算，
 其中消息行为 `[带时区时间, speakers索引, 原文]`。云端额度取配置的单次输入
 上限与已知模型扣除输出预留后的输入上限之较小值，预留 64 字节封装开销，
 提示词开销包含服务端 JSON 解释。代理模型使用 UTF-8 字节保守估算；已知模型
@@ -129,37 +161,43 @@ max_content_bytes = max(0, max_request_bytes
 
 ```json
 {
-  "prompt_version": "chat-summary-v2",
-  "prompt_digest": "<缓存中的模板 SHA-256 摘要>",
+  "prompt_version": "chat-summary-v3",
+  "prompt_digest": "<所选场景的模板 SHA-256 摘要>",
+  "scenario": "timeline",
+  "instructions": "重点整理交付日期如何发生变化。",
   "language": "es"
 }
 ```
 
-两字段缺一返回 400；新请求版本/摘要过期返回 409，且响应
+两个版本字段缺一返回 400；未知场景、自定义要求为空或要求过长也返回 400。
+未传 `scenario` 时使用配置默认场景。新请求版本/摘要过期返回 409，且响应
 `data.error_code=summary_config_changed`，更新配置后再提交。
 同一 `request_key` 重发必须保持原请求内容，服务端先查幂等记录，再检查当前
 模板，因此配置更新后仍能取回原任务。仅当该错误码明确表明尚未建任务时，
 才以刷新后的配置重发新请求；其他 409 是请求内容冲突，勿自动重跑已有任务。
 该错误码是已确认的配置变更，可触发一次合并后的条件下载，不必等待 6 小时；
 仍遵守单个更新在途和失败后 15 分钟退避，不为每次生成重复下载。
-旧客户端可不传两个版本字段，由服务端选择当前模板。
+旧客户端可不传两个版本字段和场景，由服务端选择当前默认场景模板。
 
 服务端将业务规则、版本、摘要与云端输入解释作为一份 `prompt_snapshot` 存储。
 Worker 与手动失败重试只读这份快照；结果 API 返回 `prompt_version` 和
-`prompt_digest` 和已解析的 `language`，不下发内部快照。迁移前记录的空快照
+`prompt_digest`、`language`、`scenario` 和用户自己的 `instructions`，不下发内部快照。
+场景和用户要求一并保存在快照中，不增加额外数据库字段。迁移前记录的空快照
 固定对应冻结的 `legacy-cloud-v1`，不会在重试时升级为新规则。
 本地任务也需在创建时保存模板快照、版本、摘要、scope 和来源（如
-`server` / `validated_cache`）及本次输出语言，执行和重试时沿用。
+`server` / `validated_cache`）、场景、用户要求及本次输出语言，执行和重试时沿用。
 语言或账号偏好变化不影响已有任务，同一请求键也不会因为偏好变化重复建任务。
 本地未指定语言时优先使用当前账号偏好，再用缓存中的 `default_language`。
+改场景或要求时创建新的请求键；重试已有任务不会接受新的要求。历史记录未标注场景时
+返回 `scenario: null`，不得据此重新处理历史记录。
 
 ## 维护与发布
 
-初期维护 `devify/conf/chat_analysis/summary.yaml` 中的模板、语言列表、旧参数别名
+初期维护 `devify/conf/chat_analysis/summary.yaml` 中的公共规则、场景模板、语言列表、旧参数别名
 和默认语言；增加语种不修改 Python 枚举。用 `CHAT_SUMMARY_CONFIG_PATH` 指向部署方
 维护的外部配置文件，可以在不重发应用代码的情况下更新模板。
 采用原子文件替换；每次初始化、心跳版本提示和新任务创建读取有效配置。
-内容/语言配置变化时必须递增 `version`；模板更新后客户端仍按上述间隔检查。
+内容、场景或语言配置变化时必须递增 `version`；模板更新后客户端仍按上述间隔检查。
 `legacy-cloud-v1.txt` 随代码冻结，不受外部配置覆盖。无效配置拒绝下发和创建新任务，
 已有任务执行、原请求重发和失败任务重试不依赖当前配置文件。
 协议破坏性变化才升级 schema，模板规则修改只升模板版本。
@@ -168,5 +206,5 @@ Worker 与手动失败重试只读这份快照；结果 API 返回 `prompt_versi
 不扫描或重跑历史任务。发布先应用迁移；新 API 接受任务前，需停止旧版本总结
 消费者并完成 Worker 升级（可先暂停总结入口、排空旧消费者），避免旧 Worker
 忽略快照。回滚应用代码也需先暂停并处理新规则任务，不能让旧 Worker 接管。
-控制端与桌面端分别发布；控制端上线后，新云端任务开始使用三段式规则，
+控制端与桌面端分别发布；控制端上线后，新云端任务使用所选场景或默认简洁总结，
 桌面端完成上述接入后才能对齐本地 CLI 总结。

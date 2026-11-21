@@ -27,6 +27,10 @@ class SummaryCreate(serializers.Serializer):
     period_start = serializers.DateTimeField()
     period_end = serializers.DateTimeField()
     language = serializers.CharField(max_length=30, required=False)
+    scenario = serializers.CharField(max_length=40, required=False)
+    instructions = serializers.CharField(
+        max_length=4000, required=False, allow_blank=True
+    )
     prompt_version = serializers.CharField(max_length=80, required=False)
     prompt_digest = serializers.RegexField(r"^[0-9a-f]{64}$", required=False)
     messages = InputMessage(many=True, allow_empty=False, max_length=2000)
@@ -64,12 +68,22 @@ class SummaryCreate(serializers.Serializer):
 class SummaryOutput(serializers.ModelSerializer):
     prompt_version = serializers.SerializerMethodField()
     prompt_digest = serializers.SerializerMethodField()
+    scenario = serializers.SerializerMethodField()
+    instructions = serializers.SerializerMethodField()
 
     def get_prompt_version(self, record):
         return pinned_snapshot(record.prompt_snapshot)["version"]
 
     def get_prompt_digest(self, record):
         return pinned_snapshot(record.prompt_snapshot)["sha256"]
+
+    def get_scenario(self, record):
+        return pinned_snapshot(record.prompt_snapshot).get("scenario")
+
+    def get_instructions(self, record):
+        return pinned_snapshot(record.prompt_snapshot).get(
+            "user_instructions", ""
+        )
 
     class Meta:
         model = ChatSummary
@@ -85,6 +99,8 @@ class SummaryOutput(serializers.ModelSerializer):
             "period_start",
             "period_end",
             "language",
+            "scenario",
+            "instructions",
             "sessions",
             "message_count",
             "status",

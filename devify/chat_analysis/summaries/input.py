@@ -32,14 +32,20 @@ def summary_content(record):
                 message["text"],
             ]
         )
+    content = {
+        "title": record.title,
+        "range": record.range_label,
+        "language": record.language,
+        "speakers": speakers,
+        "chats": list(chats.values()),
+    }
+    instructions = getattr(record, "prompt_snapshot", {}).get(
+        "user_instructions", ""
+    )
+    if instructions:
+        content["instructions"] = instructions
     return json.dumps(
-        {
-            "title": record.title,
-            "range": record.range_label,
-            "language": record.language,
-            "speakers": speakers,
-            "chats": list(chats.values()),
-        },
+        content,
         ensure_ascii=False,
         separators=(",", ":"),
     )

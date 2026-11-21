@@ -115,7 +115,15 @@ class SummaryList(APIView):
                 )
             return Response({"data": SummaryOutput(existing).data})
         config = load_config()
-        snapshot = current_snapshot(config)
+        try:
+            snapshot = current_snapshot(config, values.pop("scenario", None))
+        except ValueError as error:
+            raise ValidationError({"scenario": str(error)}) from error
+        instructions = values.pop("instructions", "")
+        scenario = config["scenarios"][snapshot["scenario"]]
+        if scenario.get("requires_instructions") and not instructions:
+            raise ValidationError({"instructions": "请描述希望得到什么内容。"})
+        snapshot["user_instructions"] = instructions
         version = values.pop("prompt_version", snapshot["version"])
         prompt_digest = values.pop("prompt_digest", snapshot["sha256"])
         if (version, prompt_digest) != (

@@ -74,6 +74,26 @@ def test_configuration_contains_business_rules_and_conservative_budgets(
     assert data["languages"] == list(config["languages"])
     assert data["language_names"]["es"] == "Español"
     assert data["default_language"] == config["default_language"]
+    assert data["default_scenario"] == "summary"
+    assert data["max_instructions_chars"] == 4000
+    scenarios = {item["id"]: item for item in data["scenarios"]}
+    assert set(scenarios) == {
+        "summary",
+        "three_part",
+        "action_items",
+        "timeline",
+        "custom",
+    }
+    assert scenarios["custom"]["requires_instructions"] is True
+    for key, item in scenarios.items():
+        assert item["sha256"] == prompts.sha256(item["template"])
+        assert (
+            item["template"]
+            == prompts.current_snapshot(config, key)["template"]
+        )
+        assert item["budgets"]["cloud"]["prompt_bytes"] > len(
+            item["template"].encode()
+        )
     assert data["scope"]["capabilities"] == config_api.grants.return_value
     cloud = data["budgets"]["cloud"]
     assert cloud["max_request_bytes"] == 10000

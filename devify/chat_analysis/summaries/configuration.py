@@ -46,6 +46,23 @@ def input_budget(limit, prompt, reserved):
     }
 
 
+def scenario_configuration(config, key, cloud_limit, local_limit):
+    snapshot = current_snapshot(config, key)
+    scenario = config["scenarios"][key]
+    return {
+        "id": key,
+        "name": scenario["name"],
+        "description": scenario["description"],
+        "requires_instructions": scenario.get("requires_instructions", False),
+        "template": snapshot["template"],
+        "sha256": snapshot["sha256"],
+        "budgets": {
+            "cloud": input_budget(cloud_limit, cloud_prompt(snapshot), 64),
+            "local_cli": input_budget(local_limit, snapshot["template"], 2048),
+        },
+    }
+
+
 class SummaryConfiguration(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -63,6 +80,15 @@ class SummaryConfiguration(APIView):
             getattr(settings, "CHAT_ANALYSIS_MODEL_INPUT_TOKENS", 12000)
         )
         cloud_limit, _ = request_budget(configured)
+        scenarios = [
+            scenario_configuration(config, key, cloud_limit, configured)
+            for key in config["scenarios"]
+        ]
+        default = next(
+            item
+            for item in scenarios
+            if item["id"] == config["default_scenario"]
+        )
         entitlements = build_entitlements(request.user)
         data = {
             **prompt_metadata(snapshot),
@@ -77,17 +103,15 @@ class SummaryConfiguration(APIView):
                 },
             },
             "template": snapshot["template"],
+            "default_scenario": config["default_scenario"],
+            "scenarios": scenarios,
+            "max_instructions_chars": 4000,
             "variables": [],
             "languages": list(config["languages"]),
             "language_names": config["languages"],
             "default_language": summary_language(None, request.user, config),
             "output_format": "markdown",
-            "budgets": {
-                "cloud": input_budget(cloud_limit, cloud_prompt(snapshot), 64),
-                "local_cli": input_budget(
-                    configured, snapshot["template"], 2048
-                ),
-            },
+            "budgets": default["budgets"],
             "retry_after_seconds": RETRY_INTERVAL,
             "no_cache_behavior": "require_online_initialization",
         }

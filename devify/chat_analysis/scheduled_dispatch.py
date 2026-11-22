@@ -1,6 +1,7 @@
 """Build bounded scheduled jobs from fully ingested messages."""
 
 import uuid
+from datetime import UTC
 
 from django.conf import settings
 from django.db import transaction
@@ -42,9 +43,11 @@ def ensure_due_run(now, schedule=None):
     slot = due_slot(now, schedule)
     if slot is None:
         return None
-    return ScheduledAnalysisRun.objects.get_or_create(
+    run = ScheduledAnalysisRun.objects.get_or_create(
         slot=slot, defaults={"boundary": slot_boundary(slot)}
     )[0]
+    run.boundary = run.boundary.astimezone(UTC)
+    return run
 
 
 def dispatch_due_analysis(now=None, schedule=None):

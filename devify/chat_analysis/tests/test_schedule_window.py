@@ -63,7 +63,9 @@ def test_one_persistent_run_per_slot_uses_the_slot_clock():
     same_slot = datetime(2026, 11, 17, 3, 29, tzinfo=timezone.utc)
     run = ensure_due_run(first)
     assert run is not None
-    assert ensure_due_run(same_slot).pk == run.pk
+    same = ensure_due_run(same_slot)
+    assert same.pk == run.pk
+    assert same.boundary.isoformat() == run.boundary.isoformat()
     run.refresh_from_db()
     assert run.boundary == datetime(2026, 11, 17, 3, 0, tzinfo=timezone.utc)
     next_run = ensure_due_run(

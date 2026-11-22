@@ -17,7 +17,11 @@ from chat_analysis.models import (
     EventSuggestion,
 )
 from chat_analysis.schedule_window import BEIJING
-from chat_analysis.tasks import execute_analysis_job_task
+from chat_analysis.services import retry_analysis_job
+from chat_analysis.tasks import (
+    execute_analysis_job_task,
+    run_due_scheduled_analysis_task,
+)
 from chat_analysis.tests.test_execution import (
     add_message,
     make_conversation,
@@ -26,7 +30,10 @@ from chat_analysis.tests.test_execution import (
 )
 from chat_analysis.tests.test_scheduled_dispatch import origin
 from chat_analysis.tests.test_user_dispatch import user_job
-from chat_analysis.user_dispatch import dispatch_lock
+from chat_analysis.user_dispatch import (
+    dispatch_lock,
+    dispatch_pending_analysis,
+)
 from chat_domain.models import Message
 from chat_ingestion.models import UploadBatch
 
@@ -386,3 +393,167 @@ def test_finished_reduction_commits_when_last_model_call_exceeds_budget(
     job.refresh_from_db()
     assert "event_reduction" not in job.checkpoint
     assert "resume_after" not in job.checkpoint
+
+
+@pytest.mark.parametrize("concurrency", [1, 4])
+def test_hourly_publication_precedes_continuous_new_input(
+    settings,
+    monkeypatch,
+    concurrency,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    settings.CHAT_ANALYSIS_MAX_CONCURRENT_USERS = concurrency
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    monkeypatch.setattr(execution, "_prepare_chunk", model_results)
+    old = ready_event_batch("continuous-publication")
+    initial = timezone.now().replace(minute=0, second=0, microsecond=0)
+    original = scheduled_dispatch._pending_origins
+    monkeypatch.setattr(
+        scheduled_dispatch,
+        "_pending_origins",
+        lambda *args, **kwargs: original(*args, **kwargs).filter(
+            message__conversation__space=old.space,
+        ),
+    )
+    dispatch_due = scheduled_dispatch.dispatch_due_analysis
+
+    def admit_and_deliver():
+        result = dispatch_due()
+        # Reserve capacity before returning to the hourly tick, including
+        # when the test itself is wrapped in an outer transaction.
+        dispatch_pending_analysis()
+        return result
+
+    monkeypatch.setattr(
+        scheduled_dispatch,
+        "dispatch_due_analysis",
+        admit_and_deliver,
+    )
+    previous = old
+    for index in range(1, 4):
+        now = initial + timedelta(hours=index)
+        with (
+            patch("django.utils.timezone.now", return_value=now),
+            patch("chat_analysis.tasks.execute_analysis_job_task.delay"),
+        ):
+            message = add_message(old.conversation, index + 1)
+            origin(
+                message,
+                old.created_by,
+                old.space,
+                f"continuous-{index}",
+                now,
+            )
+            run_due_scheduled_analysis_task.run()
+            assert not EventSuggestion.objects.filter(
+                analysis_job=previous,
+                status=EventSuggestion.Status.PENDING,
+            ).exists()
+            current = AnalysisJob.objects.get(
+                created_by=old.created_by,
+                state=AnalysisJob.State.QUEUED,
+            )
+            # Complete mapping without the task's eager publication, as if
+            # this round had no time left to publish its candidates.
+            previous = execution.execute_analysis_job(
+                current.pk,
+                worker_id=f"continuous-{index}",
+            ).job
+    assert execution.publish_ready_event_batches() == 1
+
+
+def test_finishing_task_publishes_older_round_in_its_space(
+    settings,
+    monkeypatch,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    monkeypatch.setattr(execution, "_prepare_chunk", model_results)
+    old = ready_event_batch("older-round-at-completion")
+    now = timezone.now() + timedelta(hours=1)
+    with (
+        patch("django.utils.timezone.now", return_value=now),
+        patch("chat_analysis.tasks.execute_analysis_job_task.delay"),
+    ):
+        message = add_message(old.conversation, 2)
+        origin(message, old.created_by, old.space, "new-round", now)
+        current = scheduled_dispatch.schedule_user(
+            old.created_by_id,
+            now,
+            dispatch=False,
+        )
+        execute_analysis_job_task.run(current.pk, worker_id="finish-round")
+    assert not EventSuggestion.objects.filter(
+        analysis_job__in=(old, current),
+        status=EventSuggestion.Status.PENDING,
+    ).exists()
+
+
+def test_publication_errors_stop_and_explicit_retry_keeps_map_results(
+    settings,
+    monkeypatch,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    with patch.object(
+        execution, "_prepare_chunk", side_effect=model_results
+    ) as extract:
+        job = ready_event_batch("publication-failure-limit")
+        initial = timezone.now()
+        failures = (
+            RuntimeError("endpoint unavailable"),
+            execution.AnalysisBatchYield(),
+            RuntimeError("endpoint unavailable"),
+            RuntimeError("endpoint unavailable"),
+        )
+        for index, (error, expected) in enumerate(zip(failures, (1, 1, 2, 3))):
+            now = initial + timedelta(hours=index)
+            with (
+                patch("django.utils.timezone.now", return_value=now),
+                patch.object(
+                    execution, "prepare_event_reduction", side_effect=error
+                ) as reduce,
+            ):
+                assert execution.publish_ready_event_batches() == 0
+                assert execution.publish_ready_event_batches() == 0
+                reduce.assert_called_once()
+            job.refresh_from_db()
+            assert job.checkpoint["publication_failures"] == expected
+            assert "endpoint unavailable" in job.error
+            assert job.state == (
+                AnalysisJob.State.FAILED
+                if expected == 3
+                else AnalysisJob.State.READY
+            )
+        note_ids = list(job.notes.values_list("pk", flat=True))
+        job = retry_analysis_job(actor=job.created_by, job=job)
+        assert "publication_failures" not in job.checkpoint
+        with (
+            patch.object(
+                execution,
+                "prepare_event_reduction",
+                side_effect=lambda j, c, **kw: [[item] for item in c],
+            ),
+            patch("chat_analysis.tasks.execute_analysis_job_task.delay"),
+        ):
+            execute_analysis_job_task.run(
+                job.pk, worker_id="publication-retry"
+            )
+        extract.assert_called_once()
+    job.refresh_from_db()
+    assert job.state == AnalysisJob.State.READY
+    assert job.error == ""
+    assert "publication_failures" not in job.checkpoint
+    assert list(job.notes.values_list("pk", flat=True)) == note_ids
+    assert not job.event_suggestions.filter(
+        status=EventSuggestion.Status.PENDING,
+    ).exists()

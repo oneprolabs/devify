@@ -173,6 +173,7 @@ def retry_analysis_job(*, actor, job):
     job.state = AnalysisJob.State.QUEUED
     job.checkpoint = dict(job.checkpoint)
     job.checkpoint.pop("resume_after", None)
+    job.checkpoint.pop("publication_failures", None)
     job.lease_owner = ""
     job.lease_until = None
     job.error = ""

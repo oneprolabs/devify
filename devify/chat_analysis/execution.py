@@ -1150,8 +1150,12 @@ def _reduction_progress(
 def _clear_reduction_progress(job):
     checkpoint = dict(job.checkpoint or {})
     checkpoint.pop("event_reduction", None)
-    AnalysisJob.objects.filter(pk=job.pk).update(checkpoint=checkpoint)
+    checkpoint.pop("publication_failures", None)
+    AnalysisJob.objects.filter(pk=job.pk).update(
+        checkpoint=checkpoint, error="",
+    )
     job.checkpoint = checkpoint
+    job.error = ""
 
 
 def _publish_reduced_events(job, lease_seconds):
@@ -1284,7 +1288,23 @@ def _publish_event_batch(space_id, boundary, *, time_limit=None):
                     **locked.checkpoint,
                     "resume_after": next_analysis_hour(),
                 }
-                locked.save(update_fields=("checkpoint",))
+                if not isinstance(error, AnalysisBatchYield):
+                    failures = locked.checkpoint.get(
+                        "publication_failures", 0,
+                    ) + 1
+                    locked.checkpoint["publication_failures"] = failures
+                    locked.error = (
+                        f"event_publication_failed: {type(error).__name__}: "
+                        f"{error}"
+                    )[:4000]
+                    if failures >= DEFAULT_MAX_ATTEMPTS:
+                        locked.state = AnalysisJob.State.FAILED
+                        locked.checkpoint.pop("resume_after", None)
+                locked.save(
+                    update_fields=(
+                        "checkpoint", "state", "error", "updated_at",
+                    ),
+                )
         if isinstance(error, AnalysisBatchYield):
             return False
         raise

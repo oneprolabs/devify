@@ -86,9 +86,9 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
         if first_result.job.specification.get("boundary"):
             publish_ready_event_batches(
                 space_id=first_result.job.space_id,
-                boundary=first_result.job.specification["boundary"],
                 time_limit=seconds - (monotonic() - started),
             )
+            first_result.job.refresh_from_db(fields=("state",))
         return {
             "job_id": job_id,
             "state": first_result.job.state,
@@ -121,8 +121,8 @@ def run_due_scheduled_analysis_task(self):
     from chat_analysis.scheduled_dispatch import dispatch_due_analysis
 
     recover_expired_analysis_jobs()
-    result = dispatch_due_analysis()
     publish_ready_event_batches()
+    result = dispatch_due_analysis()
     dispatch_pending_analysis()
     return result
 

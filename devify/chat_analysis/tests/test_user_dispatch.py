@@ -44,6 +44,7 @@ from chat_analysis.user_dispatch import (
 )
 from chat_domain.models import Message, MessageOrigin, MessagePart
 from chat_ingestion.models import UploadBatch
+from spaces.models import SpaceMembership
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -418,6 +419,40 @@ def test_scheduler_bounds_users_and_keeps_one_job_per_user(settings):
         assert dispatch_due_analysis(now, schedule)["jobs"] == 0
     assert AnalysisJob.objects.filter(created_by=owner).count() == 1
     dispatch.assert_called_once()
+
+
+def test_revoked_space_does_not_starve_another_user(settings):
+    settings.CHAT_ANALYSIS_DISPATCH_LIMIT = 1
+    denied = user_job("revoked-space")
+    allowed = user_job("allowed-space")
+    boundary = (
+        timezone.now()
+        .astimezone(BEIJING)
+        .replace(
+            second=0,
+            microsecond=0,
+        )
+    )
+    before = boundary - timedelta(seconds=1)
+    allowed_user_id = allowed.created_by_id
+    for job in (denied, allowed):
+        message = Message.objects.get(conversation=job.conversation)
+        origin(
+            message,
+            job.created_by,
+            job.space,
+            f"rights-{job.pk}",
+            before,
+        )
+        Message.objects.filter(pk=message.pk).update(created_at=before)
+        MessageOrigin.objects.filter(message=message).update(created_at=before)
+    SpaceMembership.objects.filter(space=denied.space).delete()
+    denied.delete()
+    allowed.delete()
+    with patch("chat_analysis.tasks.dispatch_analysis_job"):
+        result = dispatch_due_analysis(boundary, boundary.strftime("%H:%M"))
+    assert result["jobs"] == 1
+    assert AnalysisJob.objects.get().created_by_id == allowed_user_id
 
 
 def test_queue_wait_includes_latest_input_and_running_batch_stays_frozen(

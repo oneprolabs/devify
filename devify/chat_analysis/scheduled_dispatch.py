@@ -4,7 +4,7 @@ import uuid
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Exists, F, OuterRef
+from django.db.models import Exists, F, OuterRef, Q
 from django.utils import timezone
 
 from chat_analysis.models import (
@@ -19,12 +19,16 @@ from chat_analysis.schedule_window import (
     slot_boundary,
 )
 from chat_analysis.services import (
+    ChatAnalysisPermissionError,
     create_analysis_job,
+    ensure_can_contribute,
     get_analysis_preferences,
 )
 from chat_analysis.user_dispatch import dispatch_lock
 from chat_domain.models import Conversation, Message, MessageOrigin
 from chat_ingestion.models import UploadBatch
+from spaces.models import Space, SpaceMembership, SpaceTakeover
+from spaces.services import SpacePermissionService
 
 MAX_MESSAGES_PER_JOB = 1000
 LEGACY_OVERSIZE_ERROR = "Message exceeds the model input budget."
@@ -84,11 +88,26 @@ def dispatch_due_analysis(now=None, schedule=None):
         .distinct()[: max(0, limit - len(users))]
     )
     for user_id in users + list(partial_users):
-        jobs += int(schedule_user(user_id, run.boundary) is not None)
+        try:
+            jobs += int(schedule_user(user_id, run.boundary) is not None)
+        except ChatAnalysisPermissionError:
+            continue
     return {"jobs": jobs, "slot": run.slot}
 
 
 def _pending_origins(boundary, user_id=None):
+    membership = SpaceMembership.objects.filter(
+        space_id=OuterRef("message__conversation__space_id"),
+        user_id=OuterRef("upload_item__batch__uploaded_by_id"),
+        status=SpaceMembership.Status.ACTIVE,
+        role__in=SpacePermissionService.WRITE_ROLES,
+    )
+    takeover = SpaceTakeover.objects.filter(
+        space_id=OuterRef("message__conversation__space_id"),
+        admin_id=OuterRef("upload_item__batch__uploaded_by_id"),
+        admin__is_staff=True,
+        active=True,
+    )
     analyzed = NoteEvidence.objects.filter(
         message_id=OuterRef("message_id"),
         note__analysis_job__state=AnalysisJob.State.READY,
@@ -104,10 +123,16 @@ def _pending_origins(boundary, user_id=None):
             message__created_at__lte=boundary,
             message__orphaned_at__isnull=True,
             message__scheduled_analysis__isnull=True,
+            message__conversation__space__status=Space.Status.ACTIVE,
             upload_item__batch__space_id=F("message__conversation__space_id"),
         )
-        .annotate(analyzed=Exists(analyzed))
+        .annotate(
+            analyzed=Exists(analyzed),
+            writable=Exists(membership),
+            takeover=Exists(takeover),
+        )
         .filter(analyzed=False)
+        .filter(Q(writable=True) | Q(takeover=True))
     )
     if user_id is not None:
         origins = origins.filter(upload_item__batch__uploaded_by_id=user_id)
@@ -225,6 +250,8 @@ def schedule_conversation(
             .select_related("space")
             .get(pk=conversation_id)
         )
+        if existing_job is not None:
+            ensure_can_contribute(existing_job.created_by, conversation.space)
         if (
             existing_job is None
             and AnalysisJob.objects.filter(

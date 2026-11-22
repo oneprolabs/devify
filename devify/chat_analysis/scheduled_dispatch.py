@@ -4,8 +4,9 @@ import uuid
 from datetime import UTC
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import CharField, Exists, F, OuterRef, Q
+from django.db.models import CharField, Exists, F, OuterRef, Q, Subquery
 from django.db.models.functions import Cast
 from django.utils import timezone
 
@@ -91,7 +92,7 @@ def dispatch_due_analysis(now=None, schedule=None):
 
     The slot controls admission. Actual input is selected when the worker
     starts, including uploads received while this user was waiting.
-    Continuations do not wait for a new hourly slot.
+    Each admitted batch stays within its original space.
     """
     now = now or timezone.now()
     run = ensure_due_run(now, schedule)
@@ -103,26 +104,25 @@ def dispatch_due_analysis(now=None, schedule=None):
         state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
     ).values("created_by_id")
     limit = max(1, settings.CHAT_ANALYSIS_DISPATCH_LIMIT)
-    users = list(
-        pending.exclude(upload_item__batch__uploaded_by_id__in=busy)
-        .order_by("upload_item__batch__uploaded_by_id")
-        .values_list("upload_item__batch__uploaded_by_id", flat=True)
-        .distinct()[:limit]
-    )
-    partial_users = (
-        _retryable_partials()
-        .exclude(created_by_id__in=busy)
-        .exclude(
-            created_by_id__in=users,
+    last_batch = (
+        AnalysisJob.objects.filter(
+            created_by_id=OuterRef("pk"),
         )
-        .order_by("created_by_id")
-        .values_list(
-            "created_by_id",
-            flat=True,
-        )
-        .distinct()[: max(0, limit - len(users))]
+        .order_by("-created_at")
+        .values("created_at")[:1]
     )
-    for user_id in users + list(partial_users):
+    users = (
+        get_user_model()
+        .objects.filter(
+            Q(pk__in=pending.values("upload_item__batch__uploaded_by_id"))
+            | Q(pk__in=_retryable_partials().values("created_by_id")),
+        )
+        .exclude(pk__in=busy)
+        .annotate(last_batch=Subquery(last_batch))
+        .order_by(F("last_batch").asc(nulls_first=True), "pk")
+        .values_list("pk", flat=True)[:limit]
+    )
+    for user_id in users:
         try:
             jobs += int(schedule_user(user_id, run.boundary) is not None)
         except ChatAnalysisPermissionError:
@@ -130,7 +130,7 @@ def dispatch_due_analysis(now=None, schedule=None):
     return {"jobs": jobs, "slot": run.slot}
 
 
-def _pending_origins(boundary, user_id=None):
+def _pending_origins(boundary, user_id=None, *, space_id=None):
     excluded = (
         SpaceWorkflowConfig.objects.filter(
             space_id=OuterRef("message__conversation__space_id"),
@@ -189,10 +189,19 @@ def _pending_origins(boundary, user_id=None):
     )
     if user_id is not None:
         origins = origins.filter(upload_item__batch__uploaded_by_id=user_id)
+    if space_id is not None:
+        origins = origins.filter(message__conversation__space_id=space_id)
     return origins
 
 
-def schedule_user(user_id, boundary, *, dispatch=True, pending_before=None):
+def schedule_user(
+    user_id,
+    boundary,
+    *,
+    space_id=None,
+    dispatch=True,
+    pending_before=None,
+):
     """Queue a user wakeup; freeze its messages only when execution starts."""
     from chat_analysis.tasks import dispatch_analysis_job
 
@@ -202,14 +211,16 @@ def schedule_user(user_id, boundary, *, dispatch=True, pending_before=None):
             state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
         ).exists():
             return None
-        partial = (
-            _retryable_partials()
-            .filter(created_by_id=user_id)
-            .order_by("updated_at")
-            .first()
-        )
+        partials = _retryable_partials().filter(created_by_id=user_id)
+        if space_id is not None:
+            partials = partials.filter(space_id=space_id)
+        partial = partials.order_by("updated_at").first()
         origin = (
-            _pending_origins(pending_before or boundary, user_id)
+            _pending_origins(
+                pending_before or boundary,
+                user_id,
+                space_id=space_id,
+            )
             .select_related(
                 "message__conversation__space",
                 "upload_item__batch__uploaded_by",
@@ -259,7 +270,11 @@ def freeze_scheduled_input(job, *, input_boundary=None):
             return locked
         boundary = input_boundary or timezone.now()
         origin = (
-            _pending_origins(boundary, job.created_by_id)
+            _pending_origins(
+                boundary,
+                job.created_by_id,
+                space_id=locked.space_id,
+            )
             .order_by("created_at", "pk")
             .first()
         )
@@ -302,6 +317,10 @@ def schedule_conversation(
             .get(pk=conversation_id)
         )
         if existing_job is not None:
+            if existing_job.space_id != conversation.space_id:
+                raise ChatAnalysisPermissionError(
+                    "Analysis input must remain in its original space."
+                )
             ensure_can_contribute(existing_job.created_by, conversation.space)
         if (
             existing_job is None
@@ -469,7 +488,6 @@ def schedule_conversation(
             },
         )
         if existing_job is not None:
-            job.space = conversation.space
             job.conversation = conversation
             job.start_seq = messages[0].ingest_seq - 1
             job.end_seq = messages[-1].ingest_seq
@@ -482,7 +500,6 @@ def schedule_conversation(
             }
             job.save(
                 update_fields=(
-                    "space",
                     "conversation",
                     "start_seq",
                     "end_seq",

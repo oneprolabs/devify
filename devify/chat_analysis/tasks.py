@@ -74,6 +74,7 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
             following = schedule_user(
                 result.job.created_by_id,
                 datetime.fromisoformat(boundary),
+                space_id=result.job.space_id,
                 dispatch=False,
                 pending_before=input_boundary,
             )
@@ -83,7 +84,11 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
         if first_result is None:
             return {"job_id": job_id, "claimed": False}
         if first_result.job.specification.get("boundary"):
-            publish_ready_event_batches()
+            publish_ready_event_batches(
+                space_id=first_result.job.space_id,
+                boundary=first_result.job.specification["boundary"],
+                time_limit=seconds - (monotonic() - started),
+            )
         return {
             "job_id": job_id,
             "state": first_result.job.state,

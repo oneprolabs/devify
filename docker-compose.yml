@@ -9,6 +9,10 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# Keep API admission and analysis worker capacity consistent in production.
+x-analysis-environment: &analysis-environment
+  CHAT_ANALYSIS_MAX_CONCURRENT_USERS: ${CHAT_ANALYSIS_MAX_CONCURRENT_USERS:-4}
+
 services:
   devify-api:
     image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:latest
@@ -26,6 +30,7 @@ services:
     env_file:
       - ${DEVIFY_ENV_FILE:-./.env}
     environment:
+      <<: *analysis-environment
       CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/django/staticfiles:/opt/devify/core/staticfiles
@@ -63,6 +68,7 @@ services:
     env_file:
       - ${DEVIFY_ENV_FILE:-./.env}
     environment:
+      <<: *analysis-environment
       CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ${DEVIFY_RUNTIME_ROOT:-.}/cache:/opt/cache
@@ -94,6 +100,7 @@ services:
     env_file:
       - ${DEVIFY_ENV_FILE:-./.env}
     environment:
+      <<: *analysis-environment
       CHAT_UPLOAD_DEDICATED_QUEUE: "true"
       CHAT_DEDICATED_WORKER: "true"
       CELERY_WORKER_PREFETCH_MULTIPLIER: "1"
@@ -121,6 +128,7 @@ services:
     env_file:
       - ${DEVIFY_ENV_FILE:-./.env}
     environment:
+      <<: *analysis-environment
       CHAT_UPLOAD_DEDICATED_QUEUE: "true"
       CHAT_DEDICATED_WORKER: "true"
       CHAT_ANALYSIS_LLM_ENABLED: "true"
@@ -138,7 +146,7 @@ services:
       redis:
         condition: service_healthy
     entrypoint: ["celery"]
-    command: ["-A", "core", "worker", "--loglevel=INFO", "--concurrency=1", "--hostname=chat-analysis@%h", "--queues=chat_analysis"]
+    command: ["-A", "core", "worker", "--loglevel=INFO", "--concurrency=${CHAT_ANALYSIS_MAX_CONCURRENT_USERS:-4}", "--hostname=chat-analysis@%h", "--queues=chat_analysis"]
 
   devify-scheduler:
     image: ${DEVIFY_REGISTRY:-docker.io/oneprolabs}/devify:latest
@@ -149,6 +157,7 @@ services:
     env_file:
       - ${DEVIFY_ENV_FILE:-./.env}
     environment:
+      <<: *analysis-environment
       CHAT_UPLOAD_DEDICATED_QUEUE: "true"
     volumes:
       - ${DEVIFY_RUNTIME_ROOT:-.}/data/logs/scheduler:/var/log/celery

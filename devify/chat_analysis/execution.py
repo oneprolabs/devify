@@ -1095,8 +1095,12 @@ def _store_events(job, note, messages, events):
 
 
 def _reduction_progress(
-    job, candidates, *, publication=False,
+    job,
+    candidates,
+    *,
+    publication=False,
     lease_seconds=DEFAULT_LEASE_SECONDS,
+    time_limit=None,
 ):
     source_ids = [item.pk for item in candidates]
     saved = (job.checkpoint or {}).get("event_reduction", {})
@@ -1105,6 +1109,11 @@ def _reduction_progress(
         if saved.get("source_ids") == source_ids else None
     )
     started_at = monotonic()
+    seconds = (
+        max(1, settings.CHAT_ANALYSIS_BATCH_SECONDS)
+        if time_limit is None
+        else max(0, time_limit)
+    )
 
     def save_progress(value):
         with dispatch_lock():
@@ -1132,9 +1141,7 @@ def _reduction_progress(
                     checkpoint=checkpoint,
                 )
             job.checkpoint = checkpoint
-        if monotonic() - started_at >= max(
-            1, settings.CHAT_ANALYSIS_BATCH_SECONDS
-        ):
+        if monotonic() - started_at >= seconds:
             raise AnalysisBatchYield()
 
     return progress, save_progress
@@ -1211,22 +1218,10 @@ def _pending_batch_candidates():
 
 
 def _active_batch_jobs(space_id, boundary):
-    owners = (
-        _pending_batch_candidates()
-        .filter(space_id=space_id)
-        .values(
-            "analysis_job__created_by_id",
-        )
-    )
-    specs = (
-        AnalysisJob.objects.filter(
-            state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
-        )
-        .filter(
-            Q(space_id=space_id) | Q(created_by_id__in=owners),
-        )
-        .values_list("specification", flat=True)
-    )
+    specs = AnalysisJob.objects.filter(
+        space_id=space_id,
+        state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
+    ).values_list("specification", flat=True)
     return any(
         spec.get("scheduled_message_scope") is True
         and spec.get("boundary") == boundary
@@ -1234,7 +1229,7 @@ def _active_batch_jobs(space_id, boundary):
     )
 
 
-def _publish_event_batch(space_id, boundary):
+def _publish_event_batch(space_id, boundary, *, time_limit=None):
     pending = _pending_batch_candidates().filter(space_id=space_id)
 
     def current_candidates():
@@ -1261,6 +1256,7 @@ def _publish_event_batch(space_id, boundary):
             job,
             candidates,
             publication=True,
+            time_limit=time_limit,
         )
         groups = prepare_event_reduction(
             job,
@@ -1296,13 +1292,26 @@ def _publish_event_batch(space_id, boundary):
         release_publication_slot(job)
 
 
-def publish_ready_event_batches():
-    """Retry unpublished slot candidates on the existing analysis queue."""
+def publish_ready_event_batches(
+    *,
+    space_id=None,
+    boundary=None,
+    time_limit=None,
+):
+    """Publish ready batches within the caller's remaining time budget."""
     if not (
         settings.CHAT_ANALYSIS_LLM_ENABLED
         and settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS
     ):
         return 0
+    seconds = (
+        max(1, settings.CHAT_ANALYSIS_BATCH_SECONDS)
+        if time_limit is None
+        else max(0, time_limit)
+    )
+    if seconds == 0:
+        return 0
+    started = monotonic()
     candidates = (
         _pending_batch_candidates()
         .order_by("pk")
@@ -1311,6 +1320,12 @@ def publish_ready_event_batches():
             "analysis_job__specification",
         )
     )
+    if space_id is not None:
+        candidates = candidates.filter(space_id=space_id)
+    if boundary is not None:
+        candidates = candidates.filter(
+            analysis_job__specification__boundary=boundary,
+        )
     batches = dict.fromkeys(
         (space_id, spec["boundary"])
         for space_id, spec in candidates
@@ -1318,10 +1333,15 @@ def publish_ready_event_batches():
     )
     published = 0
     for space_id, boundary in batches:
+        remaining = seconds - (monotonic() - started)
+        if remaining <= 0:
+            break
         try:
-            published += _publish_event_batch(space_id, boundary)
-            if published:
-                break
+            published += _publish_event_batch(
+                space_id,
+                boundary,
+                time_limit=remaining,
+            )
         except Exception:
             logger.exception(
                 "Event reduction failed for space %s at %s", space_id, boundary

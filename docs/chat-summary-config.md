@@ -36,7 +36,7 @@ Authorization: Bearer <access_token>
 | data 字段 | 用法 |
 | --- | --- |
 | `schema_version` | 必须为整数 `1`；未知版本保留原缓存 |
-| `version` | 整个提示词目录的版本，例如 `chat-summary-v7` |
+| `version` | 整个提示词目录的版本，例如 `chat-summary-v8` |
 | `default_scenario` | 初始选择此 ID；当前为 `three_part` |
 | `scenarios` | 场景列表，每项字段见下表 |
 | `scope` | `server/account_id/space_id/capabilities`，用于隔离缓存 |
@@ -169,7 +169,7 @@ const body = {
 ```json
 {
   "schema_version": 1,
-  "version": "chat-summary-v7",
+  "version": "chat-summary-v8",
   "min_check_interval_seconds": 21600
 }
 ```
@@ -223,6 +223,8 @@ devify_http.rs 的诊断层也应把正常的 304 缓存命中记为成功，避
 
 维护 `devify/conf/chat_analysis/summary.yaml`，可用 `CHAT_SUMMARY_CONFIG_PATH` 指向部署方文件；
 变更模板、默认场景或场景列表时递增 version，并采用原子文件替换。
+`chat-summary-v8` 强化所有场景的人物归属：保留明确姓名或昵称，标明上下文推测，
+未知身份不编造，并区分发言人、被提及者与行动负责人。云端和本地 CLI 使用同一公共规则。
 迁移 0008 仅增加 prompt_snapshot JSON 字段，场景和要求不再加字段；
 历史空快照对应随代码冻结的 legacy-cloud-v1.txt，不受新配置影响。
 

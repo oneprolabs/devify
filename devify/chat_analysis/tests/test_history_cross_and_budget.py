@@ -320,7 +320,9 @@ def test_oversize_message_resumes_with_original_evidence(
     ).exists()
     with patch(
         "django.utils.timezone.now",
-        return_value=datetime.fromisoformat(result.job.checkpoint["resume_after"]),
+        return_value=datetime.fromisoformat(
+            result.job.checkpoint["resume_after"],
+        ),
     ):
         result = execution.execute_analysis_job(job.pk, worker_id="retry")
     assert result.job.state == AnalysisJob.State.READY

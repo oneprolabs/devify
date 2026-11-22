@@ -51,7 +51,11 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
             )
             if result is None:
                 break
-            first_result = first_result or result
+            if first_result is None:
+                first_result = result
+                frozen_at = result.job.specification.get("input_boundary")
+                if frozen_at:
+                    input_boundary = datetime.fromisoformat(frozen_at)
             processed = result.job.checkpoint.get("messages_processed", 0)
             remaining -= max(
                 0, processed - before.get("messages_processed", 0)

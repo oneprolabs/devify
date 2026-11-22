@@ -187,7 +187,10 @@ def test_upload_parse_note_event_report_and_question(monkeypatch, llm):
     job = AnalysisJob.objects.get(conversation=conversation)
     assert job.state in (AnalysisJob.State.READY, AnalysisJob.State.PARTIAL)
     note = job.notes.get()
-    assert note.evidence.count() == 2
+    # The image-only message remains stored, but is not text-analysis evidence.
+    assert list(note.evidence.values_list("message_id", flat=True)) == [
+        message.pk,
+    ]
     assert note.structured_data["facts"][0]["text"] == "客户要求降价百分之十"
 
     # 3. The suggestion is reviewed through the API, not created directly.

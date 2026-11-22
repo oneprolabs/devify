@@ -378,9 +378,13 @@ def test_scheduled_reduction_reuses_candidates_after_failure(
 
     with patch(
         "django.utils.timezone.now",
-        return_value=datetime.fromisoformat(result.job.checkpoint["resume_after"]),
+        return_value=datetime.fromisoformat(
+            result.job.checkpoint["resume_after"],
+        ),
     ):
-        result = execution.execute_analysis_job(job.pk, worker_id="reduce-retry")
+        result = execution.execute_analysis_job(
+            job.pk, worker_id="reduce-retry",
+        )
     assert result.job.state == AnalysisJob.State.READY
     assert mapped == [1, 2]
     assert reducer_attempts == [2, 2]

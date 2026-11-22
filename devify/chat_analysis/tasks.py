@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 
 from celery import shared_task
+from django.utils import timezone
 
 from chat_analysis.execution import (
     execute_analysis_job,
@@ -35,6 +36,7 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
             result.job.created_by_id,
             datetime.fromisoformat(result.job.specification["boundary"]),
             dispatch=False,
+            pending_before=timezone.now(),
         )
     if result.job.specification.get("boundary") and result.job.state in (
         AnalysisJob.State.READY,

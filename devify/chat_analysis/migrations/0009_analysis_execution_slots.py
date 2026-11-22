@@ -23,6 +23,7 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("dispatched_at", models.DateTimeField(blank=True, null=True)),
+                ("publishing", models.BooleanField(default=False)),
                 (
                     "job",
                     models.OneToOneField(

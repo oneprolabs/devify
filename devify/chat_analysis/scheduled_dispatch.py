@@ -3,7 +3,6 @@
 import uuid
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Exists, F, OuterRef
 from django.utils import timezone
@@ -19,7 +18,11 @@ from chat_analysis.schedule_window import (
     due_slot,
     slot_boundary,
 )
-from chat_analysis.services import create_analysis_job
+from chat_analysis.services import (
+    create_analysis_job,
+    get_analysis_preferences,
+)
+from chat_analysis.user_dispatch import dispatch_lock
 from chat_domain.models import Conversation, Message, MessageOrigin
 from chat_ingestion.models import UploadBatch
 
@@ -111,10 +114,11 @@ def _pending_origins(boundary, user_id=None):
     return origins
 
 
-def schedule_user(user_id, boundary, *, dispatch=True):
-    """Keep the round in existing message assignments and conversation jobs."""
-    with transaction.atomic():
-        get_user_model().objects.select_for_update().get(pk=user_id)
+def schedule_user(user_id, boundary, *, dispatch=True, pending_before=None):
+    """Queue a user wakeup; freeze its messages only when execution starts."""
+    from chat_analysis.tasks import dispatch_analysis_job
+
+    with dispatch_lock():
         if AnalysisJob.objects.filter(
             created_by_id=user_id,
             state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
@@ -130,22 +134,78 @@ def schedule_user(user_id, boundary, *, dispatch=True):
             .order_by("updated_at")
             .first()
         )
-        conversation_id = (
-            partial.conversation_id
-            if partial
-            else _pending_origins(boundary, user_id)
-            .order_by("message__conversation_id")
-            .values_list("message__conversation_id", flat=True)
+        if partial:
+            return schedule_conversation(
+                partial.conversation_id,
+                boundary,
+                user_id=user_id,
+                dispatch=dispatch,
+            )
+        origin = (
+            _pending_origins(pending_before or boundary, user_id)
+            .select_related(
+                "message__conversation__space",
+                "upload_item__batch__uploaded_by",
+            )
+            .order_by("message__conversation_id", "pk")
             .first()
         )
-        if conversation_id is None:
+        if origin is None:
             return None
-        return schedule_conversation(
-            conversation_id,
-            boundary,
-            user_id=user_id,
-            dispatch=dispatch,
+        conversation = origin.message.conversation
+        job = create_analysis_job(
+            actor=origin.upload_item.batch.uploaded_by,
+            space=conversation.space,
+            conversation=conversation,
+            request_key=f"scheduled:{uuid.uuid4()}",
+            start_seq=0,
+            end_seq=0,
+            input_version="scheduled.v1",
+            specification={
+                "scheduled_message_scope": True,
+                "snapshot_pending": True,
+                "boundary": boundary.isoformat(),
+            },
         )
+        if dispatch:
+            transaction.on_commit(lambda: dispatch_analysis_job(job))
+        return job
+
+
+def freeze_scheduled_input(job):
+    """Select the user's latest eligible input after obtaining execution."""
+    from chat_analysis.execution import _ensure_lease
+
+    with dispatch_lock():
+        locked = AnalysisJob.objects.select_for_update().get(pk=job.pk)
+        _ensure_lease(locked, job.lease_owner, job.fencing_token)
+        if not locked.specification.get("snapshot_pending"):
+            return locked
+        boundary = timezone.now()
+        origin = (
+            _pending_origins(boundary, job.created_by_id)
+            .order_by("message__conversation_id", "pk")
+            .first()
+        )
+        if origin is not None:
+            locked = (
+                schedule_conversation(
+                    origin.message.conversation_id,
+                    boundary,
+                    user_id=job.created_by_id,
+                    dispatch=False,
+                    existing_job=locked,
+                )
+                or locked
+            )
+        locked.specification = {
+            **locked.specification,
+            "snapshot_pending": False,
+            "input_boundary": boundary.isoformat(),
+        }
+        _ensure_lease(locked, job.lease_owner, job.fencing_token)
+        locked.save(update_fields=("specification", "updated_at"))
+        return locked
 
 
 def schedule_conversation(
@@ -154,25 +214,34 @@ def schedule_conversation(
     *,
     user_id=None,
     dispatch=True,
+    existing_job=None,
 ):
     """Reserve a finite window at the caller's cutoff."""
     from chat_analysis.tasks import dispatch_analysis_job
 
-    with transaction.atomic():
+    with dispatch_lock():
         conversation = (
             Conversation.objects.select_for_update()
             .select_related("space")
             .get(pk=conversation_id)
         )
-        if AnalysisJob.objects.filter(
-            conversation=conversation,
-            state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
-        ).exists():
+        if (
+            existing_job is None
+            and AnalysisJob.objects.filter(
+                conversation=conversation,
+                state__in=(
+                    AnalysisJob.State.QUEUED,
+                    AnalysisJob.State.RUNNING,
+                ),
+            ).exists()
+        ):
             return None
         partials = AnalysisJob.objects.filter(
             conversation=conversation,
             state=AnalysisJob.State.PARTIAL,
         )
+        if existing_job is not None:
+            partials = partials.none()
         if user_id is not None:
             partials = partials.filter(created_by_id=user_id)
         retryable = []
@@ -281,7 +350,8 @@ def schedule_conversation(
         if batch is None:
             return None
         if (
-            user_id is not None
+            existing_job is None
+            and user_id is not None
             and AnalysisJob.objects.filter(
                 created_by=batch.uploaded_by,
                 state__in=(
@@ -291,7 +361,7 @@ def schedule_conversation(
             ).exists()
         ):
             return None
-        job = create_analysis_job(
+        job = existing_job or create_analysis_job(
             actor=batch.uploaded_by,
             space=conversation.space,
             conversation=conversation,
@@ -304,6 +374,28 @@ def schedule_conversation(
                 "boundary": boundary.isoformat(),
             },
         )
+        if existing_job is not None:
+            job.space = conversation.space
+            job.conversation = conversation
+            job.start_seq = messages[0].ingest_seq - 1
+            job.end_seq = messages[-1].ingest_seq
+            job.specification = {
+                **job.specification,
+                "chat_analysis_preferences": get_analysis_preferences(
+                    conversation.space,
+                ),
+                "analysis_conversation_kind": conversation.kind,
+            }
+            job.save(
+                update_fields=(
+                    "space",
+                    "conversation",
+                    "start_seq",
+                    "end_seq",
+                    "specification",
+                    "updated_at",
+                )
+            )
         AnalysisJobMessage.objects.bulk_create(
             [
                 AnalysisJobMessage(job=job, message=message)

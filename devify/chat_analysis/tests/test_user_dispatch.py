@@ -35,8 +35,11 @@ from chat_analysis.tests.test_execution import (
 )
 from chat_analysis.tests.test_scheduled_dispatch import origin
 from chat_analysis.user_dispatch import (
+    claim_publication_slot,
     dispatch_lock,
     dispatch_pending_analysis,
+    publication_slot_valid,
+    release_publication_slot,
 )
 from chat_domain.models import Message, MessageOrigin, MessagePart
 from chat_ingestion.models import UploadBatch
@@ -132,7 +135,7 @@ def test_time_budget_yields_at_a_committed_chunk(settings, monkeypatch):
     settings.CHAT_ANALYSIS_BATCH_SECONDS = 1
     monkeypatch.setattr(execution, "ANALYSIS_CHUNK_SIZE", 1)
     job = user_job("timed", count=3)
-    with patch.object(execution.time, "monotonic", side_effect=[0, 2]):
+    with patch.object(execution, "monotonic", side_effect=[0, 2]):
         result = execute_analysis_job(job.pk, worker_id="timed")
     assert result.job.state == AnalysisJob.State.QUEUED
     assert result.job.checkpoint["last_ingest_seq"] == 1
@@ -276,6 +279,28 @@ def test_expired_user_execution_releases_capacity_and_fences_old_writes():
     assert job.checkpoint == {}
 
 
+def test_event_publication_uses_capacity_and_fences_expired_owners():
+    job = user_job("publication")
+    execute_analysis_job(
+        job.pk, worker_id="extract", handler=lambda *a, **k: {}
+    )
+    old = claim_publication_slot(job.pk)
+    assert old is not None
+    other = user_job("publication-other")
+    assert claim_analysis_job(other.pk, worker_id="other") is None
+    assert claim_publication_slot(job.pk) is None
+    AnalysisExecutionSlot.objects.filter(job=job).update(
+        dispatched_at=timezone.now() - timedelta(seconds=301),
+    )
+    replacement = claim_publication_slot(job.pk)
+    assert replacement is not None
+    assert not publication_slot_valid(old)
+    release_publication_slot(old)
+    assert publication_slot_valid(replacement)
+    release_publication_slot(replacement)
+    assert claim_analysis_job(other.pk, worker_id="other") is not None
+
+
 @pytest.mark.parametrize(
     "same_user,limit,expected",
     [(True, 2, 1), (False, 2, 2), (False, 1, 1)],
@@ -341,17 +366,16 @@ def test_scheduler_bounds_users_and_keeps_one_job_per_user(settings):
     dispatch.assert_called_once()
 
 
-def test_round_continues_without_waiting_an_hour_and_defers_new_uploads(
+def test_queue_wait_includes_latest_input_and_running_batch_stays_frozen(
     settings,
     monkeypatch,
 ):
     settings.CHAT_ANALYSIS_LLM_ENABLED = True
     settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = False
-    settings.CHAT_ANALYSIS_BATCH_MESSAGES = 1
+    settings.CHAT_ANALYSIS_BATCH_MESSAGES = 2
     monkeypatch.setattr(
         execution, "_messages_for_model", lambda job, rows: rows
     )
-    monkeypatch.setattr(execution, "_prepare_chunk", lambda *args: ({}, []))
     job = user_job("round-owner")
     owner, space, conversation = job.created_by, job.space, job.conversation
     job.delete()
@@ -365,41 +389,51 @@ def test_round_continues_without_waiting_an_hour_and_defers_new_uploads(
         )
     )
     old = Message.objects.get(conversation=conversation)
-    older = add_message(
-        conversation, 2, occurred_at=boundary - timedelta(days=400)
-    )
-    future = add_message(conversation, 3)
-    for message in (old, older):
-        origin(message, owner, space, f"round-old-{message.pk}", boundary)
-    origin(future, owner, space, "round-late", boundary + timedelta(seconds=1))
-    Message.objects.filter(pk__in=(old.pk, older.pk)).update(
-        created_at=boundary
-    )
-    MessageOrigin.objects.filter(message_id__in=(old.pk, older.pk)).update(
-        created_at=boundary,
-    )
-    Message.objects.filter(pk=future.pk).update(
-        created_at=boundary + timedelta(seconds=1),
-    )
+    origin(old, owner, space, "round-old", boundary)
+    Message.objects.filter(pk=old.pk).update(created_at=boundary)
+    MessageOrigin.objects.filter(message=old).update(created_at=boundary)
+    during_execution = []
+
+    def model(_job, _messages):
+        if not during_execution:
+            message = add_message(conversation, 3)
+            origin(message, owner, space, "round-during", timezone.now())
+            during_execution.append(message)
+        return {}, []
+
+    monkeypatch.setattr(execution, "_prepare_chunk", model)
     with patch("chat_analysis.tasks.execute_analysis_job_task.delay") as send:
         dispatch_due_analysis(boundary, boundary.strftime("%H:%M"))
         first_id = send.call_args.args[0]
         first = AnalysisJob.objects.get(pk=first_id)
-        assert first.end_seq == 1
+        assert first.end_seq == 0
+        assert first.specification["snapshot_pending"] is True
+        assert first.scheduled_messages.count() == 0
+
+        # This history arrives after queueing but before the user's turn.
+        queued_upload = add_message(
+            conversation,
+            2,
+            occurred_at=boundary - timedelta(days=400),
+        )
+        origin(
+            queued_upload, owner, space, "round-while-waiting", timezone.now()
+        )
         execute_analysis_job_task.run(first_id, worker_id="round-first")
+        first.refresh_from_db()
+        assert first.end_seq == 2
+        assert first.checkpoint["messages_processed"] == 2
+        assert first.specification["snapshot_pending"] is False
+        assert first.scheduled_messages.filter(message=queued_upload).exists()
+        assert not hasattr(during_execution[0], "scheduled_analysis")
+
+        # A continuation freezes fresh input without another hourly wait.
         second_id = send.call_args.args[0]
         assert second_id != first_id
         execute_analysis_job_task.run(second_id, worker_id="round-second")
-        assert (
-            AnalysisJob.objects.filter(state=AnalysisJob.State.READY).count()
-            == 2
-        )
-        assert not hasattr(future, "scheduled_analysis")
-        assert AnalysisJob.objects.count() == 2
-        dispatch_due_analysis(boundary + timedelta(minutes=10))
-        assert AnalysisJob.objects.count() == 2
-        dispatch_due_analysis(boundary + timedelta(hours=1))
-    assert AnalysisJob.objects.count() == 3
-    assert (
-        Message.objects.get(pk=future.pk).scheduled_analysis.job.end_seq == 3
-    )
+        second = AnalysisJob.objects.get(pk=second_id)
+        assert second.state == AnalysisJob.State.READY
+        assert second.end_seq == 3
+        assert second.checkpoint["messages_processed"] == 1
+    assert AnalysisJob.objects.filter(space=space).count() == 2
+    assert NoteEvidence.objects.filter(note__space=space).count() == 3

@@ -13,27 +13,37 @@ from chat_analysis.models import AnalysisExecutionSlot, AnalysisJob
 
 logger = logging.getLogger(__name__)
 ACTIVE_STATES = (AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING)
+PUBLICATION_LEASE_SECONDS = 300
 
 
 @contextmanager
 def dispatch_lock():
     """Serialize admission only; never keep this lock during model calls."""
     with transaction.atomic():
-        AnalysisExecutionSlot.objects.get_or_create(pk=0)
-        AnalysisExecutionSlot.objects.select_for_update().get(pk=0)
+        lock_dispatch_row()
         yield
+
+
+def lock_dispatch_row():
+    """Use the same admission lock inside an existing short transaction."""
+    AnalysisExecutionSlot.objects.get_or_create(pk=0)
+    AnalysisExecutionSlot.objects.select_for_update().get(pk=0)
 
 
 def _release_finished_slots():
     slots = AnalysisExecutionSlot.objects.exclude(pk=0)
+    publication_cutoff = timezone.now() - timedelta(
+        seconds=PUBLICATION_LEASE_SECONDS,
+    )
     slots.filter(
         Q(job__isnull=True)
-        | ~Q(job__state__in=ACTIVE_STATES)
+        | (~Q(job__state__in=ACTIVE_STATES) & Q(publishing=False))
+        | Q(publishing=True, dispatched_at__lt=publication_cutoff)
         | Q(
             job__state=AnalysisJob.State.QUEUED,
             job__updated_at__gt=F("dispatched_at"),
         )
-    ).update(user=None, job=None, dispatched_at=None)
+    ).update(user=None, job=None, dispatched_at=None, publishing=False)
 
 
 def reserve_user_slot(job):
@@ -58,6 +68,47 @@ def reserve_user_slot(job):
             slot.save(update_fields=("user", "job", "dispatched_at"))
             return slot
     return None
+
+
+def claim_publication_slot(job_id):
+    """Count final event reduction against the same user/model capacity."""
+    with dispatch_lock():
+        _release_finished_slots()
+        job = AnalysisJob.objects.select_for_update().get(pk=job_id)
+        if job.state != AnalysisJob.State.READY:
+            return None
+        if AnalysisExecutionSlot.objects.filter(
+            user_id=job.created_by_id,
+        ).exists():
+            return None
+        slot = reserve_user_slot(job)
+        if slot is None:
+            return None
+        slot.publishing = True
+        slot.save(update_fields=("publishing",))
+        job.fencing_token += 1
+        job.save(update_fields=("fencing_token",))
+        return job
+
+
+def publication_slot_valid(job):
+    return AnalysisExecutionSlot.objects.filter(
+        job_id=job.pk,
+        job__fencing_token=job.fencing_token,
+        publishing=True,
+        dispatched_at__gt=timezone.now()
+        - timedelta(
+            seconds=PUBLICATION_LEASE_SECONDS,
+        ),
+    ).exists()
+
+
+def release_publication_slot(job):
+    with dispatch_lock():
+        AnalysisExecutionSlot.objects.filter(
+            job_id=job.pk,
+            job__fencing_token=job.fencing_token,
+        ).update(user=None, job=None, dispatched_at=None, publishing=False)
 
 
 def _deliver(job_id, dispatched_at):

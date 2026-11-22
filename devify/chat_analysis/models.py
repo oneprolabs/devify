@@ -179,6 +179,7 @@ class AnalysisExecutionSlot(models.Model):
         AnalysisJob, null=True, blank=True, on_delete=models.CASCADE,
     )
     dispatched_at = models.DateTimeField(null=True, blank=True)
+    publishing = models.BooleanField(default=False)
 
 
 class AnalysisJobMessage(models.Model):

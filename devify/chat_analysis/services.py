@@ -18,7 +18,7 @@ from chat_analysis.models import (
     QuestionAnswer,
     ReportItemSource,
 )
-from chat_domain.models import Conversation
+from chat_analysis.user_dispatch import lock_dispatch_row
 from spaces.models import (
     SpaceWorkflowConfig,
     effective_chat_analysis_preferences,
@@ -98,7 +98,7 @@ def create_analysis_job(
     ensure_can_contribute(actor, space)
     if conversation.space_id != space.pk:
         raise ChatAnalysisError("Conversation must belong to the same space.")
-    Conversation.objects.select_for_update().get(pk=conversation.pk)
+    lock_dispatch_row()
     preferences = (
         effective_chat_analysis_preferences(analysis_preferences)
         if analysis_preferences is not None
@@ -117,17 +117,33 @@ def create_analysis_job(
         space=space, request_key=request_key,
     ).first()
     if existing is None:
-        duplicate = AnalysisJob.objects.filter(
-            space=space, created_by=actor, conversation=conversation,
-            start_seq=start_seq, end_seq=end_seq,
-            input_version=input_version,
-        ).exclude(state__in=(
-            AnalysisJob.State.FAILED, AnalysisJob.State.CANCELLED,
-        )).order_by("pk").first()
-        if duplicate and (
-            duplicate.specification.get("chat_analysis_preferences")
-            == preferences
-        ):
+        duplicate = (
+            AnalysisJob.objects.filter(
+                space=space,
+                created_by=actor,
+                conversation=conversation,
+                start_seq=start_seq,
+                end_seq=end_seq,
+                input_version=input_version,
+                upload_batches__isnull=True,
+            )
+            .exclude(
+                state__in=(
+                    AnalysisJob.State.FAILED,
+                    AnalysisJob.State.CANCELLED,
+                )
+            )
+            .order_by("pk")
+            .first()
+        )
+        ignored = {"analysis_cutoff"}
+        if duplicate and {
+            key: value
+            for key, value in duplicate.specification.items()
+            if key not in ignored
+        } == {
+            key: value for key, value in snapshot.items() if key not in ignored
+        }:
             return duplicate
     job, created = AnalysisJob.objects.get_or_create(
         space=space,
@@ -158,6 +174,7 @@ def create_analysis_job(
 def retry_analysis_job(*, actor, job):
     """Requeue a terminal analysis job after checking current permissions."""
     ensure_can_contribute(actor, job.space)
+    lock_dispatch_row()
     job = AnalysisJob.objects.select_for_update().get(pk=job.pk)
     if job.state not in (
         AnalysisJob.State.FAILED,
@@ -185,6 +202,7 @@ def retry_analysis_job(*, actor, job):
 @transaction.atomic
 def cancel_analysis_job(*, actor, job):
     ensure_can_contribute(actor, job.space)
+    lock_dispatch_row()
     locked = AnalysisJob.objects.select_for_update().get(pk=job.pk)
     if locked.state in (
         AnalysisJob.State.READY,

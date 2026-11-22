@@ -17,6 +17,7 @@ from copy import copy
 from dataclasses import dataclass
 from datetime import timedelta
 from hashlib import sha256
+from time import monotonic
 
 from django.conf import settings
 from django.db import transaction
@@ -54,7 +55,13 @@ from chat_analysis.token_budget import (
     request_budget,
     take_message_window,
 )
-from chat_analysis.user_dispatch import dispatch_lock, reserve_user_slot
+from chat_analysis.user_dispatch import (
+    claim_publication_slot,
+    dispatch_lock,
+    publication_slot_valid,
+    release_publication_slot,
+    reserve_user_slot,
+)
 from chat_domain.models import Message, MessagePart
 from core.tracking import LLMTracker
 from spaces.models import Space, SpaceWorkflowConfig
@@ -312,6 +319,10 @@ def execute_analysis_job(
         return None
     handler = handler or run_rule_based_analysis
     try:
+        if job.specification.get("snapshot_pending"):
+            from chat_analysis.scheduled_dispatch import freeze_scheduled_input
+
+            job = freeze_scheduled_input(job)
         outcome = handler(job, lease_seconds=lease_seconds)
     except AnalysisLeaseLost:
         raise
@@ -1105,10 +1116,22 @@ def _pending_batch_candidates():
 
 
 def _active_batch_jobs(space_id, boundary):
-    specs = AnalysisJob.objects.filter(
-        space_id=space_id,
-        state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
-    ).values_list("specification", flat=True)
+    owners = (
+        _pending_batch_candidates()
+        .filter(space_id=space_id)
+        .values(
+            "analysis_job__created_by_id",
+        )
+    )
+    specs = (
+        AnalysisJob.objects.filter(
+            state__in=(AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING),
+        )
+        .filter(
+            Q(space_id=space_id) | Q(created_by_id__in=owners),
+        )
+        .values_list("specification", flat=True)
+    )
     return any(
         spec.get("scheduled_message_scope") is True
         and spec.get("boundary") == boundary
@@ -1121,8 +1144,10 @@ def _publish_event_batch(space_id, boundary):
 
     def current_candidates():
         return [
-            item for item in pending.select_related(
-                "note", "analysis_job__conversation",
+            item
+            for item in pending.select_related(
+                "note",
+                "analysis_job__conversation",
                 "analysis_job__created_by",
             ).order_by("pk")
             if item.analysis_job.specification.get("boundary") == boundary
@@ -1133,16 +1158,23 @@ def _publish_event_batch(space_id, boundary):
     candidates = current_candidates()
     if not candidates:
         return False
-    job = candidates[0].analysis_job
-    groups = prepare_event_reduction(job, candidates, call_json=_call_json)
-    with transaction.atomic():
-        Space.objects.select_for_update().only("pk").get(pk=space_id)
-        if _active_batch_jobs(space_id, boundary) or [
-            item.pk for item in candidates
-        ] != [item.pk for item in current_candidates()]:
-            return False
-        _apply_reduced_groups(job, candidates, groups)
-    return True
+    job = claim_publication_slot(candidates[0].analysis_job_id)
+    if job is None:
+        return False
+    try:
+        groups = prepare_event_reduction(job, candidates, call_json=_call_json)
+        with dispatch_lock():
+            Space.objects.select_for_update().only("pk").get(pk=space_id)
+            if not publication_slot_valid(job):
+                raise AnalysisLeaseLost("Event publication lease expired.")
+            if _active_batch_jobs(space_id, boundary) or [
+                item.pk for item in candidates
+            ] != [item.pk for item in current_candidates()]:
+                return False
+            _apply_reduced_groups(job, candidates, groups)
+        return True
+    finally:
+        release_publication_slot(job)
 
 
 def publish_ready_event_batches():
@@ -1152,17 +1184,25 @@ def publish_ready_event_batches():
         and settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS
     ):
         return 0
-    candidates = _pending_batch_candidates().order_by("pk").values_list(
-        "space_id", "analysis_job__specification",
+    candidates = (
+        _pending_batch_candidates()
+        .order_by("pk")
+        .values_list(
+            "space_id",
+            "analysis_job__specification",
+        )
     )
     batches = dict.fromkeys(
-        (space_id, spec["boundary"]) for space_id, spec in candidates
+        (space_id, spec["boundary"])
+        for space_id, spec in candidates
         if spec.get("boundary")
     )
     published = 0
     for space_id, boundary in batches:
         try:
             published += _publish_event_batch(space_id, boundary)
+            if published:
+                break
         except Exception:
             logger.exception(
                 "Event reduction failed for space %s at %s", space_id, boundary
@@ -1171,17 +1211,26 @@ def publish_ready_event_batches():
 
 
 def _accept_reduced_group(job, group, event_key):
-    event = Event.objects.select_for_update().filter(
-        space_id=job.space_id, event_key=event_key,
-    ).first()
+    event = (
+        Event.objects.select_for_update()
+        .filter(
+            space_id=job.space_id,
+            event_key=event_key,
+        )
+        .first()
+    )
     previous_activity = event.last_activity_at if event else None
-    same_job = event is not None and event.suggestion_sources.filter(
-        analysis_job=job,
-    ).exists()
+    same_job = (
+        event is not None
+        and event.suggestion_sources.filter(
+            analysis_job=job,
+        ).exists()
+    )
     applied = []
     for item in group:
         if not EventSuggestion.objects.filter(
-            pk=item.pk, status=EventSuggestion.Status.PENDING,
+            pk=item.pk,
+            status=EventSuggestion.Status.PENDING,
         ).exists():
             continue
         suggestion = review_event_suggestion(
@@ -1267,7 +1316,7 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
     messages_processed = int(checkpoint.get("messages_processed", 0))
     notes_written = int(checkpoint.get("notes_written", 0))
     partial = bool(checkpoint.get("partial", False))
-    started_at = time.monotonic()
+    started_at = monotonic()
     initial_processed = messages_processed
     chunks_processed = 0
     yielded = False
@@ -1353,7 +1402,7 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
         processed = messages_processed - initial_processed
         if chunks_processed and (
             processed >= message_limit
-            or time.monotonic() - started_at >= time_limit
+            or monotonic() - started_at >= time_limit
         ):
             yielded = query.exists()
             break

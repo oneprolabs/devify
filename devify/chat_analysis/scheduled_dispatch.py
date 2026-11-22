@@ -1,7 +1,7 @@
 """Build bounded scheduled jobs from fully ingested messages."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC
 
 from django.conf import settings
 from django.db import transaction
@@ -241,11 +241,6 @@ def schedule_user(user_id, boundary, *, dispatch=True, pending_before=None):
                 "scheduled_message_scope": True,
                 "snapshot_pending": True,
                 "boundary": boundary.isoformat(),
-                **(
-                    {"input_boundary": pending_before.isoformat()}
-                    if pending_before is not None
-                    else {}
-                ),
             },
         )
         if dispatch:
@@ -253,7 +248,7 @@ def schedule_user(user_id, boundary, *, dispatch=True, pending_before=None):
         return job
 
 
-def freeze_scheduled_input(job):
+def freeze_scheduled_input(job, *, input_boundary=None):
     """Select the user's latest eligible input after obtaining execution."""
     from chat_analysis.execution import _ensure_lease
 
@@ -262,11 +257,7 @@ def freeze_scheduled_input(job):
         _ensure_lease(locked, job.lease_owner, job.fencing_token)
         if not locked.specification.get("snapshot_pending"):
             return locked
-        boundary = (
-            datetime.fromisoformat(locked.specification["input_boundary"])
-            if locked.specification.get("input_boundary")
-            else timezone.now()
-        )
+        boundary = input_boundary or timezone.now()
         origin = (
             _pending_origins(boundary, job.created_by_id)
             .order_by("created_at", "pk")

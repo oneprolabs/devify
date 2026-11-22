@@ -488,3 +488,76 @@ def test_publication_failure_or_budget_waits_until_next_hour(
         ),
     ):
         assert execution.publish_ready_event_batches() == 1
+
+
+def test_unclaimed_followup_refreshes_batches_when_it_eventually_starts(
+    settings,
+    monkeypatch,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = False
+    settings.CHAT_ANALYSIS_MAX_CONCURRENT_USERS = 1
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    monkeypatch.setattr(execution, "_prepare_chunk", lambda *_: ({}, []))
+    base = user_job("followup-wait")
+    owner, space, conversation = base.created_by, base.space, base.conversation
+    base.delete()
+    origin(
+        Message.objects.get(conversation=conversation),
+        owner,
+        space,
+        "first-group",
+        timezone.now(),
+    )
+    other_group = make_conversation(space, "followup-group")
+    origin(
+        add_message(other_group, 1),
+        owner,
+        space,
+        "second-group",
+        timezone.now(),
+    )
+    queued = schedule_user(owner.pk, timezone.now(), dispatch=False)
+    competing = user_job("competing")
+    claimed = []
+
+    def execute(*args, **kwargs):
+        result = execution.execute_analysis_job(*args, **kwargs)
+        if not claimed:
+            claimed.append(
+                execution.claim_analysis_job(
+                    competing.pk,
+                    worker_id="competing",
+                )
+            )
+            assert claimed[0] is not None
+        return result
+
+    with (
+        patch("chat_analysis.tasks.execute_analysis_job", side_effect=execute),
+        patch("chat_analysis.tasks.execute_analysis_job_task.delay"),
+    ):
+        execute_analysis_job_task.run(queued.pk, worker_id="first")
+    followup = AnalysisJob.objects.get(
+        created_by=owner,
+        state=AnalysisJob.State.QUEUED,
+    )
+    assert followup.specification["snapshot_pending"] is True
+    late = add_message(other_group, 2)
+    origin(
+        late, owner, space, "completed-while-followup-waited", timezone.now()
+    )
+    execution.complete_analysis_job(
+        claimed[0],
+        worker_id="competing",
+        fencing_token=claimed[0].fencing_token,
+    )
+    with patch("chat_analysis.tasks.execute_analysis_job_task.delay"):
+        execute_analysis_job_task.run(followup.pk, worker_id="after-waiting")
+    assert AnalysisJobMessage.objects.filter(
+        job=followup,
+        message=late,
+        completed_at__isnull=False,
+    ).exists()

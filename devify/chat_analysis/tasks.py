@@ -48,6 +48,9 @@ def execute_analysis_job_task(self, job_id, worker_id=None):
                 worker_id=worker,
                 message_limit=remaining,
                 time_limit=max(1, seconds - (monotonic() - started)),
+                input_boundary=(
+                    input_boundary if current_id != job_id else None
+                ),
             )
             if result is None:
                 break

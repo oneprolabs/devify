@@ -322,6 +322,7 @@ def execute_analysis_job(
     max_attempts=DEFAULT_MAX_ATTEMPTS,
     message_limit=None,
     time_limit=None,
+    input_boundary=None,
 ):
     """Claim and run one job, recording success, retry or failure.
 
@@ -342,7 +343,7 @@ def execute_analysis_job(
         if job.specification.get("snapshot_pending"):
             from chat_analysis.scheduled_dispatch import freeze_scheduled_input
 
-            job = freeze_scheduled_input(job)
+            job = freeze_scheduled_input(job, input_boundary=input_boundary)
         budgets = {}
         if message_limit is not None:
             budgets["message_limit"] = message_limit

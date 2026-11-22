@@ -18,6 +18,7 @@ from chat_analysis.models import (
     QuestionAnswer,
     ReportItemSource,
 )
+from chat_domain.models import Conversation
 from spaces.models import (
     SpaceWorkflowConfig,
     effective_chat_analysis_preferences,
@@ -97,6 +98,7 @@ def create_analysis_job(
     ensure_can_contribute(actor, space)
     if conversation.space_id != space.pk:
         raise ChatAnalysisError("Conversation must belong to the same space.")
+    Conversation.objects.select_for_update().get(pk=conversation.pk)
     preferences = (
         effective_chat_analysis_preferences(analysis_preferences)
         if analysis_preferences is not None
@@ -104,12 +106,29 @@ def create_analysis_job(
     )
     cutoff_days = preferences.get("lookback_days", 0)
     snapshot = dict(specification or {})
+    snapshot["deduplicate_messages"] = True
     snapshot["analysis_conversation_kind"] = conversation.kind
     snapshot["chat_analysis_preferences"] = preferences
     snapshot["analysis_cutoff"] = (
         (timezone.now() - timedelta(days=cutoff_days)).isoformat()
         if cutoff_days else None
     )
+    existing = AnalysisJob.objects.filter(
+        space=space, request_key=request_key,
+    ).first()
+    if existing is None:
+        duplicate = AnalysisJob.objects.filter(
+            space=space, created_by=actor, conversation=conversation,
+            start_seq=start_seq, end_seq=end_seq,
+            input_version=input_version,
+        ).exclude(state__in=(
+            AnalysisJob.State.FAILED, AnalysisJob.State.CANCELLED,
+        )).order_by("pk").first()
+        if duplicate and (
+            duplicate.specification.get("chat_analysis_preferences")
+            == preferences
+        ):
+            return duplicate
     job, created = AnalysisJob.objects.get_or_create(
         space=space,
         request_key=request_key,
@@ -123,7 +142,8 @@ def create_analysis_job(
         },
     )
     if not created and (
-        job.conversation_id != conversation.pk
+        job.created_by_id != actor.pk
+        or job.conversation_id != conversation.pk
         or job.start_seq != start_seq
         or job.end_seq != end_seq
         or job.input_version != input_version

@@ -167,6 +167,20 @@ class ScheduledAnalysisRun(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class AnalysisExecutionSlot(models.Model):
+    """Bound user execution; slot zero serializes short admission updates."""
+
+    id = models.PositiveIntegerField(primary_key=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.CASCADE,
+    )
+    job = models.OneToOneField(
+        AnalysisJob, null=True, blank=True, on_delete=models.CASCADE,
+    )
+    dispatched_at = models.DateTimeField(null=True, blank=True)
+
+
 class AnalysisJobMessage(models.Model):
     """Exact message assignment for a scheduled analysis job."""
 

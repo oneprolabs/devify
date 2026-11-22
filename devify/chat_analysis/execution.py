@@ -20,7 +20,7 @@ from hashlib import sha256
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
 from chat_analysis.event_metadata import participant_metadata
@@ -36,6 +36,7 @@ from chat_analysis.models import (
     Event,
     EventSuggestion,
     Note,
+    NoteEvidence,
 )
 from chat_analysis.services import (
     ChatAnalysisError,
@@ -53,6 +54,7 @@ from chat_analysis.token_budget import (
     request_budget,
     take_message_window,
 )
+from chat_analysis.user_dispatch import dispatch_lock, reserve_user_slot
 from chat_domain.models import Message, MessagePart
 from core.tracking import LLMTracker
 from spaces.models import Space, SpaceWorkflowConfig
@@ -96,6 +98,8 @@ def _ensure_lease(job, worker_id, fencing_token):
         job.state != AnalysisJob.State.RUNNING
         or job.lease_owner != worker_id
         or job.fencing_token != fencing_token
+        or job.lease_until is None
+        or job.lease_until <= timezone.now()
     ):
         raise AnalysisLeaseLost(
             "The analysis job lease is no longer held by this worker."
@@ -117,7 +121,7 @@ def claim_analysis_job(
     if not worker_id:
         raise ValueError("worker_id is required.")
     now = timezone.now()
-    with transaction.atomic():
+    with dispatch_lock():
         job = _lock_job(job_id)
         if job is None:
             return None
@@ -125,6 +129,8 @@ def claim_analysis_job(
             if job.lease_until and job.lease_until > now:
                 return None
         elif job.state != AnalysisJob.State.QUEUED:
+            return None
+        if reserve_user_slot(job) is None:
             return None
         job.state = AnalysisJob.State.RUNNING
         job.lease_owner = worker_id
@@ -221,6 +227,31 @@ def complete_analysis_job(
         return locked
 
 
+def yield_analysis_job(job, outcome):
+    """Continue from committed progress without charging a failed attempt."""
+    with transaction.atomic():
+        locked = _lock_job(job.pk)
+        _ensure_lease(locked, job.lease_owner, job.fencing_token)
+        locked.state = AnalysisJob.State.QUEUED
+        locked.checkpoint = outcome["checkpoint"]
+        locked.result_ref = outcome["result_ref"]
+        locked.lease_owner = ""
+        locked.lease_until = None
+        locked.attempts = max(0, locked.attempts - 1)
+        locked.save(
+            update_fields=(
+                "state",
+                "checkpoint",
+                "result_ref",
+                "lease_owner",
+                "lease_until",
+                "attempts",
+                "updated_at",
+            )
+        )
+        return locked
+
+
 def fail_analysis_job(
     job,
     *,
@@ -304,6 +335,10 @@ def execute_analysis_job(
         return ExecutionResult(job=failed, handler_result={"error": str(exc)})
     if not isinstance(outcome, dict):
         outcome = {}
+    if outcome.get("yielded"):
+        return ExecutionResult(
+            job=yield_analysis_job(job, outcome), handler_result=outcome,
+        )
     completed = complete_analysis_job(
         job,
         worker_id=worker_id,
@@ -1232,6 +1267,12 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
     messages_processed = int(checkpoint.get("messages_processed", 0))
     notes_written = int(checkpoint.get("notes_written", 0))
     partial = bool(checkpoint.get("partial", False))
+    started_at = time.monotonic()
+    initial_processed = messages_processed
+    chunks_processed = 0
+    yielded = False
+    message_limit = max(1, settings.CHAT_ANALYSIS_BATCH_MESSAGES)
+    time_limit = max(1, settings.CHAT_ANALYSIS_BATCH_SECONDS)
 
     preferences = (job.specification or {}).get("chat_analysis_preferences")
     cutoff = (job.specification or {}).get("analysis_cutoff")
@@ -1263,6 +1304,10 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
     scheduled_scope = (job.specification or {}).get(
         "scheduled_message_scope"
     ) is True
+    assigned_scope = (
+        scheduled_scope
+        or (job.specification or {}).get("deduplicate_messages") is True
+    )
     if scheduled_scope and not getattr(
         settings, "CHAT_ANALYSIS_LLM_ENABLED", False
     ):
@@ -1283,7 +1328,21 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
                 scheduled_analysis__completed_at__isnull=True,
                 scheduled_analysis__error="",
             )
-        elif cutoff:
+        elif assigned_scope:
+            analyzed = NoteEvidence.objects.filter(
+                message_id=OuterRef("pk"),
+                note__analysis_job__conversation_id=job.conversation_id,
+            ).exclude(note__analysis_job=job)
+            query = query.annotate(analyzed=Exists(analyzed)).filter(
+                Q(scheduled_analysis__isnull=True)
+                | Q(
+                    scheduled_analysis__job=job,
+                    scheduled_analysis__completed_at__isnull=True,
+                    scheduled_analysis__error="",
+                ),
+                analyzed=False,
+            )
+        if not scheduled_scope and cutoff:
             query = query.filter(occurred_at__gte=cutoff)
         if not scheduled_scope and batches.exists():
             query = query.filter(
@@ -1291,10 +1350,19 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             ).distinct()
         if offset is not None:
             query = query.filter(ingest_seq=checkpoint["fragment_seq"])
+        processed = messages_processed - initial_processed
+        if chunks_processed and (
+            processed >= message_limit
+            or time.monotonic() - started_at >= time_limit
+        ):
+            yielded = query.exists()
+            break
         messages = list(
             query.select_related("reply_to")
             .prefetch_related("parts")
-            .order_by("ingest_seq")[:ANALYSIS_CHUNK_SIZE]
+            .order_by("ingest_seq")[
+                :min(ANALYSIS_CHUNK_SIZE, message_limit - processed)
+            ]
         )
         if not messages:
             if offset is not None:
@@ -1325,6 +1393,27 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             raise RuntimeError(
                 "Continuing a fragmented message requires the LLM."
             )
+
+        if assigned_scope and not scheduled_scope:
+            with transaction.atomic():
+                locked = _lock_job(job.pk)
+                _ensure_lease(locked, job.lease_owner, job.fencing_token)
+                AnalysisJobMessage.objects.bulk_create(
+                    [
+                        AnalysisJobMessage(job=job, message_id=message.pk)
+                        for message in sorted(messages, key=lambda row: row.pk)
+                    ],
+                    ignore_conflicts=True,
+                )
+                owned = set(
+                    AnalysisJobMessage.objects.filter(
+                        job=job,
+                        message_id__in=[row.pk for row in messages],
+                    ).values_list("message_id", flat=True)
+                )
+            messages = [row for row in messages if row.pk in owned]
+            if not messages:
+                continue
 
         job = renew_analysis_lease(
             job,
@@ -1360,7 +1449,7 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             if next_offset is None:
                 messages_processed += len(messages)
                 last_seq = messages[-1].ingest_seq
-                if scheduled_scope:
+                if assigned_scope:
                     AnalysisJobMessage.objects.filter(
                         job=job,
                         message__in=messages,
@@ -1385,11 +1474,18 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
                 lease_seconds=lease_seconds,
                 checkpoint=checkpoint,
             )
+            chunks_processed += 1
 
-    incomplete = scheduled_scope and AnalysisJobMessage.objects.filter(
-        job=job, completed_at__isnull=True
-    ).exists()
-    if _defer_event_publication(job) and not incomplete:
+    incomplete = (
+        not yielded
+        and scheduled_scope
+        and (
+            AnalysisJobMessage.objects.filter(
+                job=job, completed_at__isnull=True
+            ).exists()
+        )
+    )
+    if _defer_event_publication(job) and not incomplete and not yielded:
         if (job.specification or {}).get("boundary"):
             checkpoint["event_map_ready"] = True
         else:
@@ -1400,6 +1496,7 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
 
     return {
         "checkpoint": checkpoint,
+        "yielded": yielded,
         "partial": partial,
         "result_ref": {
             "messages_processed": messages_processed,

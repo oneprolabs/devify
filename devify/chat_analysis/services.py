@@ -125,45 +125,13 @@ def create_analysis_job(
     )
     cutoff_days = preferences.get("lookback_days", 0)
     snapshot = dict(specification or {})
-    snapshot["deduplicate_messages"] = True
     snapshot["analysis_conversation_kind"] = conversation.kind
     snapshot["chat_analysis_preferences"] = preferences
     snapshot["analysis_cutoff"] = (
         (timezone.now() - timedelta(days=cutoff_days)).isoformat()
-        if cutoff_days else None
+        if cutoff_days
+        else None
     )
-    existing = AnalysisJob.objects.filter(
-        space=space, request_key=request_key,
-    ).first()
-    if existing is None:
-        duplicate = (
-            AnalysisJob.objects.filter(
-                space=space,
-                created_by=actor,
-                conversation=conversation,
-                start_seq=start_seq,
-                end_seq=end_seq,
-                input_version=input_version,
-                upload_batches__isnull=True,
-            )
-            .exclude(
-                state__in=(
-                    AnalysisJob.State.FAILED,
-                    AnalysisJob.State.CANCELLED,
-                )
-            )
-            .order_by("pk")
-            .first()
-        )
-        ignored = {"analysis_cutoff"}
-        if duplicate and {
-            key: value
-            for key, value in duplicate.specification.items()
-            if key not in ignored
-        } == {
-            key: value for key, value in snapshot.items() if key not in ignored
-        }:
-            return duplicate
     job, created = AnalysisJob.objects.get_or_create(
         space=space,
         request_key=request_key,
@@ -440,7 +408,8 @@ def _move_event_relations(source, target):
         )
         existing.reason = "\n".join(
             dict.fromkeys(
-                reason for reason in (existing.reason, relation.reason)
+                reason
+                for reason in (existing.reason, relation.reason)
                 if reason
             )
         )
@@ -463,10 +432,12 @@ def _move_event_citations(source, target):
                 changed_fields = ["citations"]
         event_ids = question.scope.get("event_ids", [])
         if source.pk in event_ids:
-            question.scope["event_ids"] = list(dict.fromkeys(
-                target.pk if event_id == source.pk else event_id
-                for event_id in event_ids
-            ))
+            question.scope["event_ids"] = list(
+                dict.fromkeys(
+                    target.pk if event_id == source.pk else event_id
+                    for event_id in event_ids
+                )
+            )
             changed_fields.append("scope")
         if changed_fields:
             question.save(update_fields=changed_fields + ["updated_at"])

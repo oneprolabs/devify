@@ -136,7 +136,7 @@ def test_legacy_running_job_without_slot_counts_until_recovered(settings):
     assert recovered.fencing_token > 1
 
 
-def test_cancelled_incomplete_assignments_can_be_requested_again(settings):
+def test_manual_reanalysis_keeps_existing_assignments_unchanged(settings):
     settings.CHAT_ANALYSIS_LLM_ENABLED = False
     old = user_job("cancelled", count=2)
     first, second = Message.objects.filter(
@@ -170,10 +170,10 @@ def test_cancelled_incomplete_assignments_can_be_requested_again(settings):
     )
     result = execution.execute_analysis_job(fresh.pk, worker_id="fresh")
     assert result.job.state == AnalysisJob.State.READY
-    assert result.job.checkpoint["messages_processed"] == 1
+    assert result.job.checkpoint["messages_processed"] == 2
     assert AnalysisJobMessage.objects.get(message=first).job_id == old.pk
-    assert AnalysisJobMessage.objects.get(message=second).job_id == fresh.pk
-    assert NoteEvidence.objects.filter(note__analysis_job=fresh).count() == 1
+    assert AnalysisJobMessage.objects.get(message=second).job_id == old.pk
+    assert NoteEvidence.objects.filter(note__analysis_job=fresh).count() == 2
     assert execution.execute_analysis_job(old.pk, worker_id="stale") is None
 
 
@@ -561,3 +561,114 @@ def test_unclaimed_followup_refreshes_batches_when_it_eventually_starts(
         message=late,
         completed_at__isnull=False,
     ).exists()
+
+
+def test_failed_manual_attempt_does_not_block_explicit_new_analysis(settings):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = False
+    old = user_job("failed-manual")
+    with patch.object(
+        execution,
+        "_prepare_chunk",
+        side_effect=RuntimeError("unavailable"),
+    ):
+        failed = execution.execute_analysis_job(
+            old.pk,
+            worker_id="first",
+            max_attempts=1,
+        )
+    assert failed.job.state == AnalysisJob.State.FAILED
+    fresh = create_analysis_job(
+        actor=old.created_by,
+        space=old.space,
+        conversation=old.conversation,
+        request_key="explicit-rerun",
+        start_seq=old.start_seq,
+        end_seq=old.end_seq,
+        input_version=old.input_version,
+    )
+    result = execution.execute_analysis_job(fresh.pk, worker_id="new-request")
+    assert result.job.state == AnalysisJob.State.READY
+    assert result.job.result_ref["messages_processed"] == 1
+    assert NoteEvidence.objects.filter(note__analysis_job=fresh).count() == 1
+    assert not AnalysisJobMessage.objects.filter(
+        message__conversation=old.conversation,
+    ).exists()
+    assert (
+        create_analysis_job(
+            actor=old.created_by,
+            space=old.space,
+            conversation=old.conversation,
+            request_key="explicit-rerun",
+            start_seq=old.start_seq,
+            end_seq=old.end_seq,
+            input_version=old.input_version,
+        ).pk
+        == fresh.pk
+    )
+
+
+def test_incomplete_model_output_does_not_advance_manual_checkpoint(
+    settings,
+    monkeypatch,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = False
+    job = user_job("incomplete-manual")
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    monkeypatch.setattr(execution, "_extract_events", lambda *args: [])
+    with patch.object(execution, "_summarize_note", return_value=None):
+        first = execution.execute_analysis_job(job.pk, worker_id="incomplete")
+    assert first.job.state == AnalysisJob.State.QUEUED
+    assert "last_ingest_seq" not in first.job.checkpoint
+    assert job.notes.count() == 0
+    due = datetime.fromisoformat(first.job.checkpoint["resume_after"])
+    with (
+        patch("django.utils.timezone.now", return_value=due),
+        patch.object(execution, "_summarize_note", return_value={"facts": []}),
+    ):
+        result = execution.execute_analysis_job(job.pk, worker_id="healthy")
+    assert result.job.state == AnalysisJob.State.READY
+    assert result.job.result_ref["messages_processed"] == 1
+    assert job.notes.count() == 1
+    assert job.notes.get().structured_data == {"facts": []}
+
+
+def test_manual_rerun_preserves_automatic_assignment_and_result(
+    settings,
+    monkeypatch,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = False
+    old = user_job("automatic-then-manual")
+    message = Message.objects.get(conversation=old.conversation)
+    old.specification["scheduled_message_scope"] = True
+    old.save(update_fields=("specification",))
+    assignment = AnalysisJobMessage.objects.create(job=old, message=message)
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    monkeypatch.setattr(execution, "_prepare_chunk", lambda *_: ({}, []))
+    execution.execute_analysis_job(old.pk, worker_id="automatic")
+    original_note = old.notes.get()
+    original_content = original_note.content
+    fresh = create_analysis_job(
+        actor=old.created_by,
+        space=old.space,
+        conversation=old.conversation,
+        request_key="manual-new-intent",
+        start_seq=0,
+        end_seq=1,
+        input_version=old.input_version,
+    )
+    result = execution.execute_analysis_job(fresh.pk, worker_id="manual")
+    assert result.job.state == AnalysisJob.State.READY
+    assert result.job.result_ref["messages_processed"] == 1
+    assignment.refresh_from_db()
+    original_note.refresh_from_db()
+    assert assignment.job_id == old.pk
+    assert assignment.completed_at is not None
+    assert original_note.content == original_content
+    assert fresh.notes.count() == 1
+    assert fresh.notes.get().pk != original_note.pk

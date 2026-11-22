@@ -37,7 +37,6 @@ from chat_analysis.models import (
     Event,
     EventSuggestion,
     Note,
-    NoteEvidence,
 )
 from chat_analysis.services import (
     ChatAnalysisError,
@@ -1394,6 +1393,8 @@ def _prepare_chunk(job, messages):
             (job.specification or {}).get("chat_analysis_preferences"),
         )
         events = _extract_events(job, messages, payload, language)
+        if summary is None or events is None:
+            raise ValueError("The model returned an incomplete result.")
     except Exception:
         logger.exception("LLM chat analysis failed for job %s", job.pk)
         raise RuntimeError("LLM chat analysis failed") from None
@@ -1481,10 +1482,6 @@ def run_rule_based_analysis(
     scheduled_scope = (job.specification or {}).get(
         "scheduled_message_scope"
     ) is True
-    assigned_scope = (
-        scheduled_scope
-        or (job.specification or {}).get("deduplicate_messages") is True
-    )
     if scheduled_scope and not getattr(
         settings, "CHAT_ANALYSIS_LLM_ENABLED", False
     ):
@@ -1510,39 +1507,6 @@ def run_rule_based_analysis(
                     readable=Exists(readable_text_parts(OuterRef("pk"))),
                 )
                 .filter(readable=True)
-            )
-        elif assigned_scope:
-            analyzed = (
-                NoteEvidence.objects.filter(
-                    message_id=OuterRef("pk"),
-                    note__analysis_job__conversation_id=job.conversation_id,
-                )
-                .exclude(note__analysis_job=job)
-                .exclude(
-                    Q(note__analysis_job__state=AnalysisJob.State.CANCELLED)
-                    & Q(message__scheduled_analysis__completed_at__isnull=True)
-                    & (
-                        Q(
-                            message__scheduled_analysis__job__state=(
-                                AnalysisJob.State.CANCELLED
-                            ),
-                        )
-                        | Q(message__scheduled_analysis__job=job)
-                    )
-                )
-            )
-            query = query.annotate(analyzed=Exists(analyzed)).filter(
-                Q(scheduled_analysis__isnull=True)
-                | Q(
-                    scheduled_analysis__job__state=AnalysisJob.State.CANCELLED,
-                    scheduled_analysis__completed_at__isnull=True,
-                )
-                | Q(
-                    scheduled_analysis__job=job,
-                    scheduled_analysis__completed_at__isnull=True,
-                    scheduled_analysis__error="",
-                ),
-                analyzed=False,
             )
         if not scheduled_scope and cutoff:
             query = query.filter(occurred_at__gte=cutoff)
@@ -1596,32 +1560,6 @@ def run_rule_based_analysis(
                 "Continuing a fragmented message requires the LLM."
             )
 
-        if assigned_scope and not scheduled_scope:
-            with dispatch_lock():
-                locked = _lock_job(job.pk)
-                _ensure_lease(locked, job.lease_owner, job.fencing_token)
-                AnalysisJobMessage.objects.filter(
-                    message_id__in=[row.pk for row in messages],
-                    job__state=AnalysisJob.State.CANCELLED,
-                    completed_at__isnull=True,
-                ).update(job=job, error="")
-                AnalysisJobMessage.objects.bulk_create(
-                    [
-                        AnalysisJobMessage(job=job, message_id=message.pk)
-                        for message in sorted(messages, key=lambda row: row.pk)
-                    ],
-                    ignore_conflicts=True,
-                )
-                owned = set(
-                    AnalysisJobMessage.objects.filter(
-                        job=job,
-                        message_id__in=[row.pk for row in messages],
-                    ).values_list("message_id", flat=True)
-                )
-            messages = [row for row in messages if row.pk in owned]
-            if not messages:
-                continue
-
         job = renew_analysis_lease(
             job,
             worker_id=job.lease_owner,
@@ -1656,7 +1594,7 @@ def run_rule_based_analysis(
             if next_offset is None:
                 messages_processed += len(messages)
                 last_seq = messages[-1].ingest_seq
-                if assigned_scope:
+                if scheduled_scope:
                     AnalysisJobMessage.objects.filter(
                         job=job,
                         message__in=messages,

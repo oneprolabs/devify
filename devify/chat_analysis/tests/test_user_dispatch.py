@@ -73,32 +73,29 @@ def test_user_exclusion_and_global_upper_bound(settings):
     assert AnalysisExecutionSlot.objects.filter(job__isnull=False).count() == 2
 
 
-def test_different_keys_reuse_the_same_frozen_input():
-    job = user_job("coalesced")
-    duplicate = create_analysis_job(
-        actor=job.created_by,
-        space=job.space,
-        conversation=job.conversation,
-        request_key="another-key",
-        start_seq=job.start_seq,
-        end_seq=job.end_seq,
-        input_version=job.input_version,
+def test_different_keys_keep_independent_tasks_and_stable_retries():
+    job = user_job("independent")
+    values = {
+        "actor": job.created_by,
+        "space": job.space,
+        "conversation": job.conversation,
+        "start_seq": job.start_seq,
+        "end_seq": job.end_seq,
+        "input_version": job.input_version,
+    }
+    second = create_analysis_job(request_key="another-key", **values)
+    assert second.pk != job.pk
+    assert AnalysisJob.objects.filter(space=job.space).count() == 2
+    AnalysisJob.objects.filter(pk=job.pk).update(
+        state=AnalysisJob.State.FAILED
     )
-    assert duplicate.pk == job.pk
-    assert AnalysisJob.objects.filter(space=job.space).count() == 1
-    execute_analysis_job(
-        job.pk, worker_id="finish", handler=lambda *a, **k: {}
+    assert (
+        create_analysis_job(request_key="another-key", **values).pk
+        == second.pk
     )
-    replay = create_analysis_job(
-        actor=job.created_by,
-        space=job.space,
-        conversation=job.conversation,
-        request_key="another-key",
-        start_seq=job.start_seq,
-        end_seq=job.end_seq,
-        input_version=job.input_version,
+    assert (
+        create_analysis_job(request_key=job.request_key, **values).pk == job.pk
     )
-    assert replay.pk == job.pk
 
 
 def test_yield_preserves_progress_and_gives_another_user_a_turn(
@@ -158,7 +155,7 @@ def test_time_budget_yields_at_a_committed_chunk(settings, monkeypatch):
     assert NoteEvidence.objects.filter(note__analysis_job=job).count() == 1
 
 
-def test_overlapping_manual_requests_assign_each_message_once(settings):
+def test_manual_requests_keep_independent_input_windows(settings):
     settings.CHAT_ANALYSIS_LLM_ENABLED = False
     first = user_job("overlap", count=6)
     first.end_seq = 4
@@ -175,14 +172,14 @@ def test_overlapping_manual_requests_assign_each_message_once(settings):
     execute_analysis_job(first.pk, worker_id="overlap-first")
     result = execute_analysis_job(second.pk, worker_id="overlap-second")
     assert result.job.state == AnalysisJob.State.READY
-    assert result.job.checkpoint["messages_processed"] == 2
-    assert NoteEvidence.objects.filter(note__space=first.space).count() == 6
+    assert result.job.checkpoint["messages_processed"] == 4
+    assert NoteEvidence.objects.filter(note__space=first.space).count() == 8
     assert (
         Message.objects.filter(
             conversation=first.conversation,
             scheduled_analysis__isnull=False,
         ).count()
-        == 6
+        == 0
     )
 
 
@@ -200,8 +197,16 @@ def test_duplicate_ticks_and_broker_failure_keep_one_delivery():
         send.assert_called_once_with(job.pk)
 
 
-def test_large_backlog_resumes_without_duplicate_assignments(settings):
-    settings.CHAT_ANALYSIS_LLM_ENABLED = False
+def test_large_backlog_resumes_without_duplicate_assignments(
+    settings,
+    monkeypatch,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = False
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    monkeypatch.setattr(execution, "_prepare_chunk", lambda *_: ({}, []))
     settings.CHAT_ANALYSIS_BATCH_MESSAGES = 250
     job = user_job("large")
     rows = Message.objects.bulk_create(
@@ -229,7 +234,16 @@ def test_large_backlog_resumes_without_duplicate_assignments(settings):
         ]
     )
     job.end_seq = 1201
-    job.save(update_fields=("end_seq",))
+    job.specification["scheduled_message_scope"] = True
+    job.save(update_fields=("end_seq", "specification"))
+    AnalysisJobMessage.objects.bulk_create(
+        [
+            AnalysisJobMessage(job=job, message=message)
+            for message in Message.objects.filter(
+                conversation=job.conversation
+            )
+        ]
+    )
     for turn in range(5):
         job.refresh_from_db()
         now = (

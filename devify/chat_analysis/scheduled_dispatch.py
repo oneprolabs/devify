@@ -48,11 +48,11 @@ def ensure_due_run(now, schedule=None):
 
 
 def dispatch_due_analysis(now=None, schedule=None):
-    """Open the latest started Beijing slot and schedule ready conversations.
+    """Open an hourly round for users with an eligible uploaded backlog.
 
-    The cutoff is the slot clock time, not the moment the beat wakes up.
-    A late wake still uses the latest hourly cutoff. Later uploads wait for
-    the next slot; continuations keep their original cutoff.
+    The slot controls admission. Actual input is selected when the worker
+    starts, including uploads received while this user was waiting.
+    Continuations do not wait for a new hourly slot.
     """
     now = now or timezone.now()
     run = ensure_due_run(now, schedule)

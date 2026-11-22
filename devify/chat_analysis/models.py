@@ -65,7 +65,7 @@ class ChatSummary(models.Model):
 
 
 class AnalysisJob(models.Model):
-    """A resumable extraction job over a fixed window of an upload batch."""
+    """A resumable request whose execution uses a frozen message window."""
 
     class State(models.TextChoices):
         QUEUED = "queued", "Queued"
@@ -183,7 +183,7 @@ class AnalysisExecutionSlot(models.Model):
 
 
 class AnalysisJobMessage(models.Model):
-    """Exact message assignment for a scheduled analysis job."""
+    """Unique message assignments shared by event-analysis entry points."""
 
     job = models.ForeignKey(
         AnalysisJob,

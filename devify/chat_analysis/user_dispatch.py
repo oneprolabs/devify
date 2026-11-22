@@ -111,6 +111,19 @@ def release_publication_slot(job):
         ).update(user=None, job=None, dispatched_at=None, publishing=False)
 
 
+def renew_publication_slot(job):
+    """Renew only a still-valid publication owner, under dispatch_lock."""
+    if not publication_slot_valid(job):
+        return False
+    return bool(
+        AnalysisExecutionSlot.objects.filter(
+            job_id=job.pk,
+            job__fencing_token=job.fencing_token,
+            publishing=True,
+        ).update(dispatched_at=timezone.now())
+    )
+
+
 def _deliver(job_id, dispatched_at):
     from chat_analysis.tasks import execute_analysis_job_task
 

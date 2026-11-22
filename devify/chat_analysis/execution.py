@@ -60,6 +60,7 @@ from chat_analysis.user_dispatch import (
     dispatch_lock,
     publication_slot_valid,
     release_publication_slot,
+    renew_publication_slot,
     reserve_user_slot,
 )
 from chat_domain.models import Message, MessagePart
@@ -88,6 +89,10 @@ class AnalysisJobRejected(Exception):
 
 class AnalysisLeaseLost(Exception):
     """Raised when a worker no longer holds the job lease."""
+
+
+class AnalysisBatchYield(Exception):
+    """Stop after saving a bounded portion of event reduction."""
 
 
 @dataclass(frozen=True)
@@ -1069,24 +1074,94 @@ def _store_events(job, note, messages, events):
                     )
 
 
+def _reduction_progress(
+    job, candidates, *, publication=False,
+    lease_seconds=DEFAULT_LEASE_SECONDS,
+):
+    source_ids = [item.pk for item in candidates]
+    saved = (job.checkpoint or {}).get("event_reduction", {})
+    progress = (
+        saved.get("progress")
+        if saved.get("source_ids") == source_ids else None
+    )
+    started_at = monotonic()
+
+    def save_progress(value):
+        with dispatch_lock():
+            locked = _lock_job(job.pk)
+            if publication:
+                if not renew_publication_slot(job):
+                    raise AnalysisLeaseLost("Event publication lease expired.")
+            else:
+                _ensure_lease(locked, job.lease_owner, job.fencing_token)
+            checkpoint = {
+                **locked.checkpoint,
+                "event_reduction": {
+                    "source_ids": source_ids, "progress": value,
+                },
+            }
+            if publication:
+                locked.checkpoint = checkpoint
+                locked.save(update_fields=("checkpoint", "updated_at"))
+            else:
+                renew_analysis_lease(
+                    locked,
+                    worker_id=job.lease_owner,
+                    fencing_token=job.fencing_token,
+                    lease_seconds=lease_seconds,
+                    checkpoint=checkpoint,
+                )
+            job.checkpoint = checkpoint
+        if monotonic() - started_at >= max(
+            1, settings.CHAT_ANALYSIS_BATCH_SECONDS
+        ):
+            raise AnalysisBatchYield()
+
+    return progress, save_progress
+
+
+def _clear_reduction_progress(job):
+    checkpoint = dict(job.checkpoint or {})
+    checkpoint.pop("event_reduction", None)
+    AnalysisJob.objects.filter(pk=job.pk).update(checkpoint=checkpoint)
+    job.checkpoint = checkpoint
+
+
 def _publish_reduced_events(job, lease_seconds):
     candidates = list(
         EventSuggestion.objects.filter(
-            analysis_job=job, status=EventSuggestion.Status.PENDING,
-        ).select_related("note", "analysis_job").order_by("pk")
+            analysis_job=job,
+            status=EventSuggestion.Status.PENDING,
+        )
+        .select_related("note", "analysis_job")
+        .order_by("pk")
     )
     if not candidates:
         return
     job = renew_analysis_lease(
-        job, worker_id=job.lease_owner, fencing_token=job.fencing_token,
+        job,
+        worker_id=job.lease_owner,
+        fencing_token=job.fencing_token,
         lease_seconds=lease_seconds,
     )
-    groups = prepare_event_reduction(job, candidates, call_json=_call_json)
+    progress, save_progress = _reduction_progress(
+        job,
+        candidates,
+        lease_seconds=lease_seconds,
+    )
+    groups = prepare_event_reduction(
+        job,
+        candidates,
+        call_json=_call_json,
+        progress=progress,
+        save_progress=save_progress,
+    )
     with transaction.atomic():
         locked = _lock_job(job.pk)
         _ensure_lease(locked, job.lease_owner, job.fencing_token)
         Space.objects.select_for_update().only("pk").get(pk=job.space_id)
         _apply_reduced_groups(job, candidates, groups)
+        _clear_reduction_progress(job)
 
 
 def _apply_reduced_groups(job, candidates, groups):
@@ -1162,7 +1237,18 @@ def _publish_event_batch(space_id, boundary):
     if job is None:
         return False
     try:
-        groups = prepare_event_reduction(job, candidates, call_json=_call_json)
+        progress, save_progress = _reduction_progress(
+            job,
+            candidates,
+            publication=True,
+        )
+        groups = prepare_event_reduction(
+            job,
+            candidates,
+            call_json=_call_json,
+            progress=progress,
+            save_progress=save_progress,
+        )
         with dispatch_lock():
             Space.objects.select_for_update().only("pk").get(pk=space_id)
             if not publication_slot_valid(job):
@@ -1172,7 +1258,10 @@ def _publish_event_batch(space_id, boundary):
             ] != [item.pk for item in current_candidates()]:
                 return False
             _apply_reduced_groups(job, candidates, groups)
+            _clear_reduction_progress(job)
         return True
+    except AnalysisBatchYield:
+        return False
     finally:
         release_publication_slot(job)
 
@@ -1538,7 +1627,13 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
         if (job.specification or {}).get("boundary"):
             checkpoint["event_map_ready"] = True
         else:
-            _publish_reduced_events(job, lease_seconds)
+            try:
+                _publish_reduced_events(job, lease_seconds)
+            except AnalysisBatchYield:
+                yielded = True
+            checkpoint = AnalysisJob.objects.values_list(
+                "checkpoint", flat=True,
+            ).get(pk=job.pk)
 
     if incomplete:
         partial = True

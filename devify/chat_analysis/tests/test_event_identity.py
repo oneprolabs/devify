@@ -360,7 +360,9 @@ def test_scheduled_reduction_reuses_candidates_after_failure(
 
     reducer_attempts = []
 
-    def reduce(job, candidates, *, call_json):
+    def reduce(
+        job, candidates, *, call_json, progress=None, save_progress=None
+    ):
         reducer_attempts.append(len(candidates))
         assert not Event.objects.filter(space=space).exists()
         if len(reducer_attempts) == 1:
@@ -463,7 +465,9 @@ def test_scheduled_slot_reduces_two_conversations_together(
             "source_seqs": [1],
         }]
 
-    def reduce(job, suggestions, *, call_json):
+    def reduce(
+        job, suggestions, *, call_json, progress=None, save_progress=None
+    ):
         assert {s.analysis_job_id for s in suggestions} == {
             item.pk for item in jobs
         }

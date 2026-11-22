@@ -20,6 +20,7 @@ from chat_analysis.execution import (
 from chat_analysis.models import (
     AnalysisExecutionSlot,
     AnalysisJob,
+    AnalysisJobMessage,
     NoteEvidence,
 )
 from chat_analysis.schedule_window import BEIJING
@@ -299,6 +300,59 @@ def test_event_publication_uses_capacity_and_fences_expired_owners():
     assert publication_slot_valid(replacement)
     release_publication_slot(replacement)
     assert claim_analysis_job(other.pk, worker_id="other") is not None
+
+
+def test_reduction_yield_resumes_saved_progress_without_failure_attempts(
+    settings,
+    monkeypatch,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    job = user_job("reduce-yield", count=2)
+    job.specification["scheduled_message_scope"] = True
+    job.save(update_fields=("specification",))
+    AnalysisJobMessage.objects.bulk_create(
+        [
+            AnalysisJobMessage(job=job, message=message)
+            for message in Message.objects.filter(
+                conversation=job.conversation
+            )
+        ]
+    )
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    mapped = []
+
+    def extract(job, rows):
+        mapped.append([row.ingest_seq for row in rows])
+        return {}, [
+            {
+                "title": "Case PR-55",
+                "summary": "Alice reported the issue.",
+                "source_seqs": [row.ingest_seq for row in rows],
+            }
+        ]
+
+    def reduce(job, candidates, *, call_json, progress, save_progress):
+        if progress is None:
+            save_progress({"saved_batch": 1})
+            raise execution.AnalysisBatchYield()
+        assert progress == {"saved_batch": 1}
+        return [candidates]
+
+    monkeypatch.setattr(execution, "_prepare_chunk", extract)
+    monkeypatch.setattr(execution, "prepare_event_reduction", reduce)
+    first = execute_analysis_job(job.pk, worker_id="reduce-first")
+    assert first.job.state == AnalysisJob.State.QUEUED
+    assert first.job.attempts == 0
+    assert first.job.checkpoint["last_ingest_seq"] == 2
+    second = execute_analysis_job(job.pk, worker_id="reduce-resume")
+    assert second.job.state == AnalysisJob.State.READY
+    assert second.job.attempts == 1
+    assert "event_reduction" not in second.job.checkpoint
+    assert mapped == [[1, 2]]
+    assert NoteEvidence.objects.filter(note__space=job.space).count() == 2
 
 
 @pytest.mark.parametrize(

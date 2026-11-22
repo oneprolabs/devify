@@ -2,6 +2,8 @@
 
 import json
 from collections import Counter
+from copy import deepcopy
+from hashlib import sha256
 
 from chat_analysis.models import NoteEvidence
 from chat_analysis.token_budget import MessageExceedsBudget
@@ -161,39 +163,71 @@ def _model_groups(batch, payloads, call_json, *, compact):
     return merged
 
 
-def prepare_event_reduction(job, suggestions, *, call_json):
+def prepare_event_reduction(
+    job, suggestions, *, call_json, progress=None, save_progress=None,
+):
     """Return a partition of the original suggestions without changing them."""
     suggestions = list(suggestions)
     if len(suggestions) < 2:
         return [[suggestion] for suggestion in suggestions]
     payloads = _candidate_payloads(job, suggestions)
-    groups = []
     singles = [[index] for index in range(len(suggestions))]
-    for start in range(0, len(singles), BATCH_SIZE):
-        batch = singles[start:start + BATCH_SIZE]
-        groups.extend(_model_groups(batch, payloads, call_json, compact=False))
-
-    if len(suggestions) > BATCH_SIZE:
-        # Keep potentially related matters together when initial batches
-        # contain more candidates than the model can revisit at once.
-        def sort_key(group):
-            item = payloads[group[0]]
-            return item["entity"].casefold(), item["title"].casefold()
-
-        for offset in (0, BATCH_SIZE // 2):
-            groups.sort(key=sort_key)
-            if len(groups) <= BATCH_SIZE:
-                groups = _model_groups(
-                    groups, payloads, call_json, compact=True
+    digest = sha256(json.dumps(payloads, sort_keys=True).encode()).hexdigest()
+    state = deepcopy(progress or {})
+    if state.get("digest") != digest:
+        state = {
+            "digest": digest,
+            "phase": 0,
+            "cursor": 0,
+            "groups": [],
+            "input": [],
+        }
+    while state["phase"] < 3:
+        phase = state["phase"]
+        if phase == 0:
+            source = singles
+        elif state["input"]:
+            source = state["input"]
+        else:
+            source = sorted(
+                state["groups"],
+                key=lambda group: (
+                    payloads[group[0]]["entity"].casefold(),
+                    payloads[group[0]]["title"].casefold(),
+                ),
+            )
+            state["input"] = source
+            state["cursor"] = 0 if phase == 1 else BATCH_SIZE // 2
+            state["groups"] = source[: state["cursor"]]
+        if phase and len(source) <= BATCH_SIZE:
+            state["groups"] = _model_groups(
+                source,
+                payloads,
+                call_json,
+                compact=True,
+            )
+            state["phase"] = 3
+        else:
+            start = state["cursor"]
+            batch = source[start : start + BATCH_SIZE]
+            state["groups"].extend(
+                _model_groups(
+                    batch,
+                    payloads,
+                    call_json,
+                    compact=phase != 0,
                 )
-                break
-            reduced = groups[:offset]
-            for start in range(offset, len(groups), BATCH_SIZE):
-                batch = groups[start:start + BATCH_SIZE]
-                reduced.extend(_model_groups(
-                    batch, payloads, call_json, compact=True
-                ))
-            groups = reduced
+            )
+            state["cursor"] = start + len(batch)
+            if state["cursor"] >= len(source):
+                state["phase"] += 1
+                if phase == 0 and len(suggestions) <= BATCH_SIZE:
+                    state["phase"] = 3
+                state["cursor"] = 0
+                state["input"] = []
+        if save_progress:
+            save_progress(deepcopy(state))
     return [
-        [suggestions[index] for index in group] for group in sorted(groups)
+        [suggestions[index] for index in group]
+        for group in sorted(state["groups"])
     ]

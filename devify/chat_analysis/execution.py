@@ -1141,7 +1141,7 @@ def _reduction_progress(
                     checkpoint=checkpoint,
                 )
             job.checkpoint = checkpoint
-        if monotonic() - started_at >= seconds:
+        if value.get("phase") != 3 and monotonic() - started_at >= seconds:
             raise AnalysisBatchYield()
 
     return progress, save_progress

@@ -339,3 +339,50 @@ def test_partial_users_share_admission_order_with_fresh_input(settings):
     partial.refresh_from_db()
     assert partial.state == AnalysisJob.State.QUEUED
     assert AnalysisJob.objects.filter(created_by=fresh.created_by).count() == 1
+
+
+def test_finished_reduction_commits_when_last_model_call_exceeds_budget(
+    settings,
+    monkeypatch,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    monkeypatch.setattr(
+        execution, "_messages_for_model", lambda job, rows: rows
+    )
+    monkeypatch.setattr(
+        execution,
+        "_prepare_chunk",
+        lambda job, rows: (
+            {},
+            [
+                {
+                    "title": "Case A",
+                    "summary": "First incident.",
+                    "source_seqs": [1],
+                },
+                {
+                    "title": "Case B",
+                    "summary": "Second incident.",
+                    "source_seqs": [1],
+                },
+            ],
+        ),
+    )
+    job = ready_event_batch("finished-reduction-budget")
+    elapsed = [0]
+
+    def finish(_job, candidates, *, save_progress, **kwargs):
+        elapsed[0] = 2
+        save_progress({"phase": 3, "groups": [[0], [1]]})
+        return [[item] for item in candidates]
+
+    with (
+        patch.object(execution, "monotonic", side_effect=lambda: elapsed[0]),
+        patch.object(execution, "prepare_event_reduction", side_effect=finish),
+    ):
+        assert execution.publish_ready_event_batches(time_limit=1) == 1
+    assert Event.objects.filter(space=job.space).count() == 2
+    job.refresh_from_db()
+    assert "event_reduction" not in job.checkpoint
+    assert "resume_after" not in job.checkpoint

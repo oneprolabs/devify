@@ -443,6 +443,8 @@ bluegreen_deploy() {
         python manage.py migrate --noinput
 
     log "Starting chat parser before routing uploads to its queue..."
+    # Do not overlap old consumers that ignore the new per-user gate.
+    compose stop devify-analysis-worker
     compose up -d devify-chat-worker devify-analysis-worker
     local analysis_hostname
     analysis_hostname="$(docker inspect -f '{{.Config.Hostname}}' devify-analysis-worker)"
@@ -568,6 +570,13 @@ upgrade_stack() {
     bluegreen_deploy
 }
 
+restore_analysis_workers() {
+    if [ -n "$1" ]; then
+        DEVIFY_IMAGE_TAG="$1" compose up -d \
+            devify-analysis-worker devify-scheduler
+    fi
+}
+
 rollback_stack() {
     acquire_deploy_lock
     check_requirements
@@ -587,18 +596,36 @@ rollback_stack() {
     if ! docker image inspect "${DEVIFY_IMAGE_REPO}:${rbtag}" >/dev/null 2>&1; then
         die "Image ${DEVIFY_IMAGE_REPO}:${rbtag} is not present locally; cannot roll back to it. Redeploy instead: DEVIFY_REF=v${rbtag} $0 upgrade"
     fi
+    # Check using the CURRENT API, before starting an old deferred-input consumer.
+    local api current_image current_tag=""
+    api="devify-api-${active}"
+    docker exec "${api}" test -d /opt/devify/chat_analysis || \
+        die "Cannot inspect current analysis code; rollback aborted."
+    if docker exec "${api}" test -f \
+        /opt/devify/chat_analysis/management/commands/check_analysis_handoff.py; then
+        current_image="$(docker inspect -f '{{.Config.Image}}' "${api}")"
+        current_tag="${current_image##*:}"
+        export DEVIFY_IMAGE_TAG="${current_tag}"
+        compose stop devify-scheduler devify-analysis-worker
+        if ! docker exec "${api}" python manage.py check_analysis_handoff; then
+            restore_analysis_workers "${current_tag}"
+            die "Analysis rollback check failed; current workers restored."
+        fi
+    fi
     export DEVIFY_IMAGE_TAG="${rbtag}"
     log "Active color is ${active}; rolling back to ${target} pinned at version ${rbtag}"
     log "(no pull/build/migrate — uses the locally retained ${rbtag} image)"
 
     if ! compose --profile "${target}" up -d \
         "devify-api-${target}" "devify-ui-${target}"; then
+        restore_analysis_workers "${current_tag}"
         die "Could not start ${target}. Redeploy that version instead: DEVIFY_REF=<tag> $0 upgrade"
     fi
     log "Waiting for devify-api-${target} to report healthy..."
     if ! wait_for_healthy "devify-api-${target}"; then
         compose --profile "${target}" stop \
             "devify-api-${target}" "devify-ui-${target}"
+        restore_analysis_workers "${current_tag}"
         die "devify-api-${target} never became healthy; rollback aborted, ${active} stays live"
     fi
     switch_traffic "${active}" "${target}"

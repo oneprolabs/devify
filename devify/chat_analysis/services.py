@@ -19,6 +19,7 @@ from chat_analysis.models import (
     ReportItemSource,
 )
 from chat_analysis.user_dispatch import lock_dispatch_row
+from chat_domain.models import MessagePart
 from spaces.models import (
     SpaceWorkflowConfig,
     effective_chat_analysis_preferences,
@@ -79,6 +80,24 @@ def get_analysis_preferences(space):
     config = SpaceWorkflowConfig.objects.filter(space=space).first()
     return effective_chat_analysis_preferences(
         config.chat_analysis_preferences if config else None
+    )
+
+
+def readable_text_parts(message_id):
+    """Use the same non-whitespace text requirement as message extraction."""
+    return MessagePart.objects.filter(
+        message_id=message_id,
+        kind=MessagePart.Kind.TEXT,
+        text__regex=r"(*UCP)[^\s\x1c-\x1f]",
+    )
+
+
+def disallowed_conversation_q(kind_field, preferences_field):
+    types = f"{preferences_field}__conversation_types__contains"
+    return Q(**{f"{preferences_field}__has_key": "conversation_types"}) & (
+        (Q(**{kind_field: "direct"}) & ~Q(**{types: ["direct"]}))
+        | (Q(**{kind_field: "group"}) & ~Q(**{types: ["group"]}))
+        | (Q(**{kind_field: "unknown"}) & ~Q(**{types: ["direct", "group"]}))
     )
 
 
@@ -184,12 +203,15 @@ def retry_analysis_job(*, actor, job):
             "Only failed or partial analysis jobs can be retried."
         )
     job.state = AnalysisJob.State.QUEUED
+    job.checkpoint = dict(job.checkpoint)
+    job.checkpoint.pop("resume_after", None)
     job.lease_owner = ""
     job.lease_until = None
     job.error = ""
     job.save(
         update_fields=(
             "state",
+            "checkpoint",
             "lease_owner",
             "lease_until",
             "error",

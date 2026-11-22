@@ -2,18 +2,33 @@
 
 import logging
 from contextlib import contextmanager
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import F, OuterRef, Q, Subquery
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from chat_analysis.models import AnalysisExecutionSlot, AnalysisJob
 
 logger = logging.getLogger(__name__)
 ACTIVE_STATES = (AnalysisJob.State.QUEUED, AnalysisJob.State.RUNNING)
 PUBLICATION_LEASE_SECONDS = 300
+
+
+def next_analysis_hour():
+    return (
+        timezone.now()
+        .astimezone(UTC)
+        .replace(minute=0, second=0, microsecond=0)
+        + timedelta(hours=1)
+    ).isoformat()
+
+
+def resume_is_due(job):
+    value = job.checkpoint.get("resume_after")
+    return not value or parse_datetime(value) <= timezone.now()
 
 
 @contextmanager
@@ -49,6 +64,12 @@ def _release_finished_slots():
 def reserve_user_slot(job):
     """Reserve under dispatch_lock, including calls bypassing Celery."""
     _release_finished_slots()
+    legacy_running = AnalysisJob.objects.filter(
+        state=AnalysisJob.State.RUNNING,
+        analysisexecutionslot__isnull=True,
+    ).exclude(pk=job.pk)
+    if legacy_running.filter(created_by_id=job.created_by_id).exists():
+        return None
     occupied = AnalysisExecutionSlot.objects.filter(user_id=job.created_by_id)
     slot = occupied.first()
     if slot:
@@ -56,6 +77,7 @@ def reserve_user_slot(job):
     limit = max(1, settings.CHAT_ANALYSIS_MAX_CONCURRENT_USERS)
     if (
         AnalysisExecutionSlot.objects.filter(job__isnull=False).count()
+        + legacy_running.count()
         >= limit
     ):
         return None
@@ -75,7 +97,7 @@ def claim_publication_slot(job_id):
     with dispatch_lock():
         _release_finished_slots()
         job = AnalysisJob.objects.select_for_update().get(pk=job_id)
-        if job.state != AnalysisJob.State.READY:
+        if job.state != AnalysisJob.State.READY or not resume_is_due(job):
             return None
         if AnalysisExecutionSlot.objects.filter(
             user_id=job.created_by_id,
@@ -87,7 +109,9 @@ def claim_publication_slot(job_id):
         slot.publishing = True
         slot.save(update_fields=("publishing",))
         job.fencing_token += 1
-        job.save(update_fields=("fencing_token",))
+        job.checkpoint = dict(job.checkpoint)
+        job.checkpoint.pop("resume_after", None)
+        job.save(update_fields=("fencing_token", "checkpoint"))
         return job
 
 
@@ -149,7 +173,7 @@ def _enqueue(slot):
     transaction.on_commit(lambda: _deliver(slot.job_id, slot.dispatched_at))
 
 
-def dispatch_pending_analysis(*, retry_job_id=None):
+def dispatch_pending_analysis():
     """Keep at most one delivery per user and a fixed global upper bound.
 
     Other queued conversation jobs are durable pending work, not broker
@@ -177,11 +201,30 @@ def dispatch_pending_analysis(*, retry_job_id=None):
             users = AnalysisExecutionSlot.objects.filter(
                 user__isnull=False
             ).values("user_id")
+            running_users = AnalysisJob.objects.filter(
+                state=AnalysisJob.State.RUNNING,
+            ).values("created_by_id")
+            last_work = (
+                AnalysisJob.objects.filter(
+                    created_by_id=OuterRef("created_by_id"),
+                    fencing_token__gt=0,
+                )
+                .order_by("-updated_at")
+                .values("updated_at")[:1]
+            )
+            now = timezone.now().isoformat()
             job = (
                 AnalysisJob.objects.filter(state=AnalysisJob.State.QUEUED)
-                .filter(Q(error="") | Q(pk=retry_job_id))
+                .filter(
+                    Q(checkpoint__resume_after__isnull=True)
+                    | Q(checkpoint__resume_after__lte=now)
+                )
                 .exclude(created_by_id__in=users)
-                .order_by("updated_at", "pk")
+                .exclude(created_by_id__in=running_users)
+                .annotate(last_work=Subquery(last_work))
+                .order_by(
+                    F("last_work").asc(nulls_first=True), "updated_at", "pk"
+                )
                 .first()
             )
             if job is None:

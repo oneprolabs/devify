@@ -216,14 +216,22 @@ def recover_expired_analysis_jobs(
     }
 
 
-def sweep_stale_tasks(*, now=None):
+def sweep_stale_tasks(*, now=None, include_analysis=True):
     """Move every abandoned async record into a terminal state."""
 
     from chat_analysis.summaries.services import expire_stale_summaries
 
     summaries = expire_stale_summaries(now=now)
-    jobs = recover_expired_analysis_jobs(now=now)
-    queued = recover_stale_queued_analysis_jobs(now=now)
+    jobs = (
+        recover_expired_analysis_jobs(now=now)
+        if include_analysis
+        else {"requeued": 0, "failed": 0, "requeued_job_ids": []}
+    )
+    queued = (
+        recover_stale_queued_analysis_jobs(now=now)
+        if include_analysis
+        else {"requeued": 0, "requeued_job_ids": []}
+    )
     counts = {
         "summaries_failed": summaries,
         "questions_failed": expire_stale_questions(now=now),

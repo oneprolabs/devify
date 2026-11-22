@@ -1,9 +1,10 @@
 """Celery entry points for analysis job execution."""
 
-import logging
 from datetime import datetime
+from time import monotonic
 
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 
 from chat_analysis.execution import (
@@ -12,49 +13,83 @@ from chat_analysis.execution import (
 )
 from chat_analysis.models import AnalysisJob
 from chat_analysis.summaries.tasks import generate_chat_summary  # noqa: F401
-from chat_analysis.task_status import sweep_stale_tasks
+from chat_analysis.task_status import (
+    recover_expired_analysis_jobs,
+    sweep_stale_tasks,
+)
 from chat_analysis.topic_scheduler import run_due_topic_reports
 from chat_analysis.user_dispatch import dispatch_pending_analysis
-
-logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, max_retries=0)
 def execute_analysis_job_task(self, job_id, worker_id=None):
-    """Run one analysis job; retries are handled by the job state machine."""
-    worker = worker_id or f"celery:{self.request.id or 'local'}"
-    result = execute_analysis_job(job_id, worker_id=worker)
-    if result is None:
-        return {"job_id": job_id, "claimed": False}
-    if (
-        result.job.state == AnalysisJob.State.READY
-        and result.job.specification.get("boundary")
-    ):
-        from chat_analysis.scheduled_dispatch import schedule_user
+    """Consume one bounded user batch without chaining new Celery tasks."""
+    from chat_analysis.scheduled_dispatch import schedule_user
 
-        schedule_user(
-            result.job.created_by_id,
-            datetime.fromisoformat(result.job.specification["boundary"]),
-            dispatch=False,
-            pending_before=timezone.now(),
-        )
-    if result.job.specification.get("boundary") and result.job.state in (
-        AnalysisJob.State.READY,
-        AnalysisJob.State.PARTIAL,
-        AnalysisJob.State.FAILED,
-    ):
-        publish_ready_event_batches()
-    dispatch_pending_analysis()
-    return {
-        "job_id": result.job.pk,
-        "state": result.job.state,
-        "claimed": True,
-    }
+    worker = worker_id or f"celery:{self.request.id or 'local'}"
+    started = monotonic()
+    input_boundary = timezone.now()
+    remaining = max(1, settings.CHAT_ANALYSIS_BATCH_MESSAGES)
+    seconds = max(1, settings.CHAT_ANALYSIS_BATCH_SECONDS)
+    current_id, first_result = job_id, None
+    try:
+        while remaining > 0:
+            before = (
+                AnalysisJob.objects.filter(pk=current_id)
+                .values_list(
+                    "checkpoint",
+                    flat=True,
+                )
+                .first()
+                or {}
+            )
+            result = execute_analysis_job(
+                current_id,
+                worker_id=worker,
+                message_limit=remaining,
+                time_limit=max(1, seconds - (monotonic() - started)),
+            )
+            if result is None:
+                break
+            first_result = first_result or result
+            processed = result.job.checkpoint.get("messages_processed", 0)
+            remaining -= max(
+                0, processed - before.get("messages_processed", 0)
+            )
+            boundary = result.job.specification.get("boundary")
+            if (
+                result.job.state != AnalysisJob.State.READY
+                or not boundary
+                or remaining <= 0
+                or monotonic() - started >= seconds
+            ):
+                break
+            following = schedule_user(
+                result.job.created_by_id,
+                datetime.fromisoformat(boundary),
+                dispatch=False,
+                pending_before=input_boundary,
+            )
+            if following is None:
+                break
+            current_id = following.pk
+        if first_result is None:
+            return {"job_id": job_id, "claimed": False}
+        if first_result.job.specification.get("boundary"):
+            publish_ready_event_batches()
+        return {
+            "job_id": job_id,
+            "state": first_result.job.state,
+            "claimed": True,
+        }
+    finally:
+        # Feed already-admitted users; deferred retries stay gated until due.
+        dispatch_pending_analysis()
 
 
 def dispatch_analysis_job(job):
     """Queue the job on the existing chat_analysis worker."""
-    return dispatch_pending_analysis(retry_job_id=job.pk)
+    return dispatch_pending_analysis()
 
 
 @shared_task(bind=True, max_retries=0)
@@ -73,6 +108,7 @@ def run_due_scheduled_analysis_task(self):
     """
     from chat_analysis.scheduled_dispatch import dispatch_due_analysis
 
+    recover_expired_analysis_jobs()
     result = dispatch_due_analysis()
     publish_ready_event_batches()
     dispatch_pending_analysis()
@@ -81,14 +117,7 @@ def run_due_scheduled_analysis_task(self):
 
 @shared_task(bind=True, max_retries=0)
 def sweep_stale_async_tasks(self):
-    """Close questions, reports and jobs that no worker finished."""
-    result = sweep_stale_tasks()
-    for job_id in result.pop("requeued_job_ids", []):
-        try:
-            dispatch_analysis_job(AnalysisJob.objects.get(pk=job_id))
-        except Exception:
-            logger.exception(
-                "Failed to re-dispatch recovered analysis job %s", job_id
-            )
-    dispatch_pending_analysis()
+    """Keep summary/question/report deadlines independent of events."""
+    result = sweep_stale_tasks(include_analysis=False)
+    result.pop("requeued_job_ids", None)
     return result

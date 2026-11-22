@@ -44,6 +44,7 @@ from chat_analysis.services import (
     ChatAnalysisPermissionError,
     add_note_evidence,
     create_note,
+    readable_text_parts,
     refresh_event_window,
 )
 from chat_analysis.suggestions import (
@@ -58,10 +59,12 @@ from chat_analysis.token_budget import (
 from chat_analysis.user_dispatch import (
     claim_publication_slot,
     dispatch_lock,
+    next_analysis_hour,
     publication_slot_valid,
     release_publication_slot,
     renew_publication_slot,
     reserve_user_slot,
+    resume_is_due,
 )
 from chat_domain.models import Message, MessagePart
 from core.tracking import LLMTracker
@@ -142,6 +145,8 @@ def claim_analysis_job(
                 return None
         elif job.state != AnalysisJob.State.QUEUED:
             return None
+        if not resume_is_due(job):
+            return None
         if reserve_user_slot(job) is None:
             return None
         job.state = AnalysisJob.State.RUNNING
@@ -151,9 +156,12 @@ def claim_analysis_job(
         job.attempts = job.attempts + 1
         job.engine_version = ENGINE_VERSION
         job.error = ""
+        job.checkpoint = dict(job.checkpoint)
+        job.checkpoint.pop("resume_after", None)
         job.save(
             update_fields=(
                 "state",
+                "checkpoint",
                 "lease_owner",
                 "lease_until",
                 "fencing_token",
@@ -246,6 +254,7 @@ def yield_analysis_job(job, outcome):
         _ensure_lease(locked, job.lease_owner, job.fencing_token)
         locked.state = AnalysisJob.State.QUEUED
         locked.checkpoint = outcome["checkpoint"]
+        locked.checkpoint["resume_after"] = next_analysis_hour()
         locked.result_ref = outcome["result_ref"]
         locked.lease_owner = ""
         locked.lease_until = None
@@ -285,6 +294,10 @@ def fail_analysis_job(
         locked.lease_until = None
         if retryable and locked.attempts < max_attempts:
             locked.state = AnalysisJob.State.QUEUED
+            locked.checkpoint = {
+                **locked.checkpoint,
+                "resume_after": next_analysis_hour(),
+            }
         else:
             locked.state = AnalysisJob.State.FAILED
         locked.save(
@@ -307,6 +320,8 @@ def execute_analysis_job(
     handler=None,
     lease_seconds=DEFAULT_LEASE_SECONDS,
     max_attempts=DEFAULT_MAX_ATTEMPTS,
+    message_limit=None,
+    time_limit=None,
 ):
     """Claim and run one job, recording success, retry or failure.
 
@@ -328,7 +343,12 @@ def execute_analysis_job(
             from chat_analysis.scheduled_dispatch import freeze_scheduled_input
 
             job = freeze_scheduled_input(job)
-        outcome = handler(job, lease_seconds=lease_seconds)
+        budgets = {}
+        if message_limit is not None:
+            budgets["message_limit"] = message_limit
+        if time_limit is not None:
+            budgets["time_limit"] = time_limit
+        outcome = handler(job, lease_seconds=lease_seconds, **budgets)
     except AnalysisLeaseLost:
         raise
     except Exception as exc:
@@ -1260,8 +1280,18 @@ def _publish_event_batch(space_id, boundary):
             _apply_reduced_groups(job, candidates, groups)
             _clear_reduction_progress(job)
         return True
-    except AnalysisBatchYield:
-        return False
+    except Exception as error:
+        with dispatch_lock():
+            if publication_slot_valid(job):
+                locked = _lock_job(job.pk)
+                locked.checkpoint = {
+                    **locked.checkpoint,
+                    "resume_after": next_analysis_hour(),
+                }
+                locked.save(update_fields=("checkpoint",))
+        if isinstance(error, AnalysisBatchYield):
+            return False
+        raise
     finally:
         release_publication_slot(job)
 
@@ -1392,7 +1422,13 @@ def _enrich_note_with_llm(job, note, messages):
         _persist_enrichment(job, note, messages, summary, events)
 
 
-def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
+def run_rule_based_analysis(
+    job,
+    *,
+    lease_seconds=DEFAULT_LEASE_SECONDS,
+    message_limit=None,
+    time_limit=None,
+):
     """Deterministic extractor: chunked Notes plus message evidence.
 
     It resumes after ``checkpoint["last_ingest_seq"]`` and renews the lease
@@ -1409,8 +1445,10 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
     initial_processed = messages_processed
     chunks_processed = 0
     yielded = False
-    message_limit = max(1, settings.CHAT_ANALYSIS_BATCH_MESSAGES)
-    time_limit = max(1, settings.CHAT_ANALYSIS_BATCH_SECONDS)
+    message_limit = max(
+        1, message_limit or settings.CHAT_ANALYSIS_BATCH_MESSAGES
+    )
+    time_limit = max(1, time_limit or settings.CHAT_ANALYSIS_BATCH_SECONDS)
 
     preferences = (job.specification or {}).get("chat_analysis_preferences")
     cutoff = (job.specification or {}).get("analysis_cutoff")
@@ -1461,18 +1499,43 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             orphaned_at__isnull=True,
         )
         if scheduled_scope:
-            query = query.filter(
-                scheduled_analysis__job=job,
-                scheduled_analysis__completed_at__isnull=True,
-                scheduled_analysis__error="",
+            query = (
+                query.filter(
+                    scheduled_analysis__job=job,
+                    scheduled_analysis__completed_at__isnull=True,
+                    scheduled_analysis__error="",
+                )
+                .annotate(
+                    readable=Exists(readable_text_parts(OuterRef("pk"))),
+                )
+                .filter(readable=True)
             )
         elif assigned_scope:
-            analyzed = NoteEvidence.objects.filter(
-                message_id=OuterRef("pk"),
-                note__analysis_job__conversation_id=job.conversation_id,
-            ).exclude(note__analysis_job=job)
+            analyzed = (
+                NoteEvidence.objects.filter(
+                    message_id=OuterRef("pk"),
+                    note__analysis_job__conversation_id=job.conversation_id,
+                )
+                .exclude(note__analysis_job=job)
+                .exclude(
+                    Q(note__analysis_job__state=AnalysisJob.State.CANCELLED)
+                    & Q(message__scheduled_analysis__completed_at__isnull=True)
+                    & (
+                        Q(
+                            message__scheduled_analysis__job__state=(
+                                AnalysisJob.State.CANCELLED
+                            ),
+                        )
+                        | Q(message__scheduled_analysis__job=job)
+                    )
+                )
+            )
             query = query.annotate(analyzed=Exists(analyzed)).filter(
                 Q(scheduled_analysis__isnull=True)
+                | Q(
+                    scheduled_analysis__job__state=AnalysisJob.State.CANCELLED,
+                    scheduled_analysis__completed_at__isnull=True,
+                )
                 | Q(
                     scheduled_analysis__job=job,
                     scheduled_analysis__completed_at__isnull=True,
@@ -1533,9 +1596,14 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             )
 
         if assigned_scope and not scheduled_scope:
-            with transaction.atomic():
+            with dispatch_lock():
                 locked = _lock_job(job.pk)
                 _ensure_lease(locked, job.lease_owner, job.fencing_token)
+                AnalysisJobMessage.objects.filter(
+                    message_id__in=[row.pk for row in messages],
+                    job__state=AnalysisJob.State.CANCELLED,
+                    completed_at__isnull=True,
+                ).update(job=job, error="")
                 AnalysisJobMessage.objects.bulk_create(
                     [
                         AnalysisJobMessage(job=job, message_id=message.pk)

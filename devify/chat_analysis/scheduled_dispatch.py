@@ -1,11 +1,12 @@
 """Build bounded scheduled jobs from fully ingested messages."""
 
 import uuid
-from datetime import UTC
+from datetime import UTC, datetime
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Exists, F, OuterRef, Q
+from django.db.models import CharField, Exists, F, OuterRef, Q
+from django.db.models.functions import Cast
 from django.utils import timezone
 
 from chat_analysis.models import (
@@ -22,17 +23,52 @@ from chat_analysis.schedule_window import (
 from chat_analysis.services import (
     ChatAnalysisPermissionError,
     create_analysis_job,
+    disallowed_conversation_q,
     ensure_can_contribute,
     get_analysis_preferences,
+    readable_text_parts,
 )
 from chat_analysis.user_dispatch import dispatch_lock
 from chat_domain.models import Conversation, Message, MessageOrigin
 from chat_ingestion.models import UploadBatch
-from spaces.models import Space, SpaceMembership, SpaceTakeover
+from spaces.models import (
+    Space,
+    SpaceMembership,
+    SpaceTakeover,
+    SpaceWorkflowConfig,
+)
 from spaces.services import SpacePermissionService
 
 MAX_MESSAGES_PER_JOB = 1000
 LEGACY_OVERSIZE_ERROR = "Message exceeds the model input budget."
+
+
+def _retryable_partials():
+    readable = (
+        AnalysisJobMessage.objects.filter(
+            job_id=OuterRef("pk"),
+            completed_at__isnull=True,
+            message__orphaned_at__isnull=True,
+            error__in=("", LEGACY_OVERSIZE_ERROR),
+        )
+        .annotate(
+            readable=Exists(readable_text_parts(OuterRef("message_id"))),
+        )
+        .filter(readable=True)
+    )
+    return (
+        AnalysisJob.objects.filter(
+            state=AnalysisJob.State.PARTIAL,
+        )
+        .annotate(retryable=Exists(readable))
+        .filter(retryable=True)
+        .exclude(
+            disallowed_conversation_q(
+                "conversation__kind",
+                "specification__chat_analysis_preferences",
+            ),
+        )
+    )
 
 
 def ensure_due_run(now, schedule=None):
@@ -74,11 +110,7 @@ def dispatch_due_analysis(now=None, schedule=None):
         .distinct()[:limit]
     )
     partial_users = (
-        AnalysisJob.objects.filter(
-            state=AnalysisJob.State.PARTIAL,
-            scheduled_messages__isnull=False,
-            scheduled_messages__completed_at__isnull=True,
-        )
+        _retryable_partials()
         .exclude(created_by_id__in=busy)
         .exclude(
             created_by_id__in=users,
@@ -99,6 +131,22 @@ def dispatch_due_analysis(now=None, schedule=None):
 
 
 def _pending_origins(boundary, user_id=None):
+    excluded = (
+        SpaceWorkflowConfig.objects.filter(
+            space_id=OuterRef("message__conversation__space_id"),
+        )
+        .annotate(
+            chat_kind=Cast(
+                OuterRef("message__conversation__kind"),
+                CharField(),
+            ),
+        )
+        .filter(
+            disallowed_conversation_q(
+                "chat_kind", "chat_analysis_preferences"
+            ),
+        )
+    )
     membership = SpaceMembership.objects.filter(
         space_id=OuterRef("message__conversation__space_id"),
         user_id=OuterRef("upload_item__batch__uploaded_by_id"),
@@ -133,8 +181,10 @@ def _pending_origins(boundary, user_id=None):
             analyzed=Exists(analyzed),
             writable=Exists(membership),
             takeover=Exists(takeover),
+            readable=Exists(readable_text_parts(OuterRef("message_id"))),
+            excluded=Exists(excluded),
         )
-        .filter(analyzed=False)
+        .filter(analyzed=False, readable=True, excluded=False)
         .filter(Q(writable=True) | Q(takeover=True))
     )
     if user_id is not None:
@@ -153,31 +203,29 @@ def schedule_user(user_id, boundary, *, dispatch=True, pending_before=None):
         ).exists():
             return None
         partial = (
-            AnalysisJob.objects.filter(
-                created_by_id=user_id,
-                state=AnalysisJob.State.PARTIAL,
-                scheduled_messages__completed_at__isnull=True,
-                scheduled_messages__error__in=("", LEGACY_OVERSIZE_ERROR),
-            )
+            _retryable_partials()
+            .filter(created_by_id=user_id)
             .order_by("updated_at")
             .first()
         )
-        if partial:
-            return schedule_conversation(
-                partial.conversation_id,
-                boundary,
-                user_id=user_id,
-                dispatch=dispatch,
-            )
         origin = (
             _pending_origins(pending_before or boundary, user_id)
             .select_related(
                 "message__conversation__space",
                 "upload_item__batch__uploaded_by",
             )
-            .order_by("message__conversation_id", "pk")
+            .order_by("created_at", "pk")
             .first()
         )
+        if partial and (
+            origin is None or partial.updated_at <= origin.created_at
+        ):
+            return schedule_conversation(
+                partial.conversation_id,
+                boundary,
+                user_id=user_id,
+                dispatch=dispatch,
+            )
         if origin is None:
             return None
         conversation = origin.message.conversation
@@ -193,6 +241,11 @@ def schedule_user(user_id, boundary, *, dispatch=True, pending_before=None):
                 "scheduled_message_scope": True,
                 "snapshot_pending": True,
                 "boundary": boundary.isoformat(),
+                **(
+                    {"input_boundary": pending_before.isoformat()}
+                    if pending_before is not None
+                    else {}
+                ),
             },
         )
         if dispatch:
@@ -209,10 +262,14 @@ def freeze_scheduled_input(job):
         _ensure_lease(locked, job.lease_owner, job.fencing_token)
         if not locked.specification.get("snapshot_pending"):
             return locked
-        boundary = timezone.now()
+        boundary = (
+            datetime.fromisoformat(locked.specification["input_boundary"])
+            if locked.specification.get("input_boundary")
+            else timezone.now()
+        )
         origin = (
             _pending_origins(boundary, job.created_by_id)
-            .order_by("message__conversation_id", "pk")
+            .order_by("created_at", "pk")
             .first()
         )
         if origin is not None:
@@ -266,9 +323,8 @@ def schedule_conversation(
             ).exists()
         ):
             return None
-        partials = AnalysisJob.objects.filter(
+        partials = _retryable_partials().filter(
             conversation=conversation,
-            state=AnalysisJob.State.PARTIAL,
         )
         if existing_job is not None:
             partials = partials.none()
@@ -276,30 +332,46 @@ def schedule_conversation(
             partials = partials.filter(created_by_id=user_id)
         retryable = []
         for partial in partials:
-            unfinished = partial.scheduled_messages.filter(
-                completed_at__isnull=True
+            unfinished = (
+                partial.scheduled_messages.filter(completed_at__isnull=True)
+                .annotate(
+                    readable=Exists(
+                        readable_text_parts(OuterRef("message_id"))
+                    ),
+                )
+                .filter(readable=True)
             )
             skipped = unfinished.filter(error=LEGACY_OVERSIZE_ERROR)
-            first_skipped_seq = (
-                skipped.order_by("message__ingest_seq")
+            legacy_skip = skipped.exists()
+            if legacy_skip:
+                skipped.update(error="")
+                partial.attempts = 0
+            first_seq = (
+                unfinished.filter(error="")
+                .order_by("message__ingest_seq")
                 .values_list("message__ingest_seq", flat=True)
                 .first()
             )
-            if first_skipped_seq is not None:
-                # Completed assignments stay excluded when the cursor rewinds.
-                checkpoint = dict(partial.checkpoint or {})
-                checkpoint["last_ingest_seq"] = min(
-                    checkpoint.get("last_ingest_seq", partial.start_seq),
-                    first_skipped_seq - 1,
-                )
-                checkpoint["partial"] = False
-                partial.checkpoint = checkpoint
-                partial.attempts = 0
+            if first_seq is not None:
+                # Rewind gaps without replaying completed assignments.
+                partial.checkpoint = {
+                    **partial.checkpoint,
+                    "partial": False,
+                    "last_ingest_seq": min(
+                        partial.checkpoint.get(
+                            "last_ingest_seq",
+                            partial.start_seq,
+                        ),
+                        first_seq - 1,
+                    ),
+                }
                 partial.save(
-                    update_fields=("checkpoint", "attempts", "updated_at")
+                    update_fields=(
+                        "checkpoint",
+                        "attempts",
+                        "updated_at",
+                    )
                 )
-                skipped.update(error="")
-            if unfinished.filter(error="").exists():
                 retryable.append(partial)
         if retryable:
             for partial in retryable[:1]:
@@ -349,8 +421,9 @@ def schedule_conversation(
             .annotate(
                 eligible=Exists(eligible_origins),
                 already_analyzed=Exists(analyzed_evidence),
+                readable=Exists(readable_text_parts(OuterRef("pk"))),
             )
-            .filter(eligible=True, already_analyzed=False)
+            .filter(eligible=True, already_analyzed=False, readable=True)
             .order_by("ingest_seq", "pk")[
                 : min(
                     MAX_MESSAGES_PER_JOB,

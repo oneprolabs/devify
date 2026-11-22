@@ -1,7 +1,7 @@
 """Exercise user exclusion, bounded continuation and recovery on MariaDB."""
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
+from datetime import datetime, timedelta
 from threading import Barrier
 from unittest.mock import patch
 
@@ -119,12 +119,25 @@ def test_yield_preserves_progress_and_gives_another_user_a_turn(
         assert backlog.attempts == 0
         send.assert_called_once_with(other.pk)
         execute_analysis_job_task.run(other.pk, worker_id="other-user")
-        assert send.call_args.args == (backlog.pk,)
-        execute_analysis_job_task.run(backlog.pk, worker_id="second-turn")
+        send.assert_called_once_with(other.pk)
+        assert execute_analysis_job_task.run(backlog.pk)["claimed"] is False
+        with patch(
+            "django.utils.timezone.now",
+            return_value=datetime.fromisoformat(
+                backlog.checkpoint["resume_after"],
+            ),
+        ):
+            execute_analysis_job_task.run(backlog.pk, worker_id="second-turn")
         backlog.refresh_from_db()
         assert backlog.checkpoint["last_ingest_seq"] == 4
         assert backlog.attempts == 0
-        execute_analysis_job_task.run(backlog.pk, worker_id="last-turn")
+        with patch(
+            "django.utils.timezone.now",
+            return_value=datetime.fromisoformat(
+                backlog.checkpoint["resume_after"],
+            ),
+        ):
+            execute_analysis_job_task.run(backlog.pk, worker_id="last-turn")
     backlog.refresh_from_db()
     assert backlog.state == AnalysisJob.State.READY
     assert backlog.attempts == 1
@@ -218,7 +231,14 @@ def test_large_backlog_resumes_without_duplicate_assignments(settings):
     job.end_seq = 1201
     job.save(update_fields=("end_seq",))
     for turn in range(5):
-        result = execute_analysis_job(job.pk, worker_id=f"large-{turn}")
+        job.refresh_from_db()
+        now = (
+            datetime.fromisoformat(job.checkpoint["resume_after"])
+            if turn
+            else timezone.now()
+        )
+        with patch("django.utils.timezone.now", return_value=now):
+            result = execute_analysis_job(job.pk, worker_id=f"large-{turn}")
         if turn < 4:
             assert result.job.state == AnalysisJob.State.QUEUED
             assert result.job.attempts == 0
@@ -244,7 +264,7 @@ def test_manual_retry_waits_behind_the_same_user(settings):
     claimed = claim_analysis_job(other.pk, worker_id="other-group")
     retry_analysis_job(actor=job.created_by, job=job)
     with patch("chat_analysis.tasks.execute_analysis_job_task.delay") as send:
-        assert dispatch_pending_analysis(retry_job_id=job.pk) == 0
+        assert dispatch_pending_analysis() == 0
         complete_analysis_job(
             claimed,
             worker_id=claimed.lease_owner,
@@ -348,7 +368,13 @@ def test_reduction_yield_resumes_saved_progress_without_failure_attempts(
     assert first.job.state == AnalysisJob.State.QUEUED
     assert first.job.attempts == 0
     assert first.job.checkpoint["last_ingest_seq"] == 2
-    second = execute_analysis_job(job.pk, worker_id="reduce-resume")
+    with patch(
+        "django.utils.timezone.now",
+        return_value=datetime.fromisoformat(
+            first.job.checkpoint["resume_after"],
+        ),
+    ):
+        second = execute_analysis_job(job.pk, worker_id="reduce-resume")
     assert second.job.state == AnalysisJob.State.READY
     assert second.job.attempts == 1
     assert "event_reduction" not in second.job.checkpoint
@@ -516,10 +542,14 @@ def test_queue_wait_includes_latest_input_and_running_batch_stays_frozen(
         assert first.scheduled_messages.filter(message=queued_upload).exists()
         assert not hasattr(during_execution[0], "scheduled_analysis")
 
-        # A continuation freezes fresh input without another hourly wait.
-        second_id = send.call_args.args[0]
-        assert second_id != first_id
-        execute_analysis_job_task.run(second_id, worker_id="round-second")
+        # A batch completed during execution waits for the next hourly round.
+        send.assert_called_once_with(first_id)
+        next_hour = boundary + timedelta(hours=1)
+        with patch("django.utils.timezone.now", return_value=next_hour):
+            dispatch_due_analysis(next_hour, next_hour.strftime("%H:%M"))
+            second_id = send.call_args.args[0]
+            assert second_id != first_id
+            execute_analysis_job_task.run(second_id, worker_id="round-second")
         second = AnalysisJob.objects.get(pk=second_id)
         assert second.state == AnalysisJob.State.READY
         assert second.end_seq == 3

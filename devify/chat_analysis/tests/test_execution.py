@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
@@ -256,12 +257,18 @@ def test_retryable_failure_requeues_until_max_attempts():
     assert "RuntimeError" in first.job.error
     assert first.job.lease_owner == ""
 
-    second = execute_analysis_job(
-        job.pk,
-        worker_id="worker-1",
-        handler=boom,
-        max_attempts=2,
-    )
+    with patch(
+        "django.utils.timezone.now",
+        return_value=datetime.fromisoformat(
+            first.job.checkpoint["resume_after"],
+        ),
+    ):
+        second = execute_analysis_job(
+            job.pk,
+            worker_id="worker-1",
+            handler=boom,
+            max_attempts=2,
+        )
     assert second.job.state == AnalysisJob.State.FAILED
     assert second.job.attempts == 2
     assert execute_analysis_job(job.pk, worker_id="worker-1") is None

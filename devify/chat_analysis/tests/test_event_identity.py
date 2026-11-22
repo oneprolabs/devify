@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import StringIO
 from unittest.mock import patch
 
@@ -376,7 +376,11 @@ def test_scheduled_reduction_reuses_candidates_after_failure(
     assert EventSuggestion.objects.filter(analysis_job=job).count() == 2
     assert not Event.objects.filter(space=space).exists()
 
-    result = execution.execute_analysis_job(job.pk, worker_id="reduce-retry")
+    with patch(
+        "django.utils.timezone.now",
+        return_value=datetime.fromisoformat(result.job.checkpoint["resume_after"]),
+    ):
+        result = execution.execute_analysis_job(job.pk, worker_id="reduce-retry")
     assert result.job.state == AnalysisJob.State.READY
     assert mapped == [1, 2]
     assert reducer_attempts == [2, 2]

@@ -14,7 +14,7 @@ from chat_analysis.task_status import (
     recover_stale_queued_analysis_jobs,
     sweep_stale_tasks,
 )
-from chat_analysis.tasks import sweep_stale_async_tasks
+from chat_analysis.tasks import run_due_scheduled_analysis_task
 from chat_domain.models import Conversation
 from spaces.models import Space, SpaceMembership
 
@@ -167,7 +167,7 @@ def test_live_lease_is_left_alone():
     }
 
 
-def test_sweep_task_redispatches_recovered_jobs(
+def test_hourly_task_redispatches_recovered_jobs(
     django_capture_on_commit_callbacks,
 ):
     owner = User.objects.create_user(username="task-status-sweep")
@@ -184,10 +184,12 @@ def test_sweep_task_redispatches_recovered_jobs(
         "chat_analysis.tasks.execute_analysis_job_task.delay"
     ) as dispatch:
         with django_capture_on_commit_callbacks(execute=True):
-            result = sweep_stale_async_tasks.run()
+            result = run_due_scheduled_analysis_task.run()
 
     dispatch.assert_called_once_with(job.pk)
-    assert result["jobs_requeued"] == 1
+    assert "slot" in result
+    job.refresh_from_db()
+    assert job.state == AnalysisJob.State.QUEUED
     assert "requeued_job_ids" not in result
 
 
@@ -203,10 +205,12 @@ def test_stale_queued_job_is_redispatched(django_capture_on_commit_callbacks):
         "chat_analysis.tasks.execute_analysis_job_task.delay"
     ) as dispatch:
         with django_capture_on_commit_callbacks(execute=True):
-            result = sweep_stale_async_tasks.run()
+            result = run_due_scheduled_analysis_task.run()
 
     dispatch.assert_called_once_with(job.pk)
-    assert result["jobs_requeued"] == 1
+    assert "slot" in result
+    job.refresh_from_db()
+    assert job.state == AnalysisJob.State.QUEUED
 
 
 def test_freshly_queued_job_is_left_for_the_scheduler():

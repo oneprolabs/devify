@@ -18,6 +18,7 @@ from chat_analysis.services import (
     retry_analysis_job,
 )
 from chat_analysis.tasks import dispatch_analysis_job
+from chat_analysis.user_dispatch import lock_dispatch_row
 from chat_domain.models import Conversation
 from spaces.models import Space, SpaceTakeover
 from spaces.services import SpacePermissionService, audit_space_action
@@ -169,6 +170,7 @@ class AnalysisJobCancelAPIView(APIView):
 
     @transaction.atomic
     def post(self, request, job_id):
+        lock_dispatch_row()
         job = get_object_or_404(
             AnalysisJob.objects.select_for_update().select_related("space"),
             pk=job_id,
@@ -201,6 +203,7 @@ class AnalysisJobRetryAPIView(APIView):
     @transaction.atomic
     def post(self, request, job_id):
         """Retry a failed or partial job without changing its input window."""
+        lock_dispatch_row()
         job = get_object_or_404(
             AnalysisJob.objects.select_for_update().select_related("space"),
             pk=job_id,

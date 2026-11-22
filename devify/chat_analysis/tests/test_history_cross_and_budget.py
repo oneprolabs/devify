@@ -1,7 +1,7 @@
 """History batching, cross-conversation merge, and token windows."""
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from runpy import run_path
 from unittest.mock import patch
 
@@ -318,7 +318,11 @@ def test_oversize_message_resumes_with_original_evidence(
     assert not job.scheduled_messages.filter(
         message=first, completed_at__isnull=False
     ).exists()
-    result = execution.execute_analysis_job(job.pk, worker_id="retry")
+    with patch(
+        "django.utils.timezone.now",
+        return_value=datetime.fromisoformat(result.job.checkpoint["resume_after"]),
+    ):
+        result = execution.execute_analysis_job(job.pk, worker_id="retry")
     assert result.job.state == AnalysisJob.State.READY
     assert "".join(text for seq, text in seen if seq == 1) == body
     assert [text for seq, text in seen if seq == 2] == (

@@ -32,6 +32,7 @@ class ChatSummary(models.Model):
     period_start = models.DateTimeField()
     period_end = models.DateTimeField()
     language = models.CharField(max_length=30, default="中文")
+    prompt_snapshot = models.JSONField(default=dict, blank=True)
     input_messages = models.JSONField(default=list)
     sessions = models.JSONField(default=list)
     message_count = models.PositiveIntegerField()

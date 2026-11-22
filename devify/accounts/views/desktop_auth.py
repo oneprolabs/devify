@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import logging
 import os
 import secrets
 from datetime import timedelta
@@ -15,6 +16,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import DesktopAuthorizationCode, DesktopDevice
 from accounts.utils import default_device_label
+from chat_analysis.summaries.configuration import prompt_metadata
+
+logger = logging.getLogger(__name__)
 
 CLIENT_ID = os.getenv("DESKTOP_OAUTH_CLIENT_ID", "desktop-client")
 REDIRECT_URI = os.getenv(
@@ -275,7 +279,15 @@ class DesktopDeviceListAPIView(APIView):
                     "last_seen_at",
                 )
             )
-        return Response({"data": self._payload(device)}, status=201)
+        payload = self._payload(device)
+        if request.data.get("summary_config_schema") == 1:
+            # Opt-in hints only; prompt/config failures cannot break device
+            # registration or heartbeat. Never send templates or credentials.
+            try:
+                payload["chat_summary_config"] = prompt_metadata()
+            except Exception:
+                logger.exception("Unable to attach summary config metadata")
+        return Response({"data": payload}, status=201)
 
 
 class DesktopDeviceRevokeAPIView(APIView):

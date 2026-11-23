@@ -341,6 +341,19 @@ def _missing_handoffs(cited, confirmations, texts, updates):
     return handoffs
 
 
+def legacy_identity_origins(user_id):
+    """Find the viewer's outgoing identities from verified old imports."""
+    return MessageOrigin.objects.filter(
+        message__direction=Message.Direction.OUTGOING,
+        message__orphaned_at__isnull=True,
+        upload_item__batch__uploaded_by_id=user_id,
+        upload_item__batch__space_id=F("message__conversation__space_id"),
+        upload_item__batch__status=UploadBatch.Status.COMPLETED,
+        upload_item__batch__source_type=F("message__conversation__platform"),
+        upload_item__batch__source_account_id=F("message__sender_key"),
+    ).exclude(message__sender_key="")
+
+
 def event_relevance(events, user_id):
     """Return labels and original evidence IDs for one page of Events."""
     event_ids = [event.pk for event in events]
@@ -380,21 +393,8 @@ def event_relevance(events, user_id):
         # Old exports can establish the same identity via their completed
         # batch's source account and an exact outgoing sender key.
         identities.update(
-            MessageOrigin.objects.filter(
-                message__conversation_id__in=missing,
-                message__direction=Message.Direction.OUTGOING,
-                message__orphaned_at__isnull=True,
-                upload_item__batch__uploaded_by_id=user_id,
-                upload_item__batch__space_id=F(
-                    "message__conversation__space_id"
-                ),
-                upload_item__batch__status=UploadBatch.Status.COMPLETED,
-                upload_item__batch__source_type=F(
-                    "message__conversation__platform"
-                ),
-                upload_item__batch__source_account_id=F("message__sender_key"),
-            )
-            .exclude(message__sender_key="")
+            legacy_identity_origins(user_id)
+            .filter(message__conversation_id__in=missing)
             .order_by()
             .values_list(
                 "message__conversation_id",

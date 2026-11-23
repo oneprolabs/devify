@@ -33,6 +33,11 @@ from chat_analysis.api_serializers import (
     TopicSubscriptionSerializer,
 )
 from chat_analysis.event_relevance import event_relevance
+from chat_analysis.event_relevance_queries import (
+    RELEVANCE_LABELS,
+    relevance_counts,
+    with_viewer_relevance,
+)
 from chat_analysis.models import (
     Event,
     EventNote,
@@ -374,9 +379,27 @@ class SpaceEventListCreateAPIView(APIView):
                     conversation_id
                 )
             ).distinct()
+        relevance = request.query_params.get("viewer_relevance", "").strip()
+        if relevance and relevance not in RELEVANCE_LABELS:
+            return Response(
+                {"detail": "Invalid viewer_relevance."}, status=400
+            )
+        counts = None
+        if relevance or request.query_params.get(
+            "include_relevance_counts"
+        ) == "true":
+            events = with_viewer_relevance(events, request.user.pk)
+            counts = relevance_counts(events)
+            if relevance:
+                events = events.filter(viewer_relevance=relevance)
         paginator = AnalysisPagination()
         page = paginator.paginate_queryset(events, request, view=self)
-        data = _event_data(page, request.user.pk)
+        payload = {
+            "list": _event_data(page, request.user.pk),
+            "pagination": _pagination_data(paginator),
+        }
+        if counts is not None:
+            payload["relevance_counts"] = counts
         if takeover:
             audit_space_action(
                 actor=request.user,
@@ -385,14 +408,7 @@ class SpaceEventListCreateAPIView(APIView):
                 resource_type="event",
                 metadata={"takeover_id": takeover.pk},
             )
-        return Response(
-            {
-                "data": {
-                    "list": data,
-                    "pagination": _pagination_data(paginator),
-                }
-            }
-        )
+        return Response({"data": payload})
 
     @transaction.atomic
     def post(self, request, space_id):

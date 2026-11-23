@@ -1,5 +1,6 @@
 """Recover viewer identities from already completed imports."""
 
+from uuid import UUID
 from zipfile import BadZipFile
 
 from django.core.management.base import BaseCommand
@@ -47,7 +48,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--apply", action="store_true")
-        parser.add_argument("--space-id", type=int)
+        parser.add_argument("--space-id", type=UUID)
         parser.add_argument("--conversation-id", type=int)
 
     def handle(self, *, apply, space_id, conversation_id, **options):

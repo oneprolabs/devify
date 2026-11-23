@@ -2,6 +2,7 @@ import pytest
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db import connection
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -12,7 +13,9 @@ from chat_analysis.models import (
     Event,
     EventEvidence,
     EventParticipantEvidence,
+    EventSuggestion,
 )
+from chat_analysis.services import create_note
 from chat_analysis.tests.test_event_extraction import (
     add_message,
     make_conversation,
@@ -213,9 +216,58 @@ def test_viewer_labels_follow_individual_evidence_and_completion(
 
     client = APIClient()
     client.force_authenticate(user=alice)
-    response = client.get(f"/api/v1/spaces/{space.pk}/events")
+    path = f"/api/v1/spaces/{space.pk}/events"
+    response = client.get(path)
     assert response.status_code == 200
     assert response.data["data"]["list"][0]["viewer_relevance"] == "related"
+    assert "relevance_counts" not in response.data["data"]
+
+    unrelated = Event.objects.create(
+        space=space,
+        created_by=owner,
+        event_key="other",
+        title="Different matter",
+        content="Not referenced",
+        status=Event.Status.OPEN,
+        last_activity_at=timezone.now(),
+    )
+    expected_counts = {"my_todo": 0, "related": 1, "other": 1}
+    response = client.get(path, {
+        "page_size": 1, "include_relevance_counts": "true",
+    })
+    assert response.status_code == 200
+    assert response.data["data"]["pagination"]["total"] == 2
+    assert response.data["data"]["list"][0]["id"] == unrelated.pk
+    assert response.data["data"]["relevance_counts"] == expected_counts
+
+    response = client.get(path, {
+        "page_size": 1, "viewer_relevance": "related",
+    })
+    assert response.status_code == 200
+    assert response.data["data"]["pagination"]["total"] == 1
+    assert response.data["data"]["list"][0]["id"] == event.pk
+    assert response.data["data"]["relevance_counts"] == expected_counts
+    invalid = client.get(path, {"viewer_relevance": "invalid"})
+    assert invalid.status_code == 400
+
+    client.force_authenticate(user=bob)
+    response = client.get(path, {
+        "viewer_relevance": "my_todo", "status": "in_progress",
+    })
+    assert response.status_code == 200
+    assert response.data["data"]["pagination"]["total"] == 1
+    assert response.data["data"]["list"][0]["id"] == event.pk
+    assert response.data["data"]["relevance_counts"] == {
+        "my_todo": 1, "related": 0, "other": 0,
+    }
+
+    response = client.get(path, {
+        "conversation_id": chat.pk, "include_relevance_counts": "true",
+    })
+    assert response.status_code == 200
+    assert response.data["data"]["relevance_counts"] == {
+        "my_todo": 1, "related": 0, "other": 0,
+    }
 
     duplicate = named_message(
         chat, 6, "I sent the quote. Bob still needs to confirm.", "Alice",
@@ -344,6 +396,25 @@ def test_legacy_open_event_keeps_status_without_inventing_an_assignee():
     assert data["viewer_evidence_message_ids"] == [message.pk]
     assert not ConversationIdentity.objects.filter(user=owner).exists()
 
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    path = f"/api/v1/spaces/{space.pk}/events"
+    response = client.get(path, {"viewer_relevance": "related"})
+    assert response.status_code == 200
+    assert response.data["data"]["pagination"]["total"] == 1
+    assert response.data["data"]["list"][0]["id"] == event.pk
+
+    ConversationIdentity.objects.create(
+        conversation=chat, user=owner, sender_key=message.sender_key.upper(),
+    )
+    assert read_event(owner, event)["viewer_relevance"] == "other"
+    response = client.get(path, {"viewer_relevance": "related"})
+    assert response.status_code == 200
+    assert response.data["data"]["pagination"]["total"] == 0
+    assert response.data["data"]["relevance_counts"] == {
+        "my_todo": 0, "related": 0, "other": 1,
+    }
+
 
 def test_completed_backups_restore_only_their_uploader_identity(
     settings, tmp_path,
@@ -393,7 +464,9 @@ def test_completed_backups_restore_only_their_uploader_identity(
     call_command("backfill_chat_identities", conversation_id=conversation.pk)
     assert not ConversationIdentity.objects.filter(conversation=conversation)
     for _ in range(2):
-        call_command("backfill_chat_identities", apply=True)
+        call_command(
+            "backfill_chat_identities", "--space-id", str(space.pk), "--apply"
+        )
     assert list(ConversationIdentity.objects.values_list(
         "conversation_id", "user_id", "sender_key",
     )) == [(conversation.pk, owner.pk, "wx-self")]
@@ -524,3 +597,60 @@ def test_direct_address_requires_two_distinct_participants(
         ).count()
         == 1
     )
+
+
+
+def test_database_cascades_allow_deletes_by_pre_relevance_workers():
+    if connection.vendor != "mysql":
+        pytest.skip("Production image rollback uses MariaDB foreign keys.")
+
+    owner = User.objects.create_user(username="legacy-delete-owner")
+    space = make_space(owner, "legacy-delete")
+    chat = make_conversation(space, "sales", "Sales")
+    job = make_job(space, owner, chat, 2)
+    note = create_note(
+        actor=owner, space=space, note_key="legacy-delete",
+        title="Quote", content="Reply to the quote",
+    )
+    proposal = EventSuggestion.objects.create(
+        space=space,
+        analysis_job=job,
+        note=note,
+        event_key="legacy-delete",
+        title="Quote",
+        summary="Reply to the quote",
+        created_by=owner,
+    )
+    messages = [
+        Message.objects.create(
+            conversation=chat, message_key=f"m-{seq}", ingest_seq=seq,
+        )
+        for seq in (1, 2)
+    ]
+    for message in messages:
+        EventParticipantEvidence.objects.create(
+            suggestion=proposal, message=message, sender_key="owner",
+            state="related",
+        )
+
+    # An old Django worker knows neither of the new dependent tables.
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "DELETE FROM chat_domain_message WHERE id = %s", [messages[0].pk],
+        )
+        assert cursor.rowcount == 1
+        cursor.execute(
+            "SELECT COUNT(*) FROM chat_analysis_eventparticipantevidence "
+            "WHERE message_id = %s", [messages[0].pk],
+        )
+        assert cursor.fetchone()[0] == 0
+        cursor.execute(
+            "DELETE FROM chat_analysis_eventsuggestion WHERE id = %s",
+            [proposal.pk],
+        )
+        assert cursor.rowcount == 1
+        cursor.execute(
+            "SELECT COUNT(*) FROM chat_analysis_eventparticipantevidence "
+            "WHERE suggestion_id = %s", [proposal.pk],
+        )
+        assert cursor.fetchone()[0] == 0

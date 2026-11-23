@@ -65,9 +65,13 @@ class MessageExceedsBudget(ValueError):
     """The request cannot fit the model input budget."""
 
 
+class RequestOverheadExceedsBudget(MessageExceedsBudget):
+    """The request exceeds the budget before any messages are added."""
+
+
 def take_message_window(messages, count_request, input_budget):
     if input_budget <= 0 or count_request([]) > input_budget:
-        raise MessageExceedsBudget(
+        raise RequestOverheadExceedsBudget(
             "The request overhead exceeds the input budget."
         )
     window = []

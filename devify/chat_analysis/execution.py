@@ -56,6 +56,7 @@ from chat_analysis.suggestions import (
 )
 from chat_analysis.token_budget import (
     MessageExceedsBudget,
+    RequestOverheadExceedsBudget,
     request_budget,
     take_message_window,
 )
@@ -1706,6 +1707,8 @@ def run_rule_based_analysis(
             if offset is None:
                 try:
                     messages = _messages_for_model(job, messages)
+                except RequestOverheadExceedsBudget:
+                    raise
                 except MessageExceedsBudget:
                     offset = 0
             if offset is not None:

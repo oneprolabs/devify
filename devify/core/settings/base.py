@@ -76,6 +76,18 @@ CHAT_ANALYSIS_AUTO_CREATE_EVENTS = os.getenv(
 ).lower() in {"1", "true", "yes"}
 
 CHAT_ANALYSIS_SCHEDULE = os.getenv("CHAT_ANALYSIS_SCHEDULE", DEFAULT_SCHEDULE)
+CHAT_ANALYSIS_MAX_CONCURRENT_USERS = int(
+    os.getenv("CHAT_ANALYSIS_MAX_CONCURRENT_USERS", "1")
+)
+CHAT_ANALYSIS_BATCH_MESSAGES = int(
+    os.getenv("CHAT_ANALYSIS_BATCH_MESSAGES", "1000")
+)
+CHAT_ANALYSIS_BATCH_SECONDS = int(
+    os.getenv("CHAT_ANALYSIS_BATCH_SECONDS", "120")
+)
+CHAT_ANALYSIS_DISPATCH_LIMIT = int(
+    os.getenv("CHAT_ANALYSIS_DISPATCH_LIMIT", "20")
+)
 
 # A queued question or report with no worker result after this many seconds is
 # moved to a terminal state by the stale-task sweep.

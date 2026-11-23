@@ -208,6 +208,67 @@ def test_reduction_links_candidates_across_batches(monkeypatch):
     ) == [[0], [1, 8], [2], [3], [4], [5], [6], [7]]
 
 
+def test_reduction_resumes_every_batch_without_repeating_model_calls(
+    monkeypatch,
+):
+    from chat_analysis import event_reducer
+
+    suggestions = list(range(25))
+    payloads = [
+        {
+            "title": f"Case {index % 10}",
+            "summary": "Update",
+            "entity": "case",
+            "evidence": [{"text": f"Message {index}"}],
+        }
+        for index in suggestions
+    ]
+    monkeypatch.setattr(
+        event_reducer,
+        "_candidate_payloads",
+        lambda *args: payloads,
+    )
+    calls = []
+
+    def decide(**request):
+        calls.append(request["content"])
+        return {"groups": []}
+
+    expected = event_reducer.prepare_event_reduction(
+        None,
+        suggestions,
+        call_json=decide,
+    )
+    expected_calls = calls[:]
+    calls.clear()
+    saved = None
+
+    class YieldBatch(Exception):
+        pass
+
+    def checkpoint(progress):
+        nonlocal saved
+        saved = progress
+        raise YieldBatch()
+
+    for _turn in range(30):
+        try:
+            result = event_reducer.prepare_event_reduction(
+                None,
+                suggestions,
+                call_json=decide,
+                progress=saved,
+                save_progress=checkpoint,
+            )
+            break
+        except YieldBatch:
+            continue
+    else:
+        pytest.fail("Reduction did not finish its bounded continuations.")
+    assert result == expected
+    assert calls == expected_calls
+
+
 def test_compact_reduction_preserves_stable_ids_for_group_excerpts(
     monkeypatch,
 ):

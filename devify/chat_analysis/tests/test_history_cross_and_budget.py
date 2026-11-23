@@ -1,7 +1,7 @@
 """History batching, cross-conversation merge, and token windows."""
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from runpy import run_path
 from unittest.mock import patch
 
@@ -229,7 +229,8 @@ def test_model_failure_keeps_the_assigned_message_unfinished(
         raise RuntimeError("model timeout")
 
     monkeypatch.setattr(
-        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+        "chat_analysis.execution._prepare_chunk",
+        lambda *_args, **_kwargs: (None, None),
     )
     monkeypatch.setattr("chat_analysis.execution._write_chunk_note", fail)
     result = execution.execute_analysis_job(job.pk, worker_id="history-fail")
@@ -318,7 +319,13 @@ def test_oversize_message_resumes_with_original_evidence(
     assert not job.scheduled_messages.filter(
         message=first, completed_at__isnull=False
     ).exists()
-    result = execution.execute_analysis_job(job.pk, worker_id="retry")
+    with patch(
+        "django.utils.timezone.now",
+        return_value=datetime.fromisoformat(
+            result.job.checkpoint["resume_after"],
+        ),
+    ):
+        result = execution.execute_analysis_job(job.pk, worker_id="retry")
     assert result.job.state == AnalysisJob.State.READY
     assert "".join(text for seq, text in seen if seq == 1) == body
     assert [text for seq, text in seen if seq == 2] == (
@@ -477,7 +484,8 @@ def test_token_budget_splits_long_text_and_keeps_a_reply_with_its_parent(
 
     seen = []
     monkeypatch.setattr(
-        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+        "chat_analysis.execution._prepare_chunk",
+        lambda *_args, **_kwargs: (None, None),
     )
     monkeypatch.setattr(
         "chat_analysis.execution._write_chunk_note",

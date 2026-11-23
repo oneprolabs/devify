@@ -17,10 +17,11 @@ from copy import copy
 from dataclasses import dataclass
 from datetime import timedelta
 from hashlib import sha256
+from time import monotonic
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
 from chat_analysis.event_metadata import participant_metadata
@@ -42,6 +43,7 @@ from chat_analysis.services import (
     ChatAnalysisPermissionError,
     add_note_evidence,
     create_note,
+    readable_text_parts,
     refresh_event_window,
 )
 from chat_analysis.suggestions import (
@@ -52,6 +54,16 @@ from chat_analysis.token_budget import (
     MessageExceedsBudget,
     request_budget,
     take_message_window,
+)
+from chat_analysis.user_dispatch import (
+    claim_publication_slot,
+    dispatch_lock,
+    next_analysis_hour,
+    publication_slot_valid,
+    release_publication_slot,
+    renew_publication_slot,
+    reserve_user_slot,
+    resume_is_due,
 )
 from chat_domain.models import Message, MessagePart
 from core.tracking import LLMTracker
@@ -81,6 +93,10 @@ class AnalysisLeaseLost(Exception):
     """Raised when a worker no longer holds the job lease."""
 
 
+class AnalysisBatchYield(Exception):
+    """Stop after saving a bounded portion of event reduction."""
+
+
 @dataclass(frozen=True)
 class ExecutionResult:
     job: AnalysisJob
@@ -96,10 +112,37 @@ def _ensure_lease(job, worker_id, fencing_token):
         job.state != AnalysisJob.State.RUNNING
         or job.lease_owner != worker_id
         or job.fencing_token != fencing_token
+        or job.lease_until is None
+        or job.lease_until <= timezone.now()
     ):
         raise AnalysisLeaseLost(
             "The analysis job lease is no longer held by this worker."
         )
+
+
+def recover_expired_analysis_job(job, *, now, max_attempts):
+    """Release expired ownership, unless another worker has renewed it."""
+    retry = job.attempts < max_attempts
+    state = AnalysisJob.State.QUEUED if retry else AnalysisJob.State.FAILED
+    error = (
+        "lease_expired: requeued after worker timeout."
+        if retry
+        else "lease_expired: max attempts reached "
+        f"({job.attempts}/{max_attempts})."
+    )
+    updated = AnalysisJob.objects.filter(
+        Q(lease_until__lte=now) | Q(lease_until__isnull=True),
+        pk=job.pk,
+        state=AnalysisJob.State.RUNNING,
+        fencing_token=job.fencing_token,
+    ).update(
+        state=state,
+        error=error,
+        lease_owner="",
+        lease_until=None,
+        updated_at=now,
+    )
+    return state if updated else None
 
 
 def claim_analysis_job(
@@ -107,6 +150,7 @@ def claim_analysis_job(
     *,
     worker_id,
     lease_seconds=DEFAULT_LEASE_SECONDS,
+    max_attempts=DEFAULT_MAX_ATTEMPTS,
 ):
     """Claim a queued job or an expired running job.
 
@@ -116,15 +160,26 @@ def claim_analysis_job(
     """
     if not worker_id:
         raise ValueError("worker_id is required.")
-    now = timezone.now()
-    with transaction.atomic():
+    with dispatch_lock():
         job = _lock_job(job_id)
         if job is None:
             return None
+        now = timezone.now()
         if job.state == AnalysisJob.State.RUNNING:
             if job.lease_until and job.lease_until > now:
                 return None
+            recovered = recover_expired_analysis_job(
+                job,
+                now=now,
+                max_attempts=max_attempts,
+            )
+            if recovered != AnalysisJob.State.QUEUED:
+                return None
         elif job.state != AnalysisJob.State.QUEUED:
+            return None
+        if not resume_is_due(job):
+            return None
+        if reserve_user_slot(job) is None:
             return None
         job.state = AnalysisJob.State.RUNNING
         job.lease_owner = worker_id
@@ -133,9 +188,12 @@ def claim_analysis_job(
         job.attempts = job.attempts + 1
         job.engine_version = ENGINE_VERSION
         job.error = ""
+        job.checkpoint = dict(job.checkpoint)
+        job.checkpoint.pop("resume_after", None)
         job.save(
             update_fields=(
                 "state",
+                "checkpoint",
                 "lease_owner",
                 "lease_until",
                 "fencing_token",
@@ -221,6 +279,32 @@ def complete_analysis_job(
         return locked
 
 
+def yield_analysis_job(job, outcome):
+    """Continue from committed progress without charging a failed attempt."""
+    with transaction.atomic():
+        locked = _lock_job(job.pk)
+        _ensure_lease(locked, job.lease_owner, job.fencing_token)
+        locked.state = AnalysisJob.State.QUEUED
+        locked.checkpoint = outcome["checkpoint"]
+        locked.checkpoint["resume_after"] = next_analysis_hour()
+        locked.result_ref = outcome["result_ref"]
+        locked.lease_owner = ""
+        locked.lease_until = None
+        locked.attempts = max(0, locked.attempts - 1)
+        locked.save(
+            update_fields=(
+                "state",
+                "checkpoint",
+                "result_ref",
+                "lease_owner",
+                "lease_until",
+                "attempts",
+                "updated_at",
+            )
+        )
+        return locked
+
+
 def fail_analysis_job(
     job,
     *,
@@ -242,6 +326,10 @@ def fail_analysis_job(
         locked.lease_until = None
         if retryable and locked.attempts < max_attempts:
             locked.state = AnalysisJob.State.QUEUED
+            locked.checkpoint = {
+                **locked.checkpoint,
+                "resume_after": next_analysis_hour(),
+            }
         else:
             locked.state = AnalysisJob.State.FAILED
         locked.save(
@@ -264,6 +352,9 @@ def execute_analysis_job(
     handler=None,
     lease_seconds=DEFAULT_LEASE_SECONDS,
     max_attempts=DEFAULT_MAX_ATTEMPTS,
+    message_limit=None,
+    time_limit=None,
+    input_boundary=None,
 ):
     """Claim and run one job, recording success, retry or failure.
 
@@ -276,12 +367,22 @@ def execute_analysis_job(
         job_id,
         worker_id=worker_id,
         lease_seconds=lease_seconds,
+        max_attempts=max_attempts,
     )
     if job is None:
         return None
     handler = handler or run_rule_based_analysis
     try:
-        outcome = handler(job, lease_seconds=lease_seconds)
+        if job.specification.get("snapshot_pending"):
+            from chat_analysis.scheduled_dispatch import freeze_scheduled_input
+
+            job = freeze_scheduled_input(job, input_boundary=input_boundary)
+        budgets = {}
+        if message_limit is not None:
+            budgets["message_limit"] = message_limit
+        if time_limit is not None:
+            budgets["time_limit"] = time_limit
+        outcome = handler(job, lease_seconds=lease_seconds, **budgets)
     except AnalysisLeaseLost:
         raise
     except Exception as exc:
@@ -304,6 +405,10 @@ def execute_analysis_job(
         return ExecutionResult(job=failed, handler_result={"error": str(exc)})
     if not isinstance(outcome, dict):
         outcome = {}
+    if outcome.get("yielded"):
+        return ExecutionResult(
+            job=yield_analysis_job(job, outcome), handler_result=outcome,
+        )
     completed = complete_analysis_job(
         job,
         worker_id=worker_id,
@@ -673,7 +778,10 @@ def _cited_messages(event, by_seq):
             role = str(item.get("role") or "matter").strip().lower()
             roles.append(role or "matter")
         return source_messages, roles
-    for value in event.get("source_seqs") or []:
+    source_seqs = event.get("source_seqs")
+    if not isinstance(source_seqs, (list, tuple)):
+        return source_messages, roles
+    for value in source_seqs:
         try:
             seq = int(value)
         except (TypeError, ValueError):
@@ -836,16 +944,16 @@ def _event_content(title, payload, open_events, cross):
 
 
 def _extract_events(job, messages, payload, language):
-    preferences = (job.specification or {}).get(
-        "chat_analysis_preferences", {}
-    )
+    specification = job.specification or {}
+    preferences = specification.get("chat_analysis_preferences", {})
+    deferred = _defer_event_publication(job)
     conversation = job.conversation
     conversation_title = (
         conversation.title or conversation.identity_key
     )
     prompt = _event_extraction_prompt(language, preferences)
     open_events = _open_events_same_conversation(job.space, conversation)
-    if _defer_event_publication(job):
+    if deferred:
         prior_ids = {
             message.reply_to_id for message in messages if message.reply_to_id
         } | {
@@ -904,24 +1012,38 @@ def _extract_events(job, messages, payload, language):
     events = output.get("events") if output is not None else None
     if not isinstance(events, list):
         return None
-    if _defer_event_publication(job):
-        allowed = {item["event_key"] for item in open_events + cross}
-        validated = []
-        for event in events:
-            if not isinstance(event, dict):
-                continue
-            action = str(event.get("action") or "create").strip().lower()
-            key = canonical_event_key(event.get("event_key"))
-            if action in ("attach", "drop") and key in allowed:
-                validated.append(
-                    {**event, "action": action, "event_key": key}
-                )
-            elif action != "drop":
-                validated.append(
-                    {**event, "action": "create", "event_key": ""}
-                )
-        return validated
-    return events
+    if not events:
+        return []
+
+    scheduled = specification.get("scheduled_message_scope") is True
+    allowed = {item["event_key"] for item in open_events + cross}
+    by_seq = {message.ingest_seq: message for message in messages}
+    validated = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        action = str(event.get("action") or "create").strip().lower()
+        key = canonical_event_key(event.get("event_key"))
+        if action == "drop":
+            if not deferred:
+                validated.append(event)
+            elif key in allowed:
+                validated.append({**event, "action": action, "event_key": key})
+            continue
+        if not all(
+            isinstance(event.get(field), str) and event[field].strip()
+            for field in ("title", "summary")
+        ):
+            continue
+        if scheduled and not _cited_messages(event, by_seq)[0]:
+            continue
+        if deferred:
+            if action == "attach" and key in allowed:
+                event = {**event, "action": action, "event_key": key}
+            else:
+                event = {**event, "action": "create", "event_key": ""}
+        validated.append(event)
+    return validated or None
 
 
 def _defer_event_publication(job):
@@ -1023,24 +1145,108 @@ def _store_events(job, note, messages, events):
                     )
 
 
+def _reduction_progress(
+    job,
+    candidates,
+    *,
+    publication=False,
+    lease_seconds=DEFAULT_LEASE_SECONDS,
+    time_limit=None,
+):
+    source_ids = [item.pk for item in candidates]
+    saved = (job.checkpoint or {}).get("event_reduction", {})
+    progress = (
+        saved.get("progress")
+        if saved.get("source_ids") == source_ids
+        else None
+    )
+    started_at = monotonic()
+    seconds = (
+        max(1, settings.CHAT_ANALYSIS_BATCH_SECONDS)
+        if time_limit is None
+        else max(0, time_limit)
+    )
+
+    def save_progress(value):
+        with dispatch_lock():
+            locked = _lock_job(job.pk)
+            if publication:
+                if not renew_publication_slot(job):
+                    raise AnalysisLeaseLost("Event publication lease expired.")
+            else:
+                _ensure_lease(locked, job.lease_owner, job.fencing_token)
+            checkpoint = {
+                **locked.checkpoint,
+                "event_reduction": {
+                    "source_ids": source_ids,
+                    "progress": value,
+                },
+            }
+            if publication:
+                locked.checkpoint = checkpoint
+                locked.save(update_fields=("checkpoint", "updated_at"))
+            else:
+                renew_analysis_lease(
+                    locked,
+                    worker_id=job.lease_owner,
+                    fencing_token=job.fencing_token,
+                    lease_seconds=lease_seconds,
+                    checkpoint=checkpoint,
+                )
+            job.checkpoint = checkpoint
+        if value.get("phase") != 3 and monotonic() - started_at >= seconds:
+            raise AnalysisBatchYield()
+
+    return progress, save_progress
+
+
+def _clear_reduction_progress(job):
+    checkpoint = dict(job.checkpoint or {})
+    checkpoint.pop("event_reduction", None)
+    checkpoint.pop("publication_failures", None)
+    AnalysisJob.objects.filter(pk=job.pk).update(
+        checkpoint=checkpoint,
+        error="",
+    )
+    job.checkpoint = checkpoint
+    job.error = ""
+
+
 def _publish_reduced_events(job, lease_seconds):
     candidates = list(
         EventSuggestion.objects.filter(
-            analysis_job=job, status=EventSuggestion.Status.PENDING,
-        ).select_related("note", "analysis_job").order_by("pk")
+            analysis_job=job,
+            status=EventSuggestion.Status.PENDING,
+        )
+        .select_related("note", "analysis_job")
+        .order_by("pk")
     )
     if not candidates:
         return
     job = renew_analysis_lease(
-        job, worker_id=job.lease_owner, fencing_token=job.fencing_token,
+        job,
+        worker_id=job.lease_owner,
+        fencing_token=job.fencing_token,
         lease_seconds=lease_seconds,
     )
-    groups = prepare_event_reduction(job, candidates, call_json=_call_json)
+    progress, save_progress = _reduction_progress(
+        job,
+        candidates,
+        lease_seconds=lease_seconds,
+    )
+    groups = prepare_event_reduction(
+        job,
+        candidates,
+        call_json=_call_json,
+        progress=progress,
+        save_progress=save_progress,
+    )
     with transaction.atomic():
         locked = _lock_job(job.pk)
         _ensure_lease(locked, job.lease_owner, job.fencing_token)
         Space.objects.select_for_update().only("pk").get(pk=job.space_id)
         _apply_reduced_groups(job, candidates, groups)
+        _clear_reduction_progress(job)
 
 
 def _apply_reduced_groups(job, candidates, groups):
@@ -1081,13 +1287,15 @@ def _active_batch_jobs(space_id, boundary):
     )
 
 
-def _publish_event_batch(space_id, boundary):
+def _publish_event_batch(space_id, boundary, *, time_limit=None):
     pending = _pending_batch_candidates().filter(space_id=space_id)
 
     def current_candidates():
         return [
-            item for item in pending.select_related(
-                "note", "analysis_job__conversation",
+            item
+            for item in pending.select_related(
+                "note",
+                "analysis_job__conversation",
                 "analysis_job__created_by",
             ).order_by("pk")
             if item.analysis_job.specification.get("boundary") == boundary
@@ -1098,36 +1306,116 @@ def _publish_event_batch(space_id, boundary):
     candidates = current_candidates()
     if not candidates:
         return False
-    job = candidates[0].analysis_job
-    groups = prepare_event_reduction(job, candidates, call_json=_call_json)
-    with transaction.atomic():
-        Space.objects.select_for_update().only("pk").get(pk=space_id)
-        if _active_batch_jobs(space_id, boundary) or [
-            item.pk for item in candidates
-        ] != [item.pk for item in current_candidates()]:
+    job = claim_publication_slot(candidates[0].analysis_job_id)
+    if job is None:
+        return False
+    try:
+        progress, save_progress = _reduction_progress(
+            job,
+            candidates,
+            publication=True,
+            time_limit=time_limit,
+        )
+        groups = prepare_event_reduction(
+            job,
+            candidates,
+            call_json=_call_json,
+            progress=progress,
+            save_progress=save_progress,
+        )
+        with dispatch_lock():
+            Space.objects.select_for_update().only("pk").get(pk=space_id)
+            if not publication_slot_valid(job):
+                raise AnalysisLeaseLost("Event publication lease expired.")
+            if _active_batch_jobs(space_id, boundary) or [
+                item.pk for item in candidates
+            ] != [item.pk for item in current_candidates()]:
+                return False
+            _apply_reduced_groups(job, candidates, groups)
+            _clear_reduction_progress(job)
+        return True
+    except Exception as error:
+        with dispatch_lock():
+            if publication_slot_valid(job):
+                locked = _lock_job(job.pk)
+                locked.checkpoint = {
+                    **locked.checkpoint,
+                    "resume_after": next_analysis_hour(),
+                }
+                if not isinstance(error, AnalysisBatchYield):
+                    failures = locked.checkpoint.get(
+                        "publication_failures", 0,
+                    ) + 1
+                    locked.checkpoint["publication_failures"] = failures
+                    locked.error = (
+                        f"event_publication_failed: {type(error).__name__}: "
+                        f"{error}"
+                    )[:4000]
+                    if failures >= DEFAULT_MAX_ATTEMPTS:
+                        locked.state = AnalysisJob.State.FAILED
+                        locked.checkpoint.pop("resume_after", None)
+                locked.save(
+                    update_fields=(
+                        "checkpoint", "state", "error", "updated_at",
+                    ),
+                )
+        if isinstance(error, AnalysisBatchYield):
             return False
-        _apply_reduced_groups(job, candidates, groups)
-    return True
+        raise
+    finally:
+        release_publication_slot(job)
 
 
-def publish_ready_event_batches():
-    """Retry unpublished slot candidates on the existing analysis queue."""
+def publish_ready_event_batches(
+    *,
+    space_id=None,
+    boundary=None,
+    time_limit=None,
+):
+    """Publish ready batches within the caller's remaining time budget."""
     if not (
         settings.CHAT_ANALYSIS_LLM_ENABLED
         and settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS
     ):
         return 0
-    candidates = _pending_batch_candidates().order_by("pk").values_list(
-        "space_id", "analysis_job__specification",
+    seconds = (
+        max(1, settings.CHAT_ANALYSIS_BATCH_SECONDS)
+        if time_limit is None
+        else max(0, time_limit)
     )
+    if seconds == 0:
+        return 0
+    started = monotonic()
+    candidates = (
+        _pending_batch_candidates()
+        .order_by("pk")
+        .values_list(
+            "space_id",
+            "analysis_job__specification",
+        )
+    )
+    if space_id is not None:
+        candidates = candidates.filter(space_id=space_id)
+    if boundary is not None:
+        candidates = candidates.filter(
+            analysis_job__specification__boundary=boundary,
+        )
     batches = dict.fromkeys(
-        (space_id, spec["boundary"]) for space_id, spec in candidates
+        (space_id, spec["boundary"])
+        for space_id, spec in candidates
         if spec.get("boundary")
     )
     published = 0
     for space_id, boundary in batches:
+        remaining = seconds - (monotonic() - started)
+        if remaining <= 0:
+            break
         try:
-            published += _publish_event_batch(space_id, boundary)
+            published += _publish_event_batch(
+                space_id,
+                boundary,
+                time_limit=remaining,
+            )
         except Exception:
             logger.exception(
                 "Event reduction failed for space %s at %s", space_id, boundary
@@ -1136,17 +1424,26 @@ def publish_ready_event_batches():
 
 
 def _accept_reduced_group(job, group, event_key):
-    event = Event.objects.select_for_update().filter(
-        space_id=job.space_id, event_key=event_key,
-    ).first()
+    event = (
+        Event.objects.select_for_update()
+        .filter(
+            space_id=job.space_id,
+            event_key=event_key,
+        )
+        .first()
+    )
     previous_activity = event.last_activity_at if event else None
-    same_job = event is not None and event.suggestion_sources.filter(
-        analysis_job=job,
-    ).exists()
+    same_job = (
+        event is not None
+        and event.suggestion_sources.filter(
+            analysis_job=job,
+        ).exists()
+    )
     applied = []
     for item in group:
         if not EventSuggestion.objects.filter(
-            pk=item.pk, status=EventSuggestion.Status.PENDING,
+            pk=item.pk,
+            status=EventSuggestion.Status.PENDING,
         ).exists():
             continue
         suggestion = review_event_suggestion(
@@ -1175,8 +1472,8 @@ def _accept_reduced_group(job, group, event_key):
             updated.save(update_fields=("content", "updated_at"))
 
 
-def _prepare_chunk(job, messages):
-    """Keep model calls and usage tracking outside the result transaction."""
+def _prepare_chunk(job, messages, *, lease_seconds=None):
+    """Call the model outside the write transaction and renew a job lease."""
     if not settings.CHAT_ANALYSIS_LLM_ENABLED or not any(
         _message_texts(message) for message in messages
     ):
@@ -1189,7 +1486,18 @@ def _prepare_chunk(job, messages):
             language,
             (job.specification or {}).get("chat_analysis_preferences"),
         )
+        if lease_seconds is not None:
+            renew_analysis_lease(
+                job,
+                worker_id=job.lease_owner,
+                fencing_token=job.fencing_token,
+                lease_seconds=lease_seconds,
+            )
         events = _extract_events(job, messages, payload, language)
+        if summary is None or events is None:
+            raise ValueError("The model returned an incomplete result.")
+    except AnalysisLeaseLost:
+        raise
     except Exception:
         logger.exception("LLM chat analysis failed for job %s", job.pk)
         raise RuntimeError("LLM chat analysis failed") from None
@@ -1219,7 +1527,13 @@ def _enrich_note_with_llm(job, note, messages):
         _persist_enrichment(job, note, messages, summary, events)
 
 
-def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
+def run_rule_based_analysis(
+    job,
+    *,
+    lease_seconds=DEFAULT_LEASE_SECONDS,
+    message_limit=None,
+    time_limit=None,
+):
     """Deterministic extractor: chunked Notes plus message evidence.
 
     It resumes after ``checkpoint["last_ingest_seq"]`` and renews the lease
@@ -1232,6 +1546,14 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
     messages_processed = int(checkpoint.get("messages_processed", 0))
     notes_written = int(checkpoint.get("notes_written", 0))
     partial = bool(checkpoint.get("partial", False))
+    started_at = monotonic()
+    initial_processed = messages_processed
+    chunks_processed = 0
+    yielded = False
+    message_limit = max(
+        1, message_limit or settings.CHAT_ANALYSIS_BATCH_MESSAGES
+    )
+    time_limit = max(1, time_limit or settings.CHAT_ANALYSIS_BATCH_SECONDS)
 
     preferences = (job.specification or {}).get("chat_analysis_preferences")
     cutoff = (job.specification or {}).get("analysis_cutoff")
@@ -1278,12 +1600,18 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             orphaned_at__isnull=True,
         )
         if scheduled_scope:
-            query = query.filter(
-                scheduled_analysis__job=job,
-                scheduled_analysis__completed_at__isnull=True,
-                scheduled_analysis__error="",
+            query = (
+                query.filter(
+                    scheduled_analysis__job=job,
+                    scheduled_analysis__completed_at__isnull=True,
+                    scheduled_analysis__error="",
+                )
+                .annotate(
+                    readable=Exists(readable_text_parts(OuterRef("pk"))),
+                )
+                .filter(readable=True)
             )
-        elif cutoff:
+        if not scheduled_scope and cutoff:
             query = query.filter(occurred_at__gte=cutoff)
         if not scheduled_scope and batches.exists():
             query = query.filter(
@@ -1291,10 +1619,19 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
             ).distinct()
         if offset is not None:
             query = query.filter(ingest_seq=checkpoint["fragment_seq"])
+        processed = messages_processed - initial_processed
+        if chunks_processed and (
+            processed >= message_limit
+            or monotonic() - started_at >= time_limit
+        ):
+            yielded = query.exists()
+            break
         messages = list(
             query.select_related("reply_to")
             .prefetch_related("parts")
-            .order_by("ingest_seq")[:ANALYSIS_CHUNK_SIZE]
+            .order_by("ingest_seq")[
+                :min(ANALYSIS_CHUNK_SIZE, message_limit - processed)
+            ]
         )
         if not messages:
             if offset is not None:
@@ -1341,7 +1678,11 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
                 origin=Note.Origin.MANUAL,
             ).exists()
         ):
-            summary, events = _prepare_chunk(job, messages)
+            summary, events = _prepare_chunk(
+                job,
+                messages,
+                lease_seconds=lease_seconds,
+            )
         with transaction.atomic():
             locked = _lock_job(job.pk)
             _ensure_lease(locked, job.lease_owner, job.fencing_token)
@@ -1385,21 +1726,35 @@ def run_rule_based_analysis(job, *, lease_seconds=DEFAULT_LEASE_SECONDS):
                 lease_seconds=lease_seconds,
                 checkpoint=checkpoint,
             )
+            chunks_processed += 1
 
-    incomplete = scheduled_scope and AnalysisJobMessage.objects.filter(
-        job=job, completed_at__isnull=True
-    ).exists()
-    if _defer_event_publication(job) and not incomplete:
+    incomplete = (
+        not yielded
+        and scheduled_scope
+        and (
+            AnalysisJobMessage.objects.filter(
+                job=job, completed_at__isnull=True
+            ).exists()
+        )
+    )
+    if _defer_event_publication(job) and not incomplete and not yielded:
         if (job.specification or {}).get("boundary"):
             checkpoint["event_map_ready"] = True
         else:
-            _publish_reduced_events(job, lease_seconds)
+            try:
+                _publish_reduced_events(job, lease_seconds)
+            except AnalysisBatchYield:
+                yielded = True
+            checkpoint = AnalysisJob.objects.values_list(
+                "checkpoint", flat=True,
+            ).get(pk=job.pk)
 
     if incomplete:
         partial = True
 
     return {
         "checkpoint": checkpoint,
+        "yielded": yielded,
         "partial": partial,
         "result_ref": {
             "messages_processed": messages_processed,

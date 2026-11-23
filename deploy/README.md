@@ -70,7 +70,10 @@ does not migrate them automatically. In particular, preserve incomplete upload
 archives before attempting to resume their batches.
 
 Chat archive parsing uses `devify-chat-worker` (two concurrent tasks), and AI
-event analysis uses `devify-analysis-worker` (one task). The normal worker
+event analysis uses `devify-analysis-worker` (four concurrent tasks by default).
+`CHAT_ANALYSIS_MAX_CONCURRENT_USERS` controls both its concurrency and the
+shared event-analysis user limit; the API and workers receive the same value.
+The development stack retains one analysis process. The normal worker
 continues consuming the default queue, including previously queued work. The
 analysis worker enables AI and automatic event creation and requires a working
 administrator-configured model. The blue/green deploy checks both workers before

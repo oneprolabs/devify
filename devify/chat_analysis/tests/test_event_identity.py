@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import StringIO
 from unittest.mock import patch
 
@@ -348,7 +348,7 @@ def test_scheduled_reduction_reuses_candidates_after_failure(
         execution, "_messages_for_model", lambda job, messages: messages[:1],
     )
 
-    def map_chunk(job, messages):
+    def map_chunk(job, messages, **_kwargs):
         seq = messages[0].ingest_seq
         mapped.append(seq)
         return {}, [{
@@ -360,7 +360,9 @@ def test_scheduled_reduction_reuses_candidates_after_failure(
 
     reducer_attempts = []
 
-    def reduce(job, candidates, *, call_json):
+    def reduce(
+        job, candidates, *, call_json, progress=None, save_progress=None
+    ):
         reducer_attempts.append(len(candidates))
         assert not Event.objects.filter(space=space).exists()
         if len(reducer_attempts) == 1:
@@ -374,7 +376,15 @@ def test_scheduled_reduction_reuses_candidates_after_failure(
     assert EventSuggestion.objects.filter(analysis_job=job).count() == 2
     assert not Event.objects.filter(space=space).exists()
 
-    result = execution.execute_analysis_job(job.pk, worker_id="reduce-retry")
+    with patch(
+        "django.utils.timezone.now",
+        return_value=datetime.fromisoformat(
+            result.job.checkpoint["resume_after"],
+        ),
+    ):
+        result = execution.execute_analysis_job(
+            job.pk, worker_id="reduce-retry",
+        )
     assert result.job.state == AnalysisJob.State.READY
     assert mapped == [1, 2]
     assert reducer_attempts == [2, 2]
@@ -456,14 +466,16 @@ def test_scheduled_slot_reduces_two_conversations_together(
         AnalysisJobMessage.objects.create(job=job, message=message)
         jobs.append(job)
 
-    def extract(job, messages):
+    def extract(job, messages, **_kwargs):
         return {}, [{
             "title": job.conversation.title,
             "summary": execution._message_texts(messages[0])[0],
             "source_seqs": [1],
         }]
 
-    def reduce(job, suggestions, *, call_json):
+    def reduce(
+        job, suggestions, *, call_json, progress=None, save_progress=None
+    ):
         assert {s.analysis_job_id for s in suggestions} == {
             item.pk for item in jobs
         }

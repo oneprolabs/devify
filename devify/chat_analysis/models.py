@@ -65,7 +65,7 @@ class ChatSummary(models.Model):
 
 
 class AnalysisJob(models.Model):
-    """A resumable extraction job over a fixed window of an upload batch."""
+    """A resumable request whose execution uses a frozen message window."""
 
     class State(models.TextChoices):
         QUEUED = "queued", "Queued"
@@ -167,8 +167,23 @@ class ScheduledAnalysisRun(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class AnalysisExecutionSlot(models.Model):
+    """Bound user execution; slot zero serializes short admission updates."""
+
+    id = models.PositiveIntegerField(primary_key=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.CASCADE,
+    )
+    job = models.OneToOneField(
+        AnalysisJob, null=True, blank=True, on_delete=models.CASCADE,
+    )
+    dispatched_at = models.DateTimeField(null=True, blank=True)
+    publishing = models.BooleanField(default=False)
+
+
 class AnalysisJobMessage(models.Model):
-    """Exact message assignment for a scheduled analysis job."""
+    """Unique message assignments shared by event-analysis entry points."""
 
     job = models.ForeignKey(
         AnalysisJob,

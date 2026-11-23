@@ -18,6 +18,8 @@ from chat_analysis.models import (
     QuestionAnswer,
     ReportItemSource,
 )
+from chat_analysis.user_dispatch import lock_dispatch_row
+from chat_domain.models import MessagePart
 from spaces.models import (
     SpaceWorkflowConfig,
     effective_chat_analysis_preferences,
@@ -81,6 +83,24 @@ def get_analysis_preferences(space):
     )
 
 
+def readable_text_parts(message_id):
+    """Use the same non-whitespace text requirement as message extraction."""
+    return MessagePart.objects.filter(
+        message_id=message_id,
+        kind=MessagePart.Kind.TEXT,
+        text__regex=r"(*UCP)[^\s\x1c-\x1f]",
+    )
+
+
+def disallowed_conversation_q(kind_field, preferences_field):
+    types = f"{preferences_field}__conversation_types__contains"
+    return Q(**{f"{preferences_field}__has_key": "conversation_types"}) & (
+        (Q(**{kind_field: "direct"}) & ~Q(**{types: ["direct"]}))
+        | (Q(**{kind_field: "group"}) & ~Q(**{types: ["group"]}))
+        | (Q(**{kind_field: "unknown"}) & ~Q(**{types: ["direct", "group"]}))
+    )
+
+
 @transaction.atomic
 def create_analysis_job(
     *,
@@ -97,6 +117,7 @@ def create_analysis_job(
     ensure_can_contribute(actor, space)
     if conversation.space_id != space.pk:
         raise ChatAnalysisError("Conversation must belong to the same space.")
+    lock_dispatch_row()
     preferences = (
         effective_chat_analysis_preferences(analysis_preferences)
         if analysis_preferences is not None
@@ -108,7 +129,8 @@ def create_analysis_job(
     snapshot["chat_analysis_preferences"] = preferences
     snapshot["analysis_cutoff"] = (
         (timezone.now() - timedelta(days=cutoff_days)).isoformat()
-        if cutoff_days else None
+        if cutoff_days
+        else None
     )
     job, created = AnalysisJob.objects.get_or_create(
         space=space,
@@ -123,7 +145,8 @@ def create_analysis_job(
         },
     )
     if not created and (
-        job.conversation_id != conversation.pk
+        job.created_by_id != actor.pk
+        or job.conversation_id != conversation.pk
         or job.start_seq != start_seq
         or job.end_seq != end_seq
         or job.input_version != input_version
@@ -138,6 +161,7 @@ def create_analysis_job(
 def retry_analysis_job(*, actor, job):
     """Requeue a terminal analysis job after checking current permissions."""
     ensure_can_contribute(actor, job.space)
+    lock_dispatch_row()
     job = AnalysisJob.objects.select_for_update().get(pk=job.pk)
     if job.state not in (
         AnalysisJob.State.FAILED,
@@ -147,12 +171,16 @@ def retry_analysis_job(*, actor, job):
             "Only failed or partial analysis jobs can be retried."
         )
     job.state = AnalysisJob.State.QUEUED
+    job.checkpoint = dict(job.checkpoint)
+    job.checkpoint.pop("resume_after", None)
+    job.checkpoint.pop("publication_failures", None)
     job.lease_owner = ""
     job.lease_until = None
     job.error = ""
     job.save(
         update_fields=(
             "state",
+            "checkpoint",
             "lease_owner",
             "lease_until",
             "error",
@@ -165,6 +193,7 @@ def retry_analysis_job(*, actor, job):
 @transaction.atomic
 def cancel_analysis_job(*, actor, job):
     ensure_can_contribute(actor, job.space)
+    lock_dispatch_row()
     locked = AnalysisJob.objects.select_for_update().get(pk=job.pk)
     if locked.state in (
         AnalysisJob.State.READY,
@@ -380,7 +409,8 @@ def _move_event_relations(source, target):
         )
         existing.reason = "\n".join(
             dict.fromkeys(
-                reason for reason in (existing.reason, relation.reason)
+                reason
+                for reason in (existing.reason, relation.reason)
                 if reason
             )
         )
@@ -403,10 +433,12 @@ def _move_event_citations(source, target):
                 changed_fields = ["citations"]
         event_ids = question.scope.get("event_ids", [])
         if source.pk in event_ids:
-            question.scope["event_ids"] = list(dict.fromkeys(
-                target.pk if event_id == source.pk else event_id
-                for event_id in event_ids
-            ))
+            question.scope["event_ids"] = list(
+                dict.fromkeys(
+                    target.pk if event_id == source.pk else event_id
+                    for event_id in event_ids
+                )
+            )
             changed_fields.append("scope")
         if changed_fields:
             question.save(update_fields=changed_fields + ["updated_at"])

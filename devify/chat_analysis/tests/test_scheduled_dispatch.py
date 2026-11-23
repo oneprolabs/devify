@@ -5,6 +5,7 @@ import pytest
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+from chat_analysis import scheduled_dispatch
 from chat_analysis.models import AnalysisJob, AnalysisJobMessage
 from chat_analysis.schedule_window import BEIJING
 from chat_analysis.scheduled_dispatch import (
@@ -72,7 +73,9 @@ def test_snapshot_excludes_incomplete_and_future_batches_and_deduplicates():
     assert AnalysisJobMessage.objects.count() == 1
 
 
-def test_due_slot_enqueues_each_ready_conversation_once():
+def test_due_slot_enqueues_each_ready_conversation_once(
+    django_capture_on_commit_callbacks,
+):
     owner = User.objects.create_user(username="due-slot-owner")
     space = make_space(owner, "due-slot-space")
     conversation = make_conversation(space)
@@ -88,11 +91,25 @@ def test_due_slot_enqueues_each_ready_conversation_once():
     MessageOrigin.objects.filter(message=message).update(created_at=before)
     UploadBatch.objects.filter(space=space).update(completed_at=before)
     schedule = f"{slot_start.hour:02d}:{slot_start.minute:02d}"
-    with patch(
-        "chat_analysis.tasks.dispatch_analysis_job"
-    ) as dispatch:
-        first = dispatch_due_analysis(now, schedule)
-        second = dispatch_due_analysis(now, schedule)
+    schedule_user = scheduled_dispatch.schedule_user
+
+    def interrupted(*args, **kwargs):
+        schedule_user(*args, **kwargs)
+        raise RuntimeError("admission interrupted")
+
+    with patch("chat_analysis.tasks.dispatch_analysis_job") as dispatch:
+        with (
+            patch.object(scheduled_dispatch, "schedule_user", interrupted),
+            django_capture_on_commit_callbacks(execute=True),
+            pytest.raises(RuntimeError, match="admission interrupted"),
+        ):
+            dispatch_due_analysis(now, schedule)
+        assert not AnalysisJob.objects.filter(created_by=owner).exists()
+        dispatch.assert_not_called()
+
+        with django_capture_on_commit_callbacks(execute=True):
+            first = dispatch_due_analysis(now, schedule)
+            second = dispatch_due_analysis(now, schedule)
     assert first["jobs"] == 1
     assert second == {"jobs": 0, "slot": first["slot"]}
     dispatch.assert_called_once()

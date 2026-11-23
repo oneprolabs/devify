@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 BEIJING = ZoneInfo("Asia/Shanghai")
 DEFAULT_SCHEDULE = ",".join(
-    f"{hour:02d}:{minute:02d}" for hour in range(24) for minute in (0, 30)
+    f"{hour:02d}:00" for hour in range(24)
 )
 
 

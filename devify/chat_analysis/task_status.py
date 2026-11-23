@@ -12,7 +12,10 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from chat_analysis.execution import DEFAULT_MAX_ATTEMPTS
+from chat_analysis.execution import (
+    DEFAULT_MAX_ATTEMPTS,
+    recover_expired_analysis_job,
+)
 from chat_analysis.models import AnalysisJob, QuestionAnswer, Report
 
 logger = logging.getLogger(__name__)
@@ -172,43 +175,29 @@ def recover_expired_analysis_jobs(
 ):
     """Requeue jobs whose worker disappeared with the lease still held.
 
-    The lease deadline is the per-attempt timeout: a live worker renews it
-    after every chunk. Requeued jobs keep their checkpoint, so the next claim
-    resumes instead of restarting.
+    A live worker renews the lease during chunk processing. Requeued jobs
+    keep their checkpoint, so the next claim resumes instead of restarting.
     """
 
     now = now or timezone.now()
     stale = AnalysisJob.objects.filter(
         state=AnalysisJob.State.RUNNING,
-        lease_until__lt=now,
+        lease_until__lte=now,
     )
     requeued = 0
     failed = 0
     requeued_ids = []
     for job in stale.iterator():
-        retry = job.attempts < max_attempts
-        state = AnalysisJob.State.QUEUED if retry else AnalysisJob.State.FAILED
-        error = (
-            "lease_expired: requeued after worker timeout."
-            if retry
-            else "lease_expired: max attempts reached "
-            f"({job.attempts}/{max_attempts})."
+        state = recover_expired_analysis_job(
+            job,
+            now=now,
+            max_attempts=max_attempts,
         )
-        updated = stale.filter(
-            pk=job.pk, fencing_token=job.fencing_token
-        ).update(
-            state=state,
-            error=error,
-            lease_owner="",
-            lease_until=None,
-            updated_at=now,
-        )
-        if updated:
-            if retry:
-                requeued += 1
-                requeued_ids.append(job.pk)
-            else:
-                failed += 1
+        if state == AnalysisJob.State.QUEUED:
+            requeued += 1
+            requeued_ids.append(job.pk)
+        elif state == AnalysisJob.State.FAILED:
+            failed += 1
     return {
         "requeued": requeued,
         "failed": failed,
@@ -216,14 +205,22 @@ def recover_expired_analysis_jobs(
     }
 
 
-def sweep_stale_tasks(*, now=None):
+def sweep_stale_tasks(*, now=None, include_analysis=True):
     """Move every abandoned async record into a terminal state."""
 
     from chat_analysis.summaries.services import expire_stale_summaries
 
     summaries = expire_stale_summaries(now=now)
-    jobs = recover_expired_analysis_jobs(now=now)
-    queued = recover_stale_queued_analysis_jobs(now=now)
+    jobs = (
+        recover_expired_analysis_jobs(now=now)
+        if include_analysis
+        else {"requeued": 0, "failed": 0, "requeued_job_ids": []}
+    )
+    queued = (
+        recover_stale_queued_analysis_jobs(now=now)
+        if include_analysis
+        else {"requeued": 0, "requeued_job_ids": []}
+    )
     counts = {
         "summaries_failed": summaries,
         "questions_failed": expire_stale_questions(now=now),

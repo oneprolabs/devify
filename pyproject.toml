@@ -54,7 +54,8 @@ dependencies = [
     "json-repair>=0.25.0",
     "dj-stripe>=2.8.0",
     "stripe>=8.0.0,<15.0.0",
-    "sentry-sdk[django]>=2.0.0",
+    # Production settings still use the Sentry 2.x profiling option.
+    "sentry-sdk[django]>=2.0.0,<3",
     "agentcore-metering>=0.2.0",
     "agentcore-task>=0.1.0",
     "agentcore-notifier>=0.1.0",

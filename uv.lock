@@ -901,7 +901,7 @@ requires-dist = [
     { name = "rapidfuzz", specifier = ">=3.0.0" },
     { name = "redis" },
     { name = "requests", specifier = ">=2.31.0" },
-    { name = "sentry-sdk", extras = ["django"], specifier = ">=2.0.0" },
+    { name = "sentry-sdk", extras = ["django"], specifier = ">=2.0.0,<3" },
     { name = "setuptools", specifier = "==81.0.0" },
     { name = "stripe", specifier = ">=8.0.0,<15.0.0" },
 ]

@@ -1,5 +1,7 @@
 import pytest
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -26,6 +28,9 @@ from chat_domain.models import (
 )
 from chat_domain.services import merge_messages
 from chat_ingestion.models import UploadBatch, UploadItem
+from chat_ingestion.parsing import parse_archive
+from chat_ingestion.services import archive_path, store_archive
+from chat_ingestion.tests.archives import build_archive
 from spaces.models import SpaceMembership
 
 pytestmark = pytest.mark.django_db
@@ -338,6 +343,136 @@ def test_legacy_open_event_keeps_status_without_inventing_an_assignee():
     assert data["viewer_relevance"] == "related"
     assert data["viewer_evidence_message_ids"] == [message.pk]
     assert not ConversationIdentity.objects.filter(user=owner).exists()
+
+
+def test_completed_backups_restore_only_their_uploader_identity(
+    settings, tmp_path,
+):
+    settings.CHAT_UPLOAD_ARCHIVE_DIR = str(tmp_path)
+    owner = User.objects.create_user(username="legacy-backup-owner")
+    other = User.objects.create_user(username="legacy-backup-other")
+    space = make_space(owner, "legacy-backup")
+    batch = UploadBatch.objects.create(
+        uploaded_by=owner,
+        space=space,
+        source_type="wechat",
+        source_account_id="local-backup-account",
+        idempotency_key="historic",
+    )
+    store_archive(batch, SimpleUploadedFile("history.zip", build_archive()))
+    batch.status = UploadBatch.Status.PROCESSING
+    batch.save(update_fields=("status",))
+    assert parse_archive(batch).status == UploadBatch.Status.COMPLETED
+    conversation = Conversation.objects.get(space=space)
+    ConversationIdentity.objects.filter(conversation=conversation).delete()
+    conversation.self_sender_key = "shared-field-from-someone-else"
+    conversation.save(update_fields=("self_sender_key",))
+
+    rejected = UploadBatch.objects.create(
+        uploaded_by=other,
+        space=space,
+        source_type="wechat",
+        idempotency_key="failed",
+        status=UploadBatch.Status.FAILED,
+    )
+    archive_path(rejected).write_bytes(archive_path(batch).read_bytes())
+    listing = batch.items.get(path="conversations.jsonl")
+    UploadItem.objects.create(
+        batch=rejected, path=listing.path, sha256=listing.sha256,
+    )
+    bad = UploadBatch.objects.create(
+        uploaded_by=other,
+        space=space,
+        source_type="wechat",
+        idempotency_key="tampered",
+        status=UploadBatch.Status.COMPLETED,
+    )
+    archive_path(bad).write_bytes(archive_path(batch).read_bytes())
+    UploadItem.objects.create(batch=bad, path=listing.path, sha256="0" * 64)
+
+    call_command("backfill_chat_identities", conversation_id=conversation.pk)
+    assert not ConversationIdentity.objects.filter(conversation=conversation)
+    for _ in range(2):
+        call_command("backfill_chat_identities", apply=True)
+    assert list(ConversationIdentity.objects.values_list(
+        "conversation_id", "user_id", "sender_key",
+    )) == [(conversation.pk, owner.pk, "wx-self")]
+
+
+def test_quote_whitespace_and_commitment_speaker_are_grounded():
+    from chat_analysis.event_relevance import resolve_participant_evidence
+
+    owner = User.objects.create_user(username="grounded-commitment")
+    space = make_space(owner, "grounded-commitment")
+    chat = make_conversation(space, "sales", "Sales")
+    source = named_message(chat, 1, "@Alice\u2005请准备报价", "Bob")
+    promise = named_message(chat, 2, "我发给客户", "Alice")
+    updates = resolve_participant_evidence(
+        [
+            update(1, "@Alice 请准备报价", name="Alice",
+                   link="name", action="准备报价"),
+            update(1, "@Alice 请发送报价", name="Alice",
+                   link="name", action="发送报价"),
+            update(2, "我发给客户", link="commitment", action="发给客户"),
+            update(2, "我发给客户", person_seq=1, link="commitment",
+                   action="替别人标记待办"),
+        ],
+        [source, promise],
+        [source, promise],
+        ["matter", "matter"],
+        execution._message_texts,
+        {},
+    )
+    assert [
+        (item["sender_key"], item["state"], item["action"])
+        for item in updates
+    ] == [("alice", "open", "准备报价"), ("alice", "open", "发给客户")]
+
+
+@pytest.mark.parametrize(
+    ("relay", "event_open", "expected"),
+    [
+        ("我发给客户", True, {"alice", "bob"}),
+        ("我发给客户", False, {"bob"}),
+        ("我发给客户了", True, {"bob"}),
+        ("我发给客户吗？", True, {"bob"}),
+        ("要不要我发给客户", True, {"bob"}),
+        ("请" * 280 + "，我发给客户", True, {"bob"}),
+    ],
+)
+def test_named_assignment_can_include_speakers_own_handoff(
+    relay, event_open, expected,
+):
+    from chat_analysis.event_relevance import resolve_participant_evidence
+
+    owner = User.objects.create_user(username="explicit-handoff")
+    space = make_space(owner, "explicit-handoff")
+    chat = make_conversation(space, "sales", "Sales")
+    bob = named_message(chat, 1, "报价出来了", "Bob")
+    assignment = named_message(
+        chat, 2, f"@Bob\u2005报价帮我上传吧 {relay}", "Alice",
+    )
+    model_update = update(
+        2, "@Bob 报价帮我上传吧", name="Bob",
+        link="name", action="上传报价",
+    )
+    updates = resolve_participant_evidence(
+        [model_update], [bob, assignment], [assignment], ["matter"],
+        execution._message_texts, {}, recover_handoffs=event_open,
+    )
+    assert {item["sender_key"] for item in updates} == expected
+    assert all(
+        item["state"] == "open" and item["message_id"] == assignment.pk
+        for item in updates
+    )
+    if event_open and "alice" in expected:
+        # The mentioned recipient does not have to appear in the backup.
+        assert [
+            item["sender_key"] for item in resolve_participant_evidence(
+                [], [assignment], [assignment], ["matter"],
+                execution._message_texts, {}, recover_handoffs=True,
+            )
+        ] == ["alice"]
 
 
 def test_direct_address_requires_two_distinct_participants(

@@ -24,6 +24,13 @@ MAX_UPDATES = 12
 MAX_ACTION_CONTEXT = 12
 MAX_VIEWER_EVIDENCE = 20
 ACKNOWLEDGMENTS = frozenset({"1", "收到", "好的", "ok", "嗯", "知道了"})
+# A request to another participant can end with the sender's own handoff.
+_HANDOFF = re.compile(
+    r"^@\S{1,80}\s+[^。！？?!\n]*?(?:帮我|麻烦|请)[^。！？?!\n]+?"
+    r"(?:吧\s+|[，,；;]\s*)"
+    r"(?P<quote>我(?:会|将|来)?(?P<action>(?:转发|发送|发)给"
+    r"\s*[\w-]{1,40}))\s*[。.!！]?$"
+)
 
 
 def _open_actions(records):
@@ -169,6 +176,8 @@ def resolve_participant_evidence(
     roles,
     texts,
     actions,
+    *,
+    recover_handoffs=False,
 ):
     """Resolve model references against cited text in this chunk."""
     if not isinstance(updates, list):
@@ -194,12 +203,17 @@ def resolve_participant_evidence(
         source = cited_by_seq.get(update["seq"])
         quote = update.get("quote")
         state = update.get("state")
-        text_parts = texts(source) if source is not None else ()
+        if source is None or not isinstance(quote, str):
+            continue
+        text_parts = texts(source)
+        normalized_quote = " ".join(quote.split())
         if (
-            source is None
-            or not isinstance(quote, str)
-            or not 2 <= len(quote.strip()) <= 280
-            or not any(quote in text for text in text_parts)
+            len(normalized_quote) < 2
+            or len(quote.strip()) > 280
+            or not any(
+                normalized_quote in " ".join(text.split())
+                for text in text_parts
+            )
             or state not in ("open", "done", "related")
         ):
             continue
@@ -239,6 +253,8 @@ def resolve_participant_evidence(
                 person = named_sender(source, name)
             elif participant is not None:
                 person, name = participant.sender_key, participant.sender_name
+            elif link == "commitment" and seq is None:
+                person, name = source.sender_key, source.sender_name
             elif link == "reply" and source.reply_to_id:
                 person = source.reply_to.sender_key
                 name = source.reply_to.sender_name
@@ -279,7 +295,50 @@ def resolve_participant_evidence(
                 "message_id": source.pk,
             }
         )
+    if recover_handoffs and len(results) < MAX_UPDATES:
+        handoffs = _missing_handoffs(cited, confirmations, texts, results)
+        if handoffs:
+            results.extend(resolve_participant_evidence(
+                handoffs[:MAX_UPDATES - len(results)], messages,
+                cited, roles, texts, actions,
+            ))
     return results
+
+
+def _missing_handoffs(cited, confirmations, texts, updates):
+    handoffs = []
+    for source in cited:
+        if (
+            not source.sender_key or source.ingest_seq in confirmations
+            or hasattr(source, "analysis_fragment_offset")
+            or any(
+                item["sender_key"] == source.sender_key
+                and (
+                    item["state"] == "done"
+                    or item["state"] == "open"
+                    and item["message_id"] == source.pk
+                )
+                for item in updates
+            )
+        ):
+            continue
+        for text in texts(source):
+            text = text.strip()
+            if len(text) > 280:
+                continue
+            match = _HANDOFF.fullmatch(text)
+            if match and not match["action"].endswith(
+                ("了", "过", "吗", "么", "吧", "呢", "啦", "嘛")
+            ):
+                handoffs.append({
+                    "seq": source.ingest_seq,
+                    "quote": match["quote"],
+                    "link": "commitment",
+                    "state": "open",
+                    "action": match["action"],
+                })
+                break
+    return handoffs
 
 
 def event_relevance(events, user_id):

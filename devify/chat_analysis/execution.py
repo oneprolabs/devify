@@ -854,7 +854,8 @@ def _event_extraction_prompt(language, preferences):
         "action, a decision, a commitment, a deadline, or a follow-up "
         "someone still owes. Greetings, jokes, small talk, meals, casual "
         "invitations, and short replies that confirm nothing are not "
-        'events. If this chunk has no trackable matter, return {"events":'
+        "events. Keep distinct deliverables separate even when one message "
+        'discusses both. If there is no trackable matter, return {"events":'
         "[]}. If an existing event is only trivial chat and these messages "
         "do not continue a real matter, emit action drop with that "
         "event_key so a rerun can remove it. "
@@ -903,10 +904,15 @@ def _event_extraction_prompt(language, preferences):
         "'Can we review this?' does not assign work to either person. "
         "If the named addressee did not speak in this chunk, omit person_seq "
         "and copy their exact name into name. "
-        "Use open only for the person who still has to act. Link commitment "
-        "if the speaker explicitly promises to act, such as 'I will send "
-        "it'. In 'Sam, please send it', Sam is open and the speaker is only "
-        "related. Link speaker for the speaker's participation or completion. "
+        "Review each cited message for explicit assignments and promises. "
+        "Record each outstanding action, even if the message also asks "
+        "someone else to act. For the speaker's own promise, use state "
+        "open, link commitment, and the same seq for person_seq and seq. "
+        "Quote the promise alone. In 'Sam, upload the slides; I will send "
+        "them to the client', emit two open updates for the same source: "
+        "link name for Sam to upload and link commitment for the speaker "
+        "to send. Without the promise, only Sam has an open action. "
+        "Use link speaker for participation or completion. "
         "An open action cites the message giving the assignment or promise. "
         "If a later message only acknowledges it, cite the original request "
         "for the action and use the acknowledgment only as participation. "
@@ -1088,6 +1094,7 @@ def _extract_events(job, messages, payload, language):
         updates = resolve_participant_evidence(
             event.get("participant_updates"), messages, cited, roles,
             _message_texts, action_refs,
+            recover_handoffs=event.get("status") in ("open", "in_progress"),
         )
         event = {**event, "_participant_evidence": updates}
         if deferred:

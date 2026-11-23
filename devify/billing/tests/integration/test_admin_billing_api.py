@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -952,11 +952,14 @@ def test_admin_audit_log_list_filters_by_user_query_and_dates():
         context={'plan_slug': 'starter'},
         event_key='audit-test-new',
     )
+    # This UTC timestamp falls on the next day in the API's timezone.
+    newer_created_at = datetime(2026, 1, 1, 20, tzinfo=UTC)
+    end_date = timezone.localdate(newer_created_at)
     BillingAuditLog.objects.filter(pk=older_log.pk).update(
-        created_at=timezone.now() - timedelta(days=3)
+        created_at=newer_created_at - timedelta(days=3)
     )
     BillingAuditLog.objects.filter(pk=newer_log.pk).update(
-        created_at=timezone.now()
+        created_at=newer_created_at
     )
 
     admin_client = APIClient()
@@ -967,8 +970,8 @@ def test_admin_audit_log_list_filters_by_user_query_and_dates():
         {
             'user': 'billing-date-user',
             'action_type': 'subscription.assign',
-            'start_date': (timezone.now() - timedelta(days=1)).date().isoformat(),
-            'end_date': timezone.now().date().isoformat(),
+            'start_date': (end_date - timedelta(days=1)).isoformat(),
+            'end_date': end_date.isoformat(),
         },
     )
 

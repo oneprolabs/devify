@@ -637,6 +637,73 @@ def test_incomplete_model_output_does_not_advance_manual_checkpoint(
     assert job.notes.get().structured_data == {"facts": []}
 
 
+@pytest.mark.parametrize(
+    ("events", "expected_suggestions"),
+    [
+        ([], 0),
+        ([None, "invalid"], None),
+        ([{"title": "Quote", "summary": "", "source_seqs": [1]}], None),
+        (
+            [{"title": "Quote", "summary": "Follow up", "source_seqs": [999]}],
+            None,
+        ),
+        (
+            [
+                None,
+                {"title": "Quote", "summary": "Follow up", "source_seqs": [1]},
+            ],
+            1,
+        ),
+    ],
+)
+def test_automatic_chunk_distinguishes_empty_and_invalid_results(
+    settings,
+    events,
+    expected_suggestions,
+):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    settings.CHAT_ANALYSIS_AUTO_CREATE_EVENTS = True
+    job = user_job("validate-event-output")
+    job.specification.update(
+        scheduled_message_scope=True,
+        boundary=timezone.now().isoformat(),
+    )
+    job.save(update_fields=("specification",))
+    assignment = AnalysisJobMessage.objects.create(
+        job=job,
+        message=Message.objects.get(conversation=job.conversation),
+    )
+    with (
+        patch.object(
+            execution,
+            "request_budget",
+            return_value=(12000, lambda *_: 500),
+        ),
+        patch.object(
+            execution,
+            "_call_json",
+            side_effect=[{}, {"events": events}],
+        ),
+    ):
+        result = execution.execute_analysis_job(
+            job.pk, worker_id="event-output"
+        )
+
+    assignment.refresh_from_db()
+    if expected_suggestions is None:
+        assert result.job.state == AnalysisJob.State.QUEUED
+        assert "resume_after" in result.job.checkpoint
+        assert "last_ingest_seq" not in result.job.checkpoint
+        assert assignment.completed_at is None
+        assert not job.notes.exists()
+        assert not job.event_suggestions.exists()
+    else:
+        assert result.job.state == AnalysisJob.State.READY
+        assert result.job.checkpoint["last_ingest_seq"] == 1
+        assert assignment.completed_at is not None
+        assert job.event_suggestions.count() == expected_suggestions
+
+
 def test_manual_rerun_preserves_automatic_assignment_and_result(
     settings,
     monkeypatch,

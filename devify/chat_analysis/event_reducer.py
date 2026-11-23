@@ -164,7 +164,12 @@ def _model_groups(batch, payloads, call_json, *, compact):
 
 
 def prepare_event_reduction(
-    job, suggestions, *, call_json, progress=None, save_progress=None,
+    job,
+    suggestions,
+    *,
+    call_json,
+    progress=None,
+    save_progress=None,
 ):
     """Return a partition of the original suggestions without changing them."""
     suggestions = list(suggestions)

@@ -778,7 +778,10 @@ def _cited_messages(event, by_seq):
             role = str(item.get("role") or "matter").strip().lower()
             roles.append(role or "matter")
         return source_messages, roles
-    for value in event.get("source_seqs") or []:
+    source_seqs = event.get("source_seqs")
+    if not isinstance(source_seqs, (list, tuple)):
+        return source_messages, roles
+    for value in source_seqs:
         try:
             seq = int(value)
         except (TypeError, ValueError):
@@ -941,16 +944,16 @@ def _event_content(title, payload, open_events, cross):
 
 
 def _extract_events(job, messages, payload, language):
-    preferences = (job.specification or {}).get(
-        "chat_analysis_preferences", {}
-    )
+    specification = job.specification or {}
+    preferences = specification.get("chat_analysis_preferences", {})
+    deferred = _defer_event_publication(job)
     conversation = job.conversation
     conversation_title = (
         conversation.title or conversation.identity_key
     )
     prompt = _event_extraction_prompt(language, preferences)
     open_events = _open_events_same_conversation(job.space, conversation)
-    if _defer_event_publication(job):
+    if deferred:
         prior_ids = {
             message.reply_to_id for message in messages if message.reply_to_id
         } | {
@@ -1009,24 +1012,38 @@ def _extract_events(job, messages, payload, language):
     events = output.get("events") if output is not None else None
     if not isinstance(events, list):
         return None
-    if _defer_event_publication(job):
-        allowed = {item["event_key"] for item in open_events + cross}
-        validated = []
-        for event in events:
-            if not isinstance(event, dict):
-                continue
-            action = str(event.get("action") or "create").strip().lower()
-            key = canonical_event_key(event.get("event_key"))
-            if action in ("attach", "drop") and key in allowed:
-                validated.append(
-                    {**event, "action": action, "event_key": key}
-                )
-            elif action != "drop":
-                validated.append(
-                    {**event, "action": "create", "event_key": ""}
-                )
-        return validated
-    return events
+    if not events:
+        return []
+
+    scheduled = specification.get("scheduled_message_scope") is True
+    allowed = {item["event_key"] for item in open_events + cross}
+    by_seq = {message.ingest_seq: message for message in messages}
+    validated = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        action = str(event.get("action") or "create").strip().lower()
+        key = canonical_event_key(event.get("event_key"))
+        if action == "drop":
+            if not deferred:
+                validated.append(event)
+            elif key in allowed:
+                validated.append({**event, "action": action, "event_key": key})
+            continue
+        if not all(
+            isinstance(event.get(field), str) and event[field].strip()
+            for field in ("title", "summary")
+        ):
+            continue
+        if scheduled and not _cited_messages(event, by_seq)[0]:
+            continue
+        if deferred:
+            if action == "attach" and key in allowed:
+                event = {**event, "action": action, "event_key": key}
+            else:
+                event = {**event, "action": "create", "event_key": ""}
+        validated.append(event)
+    return validated or None
 
 
 def _defer_event_publication(job):
@@ -1140,7 +1157,8 @@ def _reduction_progress(
     saved = (job.checkpoint or {}).get("event_reduction", {})
     progress = (
         saved.get("progress")
-        if saved.get("source_ids") == source_ids else None
+        if saved.get("source_ids") == source_ids
+        else None
     )
     started_at = monotonic()
     seconds = (
@@ -1160,7 +1178,8 @@ def _reduction_progress(
             checkpoint = {
                 **locked.checkpoint,
                 "event_reduction": {
-                    "source_ids": source_ids, "progress": value,
+                    "source_ids": source_ids,
+                    "progress": value,
                 },
             }
             if publication:
@@ -1186,7 +1205,8 @@ def _clear_reduction_progress(job):
     checkpoint.pop("event_reduction", None)
     checkpoint.pop("publication_failures", None)
     AnalysisJob.objects.filter(pk=job.pk).update(
-        checkpoint=checkpoint, error="",
+        checkpoint=checkpoint,
+        error="",
     )
     job.checkpoint = checkpoint
     job.error = ""

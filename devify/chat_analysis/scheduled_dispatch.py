@@ -73,31 +73,37 @@ def _retryable_partials():
 
 
 def ensure_due_run(now, schedule=None):
+    """Return the configured round and whether it was newly opened."""
     if schedule is None:
         schedule = getattr(
             settings, "CHAT_ANALYSIS_SCHEDULE", DEFAULT_SCHEDULE
         )
     slot = due_slot(now, schedule)
     if slot is None:
-        return None
-    run = ScheduledAnalysisRun.objects.get_or_create(
+        return None, False
+    run, created = ScheduledAnalysisRun.objects.get_or_create(
         slot=slot, defaults={"boundary": slot_boundary(slot)}
-    )[0]
+    )
     run.boundary = run.boundary.astimezone(UTC)
-    return run
+    return run, created
 
 
+@transaction.atomic
 def dispatch_due_analysis(now=None, schedule=None):
     """Open an hourly round for users with an eligible uploaded backlog.
 
     The slot controls admission. Actual input is selected when the worker
     starts, including uploads received while this user was waiting.
     Each admitted batch stays within its original space.
+    The run and its admitted jobs commit together so retries cannot admit
+    a second batch for the same slot.
     """
     now = now or timezone.now()
-    run = ensure_due_run(now, schedule)
+    run, created = ensure_due_run(now, schedule)
     if run is None:
         return {"jobs": 0}
+    if not created:
+        return {"jobs": 0, "slot": run.slot}
     jobs = 0
     pending = _pending_origins(run.boundary)
     busy = AnalysisJob.objects.filter(

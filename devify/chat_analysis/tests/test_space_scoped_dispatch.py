@@ -151,14 +151,15 @@ def test_admission_rotates_users_before_applying_the_limit(
     rounds = []
     for index in range(2):
         now = first + timedelta(hours=index)
+        schedule = now.astimezone(BEIJING).strftime("%H:%M")
         with (
             patch("django.utils.timezone.now", return_value=now),
             patch("chat_analysis.tasks.execute_analysis_job_task.delay"),
         ):
-            scheduled_dispatch.dispatch_due_analysis(
-                now,
-                now.astimezone(BEIJING).strftime("%H:%M"),
-            )
+            scheduled_dispatch.dispatch_due_analysis(now, schedule)
+            assert scheduled_dispatch.dispatch_due_analysis(
+                now, schedule,
+            )["jobs"] == 0
             jobs = list(
                 AnalysisJob.objects.filter(
                     created_by_id__in=users,
@@ -170,6 +171,9 @@ def test_admission_rotates_users_before_applying_the_limit(
                 execute_analysis_job_task.run(
                     job.pk, worker_id=f"round-{index}"
                 )
+            assert scheduled_dispatch.dispatch_due_analysis(
+                now, schedule,
+            )["jobs"] == 0
     assert rounds[0] == users[:2]
     assert users[2] in rounds[1]
 

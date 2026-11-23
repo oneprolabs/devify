@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from chat_domain.models import Conversation
+from chat_domain.models import Conversation, Message
 from spaces.models import Space
 
 
@@ -793,6 +793,18 @@ class EventSuggestion(models.Model):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+
+class EventParticipantEvidence(models.Model):
+    """One cited participant action or involvement in an event suggestion."""
+
+    suggestion = models.ForeignKey(EventSuggestion, on_delete=models.CASCADE)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE)
+    sender_key = models.CharField(max_length=255)
+    sender_name = models.CharField(max_length=255, blank=True)
+    state = models.CharField(max_length=10)
+    action = models.CharField(max_length=160, blank=True)
+    reference = models.CharField(max_length=64, blank=True)
 
 
 class TopicSubscription(models.Model):

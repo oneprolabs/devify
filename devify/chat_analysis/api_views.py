@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import IntegrityError, transaction
+from django.db.models import Case, When
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
@@ -30,6 +31,12 @@ from chat_analysis.api_serializers import (
     ReportSerializer,
     TopicSubscriptionCreateSerializer,
     TopicSubscriptionSerializer,
+)
+from chat_analysis.event_relevance import event_relevance
+from chat_analysis.event_relevance_queries import (
+    RELEVANCE_LABELS,
+    relevance_counts,
+    with_viewer_relevance,
 )
 from chat_analysis.models import (
     Event,
@@ -98,6 +105,13 @@ def _pagination_data(paginator):
         "next": paginator.get_next_link(),
         "previous": paginator.get_previous_link(),
     }
+
+
+def _event_data(events, user_id):
+    return EventSerializer(
+        events, many=True,
+        context={"event_relevance": event_relevance(events, user_id)},
+    ).data
 
 
 def _editable(actor, instance):
@@ -365,9 +379,27 @@ class SpaceEventListCreateAPIView(APIView):
                     conversation_id
                 )
             ).distinct()
+        relevance = request.query_params.get("viewer_relevance", "").strip()
+        if relevance and relevance not in RELEVANCE_LABELS:
+            return Response(
+                {"detail": "Invalid viewer_relevance."}, status=400
+            )
+        counts = None
+        if relevance or request.query_params.get(
+            "include_relevance_counts"
+        ) == "true":
+            events = with_viewer_relevance(events, request.user.pk)
+            counts = relevance_counts(events)
+            if relevance:
+                events = events.filter(viewer_relevance=relevance)
         paginator = AnalysisPagination()
         page = paginator.paginate_queryset(events, request, view=self)
-        data = EventSerializer(page, many=True).data
+        payload = {
+            "list": _event_data(page, request.user.pk),
+            "pagination": _pagination_data(paginator),
+        }
+        if counts is not None:
+            payload["relevance_counts"] = counts
         if takeover:
             audit_space_action(
                 actor=request.user,
@@ -376,14 +408,7 @@ class SpaceEventListCreateAPIView(APIView):
                 resource_type="event",
                 metadata={"takeover_id": takeover.pk},
             )
-        return Response(
-            {
-                "data": {
-                    "list": data,
-                    "pagination": _pagination_data(paginator),
-                }
-            }
-        )
+        return Response({"data": payload})
 
     @transaction.atomic
     def post(self, request, space_id):
@@ -422,16 +447,23 @@ class EventDetailAPIView(APIView):
         event = Event.objects.prefetch_related("tag_assignments__tag").get(
             pk=event.pk
         )
-        data = EventSerializer(event).data
+        data = _event_data([event], request.user.pk)[0]
         data["note_ids"] = list(
             event.note_links.order_by("id").values_list("note_id", flat=True)
         )
-        data["evidence"] = EventEvidenceSerializer(
+        evidence = (
             event.evidence.filter(message__conversation__space=space)
             .select_related("message")
             .prefetch_related("message__parts")
-            .order_by("message__occurred_at", "id")[:200],
-            many=True,
+        )
+        order = ["message__occurred_at", "id"]
+        evidence_ids = data["viewer_evidence_message_ids"]
+        if evidence_ids:
+            order.insert(0, Case(
+                When(message_id__in=evidence_ids, then=0), default=1,
+            ))
+        data["evidence"] = EventEvidenceSerializer(
+            evidence.order_by(*order)[:200], many=True,
         ).data
         data["relation_ids"] = list(
             EventRelation.objects.filter(space=space)
@@ -481,7 +513,7 @@ class EventDetailAPIView(APIView):
             resource_id=event.pk,
             metadata={"takeover_id": takeover.pk if takeover else None},
         )
-        return Response({"data": EventSerializer(event).data})
+        return Response({"data": _event_data([event], request.user.pk)[0]})
 
     @transaction.atomic
     def delete(self, request, event_id):

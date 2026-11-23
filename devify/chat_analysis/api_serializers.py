@@ -125,6 +125,18 @@ class EventUpdateSerializer(serializers.Serializer):
 
 class EventSerializer(serializers.ModelSerializer):
     tags = serializers.SerializerMethodField()
+    viewer_relevance = serializers.SerializerMethodField()
+    viewer_evidence_message_ids = serializers.SerializerMethodField()
+
+    def get_viewer_relevance(self, obj):
+        return self.context.get("event_relevance", {}).get(
+            obj.pk, ("other", []),
+        )[0]
+
+    def get_viewer_evidence_message_ids(self, obj):
+        return self.context.get("event_relevance", {}).get(
+            obj.pk, ("other", []),
+        )[1]
 
     def get_tags(self, obj):
         assignments = getattr(obj, "_prefetched_objects_cache", {}).get(
@@ -151,6 +163,8 @@ class EventSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "tags",
+            "viewer_relevance",
+            "viewer_evidence_message_ids",
         )
         read_only_fields = fields
 

@@ -11,6 +11,7 @@ from chat_analysis.models import AnalysisJob
 from chat_domain.models import (
     Conversation,
     ConversationAvatar,
+    ConversationIdentity,
     Message,
     MessageOrigin,
     MessagePart,
@@ -18,6 +19,7 @@ from chat_domain.models import (
 )
 from chat_ingestion.models import UploadBatch, UploadItem
 from chat_ingestion.tests.archives import (
+    DEFAULT_CONVERSATIONS,
     DEFAULT_PARTS,
     build_archive,
     default_manifest,
@@ -610,25 +612,40 @@ def test_duplicate_conversation_record_in_one_package_is_rejected():
 
 def test_same_conversation_id_in_another_namespace_merges_into_one():
     owner = User.objects.create_user(username="parse-namespace-owner")
+    member = User.objects.create_user(username="parse-namespace-member")
     space = make_team(owner, slug="parse-namespace-team")
+    SpaceMembership.objects.create(
+        space=space, user=member, role=SpaceMembership.Role.USER,
+    )
     client = auth_client(owner)
 
     first = start_upload(client, space, "parse-ns-1", build_archive())
     assert complete(client, first).status_code == 200
     other_manifest = default_manifest(1, 2, source_namespace="account:other")
+    other_conversations = [
+        {**DEFAULT_CONVERSATIONS[0], "self_sender_key": "wx-other"},
+    ]
+    other_client = auth_client(member)
     second = start_upload(
-        client,
+        other_client,
         space,
         "parse-ns-2",
-        build_archive(manifest=other_manifest),
+        build_archive(
+            manifest=other_manifest, conversations=other_conversations,
+        ),
     )
-    response = complete(client, second)
+    response = complete(other_client, second)
 
     assert response.status_code == 200
     # The account is not part of the conversation identity any more, so the
     # second export lands on the same group and its messages are duplicates.
-    assert Conversation.objects.filter(space=space).count() == 1
-    assert Message.objects.count() == 2
+    conversation = Conversation.objects.get(space=space)
+    assert set(ConversationIdentity.objects.filter(
+        conversation=conversation,
+    ).values_list("user_id", "sender_key")) == {
+        (owner.pk, "wx-self"), (member.pk, "wx-other"),
+    }
+    assert conversation.messages.count() == 2
     second.refresh_from_db()
     assert second.message_count == 0
     assert second.duplicate_count == 2

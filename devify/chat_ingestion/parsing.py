@@ -24,7 +24,12 @@ from chat_domain.avatars import (
     save_sender_avatar,
 )
 from chat_domain.media import media_exists, store_media
-from chat_domain.models import Conversation, Message, MessagePart
+from chat_domain.models import (
+    Conversation,
+    ConversationIdentity,
+    Message,
+    MessagePart,
+)
 from chat_domain.services import (
     apply_message_fingerprints,
     consolidate_conversation_messages,
@@ -269,7 +274,7 @@ def _parse_conversations(batch, manifest, package):
         timezone_name = _string(record, "timezone", where, max_length=64)
         self_sender_key = _string(
             record, "self_sender_key", where, max_length=255
-        )
+        ).strip()
         metadata = _mapping(record, "metadata", where)
 
         result = upsert_conversation(
@@ -284,6 +289,12 @@ def _parse_conversations(batch, manifest, package):
             self_sender_key=self_sender_key,
             metadata=metadata,
         )
+        if self_sender_key:
+            ConversationIdentity.objects.get_or_create(
+                conversation=result.conversation,
+                user_id=batch.uploaded_by_id,
+                sender_key=self_sender_key,
+            )
         conversations[identity] = result.conversation
         if scope_key and scope_key not in conversations:
             conversations[scope_key] = result.conversation

@@ -10,6 +10,7 @@ from chat_analysis.models import (
     Event,
     EventEvidence,
     EventNote,
+    EventParticipantEvidence,
     EventSuggestion,
     EventTag,
     EventTagAssignment,
@@ -55,6 +56,7 @@ def create_event_suggestion(
     status="",
     tags=None,
     source_seqs=None,
+    participant_evidence=None,
 ):
     ensure_can_contribute(actor, note.space)
     canonical_key = canonical_event_key(event_key, title=title)
@@ -62,7 +64,7 @@ def create_event_suggestion(
         canonical_key = canonical_event_key(
             f"{analysis_job.uuid}:{note.pk}:{title}", title=title
         )
-    suggestion, _ = EventSuggestion.objects.get_or_create(
+    suggestion, created = EventSuggestion.objects.get_or_create(
         space=note.space,
         analysis_job=analysis_job,
         note=note,
@@ -79,6 +81,13 @@ def create_event_suggestion(
             "source_seqs": list(source_seqs or []),
         },
     )
+    if created and participant_evidence:
+        EventParticipantEvidence.objects.bulk_create(
+            [
+                EventParticipantEvidence(suggestion=suggestion, **entry)
+                for entry in participant_evidence
+            ]
+        )
     return suggestion
 
 

@@ -629,7 +629,11 @@ def merge_messages(*, source, target):
         part.delete()
 
     # Imported lazily: analysis depends on chat_domain, not the other way.
-    from chat_analysis.models import EventEvidence, NoteEvidence
+    from chat_analysis.models import (
+        EventEvidence,
+        EventParticipantEvidence,
+        NoteEvidence,
+    )
 
     for evidence in list(NoteEvidence.objects.filter(message=source)):
         if NoteEvidence.objects.filter(
@@ -658,6 +662,9 @@ def merge_messages(*, source, target):
         )
         evidence.delete()
 
+    EventParticipantEvidence.objects.filter(message=source).update(
+        message=target,
+    )
     source.delete()
     return target
 

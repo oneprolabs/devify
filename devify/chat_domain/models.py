@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from chat_ingestion.models import UploadItem
@@ -67,6 +68,24 @@ class Conversation(models.Model):
 
     def __str__(self):
         return self.title or self.identity_key
+
+
+class ConversationIdentity(models.Model):
+    """A sender identity declared in a user's completed chat import."""
+
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+    )
+    sender_key = models.CharField(max_length=255)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "conversation", "sender_key"),
+                name="unique_chat_conversation_identity_user_sender",
+            ),
+        ]
 
 
 class Message(models.Model):

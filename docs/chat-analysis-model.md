@@ -36,8 +36,16 @@ The event list accepts `viewer_relevance=my_todo|related|other`. It applies
 the label before pagination. Pass `include_relevance_counts=true` to return
 `data.relevance_counts` without selecting a label. A request with a label
 also returns the three counts. Counts use all events visible to the
-current user that match the status, tag and conversation filters.
-`pagination.total` also applies the selected relevance label.
+current user that match the status, tag and conversation filters, before
+applying the keyword or selected relevance label.
+
+`GET /api/v1/spaces/{space_id}/events` accepts `q` for a case-insensitive
+substring search in the event title or content. The server trims surrounding
+whitespace, ignores an empty query, and returns HTTP 400 for a trimmed query
+longer than 200 Unicode characters. `pagination.total` includes only events
+matching the keyword and selected relevance label. Results are ordered by
+`-last_activity_at, -id`. Every successful event list response includes
+`data.search_supported: true`, including when the list is empty.
 
 The MariaDB migration also gives the new foreign keys database-level
 delete cascades. An older image can then delete a merged message or a

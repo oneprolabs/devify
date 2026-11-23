@@ -120,11 +120,37 @@ def _ensure_lease(job, worker_id, fencing_token):
         )
 
 
+def recover_expired_analysis_job(job, *, now, max_attempts):
+    """Release expired ownership, unless another worker has renewed it."""
+    retry = job.attempts < max_attempts
+    state = AnalysisJob.State.QUEUED if retry else AnalysisJob.State.FAILED
+    error = (
+        "lease_expired: requeued after worker timeout."
+        if retry
+        else "lease_expired: max attempts reached "
+        f"({job.attempts}/{max_attempts})."
+    )
+    updated = AnalysisJob.objects.filter(
+        Q(lease_until__lte=now) | Q(lease_until__isnull=True),
+        pk=job.pk,
+        state=AnalysisJob.State.RUNNING,
+        fencing_token=job.fencing_token,
+    ).update(
+        state=state,
+        error=error,
+        lease_owner="",
+        lease_until=None,
+        updated_at=now,
+    )
+    return state if updated else None
+
+
 def claim_analysis_job(
     job_id,
     *,
     worker_id,
     lease_seconds=DEFAULT_LEASE_SECONDS,
+    max_attempts=DEFAULT_MAX_ATTEMPTS,
 ):
     """Claim a queued job or an expired running job.
 
@@ -134,13 +160,20 @@ def claim_analysis_job(
     """
     if not worker_id:
         raise ValueError("worker_id is required.")
-    now = timezone.now()
     with dispatch_lock():
         job = _lock_job(job_id)
         if job is None:
             return None
+        now = timezone.now()
         if job.state == AnalysisJob.State.RUNNING:
             if job.lease_until and job.lease_until > now:
+                return None
+            recovered = recover_expired_analysis_job(
+                job,
+                now=now,
+                max_attempts=max_attempts,
+            )
+            if recovered != AnalysisJob.State.QUEUED:
                 return None
         elif job.state != AnalysisJob.State.QUEUED:
             return None
@@ -334,6 +367,7 @@ def execute_analysis_job(
         job_id,
         worker_id=worker_id,
         lease_seconds=lease_seconds,
+        max_attempts=max_attempts,
     )
     if job is None:
         return None
@@ -1418,8 +1452,8 @@ def _accept_reduced_group(job, group, event_key):
             updated.save(update_fields=("content", "updated_at"))
 
 
-def _prepare_chunk(job, messages):
-    """Keep model calls and usage tracking outside the result transaction."""
+def _prepare_chunk(job, messages, *, lease_seconds=None):
+    """Call the model outside the write transaction and renew a job lease."""
     if not settings.CHAT_ANALYSIS_LLM_ENABLED or not any(
         _message_texts(message) for message in messages
     ):
@@ -1432,9 +1466,18 @@ def _prepare_chunk(job, messages):
             language,
             (job.specification or {}).get("chat_analysis_preferences"),
         )
+        if lease_seconds is not None:
+            renew_analysis_lease(
+                job,
+                worker_id=job.lease_owner,
+                fencing_token=job.fencing_token,
+                lease_seconds=lease_seconds,
+            )
         events = _extract_events(job, messages, payload, language)
         if summary is None or events is None:
             raise ValueError("The model returned an incomplete result.")
+    except AnalysisLeaseLost:
+        raise
     except Exception:
         logger.exception("LLM chat analysis failed for job %s", job.pk)
         raise RuntimeError("LLM chat analysis failed") from None
@@ -1615,7 +1658,11 @@ def run_rule_based_analysis(
                 origin=Note.Origin.MANUAL,
             ).exists()
         ):
-            summary, events = _prepare_chunk(job, messages)
+            summary, events = _prepare_chunk(
+                job,
+                messages,
+                lease_seconds=lease_seconds,
+            )
         with transaction.atomic():
             locked = _lock_job(job.pk)
             _ensure_lease(locked, job.lease_owner, job.fencing_token)

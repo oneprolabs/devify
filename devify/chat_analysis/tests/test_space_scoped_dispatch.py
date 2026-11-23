@@ -40,7 +40,7 @@ from chat_ingestion.models import UploadBatch
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
-def model_results(job, messages):
+def model_results(job, messages, **_kwargs):
     return {}, [
         {
             "title": f"Case {job.space.slug}",
@@ -360,7 +360,7 @@ def test_finished_reduction_commits_when_last_model_call_exceeds_budget(
     monkeypatch.setattr(
         execution,
         "_prepare_chunk",
-        lambda job, rows: (
+        lambda job, rows, **_kwargs: (
             {},
             [
                 {

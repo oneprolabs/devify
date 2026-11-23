@@ -206,7 +206,9 @@ def test_large_backlog_resumes_without_duplicate_assignments(
     monkeypatch.setattr(
         execution, "_messages_for_model", lambda job, rows: rows
     )
-    monkeypatch.setattr(execution, "_prepare_chunk", lambda *_: ({}, []))
+    monkeypatch.setattr(
+        execution, "_prepare_chunk", lambda *_, **_kwargs: ({}, [])
+    )
     settings.CHAT_ANALYSIS_BATCH_MESSAGES = 250
     job = user_job("large")
     rows = Message.objects.bulk_create(
@@ -359,7 +361,7 @@ def test_reduction_yield_resumes_saved_progress_without_failure_attempts(
     )
     mapped = []
 
-    def extract(job, rows):
+    def extract(job, rows, **_kwargs):
         mapped.append([row.ingest_seq for row in rows])
         return {}, [
             {
@@ -523,7 +525,7 @@ def test_queue_wait_includes_latest_input_and_running_batch_stays_frozen(
     MessageOrigin.objects.filter(message=old).update(created_at=boundary)
     during_execution = []
 
-    def model(_job, _messages):
+    def model(_job, _messages, **_kwargs):
         if not during_execution:
             message = add_message(conversation, 3)
             origin(message, owner, space, "round-during", timezone.now())

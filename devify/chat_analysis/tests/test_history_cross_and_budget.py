@@ -229,7 +229,8 @@ def test_model_failure_keeps_the_assigned_message_unfinished(
         raise RuntimeError("model timeout")
 
     monkeypatch.setattr(
-        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+        "chat_analysis.execution._prepare_chunk",
+        lambda *_args, **_kwargs: (None, None),
     )
     monkeypatch.setattr("chat_analysis.execution._write_chunk_note", fail)
     result = execution.execute_analysis_job(job.pk, worker_id="history-fail")
@@ -483,7 +484,8 @@ def test_token_budget_splits_long_text_and_keeps_a_reply_with_its_parent(
 
     seen = []
     monkeypatch.setattr(
-        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+        "chat_analysis.execution._prepare_chunk",
+        lambda *_args, **_kwargs: (None, None),
     )
     monkeypatch.setattr(
         "chat_analysis.execution._write_chunk_note",

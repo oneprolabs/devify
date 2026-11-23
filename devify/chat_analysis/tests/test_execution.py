@@ -18,6 +18,7 @@ from chat_analysis.services import (
     ChatAnalysisPermissionError,
     create_analysis_job,
     create_note,
+    retry_analysis_job,
 )
 from chat_analysis.tasks import execute_analysis_job_task
 from chat_domain.models import Conversation, Message, MessagePart
@@ -128,6 +129,92 @@ def test_expired_lease_is_reclaimed_and_old_worker_is_fenced():
             fencing_token=first.fencing_token,
             checkpoint={"last_ingest_seq": 1},
         )
+
+
+@pytest.mark.parametrize("max_attempts", [1, execution.DEFAULT_MAX_ATTEMPTS])
+def test_expired_delivery_stops_at_attempt_limit(max_attempts):
+    owner = User.objects.create_user(username="exec-expired-delivery")
+    space = make_space(owner)
+    job = make_job(space, owner, make_conversation(space))
+    claim_analysis_job(job.pk, worker_id="expired")
+    checkpoint = {"last_ingest_seq": 2}
+    AnalysisJob.objects.filter(pk=job.pk).update(
+        lease_until=timezone.now() - timedelta(seconds=1),
+        attempts=max_attempts,
+        checkpoint=checkpoint,
+    )
+    with patch.object(execution, "run_rule_based_analysis") as handler:
+        assert (
+            execute_analysis_job(
+                job.pk,
+                worker_id="redelivery",
+                max_attempts=max_attempts,
+            )
+            is None
+        )
+        handler.assert_not_called()
+    job.refresh_from_db()
+    assert job.state == AnalysisJob.State.FAILED
+    assert job.attempts == max_attempts
+    assert job.checkpoint == checkpoint
+    assert job.lease_until is None
+    assert job.error.startswith("lease_expired: max attempts reached")
+
+    retry_analysis_job(actor=owner, job=job)
+    assert claim_analysis_job(job.pk, worker_id="explicit-retry") is not None
+
+
+@pytest.mark.parametrize("summary_seconds", [160, 300])
+def test_lease_is_checked_between_model_calls(settings, summary_seconds):
+    settings.CHAT_ANALYSIS_LLM_ENABLED = True
+    owner = User.objects.create_user(username="exec-model-lease")
+    space = make_space(owner)
+    conversation = make_conversation(space)
+    add_message(conversation, 1)
+    job = make_job(space, owner, conversation, end_seq=1)
+    now = timezone.now()
+    elapsed = 0
+
+    def summarize(*args, **kwargs):
+        nonlocal elapsed
+        elapsed += summary_seconds
+        return {}
+
+    def extract(*args, **kwargs):
+        nonlocal elapsed
+        elapsed += 160
+        return []
+
+    with (
+        patch(
+            "django.utils.timezone.now",
+            side_effect=lambda: now + timedelta(seconds=elapsed),
+        ),
+        patch.object(
+            execution,
+            "_messages_for_model",
+            return_value=[
+                Message.objects.get(conversation=conversation),
+            ],
+        ),
+        patch.object(execution, "_summarize_note", side_effect=summarize),
+        patch.object(
+            execution, "_extract_events", side_effect=extract
+        ) as call,
+    ):
+        if summary_seconds < 300:
+            result = execute_analysis_job(job.pk, worker_id="live")
+            assert result.job.state == AnalysisJob.State.READY
+            assert result.job.checkpoint["last_ingest_seq"] == 1
+            assert job.notes.count() == 1
+            call.assert_called_once()
+        else:
+            with pytest.raises(AnalysisLeaseLost):
+                execute_analysis_job(job.pk, worker_id="expired")
+            call.assert_not_called()
+            job.refresh_from_db()
+            assert not job.checkpoint
+            assert not job.notes.exists()
 
 
 def test_execution_writes_chunked_notes_with_evidence(monkeypatch):

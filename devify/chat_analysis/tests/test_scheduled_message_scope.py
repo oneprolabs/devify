@@ -57,7 +57,8 @@ def test_scheduled_job_only_analyzes_assigned_messages(monkeypatch, settings):
     ]
     seen = []
     monkeypatch.setattr(
-        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+        "chat_analysis.execution._prepare_chunk",
+        lambda *_args, **_kwargs: (None, None),
     )
     monkeypatch.setattr(
         "chat_analysis.execution._write_chunk_note",
@@ -86,7 +87,8 @@ def test_partial_chunk_is_not_marked_completed(monkeypatch, settings):
     job.save(update_fields=("specification",))
     assignment = AnalysisJobMessage.objects.create(job=job, message=message)
     monkeypatch.setattr(
-        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+        "chat_analysis.execution._prepare_chunk",
+        lambda *_args, **_kwargs: (None, None),
     )
     monkeypatch.setattr(
         "chat_analysis.execution._write_chunk_note",
@@ -134,7 +136,8 @@ def test_model_window_keeps_the_rest_for_the_next_pass(monkeypatch, settings):
 
     monkeypatch.setattr("chat_analysis.execution._messages_for_model", prefix)
     monkeypatch.setattr(
-        "chat_analysis.execution._prepare_chunk", lambda *_args: (None, None)
+        "chat_analysis.execution._prepare_chunk",
+        lambda *_args, **_kwargs: (None, None),
     )
     monkeypatch.setattr(
         "chat_analysis.execution._write_chunk_note",

@@ -245,7 +245,7 @@ def test_completed_batch_boundary_is_shared_across_groups(
     )
     job = schedule_user(owner.pk, timezone.now(), dispatch=False)
 
-    def complete_during_analysis(_job, _messages):
+    def complete_during_analysis(_job, _messages, **_kwargs):
         UploadBatch.objects.filter(pk=batch.pk).update(
             status=UploadBatch.Status.COMPLETED,
             completed_at=timezone.now(),
@@ -411,7 +411,7 @@ def test_repaired_text_rewinds_partial_cursor_without_replaying_completed(
     )
     seen = []
 
-    def extract(_job, rows):
+    def extract(_job, rows, **_kwargs):
         seen.extend(row.pk for row in rows)
         return {}, []
 
@@ -453,7 +453,7 @@ def test_publication_failure_or_budget_waits_until_next_hour(
     monkeypatch.setattr(
         execution,
         "_prepare_chunk",
-        lambda *_: (
+        lambda *_, **_kwargs: (
             {},
             [
                 {
@@ -500,7 +500,9 @@ def test_unclaimed_followup_refreshes_batches_when_it_eventually_starts(
     monkeypatch.setattr(
         execution, "_messages_for_model", lambda job, rows: rows
     )
-    monkeypatch.setattr(execution, "_prepare_chunk", lambda *_: ({}, []))
+    monkeypatch.setattr(
+        execution, "_prepare_chunk", lambda *_, **_kwargs: ({}, [])
+    )
     base = user_job("followup-wait")
     owner, space, conversation = base.created_by, base.space, base.conversation
     base.delete()
@@ -649,7 +651,9 @@ def test_manual_rerun_preserves_automatic_assignment_and_result(
     monkeypatch.setattr(
         execution, "_messages_for_model", lambda job, rows: rows
     )
-    monkeypatch.setattr(execution, "_prepare_chunk", lambda *_: ({}, []))
+    monkeypatch.setattr(
+        execution, "_prepare_chunk", lambda *_, **_kwargs: ({}, [])
+    )
     execution.execute_analysis_job(old.pk, worker_id="automatic")
     original_note = old.notes.get()
     original_content = original_note.content

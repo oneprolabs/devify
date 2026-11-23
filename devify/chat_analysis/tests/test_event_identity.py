@@ -348,7 +348,7 @@ def test_scheduled_reduction_reuses_candidates_after_failure(
         execution, "_messages_for_model", lambda job, messages: messages[:1],
     )
 
-    def map_chunk(job, messages):
+    def map_chunk(job, messages, **_kwargs):
         seq = messages[0].ingest_seq
         mapped.append(seq)
         return {}, [{
@@ -466,7 +466,7 @@ def test_scheduled_slot_reduces_two_conversations_together(
         AnalysisJobMessage.objects.create(job=job, message=message)
         jobs.append(job)
 
-    def extract(job, messages):
+    def extract(job, messages, **_kwargs):
         return {}, [{
             "title": job.conversation.title,
             "summary": execution._message_texts(messages[0])[0],

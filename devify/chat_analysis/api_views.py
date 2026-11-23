@@ -1,7 +1,7 @@
 import uuid
 
 from django.db import IntegrityError, transaction
-from django.db.models import Case, When
+from django.db.models import Case, Q, When
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
@@ -347,6 +347,7 @@ class NoteEvidenceAPIView(APIView):
 
 class SpaceEventListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
+    max_query_length = 200
 
     def get(self, request, space_id):
         space, takeover = _authorized_space(request.user, space_id)
@@ -384,19 +385,28 @@ class SpaceEventListCreateAPIView(APIView):
             return Response(
                 {"detail": "Invalid viewer_relevance."}, status=400
             )
+        query = request.query_params.get("q", "").strip()
+        if len(query) > self.max_query_length:
+            detail = f"q must be at most {self.max_query_length} characters."
+            return Response({"detail": detail}, status=400)
         counts = None
         if relevance or request.query_params.get(
             "include_relevance_counts"
         ) == "true":
             events = with_viewer_relevance(events, request.user.pk)
             counts = relevance_counts(events)
-            if relevance:
-                events = events.filter(viewer_relevance=relevance)
+        if query:
+            events = events.filter(
+                Q(title__icontains=query) | Q(content__icontains=query)
+            )
+        if relevance:
+            events = events.filter(viewer_relevance=relevance)
         paginator = AnalysisPagination()
         page = paginator.paginate_queryset(events, request, view=self)
         payload = {
             "list": _event_data(page, request.user.pk),
             "pagination": _pagination_data(paginator),
+            "search_supported": True,
         }
         if counts is not None:
             payload["relevance_counts"] = counts

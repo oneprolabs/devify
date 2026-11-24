@@ -5,14 +5,12 @@ from django.db.models.functions import Collate
 from django.db.models.lookups import Exact
 
 from chat_analysis.event_relevance import legacy_identity_origins
-
 from chat_analysis.models import (
     EventEvidence,
     EventParticipantEvidence,
     EventSuggestion,
 )
 from chat_domain.models import ConversationIdentity
-
 
 RELEVANCE_LABELS = ("my_todo", "related", "other")
 

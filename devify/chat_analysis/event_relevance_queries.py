@@ -5,15 +5,12 @@ from django.db.models.functions import Collate
 from django.db.models.lookups import Exact
 
 from chat_analysis.event_relevance import legacy_identity_origins
-
 from chat_analysis.models import (
-    Event,
     EventEvidence,
     EventParticipantEvidence,
     EventSuggestion,
 )
 from chat_domain.models import ConversationIdentity
-
 
 RELEVANCE_LABELS = ("my_todo", "related", "other")
 
@@ -52,12 +49,9 @@ def with_viewer_relevance(events, user_id):
         message__orphaned_at__isnull=True,
     )
     updates = evidence.filter(suggestion__event_id=OuterRef("pk"))
-    completed = evidence.filter(
-        suggestion__event_id=OuterRef("suggestion__event_id"),
-        reference=OuterRef("reference"),
-        state="done",
+    responsibilities = updates.filter(
+        Q(state="open") | (Q(state="done") & ~Q(reference="")),
     )
-    pending = updates.filter(~Exists(completed), state="open")
     participation = EventEvidence.objects.filter(
         _viewer_identity(user_id, "message__sender_key"),
         event_id=OuterRef("pk"),
@@ -65,10 +59,7 @@ def with_viewer_relevance(events, user_id):
     )
     return events.annotate(
         viewer_relevance=Case(
-            When(
-                ~Q(status=Event.Status.DONE) & Q(Exists(pending)),
-                then=Value("my_todo"),
-            ),
+            When(Exists(responsibilities), then=Value("my_todo")),
             When(
                 Q(Exists(updates)) | Q(Exists(participation)),
                 then=Value("related"),

@@ -207,7 +207,7 @@ def test_viewer_labels_follow_individual_evidence_and_completion(
     }
     data = read_event(alice, event)
     assert data["status"] == "in_progress"
-    assert data["viewer_relevance"] == "related"
+    assert data["viewer_relevance"] == "my_todo"
     assert finished.pk in data["viewer_evidence_message_ids"]
     assert read_event(bob, event)["viewer_relevance"] == "my_todo"
     assert EventParticipantEvidence.objects.filter(
@@ -219,7 +219,7 @@ def test_viewer_labels_follow_individual_evidence_and_completion(
     path = f"/api/v1/spaces/{space.pk}/events"
     response = client.get(path)
     assert response.status_code == 200
-    assert response.data["data"]["list"][0]["viewer_relevance"] == "related"
+    assert response.data["data"]["list"][0]["viewer_relevance"] == "my_todo"
     assert "relevance_counts" not in response.data["data"]
 
     unrelated = Event.objects.create(
@@ -231,7 +231,7 @@ def test_viewer_labels_follow_individual_evidence_and_completion(
         status=Event.Status.OPEN,
         last_activity_at=timezone.now(),
     )
-    expected_counts = {"my_todo": 0, "related": 1, "other": 1}
+    expected_counts = {"my_todo": 1, "related": 0, "other": 1}
     response = client.get(path, {
         "page_size": 1, "include_relevance_counts": "true",
     })
@@ -241,7 +241,7 @@ def test_viewer_labels_follow_individual_evidence_and_completion(
     assert response.data["data"]["relevance_counts"] == expected_counts
 
     response = client.get(path, {
-        "page_size": 1, "viewer_relevance": "related",
+        "page_size": 1, "viewer_relevance": "my_todo",
     })
     assert response.status_code == 200
     assert response.data["data"]["pagination"]["total"] == 1
@@ -268,6 +268,40 @@ def test_viewer_labels_follow_individual_evidence_and_completion(
     assert response.data["data"]["relevance_counts"] == {
         "my_todo": 1, "related": 0, "other": 0,
     }
+
+    client.force_authenticate(user=owner)
+    detail_path = f"/api/v1/events/{event.pk}"
+    response = client.patch(detail_path, {"status": "done"}, format="json")
+    assert response.status_code == 200
+    for user, label in (
+        (alice, "my_todo"), (bob, "my_todo"), (carol, "related"),
+        (observer, "other"),
+    ):
+        detail = read_event(user, event)
+        assert detail["viewer_relevance"] == label
+        client.force_authenticate(user=user)
+        response = client.get(path, {
+            "status": "done", "viewer_relevance": label,
+        })
+        assert response.status_code == 200
+        data = response.data["data"]
+        assert data["completion_filter_supported"] is True
+        assert [row["id"] for row in data["list"]] == [event.pk]
+        assert data["list"][0]["viewer_relevance"] == label
+        assert data["list"][0]["viewer_evidence_message_ids"] == (
+            detail["viewer_evidence_message_ids"]
+        )
+        assert data["relevance_counts"][label] == 1
+
+    client.force_authenticate(user=owner)
+    response = client.patch(detail_path, {"status": "open"}, format="json")
+    assert response.status_code == 200
+    client.force_authenticate(user=alice)
+    response = client.get(path, {
+        "status": "unfinished", "viewer_relevance": "my_todo",
+    })
+    assert response.status_code == 200
+    assert [row["id"] for row in response.data["data"]["list"]] == [event.pk]
 
     duplicate = named_message(
         chat, 6, "I sent the quote. Bob still needs to confirm.", "Alice",
@@ -597,7 +631,6 @@ def test_direct_address_requires_two_distinct_participants(
         ).count()
         == 1
     )
-
 
 
 def test_database_cascades_allow_deletes_by_pre_relevance_workers():

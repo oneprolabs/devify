@@ -15,7 +15,7 @@ The event list and detail responses include two viewer-specific fields.
 
 | Field | Meaning |
 | --- | --- |
-| `viewer_relevance` | `my_todo` when the viewer has an explicit unfinished action, `related` when there is evidence of involvement, or `other` when there is insufficient evidence |
+| `viewer_relevance` | `my_todo` when the viewer has explicit responsibility for an action, including a completed action linked to its assignment, `related` when there is evidence of involvement, or `other` when there is insufficient evidence |
 | `viewer_evidence_message_ids` | Original message IDs that support the returned label, available in the event detail's `evidence` list |
 
 Event `status` still describes progress on the shared event. Use both fields
@@ -37,7 +37,10 @@ the label before pagination. Pass `include_relevance_counts=true` to return
 `data.relevance_counts` without selecting a label. A request with a label
 also returns the three counts. Counts use all events visible to the
 current user that match the status, tag and conversation filters, before
-applying the keyword or selected relevance label.
+applying the keyword or selected relevance label. Use
+`status=unfinished` for `open` and `in_progress` together, `status=done`
+for completed events, or omit status for all events. Every successful event
+list response includes `data.completion_filter_supported: true`.
 
 `GET /api/v1/spaces/{space_id}/events` accepts `q` for a case-insensitive
 substring search in the event title or content. The server trims surrounding

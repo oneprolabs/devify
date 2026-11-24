@@ -7,7 +7,6 @@ from hashlib import sha256
 from django.db.models import F, Q
 
 from chat_analysis.models import (
-    Event,
     EventEvidence,
     EventParticipantEvidence,
     EventSuggestion,
@@ -431,13 +430,15 @@ def event_relevance(events, user_id):
     result = {}
     for event in events:
         items = updates[event.pk]
-        pending = (
-            _open_actions(items) if event.status != Event.Status.DONE else {}
-        )
-        if pending:
-            ids = list(
-                dict.fromkeys(item["message_id"] for item in pending.values())
-            )
+        # A resolution retains the reference of the original assignment.
+        responsibility_ids = [
+            item["message_id"]
+            for item in items
+            if item["state"] == "open"
+            or (item["state"] == "done" and item["reference"])
+        ]
+        if responsibility_ids:
+            ids = list(dict.fromkeys(responsibility_ids))
             result[event.pk] = ("my_todo", ids[:MAX_VIEWER_EVIDENCE])
             continue
         ids = list(

@@ -98,6 +98,7 @@ def test_keyword_search_treats_unicode_and_wildcards_as_text(event_list):
     assert data["list"] == []
     assert data["pagination"]["total"] == 0
     assert data["search_supported"] is True
+    assert data["completion_filter_supported"] is True
 
     unfiltered = client.get(path).json()["data"]
     for query in ("", "\t \u3000"):
@@ -140,7 +141,7 @@ def test_keyword_search_keeps_scoped_badges_and_filters_before_page_two(
         last_activity_at=now,
     )
     second = create_event(
-        space, "second", "Test release", status=Event.Status.OPEN,
+        space, "second", "Test release", status=Event.Status.IN_PROGRESS,
         last_activity_at=now,
     )
     nonmatch = create_event(
@@ -152,6 +153,11 @@ def test_keyword_search_keeps_scoped_badges_and_filters_before_page_two(
     )
     done = create_event(
         space, "done", "Release plan", status=Event.Status.DONE,
+        last_activity_at=now,
+    )
+    earlier_done = create_event(
+        space, "earlier-done", "Release checklist", status=Event.Status.DONE,
+        last_activity_at=now - timedelta(days=1),
     )
     untagged = create_event(
         space, "untagged", "Release calendar", status=Event.Status.OPEN,
@@ -159,17 +165,18 @@ def test_keyword_search_keeps_scoped_badges_and_filters_before_page_two(
     unlinked = create_event(
         space, "unlinked", "Release review", status=Event.Status.OPEN,
     )
-    for event in (first, second, nonmatch, related, done, untagged):
+    scoped = (first, second, nonmatch, related, done, earlier_done)
+    for event in (*scoped, untagged):
         EventNote.objects.create(event=event, note=note, created_by=owner)
-    for event in (first, second, nonmatch, related, done, unlinked):
+    for event in (*scoped, unlinked):
         EventTagAssignment.objects.create(
             event=event, tag=tag, created_by=owner,
         )
-    for event in (first, second, nonmatch, related):
+    for event in scoped:
         EventEvidence.objects.create(
             event=event, message=message, created_by=owner,
         )
-    for event in (first, second, nonmatch):
+    for event in (first, second, nonmatch, done, earlier_done):
         suggestion = EventSuggestion.objects.create(
             space=space, analysis_job=job, note=note, event=event,
             event_key=event.event_key, title=event.title,
@@ -181,7 +188,8 @@ def test_keyword_search_keeps_scoped_badges_and_filters_before_page_two(
         )
 
     scope = {
-        "conversation_id": chat.pk, "status": "open", "tag_key": "planned",
+        "conversation_id": chat.pk, "status": "unfinished",
+        "tag_key": "planned",
         "q": "release",
     }
     expected_counts = {"my_todo": 3, "related": 1, "other": 0}
@@ -207,6 +215,19 @@ def test_keyword_search_keeps_scoped_badges_and_filters_before_page_two(
     assert data["pagination"]["total"] == 2
     assert data["relevance_counts"] == expected_counts
     assert [row["id"] for row in data["list"]] == [first.pk]
+
+    response = client.get(path, {
+        **scope, "status": "done", "viewer_relevance": "my_todo",
+        "page_size": 1, "page": 2,
+    })
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["pagination"]["total"] == 2
+    assert data["pagination"]["page"] == 2
+    assert data["relevance_counts"] == {
+        "my_todo": 2, "related": 0, "other": 0,
+    }
+    assert [row["id"] for row in data["list"]] == [earlier_done.pk]
 
 
 def test_keyword_search_respects_private_space_and_takeover_audit():

@@ -359,7 +359,11 @@ class SpaceEventListCreateAPIView(APIView):
             .order_by("-last_activity_at", "-id")
         )
         state = request.query_params.get("status")
-        if state:
+        if state == "unfinished":
+            events = events.filter(
+                status__in=(Event.Status.OPEN, Event.Status.IN_PROGRESS)
+            )
+        elif state:
             events = events.filter(status=state)
         tag_key = request.query_params.get("tag_key", "").strip()
         if tag_key:
@@ -407,6 +411,7 @@ class SpaceEventListCreateAPIView(APIView):
             "list": _event_data(page, request.user.pk),
             "pagination": _pagination_data(paginator),
             "search_supported": True,
+            "completion_filter_supported": True,
         }
         if counts is not None:
             payload["relevance_counts"] = counts

@@ -2,7 +2,9 @@
 
 import json
 import uuid
+from urllib.parse import urlsplit
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -51,6 +53,24 @@ def summary_space(user, space_id, *, write=False):
     return space
 
 
+def summary_server_origin(request):
+    """Recover the HTTPS origin when a same-host proxy reports HTTP."""
+    origin = request.build_absolute_uri("/").rstrip("/")
+    if request.is_secure():
+        return origin
+
+    try:
+        frontend = urlsplit(settings.FRONTEND_URL)
+    except ValueError:
+        return origin
+
+    if frontend.scheme == "https" and (
+        frontend.netloc.lower() == request.get_host().lower()
+    ):
+        return f"https://{frontend.netloc}"
+    return origin
+
+
 class SummaryConfiguration(APIView):
     """Initialize a desktop catalog or revalidate its scoped ETag."""
 
@@ -62,7 +82,7 @@ class SummaryConfiguration(APIView):
         if request.query_params.get("schema_version") != "1":
             raise ValidationError("Unsupported summary configuration schema.")
         data = build_configuration(
-            request.user, space, request.build_absolute_uri("/").rstrip("/")
+            request.user, space, summary_server_origin(request)
         )
         digest = sha256(json.dumps(data, sort_keys=True, ensure_ascii=False))
         etag = f'"{digest}"'

@@ -19,6 +19,7 @@ URL = (
 def config_api(settings):
     settings.ALLOWED_HOSTS = ["*"]
     settings.CHAT_ANALYSIS_MODEL_INPUT_TOKENS = 12000
+    settings.FRONTEND_URL = ""
     with (
         patch.object(views, "summary_space") as access,
         patch.object(configuration, "build_entitlements") as grants,
@@ -150,3 +151,57 @@ def test_longer_template_reduces_content_allowance_without_truncation():
     long = configuration.input_budget(3000, "资料" * 10, 64)
     assert short["max_content_bytes"] - long["max_content_bytes"] == 54
     assert configuration.input_budget(1, "资料", 64)["max_content_bytes"] == 0
+
+
+def test_forwarded_https_header_sets_https_scope_server(config_api):
+    response = config_api.fetch(
+        HTTP_HOST="app.aimychats.com",
+        HTTP_X_FORWARDED_PROTO="https",
+    )
+    assert response.status_code == 200
+    assert (
+        response.data["data"]["scope"]["server"]
+        == "https://app.aimychats.com"
+    )
+
+
+def test_matching_https_frontend_corrects_scope_and_updates_etag(
+    config_api, settings
+):
+    http_response = config_api.fetch(HTTP_HOST="app.aimychats.com")
+    assert (
+        http_response.data["data"]["scope"]["server"]
+        == "http://app.aimychats.com"
+    )
+    settings.FRONTEND_URL = "https://app.aimychats.com/chat/"
+    response = config_api.fetch(
+        HTTP_HOST="internal-api:8000",
+        HTTP_X_FORWARDED_HOST="app.aimychats.com",
+        HTTP_IF_NONE_MATCH=http_response["ETag"],
+    )
+    assert response.status_code == 200
+    assert (
+        response.data["data"]["scope"]["server"]
+        == "https://app.aimychats.com"
+    )
+    assert response["ETag"] != http_response["ETag"]
+
+
+@pytest.mark.parametrize(
+    "frontend_url",
+    [
+        "",
+        "http://app.aimychats.com",
+        "https://frontend.example.com",
+        "https://app.aimychats.com:8443",
+        "https://[invalid",
+    ],
+)
+def test_scope_keeps_request_origin(config_api, settings, frontend_url):
+    settings.FRONTEND_URL = frontend_url
+    response = config_api.fetch(HTTP_HOST="app.aimychats.com")
+    assert response.status_code == 200
+    assert (
+        response.data["data"]["scope"]["server"]
+        == "http://app.aimychats.com"
+    )

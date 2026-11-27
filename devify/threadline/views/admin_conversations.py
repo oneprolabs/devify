@@ -6,7 +6,8 @@ from __future__ import annotations
 
 from datetime import datetime, time as dt_time
 
-from django.db.models import Count, Q
+from django.db.models import CharField, Count, Q
+from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from drf_spectacular.utils import extend_schema
@@ -66,10 +67,14 @@ def _get_conversation(uuid):
 
 
 def _apply_email_filters(queryset, conversation):
-    """Filter task executions linked to a conversation via metadata context."""
-    email_filters = Q(metadata__context__email_id=str(conversation.id))
-    email_filters |= Q(metadata__context__email_id=conversation.id)
-    return queryset.filter(email_filters)
+    """Use the indexed conversation key on the AgentCore task table."""
+    return queryset.alias(
+        email_key=RawSQL(
+            "`agentcore_task_execution`.`threadline_email_key`",
+            (),
+            output_field=CharField(max_length=20),
+        ),
+    ).filter(email_key=str(conversation.pk))
 
 
 class AdminConversationListAPIView(APIView):

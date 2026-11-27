@@ -20,6 +20,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.services.desktop_session import record_activity
 from billing.entitlements import can_use_chat_summary
 from chat_analysis.models import ChatSummary
 from chat_analysis.summaries.configuration import build_configuration
@@ -224,6 +225,7 @@ class SummaryList(APIView):
             message_count=len(messages),
             **values,
         )
+        record_activity(request.auth)
         transaction.on_commit(lambda: dispatch(summary))
         return Response({"data": SummaryOutput(summary).data}, status=202)
 

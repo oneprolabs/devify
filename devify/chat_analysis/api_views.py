@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.services.desktop_session import record_activity
 from chat_analysis.api_serializers import (
     EventCreateSerializer,
     EventEvidenceSerializer,
@@ -528,6 +529,7 @@ class EventDetailAPIView(APIView):
             resource_id=event.pk,
             metadata={"takeover_id": takeover.pk if takeover else None},
         )
+        record_activity(request.auth)
         return Response({"data": _event_data([event], request.user.pk)[0]})
 
     @transaction.atomic

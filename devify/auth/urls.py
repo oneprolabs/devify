@@ -27,6 +27,10 @@ from accounts.views.desktop_auth import (
     DesktopDeviceRevokeAPIView,
     DesktopTokenAPIView,
 )
+from accounts.views.desktop_session import (
+    DesktopSessionAPIView,
+    DesktopSessionRefreshAPIView,
+)
 
 
 class CustomLoginView(LoginView):
@@ -67,6 +71,16 @@ urlpatterns = [
         "api/v1/auth/desktop/devices/<str:device_id>",
         DesktopDeviceRevokeAPIView.as_view(),
         name="desktop_device_revoke",
+    ),
+    path(
+        "api/v1/auth/desktop/session",
+        DesktopSessionAPIView.as_view(),
+        name="desktop_session",
+    ),
+    path(
+        "api/v1/auth/desktop/session/refresh",
+        DesktopSessionRefreshAPIView.as_view(),
+        name="desktop_session_refresh",
     ),
     # Get or update user details
     path(

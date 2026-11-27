@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import DesktopAuthorizationCode, DesktopDevice
+from accounts.services.desktop_session import revoke_device
 from accounts.utils import default_device_label
 from chat_analysis.summaries.configuration import prompt_metadata
 
@@ -223,9 +224,11 @@ class DesktopDeviceListAPIView(APIView):
         label = str(request.data.get("label", "")).strip()[:120]
         platform = str(request.data.get("platform", "")).strip()[:40]
         if device_id:
-            device = DesktopDevice.objects.filter(
-                user=request.user, device_id=device_id
-            ).first()
+            device = (
+                DesktopDevice.objects.select_for_update()
+                .filter(user=request.user, device_id=device_id)
+                .first()
+            )
             if (
                 device is not None
                 and device.status == DesktopDevice.Status.REVOKED
@@ -238,7 +241,8 @@ class DesktopDeviceListAPIView(APIView):
             # Adopt a row created before the client sent a label or platform,
             # so upgrading does not leave a stale "设备 xxxx" entry behind.
             device = (
-                DesktopDevice.objects.filter(
+                DesktopDevice.objects.select_for_update()
+                .filter(
                     user=request.user,
                     status=DesktopDevice.Status.ACTIVE,
                     label="",
@@ -294,14 +298,6 @@ class DesktopDeviceRevokeAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, device_id):
-        updated = DesktopDevice.objects.filter(
-            user=request.user,
-            device_id=device_id,
-            status=DesktopDevice.Status.ACTIVE,
-        ).update(
-            status=DesktopDevice.Status.REVOKED,
-            revoked_at=timezone.now(),
-        )
-        if not updated:
+        if not revoke_device(request.user, device_id):
             return Response({"detail": "Device not found."}, status=404)
         return Response(status=204)

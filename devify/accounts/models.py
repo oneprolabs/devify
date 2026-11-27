@@ -172,3 +172,13 @@ class DesktopDevice(models.Model):
             )
         ]
         indexes = [models.Index(fields=("user", "status", "last_seen_at"))]
+
+
+class DesktopSession(models.Model):
+    device = models.OneToOneField(
+        DesktopDevice, on_delete=models.CASCADE, related_name="login_session"
+    )
+    session_id = models.CharField(max_length=32, unique=True)
+    secret_hash = models.CharField(max_length=64, unique=True)
+    last_active_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)

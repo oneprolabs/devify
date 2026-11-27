@@ -2,13 +2,13 @@
 import uuid
 
 import pytest
+from agentcore_task.adapters.django.models import TaskExecution
+from agentcore_task.adapters.django.services import register_task_execution
 from django.contrib.auth.models import User
 from django.db import connection
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from agentcore_task.adapters.django.models import TaskExecution
-from agentcore_task.adapters.django.services import register_task_execution
 from threadline.models import EmailMessage
 
 
@@ -56,7 +56,9 @@ def conversation(threadline_user):
 @pytest.mark.django_db
 @pytest.mark.integration
 class TestAdminConversationAPI:
-    def test_list_returns_conversations_with_user(self, staff_client, conversation):
+    def test_list_returns_conversations_with_user(
+        self, staff_client, conversation
+    ):
         response = staff_client.get("/api/v1/admin/threadline/conversations/")
 
         assert response.status_code == 200
@@ -70,7 +72,9 @@ class TestAdminConversationAPI:
         assert row["user"]["id"] == conversation.user_id
         assert row["user_display"] == conversation.user.username
 
-    def test_detail_returns_full_conversation(self, staff_client, conversation):
+    def test_detail_returns_full_conversation(
+        self, staff_client, conversation
+    ):
         response = staff_client.get(
             f"/api/v1/admin/threadline/conversations/{conversation.uuid}/"
         )
@@ -98,7 +102,8 @@ class TestAdminConversationAPI:
         )
 
         response = staff_client.get(
-            f"/api/v1/admin/threadline/conversations/{conversation.uuid}/tasks/"
+            "/api/v1/admin/threadline/conversations/"
+            f"{conversation.uuid}/tasks/"
         )
 
         assert response.status_code == 200
@@ -123,7 +128,8 @@ class TestAdminConversationAPI:
         )
 
         response = staff_client.get(
-            f"/api/v1/admin/threadline/conversations/{conversation.uuid}/tasks/{task.id}/"
+            "/api/v1/admin/threadline/conversations/"
+            f"{conversation.uuid}/tasks/{task.id}/"
         )
 
         assert response.status_code == 200

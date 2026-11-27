@@ -4,8 +4,13 @@ Admin-only conversation management views.
 
 from __future__ import annotations
 
-from datetime import datetime, time as dt_time
+from datetime import datetime
+from datetime import time as dt_time
 
+from agentcore_task.adapters.django.models import TaskExecution
+from agentcore_task.adapters.django.serializers import (
+    TaskExecutionSerializer,
+)
 from django.db.models import CharField, Count, Q
 from django.db.models.expressions import RawSQL
 from django.utils import timezone
@@ -16,10 +21,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.swagger import error_response, pagination_response, response
-from agentcore_task.adapters.django.models import TaskExecution
-from agentcore_task.adapters.django.serializers import (
-    TaskExecutionSerializer,
-)
 from expense.models import Invoice
 from threadline.models import EmailMessage
 from threadline.serializers import (
@@ -105,7 +106,9 @@ class AdminConversationListAPIView(APIView):
     @extend_schema(
         operation_id="admin_threadline_conversations_list",
         summary="List admin threadline conversations",
-        description="List all threadline messages with user and relay context.",
+        description=(
+            "List all threadline messages with user and relay context."
+        ),
         responses={
             200: pagination_response(AdminConversationListSerializer),
             401: error_response(),
@@ -117,7 +120,7 @@ class AdminConversationListAPIView(APIView):
 
         search = (request.query_params.get("search") or "").strip()
         if search:
-            for keyword in [part for part in search.replace(",", " ").split() if part]:
+            for keyword in search.replace(",", " ").split():
                 queryset = queryset.filter(
                     Q(subject__icontains=keyword)
                     | Q(sender__icontains=keyword)
@@ -151,7 +154,9 @@ class AdminConversationListAPIView(APIView):
             end_date=request.query_params.get("end_date"),
         )
 
-        ordering = (request.query_params.get("ordering") or "-received_at").strip()
+        ordering = (
+            request.query_params.get("ordering") or "-received_at"
+        ).strip()
         allowed_ordering = {
             "received_at",
             "-received_at",
@@ -167,7 +172,9 @@ class AdminConversationListAPIView(APIView):
         queryset = queryset.order_by(ordering, "-id")
 
         try:
-            page_size = min(int(request.query_params.get("page_size", 20)), 100)
+            page_size = min(
+                int(request.query_params.get("page_size", 20)), 100
+            )
         except (TypeError, ValueError):
             page_size = 20
         try:
@@ -250,7 +257,11 @@ class AdminConversationDetailAPIView(APIView):
         )
         if not message:
             return Response(
-                {"code": 404, "message": "Conversation not found", "data": None},
+                {
+                    "code": 404,
+                    "message": "Conversation not found",
+                    "data": None,
+                },
                 status=404,
             )
         serializer = EmailMessageSerializer(
@@ -291,7 +302,11 @@ class AdminConversationTasksAPIView(APIView):
         conversation = _get_conversation(uuid)
         if not conversation:
             return Response(
-                {"code": 404, "message": "Conversation not found", "data": None},
+                {
+                    "code": 404,
+                    "message": "Conversation not found",
+                    "data": None,
+                },
                 status=404,
             )
 
@@ -309,7 +324,9 @@ class AdminConversationTasksAPIView(APIView):
         queryset = queryset.order_by("-created_at", "-id")
 
         try:
-            page_size = min(int(request.query_params.get("page_size", 20)), 100)
+            page_size = min(
+                int(request.query_params.get("page_size", 20)), 100
+            )
         except (TypeError, ValueError):
             page_size = 20
         try:
@@ -330,7 +347,9 @@ class AdminConversationTasksAPIView(APIView):
         return Response(
             {
                 "code": 200,
-                "message": "Conversation task executions retrieved successfully",
+                "message": (
+                    "Conversation task executions retrieved successfully"
+                ),
                 "data": {
                     "list": serializer.data,
                     "pagination": {
@@ -366,7 +385,10 @@ class AdminConversationTaskDetailAPIView(APIView):
     @extend_schema(
         operation_id="admin_threadline_conversation_task_detail",
         summary="Retrieve admin task execution for conversation",
-        description="Get the full task execution details for one task linked to a threadline message.",
+        description=(
+            "Get the full task execution details for one task linked to a "
+            "threadline message."
+        ),
         responses={
             200: response(TaskExecutionSerializer),
             401: error_response(),
@@ -378,7 +400,11 @@ class AdminConversationTaskDetailAPIView(APIView):
         conversation = _get_conversation(uuid)
         if not conversation:
             return Response(
-                {"code": 404, "message": "Conversation not found", "data": None},
+                {
+                    "code": 404,
+                    "message": "Conversation not found",
+                    "data": None,
+                },
                 status=404,
             )
 
@@ -400,7 +426,9 @@ class AdminConversationTaskDetailAPIView(APIView):
         return Response(
             {
                 "code": 200,
-                "message": "Conversation task execution retrieved successfully",
+                "message": (
+                    "Conversation task execution retrieved successfully"
+                ),
                 "data": serializer.data,
             }
         )

@@ -2,11 +2,18 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from accounts.models import DesktopDevice
+from accounts.services.desktop_session import SESSION_CLAIM, session_is_valid
 
 
 class DeviceAwareJWTAuthentication(JWTAuthentication):
     def get_user(self, validated_token):
         user = super().get_user(validated_token)
+        if SESSION_CLAIM in validated_token:
+            if not session_is_valid(user, validated_token):
+                raise AuthenticationFailed(
+                    "This desktop session is no longer authorized."
+                )
+            return user
         device_id = validated_token.get("device_id")
         if device_id:
             # A missing row means the device was never registered (older
